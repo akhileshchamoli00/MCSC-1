@@ -4,13 +4,9 @@ import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useLanguage } from "@/contexts/language-context"
 import { translations } from "@/lib/translations"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
-import { WhatsAppWidget } from "@/components/whatsapp-widget"
-import { Calendar, ChevronLeft, ArrowLeft, ExternalLink, Search } from "lucide-react"
+import { Calendar, ChevronLeft, ArrowLeft, ExternalLink, Search, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { GlobalGalaxy } from "@/components/global-galaxy"
 
 export default function AnnouncementDetailPage() {
   const { id } = useParams()
@@ -85,11 +81,7 @@ export default function AnnouncementDetailPage() {
   )
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden">
-      <GlobalGalaxy />
-      <Header />
-      
-      <main className="flex-grow container mx-auto px-4 py-20 relative z-10">
+    <main className="flex-grow container mx-auto px-4 py-20 relative z-10">
         <div className="max-w-6xl mx-auto">
           {/* Back Button */}
           <Button 
@@ -183,17 +175,29 @@ export default function AnnouncementDetailPage() {
                 </div>
               )}
 
-              {announcement.referenceUrl && (
-                <div className="mt-12 pt-8 border-t border-primary/10 flex justify-start">
-                  <a
-                    href={announcement.referenceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3.5 font-semibold text-primary-foreground transition-all hover:opacity-90 hover:scale-105 active:scale-95 shadow-lg shadow-primary/20 text-sm"
-                  >
-                    {language === "en" ? "View Official Reference (BPK)" : "Lihat Referensi Resmi (BPK)"}
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
+              {((announcement as any).referenceUrl || (announcement as any).downloadUrl) && (
+                <div className="mt-12 pt-8 border-t border-primary/10 flex flex-wrap gap-4 justify-start">
+                  {(announcement as any).downloadUrl && (
+                    <a
+                      href={(announcement as any).downloadUrl}
+                      download
+                      className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3.5 font-semibold text-primary-foreground transition-all hover:opacity-90 hover:scale-105 active:scale-95 shadow-lg shadow-primary/20 text-sm cursor-pointer"
+                    >
+                      {language === "en" ? "Download Official Document" : (language === "cn" ? "下载官方文件" : "Unduh Dokumen Resmi")}
+                      <Download className="h-4 w-4" />
+                    </a>
+                  )}
+                  {(announcement as any).referenceUrl && (
+                    <a
+                      href={(announcement as any).referenceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3.5 font-semibold text-primary-foreground transition-all hover:opacity-90 hover:scale-105 active:scale-95 shadow-lg shadow-primary/20 text-sm"
+                    >
+                      {language === "en" ? "View Official Reference (BPK)" : "Lihat Referensi Resmi (BPK)"}
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  )}
                 </div>
               )}
               
@@ -207,10 +211,6 @@ export default function AnnouncementDetailPage() {
             </CardContent>
           </Card>
         </div>
-      </main>
-
-      <Footer />
-      <WhatsAppWidget />
-    </div>
+    </main>
   )
 }

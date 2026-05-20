@@ -5,6 +5,9 @@ import { Analytics } from "@vercel/analytics/next"
 import { LanguageProvider } from "@/contexts/language-context"
 import { ThemeProvider } from "@/components/theme-provider"
 import { GlobalGalaxy } from "@/components/global-galaxy"
+import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
+import { WhatsAppWidget } from "@/components/whatsapp-widget"
 import "./globals.css"
 
 const geistSans = Geist({ subsets: ["latin"], variable: "--font-sans" })
@@ -54,7 +57,12 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <GlobalGalaxy />
-          <LanguageProvider>{children}</LanguageProvider>
+          <LanguageProvider>
+            <Header />
+            {children}
+            <Footer />
+            <WhatsAppWidget />
+          </LanguageProvider>
         </ThemeProvider>
         <Analytics />
       </body>

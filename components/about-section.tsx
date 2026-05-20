@@ -25,8 +25,19 @@ export function AboutSection() {
               {t.about.description}
             </p>
             <div className="pt-4">
-              <Button variant="outline" size="lg" asChild>
-                <Link href="/about">{language === "en" ? "Read More" : "Baca Selengkapnya"}</Link>
+              <Button
+                variant="default"
+                size="lg"
+                className="group px-8 py-6 text-base font-medium transition-all duration-300 rounded-full bg-primary text-primary-foreground hover:opacity-90 hover:scale-105 active:scale-95 shadow-lg shadow-primary/20 cursor-pointer"
+                asChild
+              >
+                <Link href="/about">
+                  {{
+                    en: "Read More",
+                    id: "Baca Selengkapnya",
+                    cn: "了解更多"
+                  }[language] || "Read More"}
+                </Link>
               </Button>
             </div>
           </div>

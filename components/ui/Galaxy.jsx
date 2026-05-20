@@ -111,6 +111,13 @@ vec3 StarLayer(vec2 uv) {
 
       float star = Star(gv - offset - pad, flareSize);
       vec3 color = base;
+      
+      // Infuse soft light blue color variations into some of the stars
+      float blueRandom = Hash21(si + 9.87);
+      if (blueRandom > 0.65) {
+        vec3 lightBlue = vec3(0.55, 0.78, 1.0);
+        color = mix(color, lightBlue * val, 0.75);
+      }
 
       float twinkle = trisn(uTime * uSpeed + seed * 6.2831) * 0.5 + 1.0;
       twinkle = mix(1.0, twinkle, uTwinkleIntensity);
@@ -187,6 +194,7 @@ export default function Galaxy({
   rotationSpeed = 0.1,
   autoCenterRepulsion = 0,
   transparent = true,
+  lerpFactor = 0.05,
   ...rest
 }) {
   const ctnDom = useRef(null);
@@ -268,11 +276,11 @@ export default function Galaxy({
         program.uniforms.uStarSpeed.value = (t * 0.001 * starSpeed) / 10.0;
       }
 
-      const lerpFactor = 0.05;
-      smoothMousePos.current.x += (targetMousePos.current.x - smoothMousePos.current.x) * lerpFactor;
-      smoothMousePos.current.y += (targetMousePos.current.y - smoothMousePos.current.y) * lerpFactor;
+      const actualLerp = lerpFactor;
+      smoothMousePos.current.x += (targetMousePos.current.x - smoothMousePos.current.x) * actualLerp;
+      smoothMousePos.current.y += (targetMousePos.current.y - smoothMousePos.current.y) * actualLerp;
 
-      smoothMouseActive.current += (targetMouseActive.current - smoothMouseActive.current) * lerpFactor;
+      smoothMouseActive.current += (targetMouseActive.current - smoothMouseActive.current) * actualLerp;
 
       program.uniforms.uMouse.value[0] = smoothMousePos.current.x;
       program.uniforms.uMouse.value[1] = smoothMousePos.current.y;
@@ -325,7 +333,8 @@ export default function Galaxy({
     rotationSpeed,
     repulsionStrength,
     autoCenterRepulsion,
-    transparent
+    transparent,
+    lerpFactor
   ]);
 
   return <div ref={ctnDom} className="galaxy-container" {...rest} />;

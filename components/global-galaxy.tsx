@@ -1,7 +1,6 @@
 "use client"
 
 import Galaxy from "@/components/ui/Galaxy"
-import Particles from "@/components/ui/Particles"
 import SplashCursor from "@/components/ui/SplashCursor"
 import { useTheme } from "next-themes"
 import { useEffect, useState } from "react"
@@ -23,34 +22,24 @@ export function GlobalGalaxy() {
       {isDarkMode ? (
         <div className="w-full h-full opacity-80">
           <Galaxy
-            starSpeed={0.3}
-            density={0.6}
-            hueShift={140}
-            speed={1}
+            mouseRepulsion
+            mouseInteraction
+            density={1}
             glowIntensity={0.3}
             saturation={0}
-            mouseRepulsion={true}
-            repulsionStrength={2}
+            hueShift={140}
             twinkleIntensity={0.3}
             rotationSpeed={0.1}
+            repulsionStrength={2}
+            autoCenterRepulsion={0}
+            starSpeed={0.5}
+            speed={1}
             transparent={true}
+            lerpFactor={0.25}
           />
         </div>
       ) : (
         <div className="w-full h-full opacity-30">
-          <Particles
-            particleCount={200}
-            particleSpread={10}
-            speed={0.1}
-            particleColors={["#000000", "#000000", "#000000"]}
-            moveParticlesOnHover={false}
-            particleHoverFactor={1}
-            alphaParticles={false}
-            particleBaseSize={200}
-            sizeRandomness={1}
-            cameraDistance={20}
-            disableRotation={false}
-          />
           <SplashCursor
             DENSITY_DISSIPATION={0.5}
             VELOCITY_DISSIPATION={0.8}

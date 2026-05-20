@@ -1,8 +1,5 @@
 "use client"
 
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
-import { WhatsAppWidget } from "@/components/whatsapp-widget"
 import { useLanguage } from "@/contexts/language-context"
 import { translations } from "@/lib/translations"
 import { Building2, Users, Award, Target, TrendingUp } from "lucide-react"
@@ -48,9 +45,7 @@ export default function AboutPage() {
   ]
 
   return (
-    <div className="min-h-screen">
-      <Header />
-      <main>
+    <main>
         {/* Hero & Overview Section */}
         <section className="relative pt-20 pb-10 overflow-hidden">
           <div className="absolute inset-0 z-0">
@@ -220,9 +215,6 @@ export default function AboutPage() {
             </div>
           </div>
         </section>
-      </main>
-      <Footer />
-      <WhatsAppWidget />
-    </div>
+    </main>
   )
 }

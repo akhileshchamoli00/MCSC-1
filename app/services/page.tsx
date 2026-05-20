@@ -1,8 +1,5 @@
 "use client"
 
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
-import { WhatsAppWidget } from "@/components/whatsapp-widget"
 import { useLanguage } from "@/contexts/language-context"
 import {
   Building,
@@ -53,9 +50,7 @@ export default function ServicesPage() {
   }))
 
   return (
-    <div className="min-h-screen">
-      <Header />
-      <main>
+    <main>
         {/* Hero Section */}
         <section className="relative pt-6 pb-4 overflow-hidden">
           <div className="container mx-auto px-4 relative z-10">
@@ -146,9 +141,6 @@ export default function ServicesPage() {
             </div>
           </div>
         </section>
-      </main>
-      <Footer />
-      <WhatsAppWidget />
-    </div>
+    </main>
   )
 }

@@ -1,0 +1,9 @@
+# Firebase App Hosting configuration file
+# Reference: https://firebase.google.com/docs/app-hosting/configure
+
+env:
+  # Map GMAIL_USER and GMAIL_APP_PASSWORD to Firebase/Google Cloud Secrets
+  - variable: GMAIL_USER
+    secret: GMAIL_USER
+  - variable: GMAIL_APP_PASSWORD
+    secret: GMAIL_APP_PASSWORD

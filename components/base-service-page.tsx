@@ -1,14 +1,10 @@
 "use client"
 
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
-import { WhatsAppWidget } from "@/components/whatsapp-widget"
 import { useLanguage } from "@/contexts/language-context"
 import { CheckCircle2, ArrowRight, LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { GlobalGalaxy } from "@/components/global-galaxy"
 import ElectricBorder from "./ui/ElectricBorder"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -49,11 +45,7 @@ export function BaseServicePage({
   }
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden">
-      <GlobalGalaxy />
-      <Header />
-      
-      <main className="flex-grow relative z-10">
+    <main className="flex-grow relative z-10">
         {/* Hero Section */}
         <section className="pt-6 pb-4 md:pt-10 md:pb-6">
           <div className="container mx-auto px-4">
@@ -150,12 +142,22 @@ export function BaseServicePage({
                   : (language === "cn" ? "立即联系我们的专家，就您的业务需求进行免费咨询。" : "Hubungi ahli kami hari ini untuk konsultasi gratis mengenai kebutuhan bisnis Anda."))}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button size="lg" className="h-14 px-10 text-lg shadow-xl" asChild>
+                <Button
+                  size="lg"
+                  variant="default"
+                  className="h-14 px-10 text-lg rounded-full bg-primary text-primary-foreground hover:opacity-90 hover:scale-105 active:scale-95 shadow-lg shadow-primary/20 cursor-pointer"
+                  asChild
+                >
                   <a href="https://wa.me/6287877967799" target="_blank" rel="noopener noreferrer">
                     {language === "en" ? "WhatsApp Us" : (language === "cn" ? "WhatsApp 联系" : "WhatsApp Kami")}
                   </a>
                 </Button>
-                <Button size="lg" variant="outline" className="h-14 px-10 text-lg backdrop-blur-sm" asChild>
+                <Button
+                  size="lg"
+                  variant="default"
+                  className="h-14 px-10 text-lg rounded-full bg-primary text-primary-foreground hover:opacity-90 hover:scale-105 active:scale-95 shadow-lg shadow-primary/20 cursor-pointer"
+                  asChild
+                >
                   <Link href="/contact">
                     {language === "en" ? "Contact Form" : (language === "cn" ? "联系表单" : "Formulir Kontak")}
                   </Link>
@@ -164,10 +166,6 @@ export function BaseServicePage({
             </motion.div>
           </div>
         </section>
-      </main>
-
-      <Footer />
-      <WhatsAppWidget />
-    </div>
+    </main>
   )
 }

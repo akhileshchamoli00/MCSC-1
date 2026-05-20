@@ -3,13 +3,9 @@
 import { useParams, useRouter } from "next/navigation"
 import { useLanguage } from "@/contexts/language-context"
 import { translations } from "@/lib/translations"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
-import { WhatsAppWidget } from "@/components/whatsapp-widget"
 import { Building2, FileText, RefreshCw, Scale, MapPin, Users, Lightbulb, HardHat, ArrowLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { GlobalGalaxy } from "@/components/global-galaxy"
 
 const serviceIcons: Record<string, any> = {
   "business-establishment": Building2,
@@ -42,11 +38,7 @@ export default function ServiceDetailPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden">
-      <GlobalGalaxy />
-      <Header />
-
-      <main className="flex-grow container mx-auto px-4 py-20 relative z-10">
+    <main className="flex-grow container mx-auto px-4 py-20 relative z-10">
         <div className="max-w-4xl mx-auto">
           {/* Back Button */}
           <Button
@@ -115,10 +107,6 @@ export default function ServiceDetailPage() {
             </CardContent>
           </Card>
         </div>
-      </main>
-
-      <Footer />
-      <WhatsAppWidget />
-    </div>
+    </main>
   )
 }
