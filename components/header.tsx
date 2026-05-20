@@ -197,8 +197,9 @@ export function Header() {
               </Link>
             ))}
 
-            <div className="mt-4 border-t border-border/40 pt-4">
+            <div className="mt-6 border-t border-border/40 pt-6 flex items-center justify-around gap-4">
               <LanguageSwitcher />
+              <ThemeToggle />
             </div>
           </nav>
         </div>
