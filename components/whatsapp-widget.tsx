@@ -82,7 +82,7 @@ export function WhatsAppWidget() {
             
             <Button
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl py-5 shadow-lg shadow-primary/10 flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
-              onClick={() => window.open("https://wa.me/6281210001945", "_blank")}
+              onClick={() => window.open("https://wa.me/6287877967799", "_blank")}
             >
               <WhatsAppIcon className="h-5.5 w-5.5 text-[#25D366]" />
               <span className="font-semibold text-sm">{localT.button}</span>
