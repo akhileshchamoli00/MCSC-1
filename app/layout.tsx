@@ -20,20 +20,8 @@ export const metadata: Metadata = {
     "Your trusted partner in managing all aspects of business licensing with over 10 years of professional experience.",
   generator: "v0.app",
   icons: {
-    icon: [
-      {
-        url: "/icon-light-32x32.png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/icon-dark-32x32.png",
-        media: "(prefers-color-scheme: dark)",
-      },
-      {
-        url: "/icon.svg",
-        type: "image/svg+xml",
-      },
-    ],
+    icon: "/icon.png",
+    shortcut: "/icon.png",
     apple: "/apple-icon.png",
   },
 }
