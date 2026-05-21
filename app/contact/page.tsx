@@ -7,7 +7,7 @@ import { translations } from "@/lib/translations"
 import { MapPin, Phone, Mail, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
-import ElectricBorder from "@/components/ui/ElectricBorder"
+import BorderGlow from "@/components/ui/BorderGlow"
 
 export default function ContactPage() {
   const { language } = useLanguage()
@@ -24,7 +24,7 @@ export default function ContactPage() {
   const localT = {
     en: {
       subtitle: "Get in touch with us for your business licensing needs",
-      hours: "Mon - Fri: 9:00 AM - 5:00 PM",
+      hours: "Mon - Fri: 8:00 AM - 5:00 PM",
       sendMessage: "Send us a message",
       name: "Name",
       namePlaceholder: "Your name",
@@ -39,7 +39,7 @@ export default function ContactPage() {
     },
     id: {
       subtitle: "Hubungi kami untuk kebutuhan perizinan usaha Anda",
-      hours: "Sen - Jum: 09.00 - 17.00",
+      hours: "Sen - Jum: 8.00 - 17.00",
       sendMessage: "Kirim pesan kepada kami",
       name: "Nama",
       namePlaceholder: "Nama Anda",
@@ -54,7 +54,7 @@ export default function ContactPage() {
     },
     cn: {
       subtitle: "联系我们以获取您的业务许可需求",
-      hours: "周一 - 周五: 上午 9:00 - 下午 5:00",
+      hours: "周一 - 周五: 上午 8:00 - 下午 5:00",
       sendMessage: "给我们发送留言",
       name: "姓名",
       namePlaceholder: "您的姓名",
@@ -124,163 +124,168 @@ export default function ContactPage() {
 
   return (
     <main>
-        {/* Hero Section */}
-        <section className="relative pt-6 pb-4 overflow-hidden">
-          <div className="absolute inset-0 z-0">
+      {/* Hero Section */}
+      <section className="relative pt-6 pb-4 overflow-hidden">
+        <div className="absolute inset-0 z-0">
 
+        </div>
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="mx-auto max-w-3xl text-center">
+            <h1 className="mb-6 text-4xl font-bold text-balance md:text-5xl">{t.contact.title}</h1>
+            <p className="text-lg text-muted-foreground text-pretty">
+              {localT.subtitle}
+            </p>
           </div>
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="mx-auto max-w-3xl text-center">
-              <h1 className="mb-6 text-4xl font-bold text-balance md:text-5xl">{t.contact.title}</h1>
-              <p className="text-lg text-muted-foreground text-pretty">
-                {localT.subtitle}
-              </p>
-            </div>
-          </div>
-        </section>
-        <section className="pt-2 pb-20">
-          <div className="container mx-auto px-4">
-            <div className="grid gap-12 lg:grid-cols-2">
-              {/* Contact Information */}
-              <div className="space-y-8">
-                <div className="group">
-                  <h2 className="mb-6 text-2xl font-bold">{t.contact.headOffice}</h2>
-                  <div className="space-y-4">
-                    <div className="flex gap-4 group-hover:translate-x-1 transition-transform">
-                      <MapPin className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
-                      <p className="text-muted-foreground text-pretty">{t.contact.headAddress}</p>
-                    </div>
-                    <div className="flex gap-4 items-center group-hover:translate-x-1 transition-transform">
-                      <Phone className="h-5 w-5 text-primary flex-shrink-0" />
-                      <a
-                        href="tel:+6287877967799"
-                        className="text-muted-foreground hover:text-primary transition-colors"
-                      >
-                        +62 878-7796-7799
-                      </a>
-                    </div>
-                    <div className="flex gap-4 items-center group-hover:translate-x-1 transition-transform">
-                      <Mail className="h-5 w-5 text-primary flex-shrink-0" />
-                      <a
-                        href="mailto:info@MCS Consulting.co.id"
-                        className="text-muted-foreground hover:text-primary transition-colors"
-                      >
-                        info@MCS Consulting.co.id
-                      </a>
-                    </div>
-                    <div className="flex gap-4 items-center group-hover:translate-x-1 transition-transform">
-                      <Clock className="h-5 w-5 text-primary flex-shrink-0" />
-                      <p className="text-muted-foreground">
-                        {localT.hours}
-                      </p>
-                    </div>
+        </div>
+      </section>
+      <section className="pt-2 pb-20">
+        <div className="container mx-auto px-4">
+          <div className="grid gap-12 lg:grid-cols-2">
+            {/* Contact Information */}
+            <div className="space-y-8">
+              <div className="group">
+                <h2 className="mb-6 text-2xl font-bold">{t.contact.headOffice}</h2>
+                <div className="space-y-4">
+                  <div className="flex gap-4 group-hover:translate-x-1 transition-transform">
+                    <MapPin className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
+                    <p className="text-muted-foreground text-pretty">{t.contact.headAddress}</p>
                   </div>
-                </div>
-
-                <div className="group">
-                  <h2 className="mb-6 text-2xl font-bold">{t.contact.branchOffice}</h2>
-                  <div className="space-y-4">
-                    <div className="flex gap-4 group-hover:translate-x-1 transition-transform">
-                      <MapPin className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
-                      <p className="text-muted-foreground text-pretty">{t.contact.branchAddress}</p>
-                    </div>
+                  <div className="flex gap-4 items-center group-hover:translate-x-1 transition-transform">
+                    <Phone className="h-5 w-5 text-primary flex-shrink-0" />
+                    <a
+                      href="tel:+6287877967799"
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      +62 878-7796-7799
+                    </a>
+                  </div>
+                  <div className="flex gap-4 items-center group-hover:translate-x-1 transition-transform">
+                    <Mail className="h-5 w-5 text-primary flex-shrink-0" />
+                    <a
+                      href="mailto:admin@mcsc.co.id"
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      admin@mcsc.co.id
+                    </a>
+                  </div>
+                  <div className="flex gap-4 items-center group-hover:translate-x-1 transition-transform">
+                    <Clock className="h-5 w-5 text-primary flex-shrink-0" />
+                    <p className="text-muted-foreground">
+                      {localT.hours}
+                    </p>
                   </div>
                 </div>
               </div>
 
-              {/* Contact Form */}
-              <ElectricBorder
-                color="#1e40af"
-                speed={0.8}
-                chaos={0.1}
-                borderRadius={16}
-                className="h-full"
-              >
-                <div className="rounded-lg border-none bg-background/40 backdrop-blur-md p-8 h-full">
-                  <h2 className="mb-6 text-2xl font-bold">
-                    {localT.sendMessage}
-                  </h2>
-                  {status === "success" && (
-                    <div className="p-4 mb-6 text-sm rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold shadow-lg shadow-emerald-500/5">
-                      ✨ {localT.success}
-                    </div>
-                  )}
-                  {status === "error" && (
-                    <div className="p-4 mb-6 text-sm rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 font-semibold shadow-lg shadow-red-500/5">
-                      <div className="font-bold">❌ {localT.error}</div>
-                      {errorMessage && (
-                        <div className="text-xs opacity-90 mt-2 font-mono bg-red-950/40 p-2.5 rounded-lg border border-red-500/10">
-                          Error Details: {errorMessage}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">{localT.name}</label>
-                      <input
-                        type="text"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleChange}
-                        required
-                        disabled={status === "submitting"}
-                        className="w-full rounded-md border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary transition-shadow disabled:opacity-50"
-                        placeholder={localT.namePlaceholder}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">Email</label>
-                      <input
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        required
-                        disabled={status === "submitting"}
-                        className="w-full rounded-md border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary transition-shadow disabled:opacity-50"
-                        placeholder={localT.emailPlaceholder}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">{localT.phone}</label>
-                      <input
-                        type="tel"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleChange}
-                        required
-                        disabled={status === "submitting"}
-                        className="w-full rounded-md border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary transition-shadow disabled:opacity-50"
-                        placeholder="+62 xxx xxx xxx"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">{localT.message}</label>
-                      <textarea
-                        name="message"
-                        value={formData.message}
-                        onChange={handleChange}
-                        required
-                        disabled={status === "submitting"}
-                        rows={5}
-                        className="w-full rounded-md border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary transition-shadow disabled:opacity-50"
-                        placeholder={localT.messagePlaceholder}
-                      />
-                    </div>
-                    <Button 
-                      type="submit" 
-                      disabled={status === "submitting"} 
-                      className="w-full transition-transform hover:scale-105 disabled:opacity-70 disabled:hover:scale-100"
-                    >
-                      {status === "submitting" ? localT.submitting : localT.submit}
-                    </Button>
-                  </form>
+              <div className="group">
+                <h2 className="mb-6 text-2xl font-bold">{t.contact.branchOffice}</h2>
+                <div className="space-y-4">
+                  <div className="flex gap-4 group-hover:translate-x-1 transition-transform">
+                    <MapPin className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
+                    <p className="text-muted-foreground text-pretty">{t.contact.branchAddress}</p>
+                  </div>
                 </div>
-              </ElectricBorder>
+              </div>
             </div>
+
+            {/* Contact Form */}
+            <BorderGlow
+              edgeSensitivity={30}
+              glowColor="220 80 80"
+              backgroundColor="transparent"
+              borderRadius={16}
+              glowRadius={40}
+              glowIntensity={1}
+              coneSpread={25}
+              animated={false}
+              colors={['#1e40af', '#10b981', '#f97316']}
+              className="h-full"
+            >
+              <div className="rounded-lg border-none bg-background/40 backdrop-blur-md p-8 h-full">
+                <h2 className="mb-6 text-2xl font-bold">
+                  {localT.sendMessage}
+                </h2>
+                {status === "success" && (
+                  <div className="p-4 mb-6 text-sm rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold shadow-lg shadow-emerald-500/5">
+                    ✨ {localT.success}
+                  </div>
+                )}
+                {status === "error" && (
+                  <div className="p-4 mb-6 text-sm rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 font-semibold shadow-lg shadow-red-500/5">
+                    <div className="font-bold">❌ {localT.error}</div>
+                    {errorMessage && (
+                      <div className="text-xs opacity-90 mt-2 font-mono bg-red-950/40 p-2.5 rounded-lg border border-red-500/10">
+                        Error Details: {errorMessage}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">{localT.name}</label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      required
+                      disabled={status === "submitting"}
+                      className="w-full rounded-md border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary transition-shadow disabled:opacity-50"
+                      placeholder={localT.namePlaceholder}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Email</label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      required
+                      disabled={status === "submitting"}
+                      className="w-full rounded-md border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary transition-shadow disabled:opacity-50"
+                      placeholder={localT.emailPlaceholder}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">{localT.phone}</label>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      required
+                      disabled={status === "submitting"}
+                      className="w-full rounded-md border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary transition-shadow disabled:opacity-50"
+                      placeholder="+62 xxx xxx xxx"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">{localT.message}</label>
+                    <textarea
+                      name="message"
+                      value={formData.message}
+                      onChange={handleChange}
+                      required
+                      disabled={status === "submitting"}
+                      rows={5}
+                      className="w-full rounded-md border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary transition-shadow disabled:opacity-50"
+                      placeholder={localT.messagePlaceholder}
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={status === "submitting"}
+                    className="w-full transition-transform hover:scale-105 disabled:opacity-70 disabled:hover:scale-100"
+                  >
+                    {status === "submitting" ? localT.submitting : localT.submit}
+                  </Button>
+                </form>
+              </div>
+            </BorderGlow>
           </div>
-        </section>
+        </div>
+      </section>
     </main>
   )
 }

@@ -5,7 +5,7 @@ import { CheckCircle2, ArrowRight, LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import ElectricBorder from "./ui/ElectricBorder"
+import BorderGlow from "./ui/BorderGlow"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface SubService {
@@ -80,11 +80,16 @@ export function BaseServicePage({
                   viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: index * 0.1 }}
                 >
-                  <ElectricBorder
-                    color="#1e40af"
-                    speed={0.8}
-                    chaos={0.1}
+                  <BorderGlow
+                    edgeSensitivity={30}
+                    glowColor="220 80 80"
+                    backgroundColor="transparent"
                     borderRadius={16}
+                    glowRadius={40}
+                    glowIntensity={1}
+                    coneSpread={25}
+                    animated={false}
+                    colors={['#1e40af', '#10b981', '#f97316']}
                     className="h-full"
                   >
                     <Card className="h-full border-none bg-background/40 backdrop-blur-md transition-all duration-300 hover:bg-background/60 flex flex-col">
@@ -117,7 +122,7 @@ export function BaseServicePage({
                         </Button>
                       </CardContent>
                     </Card>
-                  </ElectricBorder>
+                  </BorderGlow>
                 </motion.div>
               ))}
             </div>

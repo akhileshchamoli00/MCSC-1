@@ -4,7 +4,7 @@ import { useLanguage } from "@/contexts/language-context"
 import { translations } from "@/lib/translations"
 import { Calendar, Bell, Check, Loader2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import ElectricBorder from "@/components/ui/ElectricBorder"
+import BorderGlow from "@/components/ui/BorderGlow"
 import { motion } from "framer-motion"
 import Link from "next/link"
 import { useState } from "react"
@@ -80,11 +80,16 @@ export default function AnnouncementsPage() {
                   transition={{ duration: 0.5, delay: index * 0.1 }}
                 >
                   <Link href={`/announcement/${announcement.id}`} className="block group">
-                    <ElectricBorder
-                      color="#3b82f6"
-                      speed={0.8}
-                      chaos={0.1}
+                    <BorderGlow
+                      edgeSensitivity={30}
+                      glowColor="220 80 80"
+                      backgroundColor="transparent"
                       borderRadius={16}
+                      glowRadius={40}
+                      glowIntensity={1}
+                      coneSpread={25}
+                      animated={false}
+                      colors={['#1e40af', '#10b981', '#f97316']}
                       className="h-full"
                     >
                       <Card className="border-none bg-background/40 backdrop-blur-md transition-all duration-300 hover:bg-background/60 cursor-pointer h-full">
@@ -107,7 +112,7 @@ export default function AnnouncementsPage() {
                           </div>
                         </CardContent>
                       </Card>
-                    </ElectricBorder>
+                    </BorderGlow>
                   </Link>
                 </motion.div>
               ))}

@@ -13,7 +13,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import ElectricBorder from "@/components/ui/ElectricBorder"
+import BorderGlow from "@/components/ui/BorderGlow"
 import { motion } from "framer-motion"
 
 import { translations } from "@/lib/translations"
@@ -90,11 +90,16 @@ export default function ServicesPage() {
                     transition={{ duration: 0.5, delay: index * 0.08 }}
                   >
                     <Link href={service.href} className="block h-full group">
-                      <ElectricBorder
-                        color="#1e40af"
-                        speed={0.8}
-                        chaos={0.1}
+                      <BorderGlow
+                        edgeSensitivity={30}
+                        glowColor="220 80 80"
+                        backgroundColor="transparent"
                         borderRadius={16}
+                        glowRadius={40}
+                        glowIntensity={1}
+                        coneSpread={25}
+                        animated={false}
+                        colors={['#1e40af', '#10b981', '#f97316']}
                         className="h-full"
                       >
                         <div className="rounded-xl border-none bg-background/40 backdrop-blur-md p-6 transition-all duration-300 hover:bg-background/60 cursor-pointer h-full flex flex-col justify-between">
@@ -114,7 +119,7 @@ export default function ServicesPage() {
                             <ArrowRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                           </div>
                         </div>
-                      </ElectricBorder>
+                      </BorderGlow>
                     </Link>
                   </motion.div>
                 )

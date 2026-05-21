@@ -7,7 +7,7 @@ import { Calendar, ChevronLeft, ChevronRight, ArrowRight } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
-import ElectricBorder from "./ui/ElectricBorder"
+import BorderGlow from "./ui/BorderGlow"
 
 export function AnnouncementSection() {
   const { language } = useLanguage()
@@ -75,7 +75,13 @@ export function AnnouncementSection() {
           <h2 className="mb-6 font-serif text-4xl font-bold tracking-tight text-foreground md:text-5xl">
             {t.announcement.title}
           </h2>
-          <p className="mx-auto max-w-3xl text-xl leading-relaxed text-muted-foreground">{t.announcement.description}</p>
+          <p className="mx-auto max-w-3xl text-xl leading-relaxed text-muted-foreground">
+            {(t.announcement as any).description || (language === "en"
+              ? "Stay informed with the latest governmental regulations, laws, and announcements affecting business in Indonesia."
+              : (language === "cn"
+                ? "随时了解影响印度尼西亚商业的最新政府法规、法律和公告动态。"
+                : "Tetap terinformasi dengan regulasi, undang-undang, dan pengumuman pemerintah terbaru yang memengaruhi bisnis di Indonesia."))}
+          </p>
         </motion.div>
 
         <div
@@ -101,11 +107,17 @@ export function AnnouncementSection() {
                 {getVisibleItems().map((announcement, idx) => (
                   <div key={`${announcement.id}-${idx}`} className="h-full">
                     <Link href={`/announcement/${announcement.id}`}>
-                      <ElectricBorder
-                        color="#1e40af"
-                        speed={0.9}
-                        chaos={0.1}
+                      <BorderGlow
+                        edgeSensitivity={30}
+                        glowColor="220 80 80"
+                        backgroundColor="transparent"
                         borderRadius={16}
+                        glowRadius={40}
+                        glowIntensity={1}
+                        coneSpread={25}
+                        animated={false}
+                        colors={['#1e40af', '#10b981', '#f97316']}
+                        className="h-full"
                       >
                         <Card className="hover-lift h-full border-border/50 bg-transparent backdrop-blur-[2px] transition-all duration-300 hover:border-primary/50 hover:shadow-xl cursor-pointer flex flex-col">
                           <CardHeader className="pb-4">
@@ -127,7 +139,7 @@ export function AnnouncementSection() {
                             </span>
                           </CardContent>
                         </Card>
-                      </ElectricBorder>
+                      </BorderGlow>
                     </Link>
                   </div>
                 ))}

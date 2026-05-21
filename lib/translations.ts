@@ -156,7 +156,6 @@ export const translations = {
       description:
         "Didirikan pada November 2013, PT Mandiri Cipta Solusi (MCS Consulting) telah beroperasi secara profesional di bidang perizinan usaha selama lebih dari 10 tahun. Kami berkomitmen menjadi mitra terpercaya bagi pemilik usaha dengan memberikan layanan yang handal, komprehensif, dan profesional.",
       fullDescription: [
-        "Didirikan pada November 2013, PT Mandiri Cipta Solusi (MCS Consulting) telah beroperasi secara profesional di bidang perizinan usaha selama lebih dari 10 tahun. Kami berkomitmen menjadi mitra terpercaya bagi pemilik usaha dengan memberikan layanan yang handal, komprehensif, dan profesional.",
         "MCS Consulting membantu klien dalam mendirikan badan hukum dan badan usaha, memastikan setiap langkah dilakukan dengan akurat dan sesuai peraturan. Selain itu, kami menawarkan layanan kekayaan intelektual, termasuk pendaftaran merek dan pencatatan lisensi, untuk membantu melindungi aset berharga perusahaan Anda.",
         "Selain pendirian badan usaha dan perlindungan merek, kami juga menyediakan layanan pembukuan yang teliti dan profesional, mendukung Anda dalam mengelola keuangan bisnis secara efisien dan transparan. Dengan rangkaian layanan lengkap dari perizinan hingga pembukuan, MCS Consulting hadir untuk mendukung pertumbuhan dan kesuksesan bisnis Anda.",
         "Kepercayaan klien adalah prioritas kami, dan dengan tim yang berpengalaman dan terampil, kami berdedikasi untuk memberikan solusi terbaik untuk setiap kebutuhan bisnis.",
@@ -295,7 +294,6 @@ export const translations = {
       description:
         "PT Mandiri Cipta Solusi (MCS Consulting) 成立于2013年11月，在业务许可领域专业运营超过10年。我们致力于通过提供可靠、全面且专业的服务，成为企业主值得信赖的合作伙伴。",
       fullDescription: [
-        "PT Mandiri Cipta Solusi (MCS Consulting) 成立于2013年11月，在业务许可领域专业运营超过10年。我们致力于通过提供可靠、全面且专业的服务，成为企业主值得信赖的合作伙伴。",
         "MCS Consulting 协助客户建立法人实体和业务实体，确保每一步都准确无误并符合法规。此外，我们还提供知识产权服务，包括商标注册和许可记录，以帮助保护您公司的宝贵资产。",
         "除了实体建立和品牌保护，我们还提供细致且专业的簿记服务，支持您高效透明地管理业务财务。凭借从许可到簿记的全方位服务，MCS Consulting 致力于支持您业务的增长和成功。",
         "客户的信任是我们的首要任务，凭借经验丰富且技术精湛的团队，我们致力于为每一个业务需求提供最佳解决方案。",

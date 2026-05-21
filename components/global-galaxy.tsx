@@ -1,6 +1,5 @@
 "use client"
 
-import Galaxy from "@/components/ui/Galaxy"
 import SplashCursor from "@/components/ui/SplashCursor"
 import { useTheme } from "next-themes"
 import { useEffect, useState } from "react"
@@ -20,23 +19,20 @@ export function GlobalGalaxy() {
   return (
     <div className="fixed inset-0 z-[-1] pointer-events-auto">
       {isDarkMode ? (
-        <div className="w-full h-full opacity-80">
-          <Galaxy
-            mouseRepulsion
-            mouseInteraction
-            density={1}
-            glowIntensity={0.3}
-            saturation={0}
-            hueShift={140}
-            twinkleIntensity={0.3}
-            rotationSpeed={0.1}
-            repulsionStrength={2}
-            autoCenterRepulsion={0}
-            starSpeed={0.5}
-            speed={1}
-            transparent={true}
-            lerpFactor={0.25}
-          />
+        <div className="w-full h-full opacity-80 flex items-center justify-center">
+          <div style={{ width: '1080px', height: '1080px', position: 'relative' }}>
+            <SplashCursor
+              SIM_RESOLUTION={128}
+              DYE_RESOLUTION={1440}
+              DENSITY_DISSIPATION={3.5}
+              VELOCITY_DISSIPATION={2}
+              PRESSURE={0.1}
+              CURL={3}
+              SPLAT_RADIUS={0.2}
+              SPLAT_FORCE={6000}
+              COLOR_UPDATE_SPEED={10}
+            />
+          </div>
         </div>
       ) : (
         <div className="w-full h-full opacity-30">

@@ -23,7 +23,7 @@ export default function ServiceDetailPage() {
   const router = useRouter()
   const t = translations[language]
 
-  const service = t.services.items.find((item) => item.id === id)
+  const service = t.services.items.find((item) => item.id === id) as any
   const Icon = serviceIcons[id as string] || Building2
 
   if (!service) {

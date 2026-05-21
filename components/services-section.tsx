@@ -7,7 +7,7 @@ import { Building2, FileText, RefreshCw, Scale, MapPin, Users, Lightbulb, Chevro
 import { motion, AnimatePresence } from "framer-motion"
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
-import ElectricBorder from "./ui/ElectricBorder"
+import BorderGlow from "./ui/BorderGlow"
 
 const serviceIcons = [Building2, FileText, RefreshCw, Scale, MapPin, Users, Lightbulb]
 
@@ -76,7 +76,11 @@ export function ServicesSection() {
           <h2 className="mb-6 font-serif text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
             {t.services.title}
           </h2>
-          <p className="mx-auto max-w-3xl text-xl leading-relaxed text-muted-foreground">{t.services.description}</p>
+          <p className="mx-auto max-w-3xl text-xl leading-relaxed text-muted-foreground">
+            {(t.services as any).description || (language === "en"
+              ? "Comprehensive business licensing solutions tailored to your needs"
+              : (language === "cn" ? "为您量身定制的全面业务许可解决方案" : "Solusi perizinan usaha komprehensif yang disesuaikan dengan kebutuhan Anda"))}
+          </p>
         </motion.div>
 
         <div
@@ -107,11 +111,17 @@ export function ServicesSection() {
                   return (
                     <div key={`${service.id}-${idx}`} className="h-full">
                       <Link href={`/services/${service.id}`}>
-                        <ElectricBorder
-                          color="#1e40af"
-                          speed={0.9}
-                          chaos={0.1}
+                        <BorderGlow
+                          edgeSensitivity={30}
+                          glowColor="220 80 80"
+                          backgroundColor="transparent"
                           borderRadius={16}
+                          glowRadius={40}
+                          glowIntensity={1}
+                          coneSpread={25}
+                          animated={false}
+                          colors={['#1e40af', '#10b981', '#f97316']}
+                          className="h-full"
                         >
                           <Card
                             className="group hover-lift h-full border-border/50 bg-transparent transition-all duration-300 hover:border-primary/50 hover:shadow-xl backdrop-blur-[2px] cursor-pointer flex flex-col"
@@ -130,7 +140,7 @@ export function ServicesSection() {
                               </span>
                             </CardContent>
                           </Card>
-                        </ElectricBorder>
+                        </BorderGlow>
                       </Link>
                     </div>
                   )
