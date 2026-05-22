@@ -124,7 +124,7 @@ export function ServicesSection() {
                           className="h-full"
                         >
                           <Card
-                            className="group hover-lift h-full border-border/50 bg-transparent transition-all duration-300 hover:border-primary/50 hover:shadow-xl backdrop-blur-[2px] cursor-pointer flex flex-col"
+                            className="group hover-lift h-full border-none bg-transparent transition-all duration-300 hover:shadow-xl backdrop-blur-[2px] cursor-pointer flex flex-col"
                           >
                             <CardHeader className="space-y-4">
                               <div className="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-primary/5 transition-all duration-300 group-hover:bg-primary/20 group-hover:scale-110">

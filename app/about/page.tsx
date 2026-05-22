@@ -86,7 +86,7 @@ export default function AboutPage() {
                 className="h-full"
               >
                 <div
-                  className="group rounded-lg border border-border/20 bg-background/40 backdrop-blur-sm p-6 transition-all hover:shadow-lg hover:border-primary/50 text-left h-full"
+                  className="group rounded-lg border-none bg-background/40 backdrop-blur-sm p-6 transition-all hover:shadow-lg text-left h-full"
                 >
                   <div className="mb-4 inline-flex rounded-lg bg-primary/10 p-3 transition-transform group-hover:scale-110">
                     <value.icon className="h-6 w-6 text-primary" />
@@ -124,7 +124,7 @@ export default function AboutPage() {
                 colors={['#1e40af', '#10b981', '#f97316']}
                 className="h-full"
               >
-                <div className="rounded-lg border border-border/20 bg-background/40 backdrop-blur-sm p-8 text-left transition-all hover:shadow-lg hover:border-primary/50 h-full">
+                <div className="rounded-lg border-none bg-background/40 backdrop-blur-sm p-8 text-left transition-all hover:shadow-lg h-full">
                   <div className="mb-4 flex justify-start">
                     <div className="rounded-full bg-primary/10 p-4">
                       <Building2 className="h-8 w-8 text-primary" />
@@ -145,7 +145,7 @@ export default function AboutPage() {
                 colors={['#1e40af', '#10b981', '#f97316']}
                 className="h-full"
               >
-                <div className="rounded-lg border border-border/20 bg-background/40 backdrop-blur-sm p-8 text-left transition-all hover:shadow-lg hover:border-primary/50 h-full">
+                <div className="rounded-lg border-none bg-background/40 backdrop-blur-sm p-8 text-left transition-all hover:shadow-lg h-full">
                   <div className="mb-4 flex justify-start">
                     <div className="rounded-full bg-primary/10 p-4">
                       <TrendingUp className="h-8 w-8 text-primary" />
@@ -168,7 +168,7 @@ export default function AboutPage() {
                 colors={['#1e40af', '#10b981', '#f97316']}
                 className="h-full"
               >
-                <div className="rounded-lg border border-border/20 bg-background/40 backdrop-blur-sm p-8 text-left transition-all hover:shadow-lg hover:border-primary/50 h-full">
+                <div className="rounded-lg border-none bg-background/40 backdrop-blur-sm p-8 text-left transition-all hover:shadow-lg h-full">
                   <div className="mb-4 flex justify-start">
                     <div className="rounded-full bg-primary/10 p-4">
                       <Award className="h-8 w-8 text-primary" />
