@@ -587,7 +587,25 @@ const chronologicalOrder = [
   "peraturan-menteri-hukum-49-2025"
 ];
 
-const sortItems = (items: any[]) => {
+const urlOverrides: Record<string, string> = {
+  "kepgub-310-2026": "https://jdih.jakarta.go.id/dokumen/detail/14932/keputusan-gubernur-nomor-371-tahun-2026tentang-pemberian-keringanan-pokok-pajak-dan-pembebasan-sanksi-administratif-atas-piutang-pajak-bumi-dan-bangunan-perdesaan-dan-perkotaan",
+  "pmk-1-2026": "https://jdih.kemenkeu.go.id/dok/pmk-1-tahun-2026",
+  "pmk-4-2026": "https://jdih.kemenkeu.go.id/dok/pmk-4-tahun-2026",
+  "pmk-5-2026": "https://jdih.kemenkeu.go.id/dok/pmk-5-tahun-2026",
+  "pmk-6-2026": "https://www.pajak.go.id/sites/default/files/2026-04/Kebijakan%20Penghapusan%20Sanksi%20Administratif%20atas%20Keterlambatan%20Pembayaran%20dan%20Pelaporan%20Surat%20Pemberitahuan%20Tahunan%20Pajak%20Penghasilan%20Badan%20untuk%20Tahun%20Pajak%202025.pdf",
+  "pmk-28-2026": "https://pajak.go.id/id/peraturan/tata-cara-pengembalian-pendahuluankelebihan-pembayaran-pajak",
+  "kep-71-pj-2026": "https://jdih.kemenkeu.go.id/dok/pmk-6-tahun-2026"
+};
+
+const processItems = (items: any[]) => {
+  // Apply URL overrides
+  items.forEach(item => {
+    if (urlOverrides[item.id]) {
+      item.referenceUrl = urlOverrides[item.id];
+    }
+  });
+
+  // Sort chronologically
   return [...items].sort((a, b) => {
     const idxA = chronologicalOrder.indexOf(a.id);
     const idxB = chronologicalOrder.indexOf(b.id);
@@ -595,8 +613,8 @@ const sortItems = (items: any[]) => {
   });
 };
 
-translations.en.announcement.items = sortItems(translations.en.announcement.items);
-translations.id.announcement.items = sortItems(translations.id.announcement.items);
-translations.cn.announcement.items = sortItems(translations.cn.announcement.items);
+translations.en.announcement.items = processItems(translations.en.announcement.items);
+translations.id.announcement.items = processItems(translations.id.announcement.items);
+translations.cn.announcement.items = processItems(translations.cn.announcement.items);
 
 export type Language = keyof typeof translations
