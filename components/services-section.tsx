@@ -73,7 +73,7 @@ export function ServicesSection() {
           transition={{ duration: 0.6 }}
           className="mb-16 text-center"
         >
-          <h2 className="mb-6 font-serif text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
+          <h2 className="mb-6 font-sans text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
             {t.services.title}
           </h2>
           <p className="mx-auto max-w-3xl text-xl leading-relaxed text-muted-foreground">
@@ -124,7 +124,7 @@ export function ServicesSection() {
                           className="h-full"
                         >
                           <Card
-                            className="group hover-lift h-full border-none bg-transparent transition-all duration-300 hover:shadow-xl backdrop-blur-[2px] cursor-pointer flex flex-col"
+                            className="group hover-lift h-full border-none bg-background/50 backdrop-blur-md transition-all duration-300 hover:shadow-xl hover:bg-background/70 cursor-pointer flex flex-col"
                           >
                             <CardHeader className="space-y-4">
                               <div className="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-primary/5 transition-all duration-300 group-hover:bg-primary/20 group-hover:scale-110">

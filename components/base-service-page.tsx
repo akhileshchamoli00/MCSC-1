@@ -58,7 +58,7 @@ export function BaseServicePage({
             <div className="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 mb-8 backdrop-blur-sm border border-primary/20">
               <Icon className="h-10 w-10 text-primary" />
             </div>
-            <h1 className="mb-6 text-4xl font-bold tracking-tight text-foreground md:text-6xl font-serif">
+            <h1 className="mb-6 text-4xl font-bold tracking-tight text-foreground md:text-6xl font-sans">
               {getTranslation(title, language)}
             </h1>
             <p className="text-xl text-muted-foreground text-pretty leading-relaxed max-w-3xl mx-auto">
@@ -92,7 +92,7 @@ export function BaseServicePage({
                   colors={['#1e40af', '#10b981', '#f97316']}
                   className="h-full"
                 >
-                  <Card className="h-full border-none bg-background/40 backdrop-blur-md transition-all duration-300 hover:bg-background/60 flex flex-col">
+                  <Card className="h-full border-none bg-background/50 backdrop-blur-md transition-all duration-300 hover:bg-background/70 flex flex-col">
                     <CardHeader className="pb-6">
                       <CardTitle className="text-2xl font-bold leading-tight mb-2">
                         {getTranslation(service.title, language)}

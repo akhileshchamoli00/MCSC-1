@@ -93,7 +93,7 @@ export default function AnnouncementDetailPage() {
             {language === "en" ? "Back to Home" : (language === "cn" ? "返回主页" : "Kembali ke Beranda")}
           </Button>
 
-          <Card className="border-2 border-primary/20 bg-background/40 backdrop-blur-md shadow-2xl overflow-hidden rounded-2xl">
+          <Card className="border-2 border-primary/20 bg-background/50 backdrop-blur-md shadow-2xl overflow-hidden rounded-2xl">
             <CardHeader className="pt-10 pb-6 px-8 md:px-12 border-b border-primary/10">
               <div className="flex items-center gap-3 text-primary font-medium mb-4">
                 <Calendar className="h-5 w-5" />
@@ -148,7 +148,7 @@ export default function AnnouncementDetailPage() {
                         </span>
                         <div className="flex-1">
                           {prov.term && (
-                            <h4 className="font-serif font-bold text-lg text-foreground mb-2 group-hover:text-primary transition-colors">
+                            <h4 className="font-sans font-bold text-lg text-foreground mb-2 group-hover:text-primary transition-colors">
                               {prov.term}
                             </h4>
                           )}

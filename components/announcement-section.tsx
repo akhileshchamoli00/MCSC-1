@@ -72,7 +72,7 @@ export function AnnouncementSection() {
           transition={{ duration: 0.6 }}
           className="mb-16 text-center"
         >
-          <h2 className="mb-6 font-serif text-4xl font-bold tracking-tight text-foreground md:text-5xl">
+          <h2 className="mb-6 font-sans text-4xl font-bold tracking-tight text-foreground md:text-5xl">
             {t.announcement.title}
           </h2>
           <p className="mx-auto max-w-3xl text-xl leading-relaxed text-muted-foreground">
@@ -119,7 +119,7 @@ export function AnnouncementSection() {
                         colors={['#1e40af', '#10b981', '#f97316']}
                         className="h-full"
                       >
-                        <Card className="hover-lift h-full border-none bg-transparent backdrop-blur-[2px] transition-all duration-300 hover:shadow-xl cursor-pointer flex flex-col">
+                        <Card className="hover-lift h-full border-none bg-background/50 backdrop-blur-md transition-all duration-300 hover:shadow-xl hover:bg-background/70 cursor-pointer flex flex-col">
                           <CardHeader className="pb-4">
                             <div className="flex items-center gap-2 text-sm text-primary mb-3 font-medium">
                               <Calendar className="h-4 w-4" />

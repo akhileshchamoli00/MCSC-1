@@ -50,7 +50,7 @@ export default function ServiceDetailPage() {
             {language === "en" ? "Back to Services" : (language === "cn" ? "返回服务" : "Kembali ke Layanan")}
           </Button>
  
-          <Card className="border-2 border-primary/20 bg-background/40 backdrop-blur-md shadow-2xl overflow-hidden rounded-2xl">
+          <Card className="border-2 border-primary/20 bg-background/50 backdrop-blur-md shadow-2xl overflow-hidden rounded-2xl">
             <CardHeader className="pt-12 pb-8 px-8 md:px-12 border-b border-primary/10">
               <div className="flex items-center gap-6">
                 <div className="h-20 w-20 flex items-center justify-center rounded-2xl bg-primary/10 text-primary shrink-0">

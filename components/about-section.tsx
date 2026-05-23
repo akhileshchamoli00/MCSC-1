@@ -14,7 +14,7 @@ export function AboutSection() {
       <div className="container mx-auto px-4">
         {/* Header Section */}
         <div className="mx-auto max-w-3xl text-center mb-16">
-          <h2 className="font-serif text-4xl font-bold leading-[1.1] tracking-tight text-foreground md:text-5xl lg:text-6xl">
+          <h2 className="font-sans text-4xl font-bold leading-[1.1] tracking-tight text-foreground md:text-5xl lg:text-6xl">
             {t.about.title}
           </h2>
         </div>

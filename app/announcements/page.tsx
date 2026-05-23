@@ -92,7 +92,7 @@ export default function AnnouncementsPage() {
                       colors={['#1e40af', '#10b981', '#f97316']}
                       className="h-full"
                     >
-                      <Card className="border-none bg-background/40 backdrop-blur-md transition-all duration-300 hover:bg-background/60 cursor-pointer h-full">
+                      <Card className="border-none bg-background/50 backdrop-blur-md transition-all duration-300 hover:bg-background/70 cursor-pointer h-full">
                         <CardHeader>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                             <Calendar className="h-4 w-4" />
