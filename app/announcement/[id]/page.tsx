@@ -21,7 +21,7 @@ export default function AnnouncementDetailPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Announcement Not Found</h1>
+          <h1 className="text-2xl font-bold mb-4">Regulation Not Found</h1>
           <Button onClick={() => router.push("/")}>Go Home</Button>
         </div>
       </div>
@@ -90,7 +90,7 @@ export default function AnnouncementDetailPage() {
             onClick={() => router.back()}
           >
             <ArrowLeft className="mr-2 h-5 w-5 transition-transform group-hover:-translate-x-1" />
-            {language === "en" ? "Back to Home" : "Kembali ke Beranda"}
+            {language === "en" ? "Back to Home" : (language === "cn" ? "返回主页" : "Kembali ke Beranda")}
           </Button>
 
           <Card className="border-2 border-primary/20 bg-background/40 backdrop-blur-md shadow-2xl overflow-hidden rounded-2xl">
@@ -194,7 +194,7 @@ export default function AnnouncementDetailPage() {
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3.5 font-semibold text-primary-foreground transition-all hover:opacity-90 hover:scale-105 active:scale-95 shadow-lg shadow-primary/20 text-sm"
                     >
-                      {language === "en" ? "View Official Reference (BPK)" : "Lihat Referensi Resmi (BPK)"}
+                      {language === "en" ? "View Official Reference (BPK)" : (language === "cn" ? "查看官方参考 (BPK)" : "Lihat Referensi Resmi (BPK)")}
                       <ExternalLink className="h-4 w-4" />
                     </a>
                   )}
@@ -205,7 +205,9 @@ export default function AnnouncementDetailPage() {
                 <p className="text-sm text-muted-foreground italic">
                   {language === "en" 
                     ? "Published by MCS Consulting Media Team" 
-                    : "Diterbitkan oleh Tim Media MCS Consulting"}
+                    : (language === "cn" 
+                      ? "由 MCS 咨询媒体团队发布" 
+                      : "Diterbitkan oleh Tim Media MCS Consulting")}
                 </p>
               </div>
             </CardContent>

@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Geist, Geist_Mono, Playfair_Display } from "next/font/google"
+import { Geist, Geist_Mono, Playfair_Display, Antonio } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { LanguageProvider } from "@/contexts/language-context"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -13,6 +13,7 @@ import "./globals.css"
 const geistSans = Geist({ subsets: ["latin"], variable: "--font-sans" })
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" })
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-serif" })
+const antonio = Antonio({ subsets: ["latin"], variable: "--font-antonio" })
 
 export const metadata: Metadata = {
   title: "MCS Consulting - Comprehensive Business Licensing Solution",
@@ -34,7 +35,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`scroll-smooth ${geistSans.variable} ${geistMono.variable} ${playfair.variable}`}
+      className={`scroll-smooth ${antonio.variable} ${geistSans.variable} ${geistMono.variable} ${playfair.variable}`}
       suppressHydrationWarning
     >
       <body className="font-sans antialiased min-h-screen bg-transparent text-foreground selection:bg-primary/30 relative">

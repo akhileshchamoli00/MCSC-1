@@ -181,8 +181,6 @@ export default function EstablishmentPage() {
       title: { en: "Sole Proprietorship", id: "Usaha Perseorangan", cn: "设立独资企业 (Usaha Perseorangan)" },
       items: {
         en: [
-          "Deed of Establishment",
-          "Ministry of Law and Human Rights Decree",
           "Tax Identification Number (NPWP)",
           "Company Details",
           "OSS Account",
@@ -190,8 +188,6 @@ export default function EstablishmentPage() {
           "Business Identification Number (NIB)",
         ],
         id: [
-          "Akta Pendirian",
-          "SK Kemenkumham",
           "NPWP Asli",
           "Keterangan Perusahaan",
           "Akun OSS",
@@ -199,8 +195,6 @@ export default function EstablishmentPage() {
           "Nomor Induk Berusaha (NIB)",
         ],
         cn: [
-          "设立契约",
-          "法律与人权部批文",
           "原件税务登记号 (NPWP)",
           "公司说明文件",
           "OSS 账号",

@@ -114,19 +114,19 @@ export default function WorkPermitPage() {
       items: {
         en: [
           "Residence Certificate (SKTT)",
-          "Reporting Certificate (STM)",
+          "Reporting Certificate (TTKOA)",
           "Dukcapil & Police Coordination",
           "Identity Documents for Foreigners",
         ],
         id: [
           "Surat Keterangan Tinggal Tetap (SKTT)",
-          "Surat Keterangan Melapor (STM)",
+          "Surat Keterangan Melapor (TTKOA)",
           "Koordinasi Dukcapil & Polisi",
           "Dokumen Identitas Orang Asing",
         ],
         cn: [
           "临时居留证明 (SKTT)",
-          "警方申报证明 (STM)",
+          "警方申报证明 (TTKOA)",
           "户政局与警方协调对接",
           "外籍人士身份证明文件",
         ],
@@ -134,8 +134,8 @@ export default function WorkPermitPage() {
     },
   ]
 
-  const ctaText = { 
-    en: "Simplify Your Immigration Process", 
+  const ctaText = {
+    en: "Simplify Your Immigration Process",
     id: "Permudah Proses Imigrasi Anda",
     cn: "简化您的移民与签证流程",
   }

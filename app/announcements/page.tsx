@@ -51,7 +51,7 @@ export default function AnnouncementsPage() {
                 transition={{ duration: 0.6 }}
               >
                 <div className="mb-4 inline-flex rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
-                  {language === "en" ? "News & Announcements" : (language === "cn" ? "新闻与公告" : "Berita & Pengumuman")}
+                  {language === "en" ? "Regulations" : (language === "cn" ? "政策法规" : "Regulasi")}
                 </div>
                 <h1 className="mb-6 text-4xl font-bold text-balance md:text-5xl">
                   {language === "en" ? "Latest Regulatory Updates" : (language === "cn" ? "最新监管动态" : "Pembaruan Regulasi Terbaru")}
@@ -107,7 +107,7 @@ export default function AnnouncementsPage() {
                             {announcement.content}
                           </p>
                           <div className="flex items-center text-primary text-sm font-semibold group-hover:gap-2 transition-all">
-                            {language === "en" ? "Read Full Announcement" : (language === "cn" ? "阅读完整公告" : "Baca Selengkapnya")}
+                            {language === "en" ? "Read Full Regulation" : (language === "cn" ? "阅读完整法规" : "Baca Selengkapnya")}
                             <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
                           </div>
                         </CardContent>

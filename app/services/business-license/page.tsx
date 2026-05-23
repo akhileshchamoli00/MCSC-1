@@ -50,9 +50,9 @@ export default function BusinessLicensePage() {
         cn: "申请成为增值税一般纳税人 (PKP)",
       },
       items: {
-        en: ["Taxable Entrepreneur Certificate", "Activation Code", "Password Activation Code"],
-        id: ["Sertifikat Pengusaha Kena Pajak", "Kode Aktivasi", "Password Kode Aktivasi"],
-        cn: ["增值税一般纳税人证书", "激活码", "密码激活码"],
+        en: ["Taxable Entrepreneur Certificate"],
+        id: ["Sertifikat Pengusaha Kena Pajak"],
+        cn: ["增值税一般纳税人证书"],
       },
     },
     {
@@ -74,9 +74,9 @@ export default function BusinessLicensePage() {
         cn: "注册税务登记号 (NPWP)",
       },
       items: {
-        en: ["NPWP Registration", "Original NPWP Card", "Tax Registration Certificate"],
-        id: ["Pendaftaran NPWP", "Kartu NPWP Asli", "Surat Keterangan Terdaftar Pajak"],
-        cn: ["NPWP 注册", "原件 NPWP 卡", "税务登记证"],
+        en: ["NPWP Registration", "Tax Registration Certificate"],
+        id: ["Pendaftaran NPWP", "Surat Keterangan Terdaftar Pajak"],
+        cn: ["NPWP 注册", "税务登记证"],
       },
     },
   ]

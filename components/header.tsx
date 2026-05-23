@@ -47,7 +47,7 @@ export function Header() {
             <Link
               key={item.href}
               href={item.href}
-              className={`group relative px-5 py-2 text-[16px] font-semibold tracking-wide transition-colors duration-300 ${pathname === item.href ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              className={`group relative px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${pathname === item.href ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               {item.label}
@@ -65,7 +65,7 @@ export function Header() {
           >
             <Link
               href="/services"
-              className={`group relative flex items-center gap-1 px-5 py-2 text-[16px] font-semibold tracking-wide transition-colors duration-300 ${pathname.startsWith("/services") ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              className={`group relative flex items-center gap-1 px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${pathname.startsWith("/services") ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               {t.nav.services}
@@ -105,7 +105,7 @@ export function Header() {
             <Link
               key={item.href}
               href={item.href}
-              className={`group relative px-5 py-2 text-[16px] font-semibold tracking-wide transition-colors duration-300 ${pathname === item.href ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              className={`group relative px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${pathname === item.href ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               {item.label}
