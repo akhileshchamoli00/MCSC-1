@@ -28,7 +28,7 @@ export function Hero() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
-              className="font-serif text-5xl font-bold leading-[1.15] tracking-tight text-foreground md:text-6xl lg:text-7xl bg-clip-text text-transparent bg-gradient-to-b from-foreground via-foreground/90 to-foreground/70"
+              className="font-sans text-5xl font-bold leading-[1.15] tracking-tight text-foreground md:text-6xl lg:text-7xl bg-clip-text text-transparent bg-gradient-to-b from-foreground via-foreground/90 to-foreground/70"
             >
               {t.hero.title || "Streamline Business Licensing. Instantly."}
             </motion.h1>
