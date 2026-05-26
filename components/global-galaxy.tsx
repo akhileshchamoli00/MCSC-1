@@ -17,7 +17,7 @@ export function GlobalGalaxy() {
   const isDarkMode = resolvedTheme === "dark"
 
   return (
-    <div className="fixed inset-0 z-[-1] pointer-events-auto">
+    <div className="fixed inset-0 z-[-1] pointer-events-auto bg-background transition-colors duration-500">
       {isDarkMode ? (
         <div className="w-full h-full opacity-80 flex items-center justify-center">
           <div style={{ width: '1080px', height: '1080px', position: 'relative' }}>

@@ -2,6 +2,9 @@ export const translations = {
   en: {
     nav: {
       home: "Home",
+      intellectualProperty: "Intellectual Property",
+      brandClassification: "Brand Classification",
+      checkApplicationStatus: "Check Application Status",
       about: "About Us",
       services: "Services",
       announcement: "Regulations",
@@ -194,6 +197,9 @@ export const translations = {
   id: {
     nav: {
       home: "Beranda",
+      intellectualProperty: "Kekayaan Intelektual",
+      brandClassification: "Klasifikasi Merek",
+      checkApplicationStatus: "Cek Status Permohonan",
       about: "Tentang Kami",
       services: "Layanan",
       announcement: "Regulasi",
@@ -386,6 +392,9 @@ export const translations = {
   cn: {
     nav: {
       home: "首页",
+      intellectualProperty: "知识产权",
+      brandClassification: "商标分类",
+      checkApplicationStatus: "查询申请状态",
       about: "关于我们",
       services: "服务项目",
       announcement: "政策法规",

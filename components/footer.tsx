@@ -30,6 +30,11 @@ export function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/intellectual-property" className="text-muted-foreground transition-colors hover:text-foreground">
+                  {t.nav.intellectualProperty}
+                </Link>
+              </li>
+              <li>
                 <Link href="/about" className="text-muted-foreground transition-colors hover:text-foreground">
                   {t.nav.about}
                 </Link>
