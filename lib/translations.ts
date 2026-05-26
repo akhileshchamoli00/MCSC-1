@@ -10,6 +10,7 @@ export const translations = {
       announcement: "Regulations",
       contact: "Contact Us",
     },
+    logoSubtext: "License • Financial Reports • Intellectual Property",
     hero: {
       title: "Comprehensive Business Licensing Solution",
       description:
@@ -205,6 +206,7 @@ export const translations = {
       announcement: "Regulasi",
       contact: "Hubungi Kami",
     },
+    logoSubtext: "Perizinan • Laporan Keuangan • Kekayaan Intelektual",
     hero: {
       title: "Solusi Perizinan Usaha Komprehensif",
       description:
@@ -400,6 +402,7 @@ export const translations = {
       announcement: "政策法规",
       contact: "联系我们",
     },
+    logoSubtext: "许可 • 财务报告 • 知识产权",
     hero: {
       title: "全方位的业务许可解决方案",
       description:

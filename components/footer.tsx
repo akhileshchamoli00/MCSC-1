@@ -16,7 +16,7 @@ export function Footer() {
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
           <div>
             <div className="mb-4 flex items-center gap-2">
-              <AskLogo className="h-28 w-auto" />
+              <AskLogo className="h-16 w-auto" />
             </div>
             <p className="text-sm leading-relaxed text-muted-foreground">{t.footer.tagline}</p>
           </div>

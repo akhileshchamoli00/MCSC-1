@@ -44,7 +44,7 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex py-4 items-center justify-between px-4 lg:px-8">
         <Link href="/" className="group flex items-center gap-3 transition-all duration-300">
-          <AskLogo className="h-28 w-auto transition-transform duration-300 group-hover:scale-105" />
+          <AskLogo className="h-16 w-auto transition-transform duration-300 group-hover:scale-105" />
         </Link>
 
         {/* Desktop Navigation */}
