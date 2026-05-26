@@ -38,6 +38,53 @@ export default function AnnouncementsPage() {
     setIsLoading(false)
     setIsSubscribed(true)
   }
+  const taxLicenseRegulations = t.announcement.items.filter(item => item.date.includes("25 Feb") || item.date.includes("23 Feb"))
+  const financeRegulations = t.announcement.items.filter(item => !(item.date.includes("25 Feb") || item.date.includes("23 Feb")))
+
+  const renderAnnouncementCard = (announcement: any, index: number) => (
+    <motion.div
+      key={announcement.id}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: index * 0.1 }}
+    >
+      <Link href={`/announcement/${announcement.id}`} className="block group">
+        <BorderGlow
+          edgeSensitivity={30}
+          glowColor="220 80 80"
+          backgroundColor="transparent"
+          borderRadius={16}
+          glowRadius={40}
+          glowIntensity={1}
+          coneSpread={25}
+          animated={false}
+          colors={['#1e40af', '#10b981', '#f97316']}
+          className="h-full"
+        >
+          <Card className="border-none bg-background/50 backdrop-blur-md transition-all duration-300 hover:bg-background/70 cursor-pointer h-full">
+            <CardHeader>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                <Calendar className="h-4 w-4" />
+                <span>{announcement.date}</span>
+              </div>
+              <CardTitle className="text-2xl group-hover:text-primary transition-colors line-clamp-2">
+                {announcement.title}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground line-clamp-3 mb-6">
+                {announcement.content}
+              </p>
+              <div className="flex items-center text-primary text-sm font-semibold group-hover:gap-2 transition-all">
+                {language === "en" ? "Read Full Regulation" : (language === "cn" ? "阅读完整法规" : "Baca Selengkapnya")}
+                <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
+              </div>
+            </CardContent>
+          </Card>
+        </BorderGlow>
+      </Link>
+    </motion.div>
+  )
 
   return (
     <main>
@@ -70,52 +117,27 @@ export default function AnnouncementsPage() {
 
         {/* Announcements List */}
         <section className="pt-4 pb-20">
-          <div className="container mx-auto px-4">
-            <div className="grid gap-8 max-w-4xl mx-auto">
-              {t.announcement.items.map((announcement, index) => (
-                <motion.div
-                  key={announcement.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                >
-                  <Link href={`/announcement/${announcement.id}`} className="block group">
-                    <BorderGlow
-                      edgeSensitivity={30}
-                      glowColor="220 80 80"
-                      backgroundColor="transparent"
-                      borderRadius={16}
-                      glowRadius={40}
-                      glowIntensity={1}
-                      coneSpread={25}
-                      animated={false}
-                      colors={['#1e40af', '#10b981', '#f97316']}
-                      className="h-full"
-                    >
-                      <Card className="border-none bg-background/50 backdrop-blur-md transition-all duration-300 hover:bg-background/70 cursor-pointer h-full">
-                        <CardHeader>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                            <Calendar className="h-4 w-4" />
-                            <span>{announcement.date}</span>
-                          </div>
-                          <CardTitle className="text-2xl group-hover:text-primary transition-colors line-clamp-2">
-                            {announcement.title}
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-muted-foreground line-clamp-3 mb-6">
-                            {announcement.content}
-                          </p>
-                          <div className="flex items-center text-primary text-sm font-semibold group-hover:gap-2 transition-all">
-                            {language === "en" ? "Read Full Regulation" : (language === "cn" ? "阅读完整法规" : "Baca Selengkapnya")}
-                            <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </BorderGlow>
-                  </Link>
-                </motion.div>
-              ))}
+          <div className="container mx-auto px-4 max-w-6xl">
+            <div className="grid gap-8 lg:grid-cols-2">
+              {/* Tax Regulations (Left) */}
+              <div>
+                <h2 className="mb-8 text-2xl font-bold text-center border-b border-zinc-200/60 dark:border-zinc-800/60 pb-4 text-foreground/90">
+                  {language === "en" ? "Tax Regulations" : (language === "cn" ? "税务法规" : "Regulasi Pajak")}
+                </h2>
+                <div className="grid gap-8">
+                  {financeRegulations.map((announcement, index) => renderAnnouncementCard(announcement, index))}
+                </div>
+              </div>
+
+              {/* License Regulations (Right) */}
+              <div>
+                <h2 className="mb-8 text-2xl font-bold text-center border-b border-zinc-200/60 dark:border-zinc-800/60 pb-4 text-foreground/90">
+                  {language === "en" ? "License Regulations" : (language === "cn" ? "许可法规" : "Regulasi Izin")}
+                </h2>
+                <div className="grid gap-8">
+                  {taxLicenseRegulations.map((announcement, index) => renderAnnouncementCard(announcement, index))}
+                </div>
+              </div>
             </div>
           </div>
         </section>

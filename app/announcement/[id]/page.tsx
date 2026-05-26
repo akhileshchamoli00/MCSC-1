@@ -33,45 +33,47 @@ export default function AnnouncementDetailPage() {
   const introParagraphs: string[] = []
   const provisions: Array<{ number: string; term: string; definition: string }> = []
 
-  lines.forEach((line) => {
-    const trimmed = line.trim()
-    if (!trimmed) return
+  if (announcement.id !== "kepgub-310-2026") {
+    lines.forEach((line) => {
+      const trimmed = line.trim()
+      if (!trimmed) return
 
-    // Regex to match lines starting with numbers like "1. ", "40. "
-    const match = trimmed.match(/^(\d+)\.\s*(.*)$/)
-    if (match) {
-      const num = match[1]
-      const rest = match[2]
+      // Regex to match lines starting with numbers like "1. ", "40. "
+      const match = trimmed.match(/^(\d+)\.\s*(.*)$/)
+      if (match) {
+        const num = match[1]
+        const rest = match[2]
 
-      // Try to split the term and definition by the first colon ":"
-      const colonIdx = rest.indexOf(":")
-      if (colonIdx !== -1) {
-        const term = rest.substring(0, colonIdx).trim()
-        const definition = rest.substring(colonIdx + 1).trim()
-        provisions.push({
-          number: num.padStart(2, "0"),
-          term,
-          definition
-        })
+        // Try to split the term and definition by the first colon ":"
+        const colonIdx = rest.indexOf(":")
+        if (colonIdx !== -1) {
+          const term = rest.substring(0, colonIdx).trim()
+          const definition = rest.substring(colonIdx + 1).trim()
+          provisions.push({
+            number: num.padStart(2, "0"),
+            term,
+            definition
+          })
+        } else {
+          provisions.push({
+            number: num.padStart(2, "0"),
+            term: "",
+            definition: rest
+          })
+        }
       } else {
-        provisions.push({
-          number: num.padStart(2, "0"),
-          term: "",
-          definition: rest
-        })
+        // Exclude generic header lines from intro paragraphs
+        const lower = trimmed.toLowerCase()
+        if (
+          !lower.includes("provisions & definitions") && 
+          !lower.includes("ketentuan umum & definisi") && 
+          !lower.includes("项核心规定与定义")
+        ) {
+          introParagraphs.push(trimmed)
+        }
       }
-    } else {
-      // Exclude generic header lines from intro paragraphs
-      const lower = trimmed.toLowerCase()
-      if (
-        !lower.includes("provisions & definitions") && 
-        !lower.includes("ketentuan umum & definisi") && 
-        !lower.includes("项核心规定与定义")
-      ) {
-        introParagraphs.push(trimmed)
-      }
-    }
-  })
+    })
+  }
 
   // Filter provisions based on search query
   const filteredProvisions = provisions.filter(
@@ -94,12 +96,12 @@ export default function AnnouncementDetailPage() {
           </Button>
 
           <Card className="border-2 border-primary/20 bg-background/50 backdrop-blur-md shadow-2xl overflow-hidden rounded-2xl">
-            <CardHeader className="pt-10 pb-6 px-8 md:px-12 border-b border-primary/10">
-              <div className="flex items-center gap-3 text-primary font-medium mb-4">
+            <CardHeader className="pt-10 pb-6 px-8 md:px-12 border-b border-primary/10 text-center flex flex-col items-center">
+              <div className="flex items-center justify-center gap-3 text-primary font-medium mb-4">
                 <Calendar className="h-5 w-5" />
                 <span>{announcement.date}</span>
               </div>
-              <CardTitle className="text-3xl md:text-5xl font-bold leading-tight tracking-tight text-foreground">
+              <CardTitle className="text-3xl md:text-5xl font-bold leading-tight tracking-tight text-foreground text-center">
                 {announcement.title}
               </CardTitle>
             </CardHeader>
@@ -169,9 +171,19 @@ export default function AnnouncementDetailPage() {
               ) : (
                 /* Fallback for regular announcements */
                 <div className="prose prose-lg dark:prose-invert max-w-none">
-                  <p className="text-xl leading-relaxed text-muted-foreground whitespace-pre-wrap">
-                    {announcement.content}
-                  </p>
+                  {announcement.id === "kepgub-310-2026" ? (
+                    <div className="text-xl leading-relaxed text-muted-foreground">
+                      {announcement.content.split('\n').map((line, idx) => (
+                        <div key={idx} className={idx <= 13 ? "text-center font-bold" : "whitespace-pre-wrap"}>
+                          {line === "" ? <br /> : line}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xl leading-relaxed text-muted-foreground whitespace-pre-wrap">
+                      {announcement.content}
+                    </p>
+                  )}
                 </div>
               )}
 
