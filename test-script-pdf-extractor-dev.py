@@ -2,16 +2,15 @@ import pymupdf4llm
 import pathlib
 
 # Your file name
-pdf_path = "PMK NOMOR 28 TAHUN 2026.pdf"
+pdf_path = "public/AnnouncementDocs/Permenkum No. 5 Tahun 2026 Tentang Pendaftaran Merek.pdf"
 
 print("Extracting and formatting... give it a sec.")
 
-# Extract pages 1 to 35 (0-indexed: 0 to 34)
-# This library automatically formats tables, bold text, and lists into Markdown
-md_text = pymupdf4llm.to_markdown(pdf_path, pages=list(range(35)))
+# Extract all pages
+md_text = pymupdf4llm.to_markdown(pdf_path)
 
 # Save it out to a clean Markdown file
-output_path = pathlib.Path("PMK_28_Extracted.md")
+output_path = pathlib.Path("Permenkum_5_Extracted.md")
 output_path.write_bytes(md_text.encode("utf-8"))
 
 print(f"Done! Clean Markdown saved to {output_path.name}")
