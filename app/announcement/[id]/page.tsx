@@ -168,24 +168,24 @@ export default function AnnouncementDetailPage() {
                     </div>
                   )}
                 </div>
-              ) : (
-                /* Fallback for regular announcements */
-                <div className="prose prose-lg dark:prose-invert max-w-none">
-                  {announcement.id === "kepgub-310-2026" ? (
-                    <div className="text-xl leading-relaxed text-muted-foreground">
-                      {announcement.content.split('\n').map((line, idx) => (
-                        <div key={idx} className={idx <= 13 ? "text-center font-bold" : "whitespace-pre-wrap"}>
+              ) : (() => {
+                let hasSeenLowercase = false;
+                return (
+                  <div className="prose prose-lg dark:prose-invert max-w-none text-xl leading-relaxed text-muted-foreground">
+                    {announcement.content.split('\n').map((line, idx) => {
+                      if (!hasSeenLowercase && line !== line.toUpperCase()) {
+                        hasSeenLowercase = true;
+                      }
+                      const isHeader = !hasSeenLowercase;
+                      return (
+                        <div key={idx} className={isHeader ? "text-center font-bold" : "whitespace-pre-wrap text-justify"}>
                           {line === "" ? <br /> : line}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xl leading-relaxed text-muted-foreground whitespace-pre-wrap">
-                      {announcement.content}
-                    </p>
-                  )}
-                </div>
-              )}
+                      )
+                    })}
+                  </div>
+                );
+              })()}
 
               {((announcement as any).referenceUrl || (announcement as any).downloadUrl) && (
                 <div className="mt-12 pt-8 border-t border-primary/10 flex flex-wrap gap-4 justify-start">
