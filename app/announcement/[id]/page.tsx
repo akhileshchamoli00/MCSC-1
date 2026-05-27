@@ -33,7 +33,11 @@ export default function AnnouncementDetailPage() {
   const introParagraphs: string[] = []
   const provisions: Array<{ number: string; term: string; definition: string }> = []
 
-  if (announcement.id !== "kepgub-310-2026") {
+  const hasProvisionsMarker = announcement.content.toLowerCase().includes("provisions & definitions") || 
+                              announcement.content.toLowerCase().includes("ketentuan umum & definisi") ||
+                              announcement.content.includes("项核心规定与定义")
+
+  if (hasProvisionsMarker) {
     lines.forEach((line) => {
       const trimmed = line.trim()
       if (!trimmed) return
