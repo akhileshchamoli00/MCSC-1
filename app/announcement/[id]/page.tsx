@@ -110,6 +110,7 @@ export default function AnnouncementDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="py-10 px-8 md:px-12">
+
               {/* Intro paragraphs */}
               {introParagraphs.length > 0 && (
                 <div className="mb-10 space-y-4">
@@ -190,6 +191,56 @@ export default function AnnouncementDetailPage() {
                   </div>
                 );
               })()}
+
+              {/* Summary and Key Points */}
+              {((announcement as any).summary || (announcement as any).keyPoints) && (
+                <div className="mt-16 relative animate-in fade-in slide-in-from-bottom-4 duration-700">
+                  {/* Decorative background blur gradient */}
+                  <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-primary/10 rounded-3xl blur opacity-25" />
+                  
+                  {/* Glassmorphic Container */}
+                  <div className="relative backdrop-blur-xl bg-background/40 border border-primary/20 shadow-2xl rounded-3xl p-8 md:p-12 overflow-hidden">
+                    
+                    {/* Subtle noise/texture overlay for premium feel */}
+                    <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none mix-blend-overlay" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.65\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }}></div>
+
+                    {/* Summary Section */}
+                    {(announcement as any).summary && (
+                      <div className="relative z-10 mb-10">
+                        <div className="flex items-center gap-4 mb-6">
+                          <div className="h-10 w-1 rounded-full bg-primary" />
+                          <h3 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
+                            {language === "en" ? "Executive Summary" : (language === "cn" ? "执行摘要" : "Ringkasan Eksekutif")}
+                          </h3>
+                        </div>
+                        <p className="text-lg md:text-xl leading-relaxed text-muted-foreground/90 font-medium pl-5 border-l border-primary/20 whitespace-pre-wrap">
+                          {(announcement as any).summary}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Key Points Section */}
+                    {(announcement as any).keyPoints && (announcement as any).keyPoints.length > 0 && (
+                      <div className="relative z-10 pt-8 border-t border-primary/10">
+                        <h3 className="text-xl md:text-2xl font-bold text-foreground mb-6 flex items-center gap-3">
+                          <span className="text-primary opacity-80">✦</span>
+                          {language === "en" ? "Key Takeaways" : (language === "cn" ? "核心要点" : "Poin Utama")}
+                        </h3>
+                        <ul className="flex flex-col gap-4 pl-2">
+                          {(announcement as any).keyPoints.map((point: string, idx: number) => (
+                            <li key={idx} className="flex gap-4 text-muted-foreground items-start group/item">
+                              <span className="text-primary/50 mt-2 shrink-0 transition-colors group-hover/item:text-primary">
+                                <div className="h-2 w-2 rounded-full bg-current" />
+                              </span>
+                              <span className="leading-relaxed text-base md:text-lg">{point}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {((announcement as any).referenceUrl || (announcement as any).downloadUrl) && (
                 <div className="mt-12 pt-8 border-t border-primary/10 flex flex-wrap gap-4 justify-start">
