@@ -3,7 +3,7 @@ import pathlib
 import json
 
 # Read extracted markdown
-text = pathlib.Path("Permenkum_5_Extracted.md").read_text(encoding="utf-8")
+text = pathlib.Path("PMK_28_Extracted.md").read_text(encoding="utf-8")
 
 # Clean up
 lines = text.split("\n")
@@ -30,15 +30,15 @@ ts_path = pathlib.Path("lib/translations.ts")
 ts_content = ts_path.read_text(encoding="utf-8")
 
 new_ts = []
-in_permenkum5 = False
+in_pmk28 = False
 skip_mode = False
 for line in ts_content.split('\n'):
-    if 'id: "permenkum-5-2026"' in line:
-        in_permenkum5 = True
+    if 'id: "pmk-28-2026"' in line:
+        in_pmk28 = True
         new_ts.append(line)
         continue
         
-    if in_permenkum5:
+    if in_pmk28:
         if line.strip().startswith('content:'):
             # inject our new content
             new_ts.append(f'          content: {escaped_text},')
@@ -49,10 +49,10 @@ for line in ts_content.split('\n'):
                 skip_mode = False
                 new_ts.append(line)
                 if '},' in line:
-                    in_permenkum5 = False
+                    in_pmk28 = False
             continue
         if '},' in line:
-            in_permenkum5 = False
+            in_pmk28 = False
             new_ts.append(line)
             continue
             
