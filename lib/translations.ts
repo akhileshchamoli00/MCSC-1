@@ -16,17 +16,18 @@ export const translations = {
     hero: {
       title: "Comprehensive Business Licensing Solution",
       description:
-        "We are here as your strategic partner in managing all aspects of business licensing. With in-depth expertise in business regulation, we ensure the smooth operation of your company.",
+        "Your Trusted Partner for Business Establishment, Licensing, Compliance, and Growth in Indonesia",
       cta: "Contact Us",
     },
     about: {
       title: "About Us",
       description:
-        "Founded in November 2013, PT Mandiri Cipta Solusi (MCS Consulting) has operated professionally in the business licensing field for over 10 years. We are committed to being a trusted partner for business owners by providing reliable, comprehensive, and professional services.",
+        "Since 2013, MCS Consulting has helped local businesses, foreign investors, and multinational companies successfully establish and expand their operations in Indonesia. With more than a decade of experience, our team provides end-to-end solutions covering company registration, business licensing, regulatory compliance, trademark registration, accounting, taxation, and virtual office services.",
       fullDescription: [
-        "MCS Consulting assists clients in establishing legal entities and business entities, ensuring each step is conducted accurately and in compliance with regulations. In addition, we offer intellectual property services, including trademark registration and license recording, to help protect your company's valuable assets.",
-        "Beyond entity establishment and brand protection, we also provide meticulous and professional bookkeeping services, supporting you in managing your business finances efficiently and transparently. With a complete range of services from licensing to bookkeeping, MCS Consulting is here to support the growth and success of your business.",
-        "Client trust is our priority, and with an experienced and skilled team, we are dedicated to delivering the best solutions for every business need.",
+        "MCS Consulting is a leading business consulting firm helping Indonesian companies, Chinese investors, and international businesses establish and grow their operations in Indonesia. Since 2013, we have provided comprehensive services including company registration (PT & PT PMA), business licensing, OSS RBA compliance, trademark registration, accounting and bookkeeping, tax compliance, and virtual office solutions.",
+        "Our experienced consultants guide clients through every stage of the business lifecycle—from market entry and company incorporation to ongoing regulatory compliance and operational support. With deep knowledge of Indonesian regulations and extensive experience assisting foreign-owned companies, we simplify complex processes and help businesses achieve their goals faster and with lower risk.",
+        "Whether you are starting a new venture, expanding into Indonesia, or seeking reliable compliance support, MCS Consulting provides the expertise and local knowledge needed to succeed in one of Southeast Asia's fastest-growing markets.",
+        "Helping Businesses Succeed in Indonesia Since 2013",
       ],
       staffTitle: "Our Staff",
       staffDescription:
@@ -499,22 +500,7 @@ export const translations = {
           referenceUrl: "#",
           downloadUrl: "/AnnouncementDocs/PERMENKUM%20NO.%2049.pdf",
         },
-        {
-          id: "new-tax-reg-2026",
-          title:
-            "PERATURAN PEMERINTAH TENTANG PENYELENGGARAAN PERIZINAN BERUSAHA BERBASIS RISIKO",
-          date: "27 May 2026",
-          summary:
-            "Peraturan ini berkaitan dengan penyelenggaraan perizinan berusaha berbasis risiko untuk mendukung cipta kerja dan menyederhanakan proses bisnis.",
-          keyPoints: [
-            "Penyederhanaan perizinan berusaha.",
-            "Pendekatan berbasis risiko.",
-          ],
-          content:
-            "TENTANG\nPENYELENGGARAAN PERIZINAN BERUSAHA BERBASIS RISIKO\n\nDENGAN RAHMAT TUHAN YANG MAHA ESA\n\nPRESIDEN REPUBLIK INDONESIA,\n\nMenimbang :\na. bahwa penyederhanaan perizinan Berusaha melalui penerapan Perizinan Berusaha Berbasis Risiko perlu dilakukan reformasi kebijakan secara berkelanjutan dalam mewujudkan kemudahan dalam memulai dan menjalankan usaha guna mendukung cipta kerja;\n\nb. bahwa penyederhanaan perizinan Berusaha melalui penerapan Perizinan Berusaha Berbasis Risiko sebagaimana telah diatur dalam Peraturan Pemerintah Nomor 5 Tahun 2021 tentang Penyelenggaraan Perizinan Berusaha Berbasis Risiko yang merupakan peraturan pelaksanaan Undang-Undang Nomor 11 Tahun 2020 tentang Cipta Kerja perlu disempurnakan untuk semakin memberikan kepastian hukum kepada pelaku usaha terutama mengenai proses bisnis dan jaminan kualitas layanan;\n\nc. bahwa dengan berlakunya Undang-Undang Nomor 6 Tahun 2023 tentang Penetapan Peraturan Pemerintah Pengganti Undang-Undang Nomor 2 Tahun 2022 tentang Cipta Kerja menjadi Undang-Undang, Peraturan Pemerintah Nomor 5 Tahun 2021 tentang Penyelenggaraan Perizinan Berusaha Berbasis Risiko perlu diganti;\n\nd. bahwa berdasarkan pertimbangan sebagaimana dimaksud dalam huruf a, huruf b, dan huruf c, perlu menetapkan Peraturan Pemerintah tentang Penyelenggaraan Perizinan Berusaha Berbasis Risiko;\n\nMengingat :\n1. Pasal 5 ayat (2) Undang-Undang Dasar Negara Republik Indonesia Tahun 1945;\n\n2. Undang-Undang Nomor 6 Tahun 2023 tentang Penetapan Peraturan Pemerintah Pengganti Undang-Undang Nomor 2 Tahun 2022 tentang Cipta Kerja menjadi Undang-Undang (Lembaran Negara Republik Indonesia Tahun 2023 Nomor 41, Tambahan Lembaran Negara Republik Indonesia Nomor 6856);\n\nMEMUTUSKAN :\n\nMenetapkan :\nPERATURAN PEMERINTAH TENTANG PENYELENGGARAAN PERIZINAN BERUSAHA BERBASIS RISIKO.\n",
-          referenceUrl: "#",
-          downloadUrl: "#",
-        },
+
         {
           id: "kepgub-310-2026",
           summary:
@@ -891,18 +877,7 @@ export const translations = {
           referenceUrl: "#",
           downloadUrl: "/AnnouncementDocs/PERMENKUM%20NO.%2049.pdf",
         },
-        {
-          id: "new-tax-reg-2026",
-          title: "关于实施基于风险的商业许可的政府法规",
-          date: "27 May 2026",
-          summary:
-            "本法规涉及实施基于风险的商业许可，以支持创造就业机会并简化业务流程。",
-          keyPoints: ["简化业务许可。", "基于风险的方法。"],
-          content:
-            "TENTANG\nPENYELENGGARAAN PERIZINAN BERUSAHA BERBASIS RISIKO\n\nDENGAN RAHMAT TUHAN YANG MAHA ESA\n\nPRESIDEN REPUBLIK INDONESIA,\n\nMenimbang :\na. bahwa penyederhanaan perizinan Berusaha melalui penerapan Perizinan Berusaha Berbasis Risiko perlu dilakukan reformasi kebijakan secara berkelanjutan dalam mewujudkan kemudahan dalam memulai dan menjalankan usaha guna mendukung cipta kerja;\n\nb. bahwa penyederhanaan perizinan Berusaha melalui penerapan Perizinan Berusaha Berbasis Risiko sebagaimana telah diatur dalam Peraturan Pemerintah Nomor 5 Tahun 2021 tentang Penyelenggaraan Perizinan Berusaha Berbasis Risiko yang merupakan peraturan pelaksanaan Undang-Undang Nomor 11 Tahun 2020 tentang Cipta Kerja perlu disempurnakan untuk semakin memberikan kepastian hukum kepada pelaku usaha terutama mengenai proses bisnis dan jaminan kualitas layanan;\n\nc. bahwa dengan berlakunya Undang-Undang Nomor 6 Tahun 2023 tentang Penetapan Peraturan Pemerintah Pengganti Undang-Undang Nomor 2 Tahun 2022 tentang Cipta Kerja menjadi Undang-Undang, Peraturan Pemerintah Nomor 5 Tahun 2021 tentang Penyelenggaraan Perizinan Berusaha Berbasis Risiko perlu diganti;\n\nd. bahwa berdasarkan pertimbangan sebagaimana dimaksud dalam huruf a, huruf b, dan huruf c, perlu menetapkan Peraturan Pemerintah tentang Penyelenggaraan Perizinan Berusaha Berbasis Risiko;\n\nMengingat :\n1. Pasal 5 ayat (2) Undang-Undang Dasar Negara Republik Indonesia Tahun 1945;\n\n2. Undang-Undang Nomor 6 Tahun 2023 tentang Penetapan Peraturan Pemerintah Pengganti Undang-Undang Nomor 2 Tahun 2022 tentang Cipta Kerja menjadi Undang-Undang (Lembaran Negara Republik Indonesia Tahun 2023 Nomor 41, Tambahan Lembaran Negara Republik Indonesia Nomor 6856);\n\nMEMUTUSKAN :\n\nMenetapkan :\nPERATURAN PEMERINTAH TENTANG PENYELENGGARAAN PERIZINAN BERUSAHA BERBASIS RISIKO.\n",
-          referenceUrl: "#",
-          downloadUrl: "#",
-        },
+
         {
           id: "kepgub-310-2026",
           summary:

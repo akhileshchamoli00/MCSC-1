@@ -78,7 +78,7 @@ export function ServicesSection() {
           </h2>
           <p className="mx-auto max-w-3xl text-xl leading-relaxed text-muted-foreground">
             {(t.services as any).description || (language === "en"
-              ? "Comprehensive business licensing solutions tailored to your needs"
+              ? "Establish, Operate, and Grow Your Business in Indonesia with Confidence"
               : (language === "cn" ? "为您量身定制的全面业务许可解决方案" : "Solusi perizinan usaha komprehensif yang disesuaikan dengan kebutuhan Anda"))}
           </p>
         </motion.div>
