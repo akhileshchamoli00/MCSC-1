@@ -4,7 +4,7 @@ export const translations = {
   en: {
     nav: {
       home: "Home",
-      intellectualProperty: "Intellectual Property",
+      intellectualProperty: "Resources",
       brandClassification: "Brand Classification",
       checkApplicationStatus: "Check Application Status",
       about: "About Us",
@@ -31,9 +31,9 @@ export const translations = {
       ],
       staffTitle: "Our Staff",
       staffDescription:
-        "PT Mandiri Cipta Solusi is divided into three divisions: Tax, Accounting and Licenses. We have teams of professionals who are experts in their own fields. We depend on the skills as individual person and team work to complete tasks and company duty reliably and to perfection. Our teams are specifically hand selected to work with us because of their dedications to finish their work and focus for the satisfaction of our clients.",
+        "At PT Mandiri Cipta Solusi, our success is driven by a team of dedicated professionals specializing in Business Licensing, Taxation, and Accounting Services. Each division is staffed by experienced specialists who bring deep industry knowledge, technical expertise, and a commitment to delivering exceptional results for our clients.\n\nWe believe that outstanding service is achieved through a combination of individual excellence and strong collaboration. Our professionals are carefully selected not only for their qualifications and expertise but also for their integrity, dedication, and client-focused mindset. By working closely together, our teams ensure that every project is handled efficiently, accurately, and in full compliance with Indonesian regulations.",
       staffTrips:
-        "Our team have annual trip since 2016 to bond even more outside of working environment and learn about individual personality to work in perfect sync during working environment. Our most recent trip was to Bali in 2019, we also went to Japan in 2018, Malang in 2017 and Carita, Anyer in Banten in 2016.",
+        "<strong class=\"text-foreground font-semibold text-2xl \">A Culture Built on Collaboration</strong>\n\nAt MCS Consulting, we recognize that strong teamwork is the foundation of excellent client service. To foster collaboration and strengthen relationships beyond the workplace, we organize annual team-building trips that encourage connection, mutual understanding, and professional growth.\n\nThese experiences help us build a cohesive, motivated, and highly collaborative team—allowing us to work seamlessly together and deliver the highest level of service to our clients.\n\n<strong class=\"text-foreground font-semibold text-2xl\">Why Clients Trust Us</strong>\n\n• Experienced specialists in Licensing, Tax, and Accounting\n• Dedicated support for local and international businesses\n• Collaborative, client-focused approach\n• Commitment to accuracy, compliance, and professionalism\n• More than a decade of experience serving businesses across Indonesia\n\nThis strong combination of expertise, teamwork, and commitment enables us to be a trusted partner for businesses seeking to establish, operate, and grow successfully in Indonesia.",
     },
     services: {
       title: "Services",
@@ -377,7 +377,7 @@ export const translations = {
     },
     footer: {
       tagline:
-        "Your trusted partner in business licensing solutions since 2013.",
+        "Serving clients throughout Indonesia and international clients from Singapore, Malaysia, China, and other countries.",
       quickLinks: "Quick Links",
       servicesTitle: "Services",
       connect: "Connect With Us",
@@ -399,23 +399,24 @@ export const translations = {
     hero: {
       title: "Solusi Perizinan Usaha Komprehensif",
       description:
-        "Kami hadir sebagai mitra strategis Anda dalam mengelola segala aspek perizinan usaha. Dengan keahlian mendalam dalam regulasi bisnis, kami memastikan kelancaran operasional perusahaan Anda.",
+        "Mitra Terpercaya Anda untuk Pendirian Usaha, Perizinan, Kepatuhan, dan Pertumbuhan di Indonesia",
       cta: "Hubungi Kami",
     },
     about: {
       title: "Tentang Kami",
       description:
-        "Didirikan pada November 2013, PT Mandiri Cipta Solusi (MCS Consulting) telah beroperasi secara profesional di bidang perizinan usaha selama lebih dari 10 tahun. Kami berkomitmen menjadi mitra terpercaya bagi pemilik usaha dengan memberikan layanan yang handal, komprehensif, dan profesional.",
+        "Sejak 2013, MCS Consulting telah membantu bisnis lokal, investor asing, dan perusahaan multinasional berhasil mendirikan dan memperluas operasi mereka di Indonesia. Dengan pengalaman lebih dari satu dekade, tim kami menyediakan solusi menyeluruh yang mencakup pendaftaran perusahaan, perizinan bisnis, kepatuhan regulasi, pendaftaran merek dagang, akuntansi, perpajakan, dan layanan kantor virtual.",
       fullDescription: [
-        "MCS Consulting membantu klien dalam mendirikan badan hukum dan badan usaha, memastikan setiap langkah dilakukan dengan akurat dan sesuai peraturan. Selain itu, kami menawarkan layanan kekayaan intelektual, termasuk pendaftaran merek dan pencatatan lisensi, untuk membantu melindungi aset berharga perusahaan Anda.",
-        "Selain pendirian badan usaha dan perlindungan merek, kami juga menyediakan layanan pembukuan yang teliti dan profesional, mendukung Anda dalam mengelola keuangan bisnis secara efisien dan transparan. Dengan rangkaian layanan lengkap dari perizinan hingga pembukuan, MCS Consulting hadir untuk mendukung pertumbuhan dan kesuksesan bisnis Anda.",
-        "Kepercayaan klien adalah prioritas kami, dan dengan tim yang berpengalaman dan terampil, kami berdedikasi untuk memberikan solusi terbaik untuk setiap kebutuhan bisnis.",
+        "MCS Consulting adalah perusahaan konsultan bisnis terkemuka yang membantu perusahaan Indonesia, investor Cina, dan bisnis internasional mendirikan dan mengembangkan operasi mereka di Indonesia. Sejak 2013, kami telah menyediakan layanan komprehensif termasuk pendaftaran perusahaan (PT & PT PMA), perizinan usaha, kepatuhan OSS RBA, pendaftaran merek dagang, akuntansi dan pembukuan, kepatuhan pajak, serta solusi virtual office.",
+        "Konsultan kami yang berpengalaman membimbing klien melalui setiap tahap siklus hidup bisnis—mulai dari masuk ke pasar dan pendirian perusahaan hingga kepatuhan regulasi yang berkelanjutan serta dukungan operasional. Dengan pengetahuan mendalam tentang regulasi Indonesia dan pengalaman luas dalam membantu perusahaan milik asing, kami menyederhanakan proses yang kompleks dan membantu bisnis mencapai tujuannya dengan lebih cepat dan risiko yang lebih rendah.",
+        "Baik Anda memulai usaha baru, melakukan ekspansi ke Indonesia, maupun mencari dukungan kepatuhan yang dapat diandalkan, MCS Consulting memberikan keahlian dan pengetahuan lokal yang dibutuhkan untuk sukses di salah satu pasar dengan pertumbuhan tercepat di Asia Tenggara.",
+        "Membantu Bisnis Sukses di Indonesia Sejak 2013"
       ],
       staffTitle: "Tim Kami",
       staffDescription:
-        "PT Mandiri Cipta Solusi terbagi menjadi tiga divisi: Pajak, Akuntansi, dan Perizinan. Kami memiliki tim profesional yang ahli di bidangnya masing-masing. Kami mengandalkan keterampilan individu dan kerja sama tim untuk menyelesaikan tugas dan kewajiban perusahaan dengan andal dan sempurna. Tim kami dipilih secara khusus untuk bekerja dengan kami karena dedikasi mereka dalam menyelesaikan pekerjaan dan fokus untuk kepuasan klien kami.",
+        "Di PT Mandiri Cipta Solusi, kesuksesan kami didorong oleh tim profesional yang berdedikasi dan berspesialisasi dalam Layanan Perizinan Usaha, Perpajakan, dan Akuntansi. Setiap divisi diisi oleh spesialis berpengalaman yang membawa pengetahuan industri mendalam, keahlian teknis, dan komitmen untuk memberikan hasil yang luar biasa bagi klien kami.\n\nKami percaya bahwa layanan yang luar biasa dicapai melalui kombinasi keunggulan individu dan kolaborasi yang kuat. Para profesional kami dipilih secara cermat bukan hanya karena kualifikasi dan keahlian mereka, tetapi juga karena integritas, dedikasi, dan pola pikir yang berfokus pada klien. Dengan bekerja sama dengan erat, tim kami memastikan bahwa setiap proyek ditangani secara efisien, akurat, dan mematuhi sepenuhnya regulasi di Indonesia.",
       staffTrips:
-        "Tim kami memiliki perjalanan tahunan sejak 2016 untuk lebih mendekatkan diri di luar lingkungan kerja dan mempelajari kepribadian individu untuk bekerja dengan sinkronisasi sempurna selama lingkungan kerja. Perjalanan terbaru kami adalah ke Bali pada tahun 2019, kami juga pergi ke Jepang pada tahun 2018, Malang pada tahun 2017 dan Carita, Anyer di Banten pada tahun 2016.",
+        "<strong class=\"text-foreground font-semibold text-2xl \">Budaya yang Dibangun di Atas Kolaborasi</strong>\n\nDi MCS Consulting, kami menyadari bahwa kerja sama tim yang kuat adalah fondasi dari layanan klien yang prima. Untuk membina kolaborasi dan memperkuat hubungan di luar tempat kerja, kami menyelenggarakan perjalanan peningkatan kapasitas tim (team-building) tahunan yang mendorong koneksi, saling pengertian, dan pertumbuhan profesional.\n\nPengalaman ini membantu kami membangun tim yang solid, termotivasi, dan sangat kolaboratif—memungkinkan kami bekerja bersama dengan mulus dan memberikan tingkat layanan tertinggi kepada klien kami.\n\n<strong class=\"text-foreground font-semibold text-2xl\">Mengapa Klien Mempercayai Kami</strong>\n\n• Spesialis berpengalaman dalam Perizinan, Pajak, dan Akuntansi\n• Dukungan khusus untuk bisnis lokal dan internasional\n• Pendekatan kolaboratif dan berfokus pada klien\n• Komitmen terhadap akurasi, kepatuhan, dan profesionalisme\n• Lebih dari satu dekade pengalaman melayani bisnis di seluruh Indonesia\n\nKombinasi kuat antara keahlian, kerja sama tim, dan komitmen ini menjadikan kami sebagai mitra terpercaya bagi bisnis yang ingin mendirikan, beroperasi, dan tumbuh sukses di Indonesia.",
     },
     services: {
       title: "Layanan",
@@ -778,25 +779,26 @@ export const translations = {
     },
     logoSubtext: "许可  |  财务报告  |  知识产权",
     hero: {
-      title: "全方位的业务许可解决方案",
+      title: "全面的业务许可解决方案",
       description:
-        "我们是您管理各项业务许可的战略合作伙伴。凭籍在业务法规方面的深厚专业知识，我们确保您的公司运营顺畅。",
+        "您在印度尼西亚企业设立、许可、合规与增长的值得信赖的合作伙伴",
       cta: "联系我们",
     },
     about: {
       title: "关于我们",
       description:
-        "PT Mandiri Cipta Solusi (MCS Consulting) 成立于2013年11月，在业务许可领域专业运营超过10年。我们致力于通过提供可靠、全面且专业的服务，成为企业主值得信赖的合作伙伴。",
+        "自 2013 年以来，MCS Consulting 已经帮助本地企业、外国投资者和跨国公司在印度尼西亚成功建立和扩展业务。凭借十多年的经验，我们的团队提供端到端的解决方案，涵盖公司注册、商业许可、监管合规、商标注册、会计、税务和虚拟办公室服务。",
       fullDescription: [
-        "MCS Consulting 协助客户建立法人实体和业务实体，确保每一步都准确无误并符合法规。此外，我们还提供知识产权服务，包括商标注册和许可记录，以帮助保护您公司的宝贵资产。",
-        "除了实体建立和品牌保护，我们还提供细致且专业的簿记服务，支持您高效透明地管理业务财务。凭借从许可到簿记的全方位服务，MCS Consulting 致力于支持您业务的增长和成功。",
-        "客户的信任是我们的首要任务，凭借经验丰富且技术精湛的团队，我们致力于为每一个业务需求提供最佳解决方案。",
+        "MCS Consulting 是一家领先的商业咨询公司，致力于帮助印度尼西亚公司、中国投资者和国际企业在印度尼西亚建立和发展业务。自 2013 年以来，我们提供包括公司注册（PT 和 PT PMA）、商业许可、OSS RBA 合规、商标注册、会计和簿记、税务合规以及虚拟办公室解决方案在内的全方位服务。",
+        "我们经验丰富的顾问在业务生命周期的每个阶段为客户提供指导——从市场准入和公司成立，到持续的监管合规和运营支持。凭借对印度尼西亚法规的深刻了解和协助外资企业的丰富经验，我们简化复杂的流程，帮助企业更快、风险更低地实现目标。",
+        "无论您是开展新业务、向印度尼西亚扩张，还是寻求可靠的合规支持，MCS Consulting 都能提供您在东南亚增长最快的市场之一取得成功所需的专业知识和本地洞察。",
+        "自 2013 年起帮助企业在印度尼西亚取得成功"
       ],
       staffTitle: "我们的团队",
       staffDescription:
-        "PT Mandiri Cipta Solusi 分为三个部门：税务、会计和许可。我们拥有各领域的专家专业团队。我们依靠个人技能和团队协作，可靠且完美地完成任务和公司职责。我们的团队是经过专门挑选的，因为他们致力于完成工作并专注于客户的满意度。",
+        "在 PT Mandiri Cipta Solusi，我们的成功离不开一支专注于业务许可、税务和会计服务的专业团队的推动。每个部门均由经验丰富的专家组成，他们具备深厚的行业知识、技术专长，并致力于为客户提供卓越的成果。\n\n我们相信，出色的服务是通过个人卓越表现与紧密协作的结合来实现的。我们的专业人员不仅因其资质和专长被精心挑选，更因其诚信、敬业精神以及以客户为中心的思维方式而受到认可。通过密切合作，我们的团队确保每一个项目都能高效、准确且完全符合印度尼西亚的法规要求。",
       staffTrips:
-        "自2016年以来，我们的团队每年都会进行旅行，以便在工作环境之外建立更紧密的联系，并了解个人性格，以便在工作环境中实现完美同步。我们最近一次旅行是2019年去巴厘岛，我们还在2018年去了日本，2017年去了马朗，2016年去了万丹的安耶尔卡里塔。",
+        "<strong class=\"text-foreground font-semibold text-2xl \">建立在协作基础上的文化</strong>\n\n在 MCS Consulting，我们认识到强大的团队合作是提供卓越客户服务的基础。为了在工作场所之外促进协作并加强联系，我们每年组织团队建设之旅，以鼓励沟通、相互理解和职业发展。\n\n这些经历帮助我们建立了一个具有凝聚力、积极向上且高度协作的团队——使我们能够无缝协作，并为客户提供最高水平的服务。\n\n<strong class=\"text-foreground font-semibold text-2xl\">为什么客户信任我们</strong>\n\n• 许可、税务和会计领域的资深专家\n• 为本地和国际企业提供专属支持\n• 协作且以客户为中心的方法\n• 致力于准确性、合规性和专业性\n• 为印度尼西亚各地企业提供超过十年的服务经验\n\n专业知识、团队合作和承诺的完美结合，使我们成为寻求在印度尼西亚成功建立、运营和发展的企业值得信赖的合作伙伴。",
     },
     services: {
       title: "服务项目",

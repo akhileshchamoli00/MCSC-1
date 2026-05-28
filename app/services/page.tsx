@@ -102,7 +102,7 @@ export default function ServicesPage() {
                       colors={['#1e40af', '#10b981', '#f97316']}
                       className="h-full"
                     >
-                      <div className="rounded-xl border-none bg-background/40 backdrop-blur-md p-6 transition-all duration-300 hover:bg-background/60 cursor-pointer h-full flex flex-col justify-between">
+                      <div className="rounded-xl border border-border/50 dark:border-white/20 bg-background/40 backdrop-blur-md p-6 transition-all duration-300 hover:bg-background/60 cursor-pointer h-full flex flex-col justify-between">
                         <div>
                           <div className="mb-4 inline-flex rounded-lg bg-primary/10 p-3 transition-transform group-hover:scale-110 group-hover:bg-primary/20">
                             <Icon className="h-6 w-6 text-primary" />
