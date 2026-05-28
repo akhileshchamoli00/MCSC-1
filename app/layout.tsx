@@ -16,7 +16,7 @@ const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-serif"
 const antonio = Antonio({ subsets: ["latin"], variable: "--font-antonio" })
 
 export const metadata: Metadata = {
-  title: "MCS Consulting - Comprehensive Business Licensing Solution",
+  title: "MCS Consulting - Company Registration, Business Licensing, Tax & Compliance Services in Indonesia",
   description:
     "Your trusted partner in managing all aspects of business licensing with over 10 years of professional experience.",
   generator: "v0.app",

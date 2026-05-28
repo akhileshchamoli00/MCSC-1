@@ -1,10 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { useLanguage } from "@/contexts/language-context";
-import { CheckCircle2, ArrowRight, LucideIcon } from "lucide-react";
+import {
+  CheckCircle2,
+  ArrowRight,
+  LucideIcon,
+  ChevronDown,
+  HelpCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import BorderGlow from "./ui/BorderGlow";
 import {
   Card,
@@ -21,11 +28,17 @@ interface SubService {
   items?: { en: string[]; id: string[]; cn?: string[] };
 }
 
+interface FAQ {
+  question: { en: string; id: string; cn?: string };
+  answer: { en: string; id: string; cn?: string };
+}
+
 interface BaseServicePageProps {
   icon: LucideIcon;
   title: { en: string; id: string; cn?: string };
   description: { en: string; id: string; cn?: string };
   subServices: SubService[];
+  faqs?: FAQ[];
   ctaText?: { en: string; id: string; cn?: string };
   ctaDescription?: { en: string; id: string; cn?: string };
 }
@@ -35,10 +48,12 @@ export function BaseServicePage({
   title,
   description,
   subServices,
+  faqs,
   ctaText,
   ctaDescription,
 }: BaseServicePageProps) {
   const { language } = useLanguage();
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   const getTranslation = (obj: any, lang: string) => {
     if (!obj) return "";
@@ -153,8 +168,77 @@ export function BaseServicePage({
         </div>
       </section>
 
+      {/* FAQ Section */}
+      {faqs && faqs.length > 0 && (
+        <section className="pt-8 pb-8 relative overflow-hidden">
+          <div className="container mx-auto px-4 relative z-10">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="mx-auto max-w-3xl rounded-3xl border border-border/50 dark:border-white/20 bg-background/50 backdrop-blur-md p-8 md:p-12 shadow-sm"
+            >
+              <div className="text-center mb-8">
+                <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 mb-4 backdrop-blur-sm border border-primary/20">
+                  <HelpCircle className="h-6 w-6 text-primary" />
+                </div>
+                <h2 className="text-3xl font-bold tracking-tight mb-2 text-foreground">
+                  {language === "en"
+                    ? "Frequently Asked Questions"
+                    : language === "cn"
+                      ? "常见问题"
+                      : "Pertanyaan yang Sering Diajukan"}
+                </h2>
+              </div>
+              <div className="divide-y divide-border/50 dark:divide-white/40">
+                {faqs.map((faq, index) => {
+                  const isOpen = openIndex === index;
+                  return (
+                    <div key={index} className="group">
+                      <button
+                        onClick={() => setOpenIndex(isOpen ? null : index)}
+                        className="w-full text-left py-5 flex items-start justify-between gap-4 focus:outline-none transition-colors"
+                      >
+                        <h3
+                          className={`font-medium text-base transition-colors ${isOpen ? "text-primary" : "text-foreground group-hover:text-primary/80"}`}
+                        >
+                          {getTranslation(faq.question, language)}
+                        </h3>
+                        <ChevronDown
+                          className={`h-5 w-5 mt-0.5 shrink-0 transition-transform duration-300 ${
+                            isOpen
+                              ? "rotate-180 text-primary"
+                              : "text-muted-foreground group-hover:text-primary/80"
+                          }`}
+                        />
+                      </button>
+                      <AnimatePresence initial={false}>
+                        {isOpen && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="pb-5 pt-1 pr-8 text-sm text-muted-foreground leading-relaxed">
+                              {getTranslation(faq.answer, language)}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </div>
+        </section>
+      )}
+
       {/* CTA Section */}
-      <section className="py-24 relative overflow-hidden">
+      <section className="pt-8 pb-24 relative overflow-hidden">
         <div className="container mx-auto px-4 text-center relative z-10">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}

@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useLanguage } from "@/contexts/language-context"
+import { useLanguage } from "@/contexts/language-context";
 import {
   Building,
   FileText,
@@ -10,44 +10,44 @@ import {
   Briefcase,
   Copyright,
   ArrowRight,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import Link from "next/link"
-import BorderGlow from "@/components/ui/BorderGlow"
-import { motion } from "framer-motion"
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import BorderGlow from "@/components/ui/BorderGlow";
+import { motion } from "framer-motion";
 
-import { translations } from "@/lib/translations"
+import { translations } from "@/lib/translations";
 
 export default function ServicesPage() {
-  const { language } = useLanguage()
-  const t = translations[language]
+  const { language } = useLanguage();
+  const t = translations[language];
 
   const serviceIcons: Record<string, any> = {
-    "establishment": Building,
+    establishment: Building,
     "business-license": FileText,
     "company-changes": RefreshCw,
-    "agreements": FileSignature,
+    agreements: FileSignature,
     "virtual-office": MapPin,
     "work-permit": Briefcase,
     "intellectual-property": Copyright,
-  }
+  };
 
   const servicePaths: Record<string, string> = {
-    "establishment": "/services/establishment",
+    establishment: "/services/establishment",
     "business-license": "/services/business-license",
     "company-changes": "/services/company-changes",
-    "agreements": "/services/agreements",
+    agreements: "/services/agreements",
     "virtual-office": "/services/virtual-office",
     "work-permit": "/services/work-permit",
     "intellectual-property": "/services/intellectual-property",
-  }
+  };
 
   const servicesList = t.services.items.map((item) => ({
     icon: serviceIcons[item.id] || Building,
     title: item.title,
     description: item.description,
     href: servicePaths[item.id] || `/services/${item.id}`,
-  }))
+  }));
 
   return (
     <main>
@@ -61,15 +61,25 @@ export default function ServicesPage() {
               transition={{ duration: 0.6 }}
             >
               <div className="mb-4 inline-flex rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
-                {language === "en" ? "What We Do" : (language === "cn" ? "服务范围" : "Apa Yang Kami Lakukan")}
+                {language === "en"
+                  ? "What We Do"
+                  : language === "cn"
+                    ? "服务范围"
+                    : "Apa Yang Kami Lakukan"}
               </div>
               <h1 className="mb-6 text-4xl font-bold text-balance md:text-5xl">
-                {language === "en" ? "Our Services" : (language === "cn" ? "我们的服务" : "Layanan Kami")}
+                {language === "en"
+                  ? "Our Services"
+                  : language === "cn"
+                    ? "我们的服务"
+                    : "Layanan Kami"}
               </h1>
               <p className="text-lg text-muted-foreground text-pretty">
                 {language === "en"
                   ? "Establish, Operate, and Grow Your Business in Indonesia with Confidence"
-                  : (language === "cn" ? "为您量身定制的全面业务许可解决方案" : "Solusi perizinan usaha komprehensif yang disesuaikan dengan kebutuhan Anda")}
+                  : language === "cn"
+                    ? "为您量身定制的全面业务许可解决方案"
+                    : "Solusi perizinan usaha komprehensif yang disesuaikan dengan kebutuhan Anda"}
               </p>
             </motion.div>
           </div>
@@ -81,7 +91,7 @@ export default function ServicesPage() {
         <div className="container mx-auto px-4">
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4 max-w-7xl mx-auto">
             {servicesList.map((service, index) => {
-              const Icon = service.icon
+              const Icon = service.icon;
               return (
                 <motion.div
                   key={index}
@@ -99,7 +109,7 @@ export default function ServicesPage() {
                       glowIntensity={1}
                       coneSpread={25}
                       animated={false}
-                      colors={['#1e40af', '#10b981', '#f97316']}
+                      colors={["#1e40af", "#10b981", "#f97316"]}
                       className="h-full"
                     >
                       <div className="rounded-xl border border-border/50 dark:border-white/20 bg-background/40 backdrop-blur-md p-6 transition-all duration-300 hover:bg-background/60 cursor-pointer h-full flex flex-col justify-between">
@@ -115,14 +125,18 @@ export default function ServicesPage() {
                           </p>
                         </div>
                         <div className="flex items-center text-primary text-sm font-semibold mt-auto group-hover:gap-2 transition-all">
-                          {language === "en" ? "Learn More" : (language === "cn" ? "了解更多" : "Pelajari Lebih Lanjut")}
+                          {language === "en"
+                            ? "Learn More"
+                            : language === "cn"
+                              ? "了解更多"
+                              : "Pelajari Lebih Lanjut"}
                           <ArrowRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                         </div>
                       </div>
                     </BorderGlow>
                   </Link>
                 </motion.div>
-              )
+              );
             })}
           </div>
         </div>
@@ -133,19 +147,35 @@ export default function ServicesPage() {
         <div className="container mx-auto px-4 text-center">
           <div className="mx-auto max-w-2xl">
             <h2 className="mb-4 text-3xl font-bold text-balance md:text-4xl">
-              {language === "en" ? "Ready to Get Started?" : (language === "cn" ? "准备好开始了吗？" : "Siap untuk Memulai?")}
+              {language === "en"
+                ? "Ready to Get Started?"
+                : language === "cn"
+                  ? "准备好开始了吗？"
+                  : "Siap untuk Memulai?"}
             </h2>
             <p className="mb-8 text-lg text-muted-foreground text-pretty">
               {language === "en"
                 ? "Contact us today to discuss your business licensing needs"
-                : (language === "cn" ? "立即联系我们以讨论您的业务许可需求" : "Hubungi kami hari ini untuk mendiskusikan kebutuhan perizinan usaha Anda")}
+                : language === "cn"
+                  ? "立即联系我们以讨论您的业务许可需求"
+                  : "Hubungi kami hari ini untuk mendiskusikan kebutuhan perizinan usaha Anda"}
             </p>
-            <Button size="lg" asChild className="transition-all hover:scale-105 active:scale-95 px-8 py-6 text-md font-semibold shadow-lg">
-              <Link href="/contact">{language === "en" ? "Contact Us" : (language === "cn" ? "联系我们" : "Hubungi Kami")}</Link>
+            <Button
+              size="lg"
+              asChild
+              className="transition-all hover:scale-105 active:scale-95 px-8 py-6 text-md font-semibold shadow-lg"
+            >
+              <Link href="/contact">
+                {language === "en"
+                  ? "Contact Us"
+                  : language === "cn"
+                    ? "联系我们"
+                    : "Hubungi Kami"}
+              </Link>
             </Button>
           </div>
         </div>
       </section>
     </main>
-  )
+  );
 }
