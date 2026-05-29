@@ -997,7 +997,7 @@ export default function FAQPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
-      <section className="pt-12 pb-8 md:pt-20 md:pb-12">
+      <section className="pt-4 pb-6 md:pt-8 md:pb-10">
         <div className="container mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -1005,7 +1005,7 @@ export default function FAQPage() {
             transition={{ duration: 0.6 }}
             className="mx-auto max-w-4xl text-center"
           >
-            <div className="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 mb-8 backdrop-blur-sm border border-primary/20">
+            <div className="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 mb-6 backdrop-blur-sm border border-primary/20">
               <HelpCircle className="h-10 w-10 text-primary" />
             </div>
             <h1 className="mb-6 text-4xl font-bold tracking-tight text-foreground md:text-5xl font-sans">

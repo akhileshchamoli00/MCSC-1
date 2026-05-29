@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useLanguage } from "@/contexts/language-context";
-import { translations } from "@/lib/translations";
 import { motion } from "framer-motion";
 import {
   Search,
@@ -20,7 +19,7 @@ import {
 } from "lucide-react";
 import BorderGlow from "@/components/ui/BorderGlow";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 
 // Types matching scraped data structure
 interface NiceItem {
@@ -37,7 +36,6 @@ interface NiceClass {
 
 export default function BrandClassificationPage() {
   const { language } = useLanguage();
-  const t = translations[language];
 
   // Component local states
   const [classesData, setClassesData] = useState<Record<
@@ -48,9 +46,18 @@ export default function BrandClassificationPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeClass, setActiveClass] = useState<string>("1");
   const [searchQuery, setSearchQuery] = useState("");
-  const [globalSearch, setGlobalSearch] = useState(false);
+  const [globalSearch, setGlobalSearch] = useState(true);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
+
+  // Debounce search input to prevent UI freeze on large datasets
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Multilingual local UI translations
   const localUI = {
@@ -66,19 +73,11 @@ export default function BrandClassificationPage() {
       tableColClass: "Class",
       tableColNameId: "Goods/Services Name (ID)",
       tableColNameEn: "Goods/Services Name (EN)",
-      tableColActions: "Select",
       noResults: "No matching goods or services found.",
       searchTip:
         "Try typing a different keyword (e.g., 'kopi', 'software', 'hukum', 'delivery').",
       loadingText: "Loading classification database...",
       errorText: "Failed to load database. Please try again.",
-      selectedCartTitle: "Selected Trademark Items",
-      selectedItemsCount: "Selected ({count})",
-      copyList: "Copy Selected List",
-      clearAll: "Clear All",
-      emptyCart:
-        "No items selected yet. Click the '+' button next to items to add them to your trademark application checklist.",
-      copiedToast: "Selected list copied to clipboard!",
       totalResults: "Found {count} matches",
       sourceLabel: "MCS Intellectual Property Services",
       classTab: "Class {id}",
@@ -97,19 +96,11 @@ export default function BrandClassificationPage() {
       tableColClass: "Kelas",
       tableColNameId: "Nama Barang/Jasa (ID)",
       tableColNameEn: "Nama Barang/Jasa (EN)",
-      tableColActions: "Pilih",
       noResults: "Barang atau jasa tidak ditemukan.",
       searchTip:
         "Coba ketik kata kunci lain (misalnya, 'kopi', 'software', 'hukum', 'pengiriman').",
       loadingText: "Memuat database klasifikasi...",
       errorText: "Gagal memuat database. Silakan coba lagi.",
-      selectedCartTitle: "Item Merek Terpilih",
-      selectedItemsCount: "Terpilih ({count})",
-      copyList: "Salin Daftar",
-      clearAll: "Hapus Semua",
-      emptyCart:
-        "Belum ada item terpilih. Klik tombol '+' di samping item untuk menambahkan ke daftar permohonan merek Anda.",
-      copiedToast: "Daftar terpilih berhasil disalin ke clipboard!",
       totalResults: "Menampilkan {count} kecocokan",
       sourceLabel: "Layanan Kekayaan Intelektual MCS",
       classTab: "Kelas {id}",
@@ -127,19 +118,11 @@ export default function BrandClassificationPage() {
       tableColClass: "类别",
       tableColNameId: "商品/服务名称 (印尼语)",
       tableColNameEn: "商品/服务名称 (英语)",
-      tableColActions: "选择",
       noResults: "未找到匹配的商品或服务。",
       searchTip:
         "尝试输入其他关键词（例如：'kopi'、'software'、'hukum'、'delivery'）。",
       loadingText: "正在加载分类数据库...",
       errorText: "加载数据库失败。请重试。",
-      selectedCartTitle: "已选商标项目",
-      selectedItemsCount: "已选 ({count})",
-      copyList: "复制已选列表",
-      clearAll: "全部清除",
-      emptyCart:
-        "尚未选择任何项目。点击项目旁的 '+' 按钮，将其添加到您的商标申请清单中。",
-      copiedToast: "已选列表已成功复制到剪贴板！",
       totalResults: "找到 {count} 个匹配项",
       sourceLabel: "MCS 知识产权服务",
       classTab: "第 {id} 类",
@@ -174,7 +157,7 @@ export default function BrandClassificationPage() {
   // Reset pagination when active class or search configurations change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeClass, searchQuery, globalSearch]);
+  }, [activeClass, debouncedQuery, globalSearch]);
 
   const isFirstRender = useRef(true);
 
@@ -212,34 +195,34 @@ export default function BrandClassificationPage() {
     return { goods, services };
   }, [classesData]);
 
-  // Search Engine & Relevance Ranking
+  // Pre-compute global items pool (only depends on classesData)
+  const globalItemsPool = useMemo(() => {
+    if (!classesData) return [];
+    const pool: NiceItem[] = [];
+    Object.keys(classesData).forEach((key) => {
+      const cls = classesData[key];
+      cls.items.forEach((item) => {
+        pool.push({ ...item, classId: key });
+      });
+    });
+    return pool;
+  }, [classesData]);
+
+  // Search Engine & Relevance Ranking (uses debounced query)
   const filteredItems = useMemo(() => {
     if (!classesData) return [];
-    const query = searchQuery.trim().toLowerCase();
+    const query = debouncedQuery.trim().toLowerCase();
 
     // 1. Gather raw pool of items based on scope
-    let itemsPool: NiceItem[] = [];
+    let itemsPool: NiceItem[];
     if (globalSearch) {
-      // Gather all items from all classes
-      Object.keys(classesData).forEach((key) => {
-        const cls = classesData[key];
-        cls.items.forEach((item) => {
-          itemsPool.push({
-            ...item,
-            classId: key,
-          });
-        });
-      });
+      itemsPool = globalItemsPool;
     } else {
-      // Gather only items from active class
       const cls = classesData?.[activeClass];
       if (cls) {
-        cls.items.forEach((item) => {
-          itemsPool.push({
-            ...item,
-            classId: activeClass,
-          });
-        });
+        itemsPool = cls.items.map((item) => ({ ...item, classId: activeClass }));
+      } else {
+        itemsPool = [];
       }
     }
 
@@ -286,7 +269,7 @@ export default function BrandClassificationPage() {
       // Default alphabetically or original indexing stability
       return aId.localeCompare(bId);
     });
-  }, [classesData, searchQuery, globalSearch, activeClass]);
+  }, [classesData, debouncedQuery, globalSearch, activeClass, globalItemsPool]);
 
   // Pagination calculation
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
@@ -386,11 +369,10 @@ export default function BrandClassificationPage() {
                           setActiveClass(cls.id);
                           setGlobalSearch(false);
                         }}
-                        className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all duration-200 flex items-center justify-between group ${
-                          activeClass === cls.id && !globalSearch
+                        className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all duration-200 flex items-center justify-between group ${activeClass === cls.id && !globalSearch
                             ? "bg-primary/10 border-l-2 border-primary text-primary font-semibold"
                             : "text-zinc-600 dark:text-muted-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800/40 hover:text-zinc-900 dark:hover:text-foreground"
-                        }`}
+                          }`}
                       >
                         <span className="truncate pr-2">
                           {ui.classTab.replace("{id}", cls.id.padStart(2, "0"))}{" "}
@@ -417,11 +399,10 @@ export default function BrandClassificationPage() {
                           setActiveClass(cls.id);
                           setGlobalSearch(false);
                         }}
-                        className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all duration-200 flex items-center justify-between group ${
-                          activeClass === cls.id && !globalSearch
+                        className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all duration-200 flex items-center justify-between group ${activeClass === cls.id && !globalSearch
                             ? "bg-primary/10 border-l-2 border-primary text-primary font-semibold"
                             : "text-zinc-600 dark:text-muted-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800/40 hover:text-zinc-900 dark:hover:text-foreground"
-                        }`}
+                          }`}
                       >
                         <span className="truncate pr-2">
                           {ui.classTab.replace("{id}", cls.id)} - {cls.desc}
@@ -582,22 +563,6 @@ export default function BrandClassificationPage() {
                       </button>
                     )}
                   </div>
-
-                  {/* Search Mode Toggles */}
-                  <div className="flex items-center justify-between w-full md:w-auto gap-4 border-t border-zinc-200 dark:border-zinc-800 md:border-t-0 pt-4 md:pt-0 shrink-0">
-                    <label className="flex items-center gap-3 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={globalSearch}
-                        onChange={(e) => setGlobalSearch(e.target.checked)}
-                        className="hidden peer"
-                      />
-                      <div className="w-10 h-5 bg-zinc-300 dark:bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary relative animate-all duration-300"></div>
-                      <span className="text-sm font-semibold text-zinc-600 dark:text-muted-foreground peer-checked:text-zinc-900 peer-checked:dark:text-foreground transition-colors shrink-0">
-                        {ui.globalSearchToggle}
-                      </span>
-                    </label>
-                  </div>
                 </div>
               </BorderGlow>
 
@@ -749,11 +714,10 @@ export default function BrandClassificationPage() {
                                 currentPage === pageNum ? "default" : "ghost"
                               }
                               onClick={() => setCurrentPage(pageNum)}
-                              className={`w-8 h-8 rounded-full text-xs font-bold transition-all duration-300 p-0 flex items-center justify-center ${
-                                currentPage === pageNum
+                              className={`w-8 h-8 rounded-full text-xs font-bold transition-all duration-300 p-0 flex items-center justify-center ${currentPage === pageNum
                                   ? "bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-110 font-extrabold"
                                   : "text-zinc-600 dark:text-muted-foreground hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-foreground"
-                              }`}
+                                }`}
                             >
                               {pageNum}
                             </Button>

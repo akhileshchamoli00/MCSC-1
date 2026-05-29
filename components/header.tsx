@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Menu, X, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/contexts/language-context";
@@ -17,6 +17,10 @@ export function Header() {
   const { language } = useLanguage();
   const t = translations[language];
   const pathname = usePathname();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [pathname]);
 
   const navItems = [
     { label: t.nav.home, href: "/" },
@@ -58,6 +62,10 @@ export function Header() {
     {
       label: t.nav.checkApplicationStatus,
       href: "/resources/check-application-status",
+    },
+    {
+      label: t.nav.kbliDirectory,
+      href: "/resources/kbli",
     },
     {
       label: "FAQ",

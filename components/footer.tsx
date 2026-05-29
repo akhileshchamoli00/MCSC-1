@@ -6,12 +6,25 @@ import { useLanguage } from "@/contexts/language-context";
 import { translations } from "@/lib/translations";
 import { AskLogo } from "@/components/ask-logo";
 
+const renderDisclaimerText = (text: string) => {
+  const parts = text.split("**");
+  return parts.map((part, index) =>
+    index % 2 === 1 ? (
+      <strong key={index} className="font-semibold text-muted-foreground/80">
+        {part}
+      </strong>
+    ) : (
+      part
+    )
+  );
+};
+
 export function Footer() {
   const { language } = useLanguage();
   const t = translations[language];
 
   return (
-    <footer className="border-t border-border/20 bg-background/30 backdrop-blur-md py-12 relative z-10">
+    <footer className="border-t border-border/20 bg-background/30 backdrop-blur-md pt-6 pb-4 relative z-10">
       <div className="container mx-auto px-4">
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-6">
           <div className="lg:col-span-2">
@@ -166,6 +179,14 @@ export function Footer() {
               </li>
               <li>
                 <Link
+                  href="/resources/kbli"
+                  className="text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {t.nav.kbliDirectory}
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/resources/faq"
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
@@ -211,10 +232,15 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-8 border-t border-border pt-8 text-center text-sm text-muted-foreground">
-          <p>
+        <div className="mt-4 border-t border-border pt-4 text-center text-sm text-muted-foreground">
+          <p className="mb-2">
             © {new Date().getFullYear()} MCS Consulting. {t.footer.rights}
           </p>
+          {t.footer.disclaimer && (
+            <p className="mt-2 border-t border-border/10 pt-2 text-[11px] leading-relaxed text-muted-foreground/50 max-w-5xl mx-auto text-justify md:text-center">
+              {renderDisclaimerText(t.footer.disclaimer)}
+            </p>
+          )}
         </div>
       </div>
     </footer>

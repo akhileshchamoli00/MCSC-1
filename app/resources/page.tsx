@@ -49,6 +49,15 @@ export default function ResourcesPage() {
       },
     },
     {
+      title: t.nav.kbliDirectory,
+      href: "/resources/kbli",
+      description: {
+        en: "Search the official KBLI 2020 business classification codes and risk levels in Indonesia.",
+        id: "Cari kode klasifikasi bisnis resmi KBLI 2020 dan tingkat risiko di Indonesia.",
+        cn: "搜索印度尼西亚官方 KBLI 2020 业务分类代码和风险级别。",
+      },
+    },
+    {
       title: "FAQ",
       href: "/resources/faq",
       description: {

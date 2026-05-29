@@ -11,12 +11,13 @@ export const translations = {
       services: "Services",
       announcement: "Regulations",
       contact: "Contact Us",
+      kbliDirectory: "KBLI Directory",
     },
     logoSubtext: "License  |  Financial Reports  |  Intellectual Property",
     hero: {
-      title: "Comprehensive Business Licensing Solution",
+      title: "Business Setup & Licensing Experts in Indonesia",
       description:
-        "Your Trusted Partner for Business Establishment, Licensing, Compliance, and Growth in Indonesia",
+        "Helping Local and International Businesses Navigate Company Registration, Licensing, Compliance, and Market Entry Since 2013.",
       cta: "Contact Us",
     },
     about: {
@@ -382,6 +383,8 @@ export const translations = {
       servicesTitle: "Services",
       connect: "Connect With Us",
       rights: "All rights reserved.",
+      disclaimer:
+        "**Disclaimer**: The information provided on this website by **PT Mandiri Cipta Solusi (MCS Consulting)** is for general informational purposes only. While we strive to keep information accurate and up to date, we make no warranties regarding its completeness or reliability. MCS Consulting is an independent consulting firm and is **not affiliated with, endorsed by, or acting on behalf of the Government of the Republic of Indonesia or any government agency**. We do not issue official government documents, permits, licenses, visas, passports, or other government-issued approvals. Our services are limited to professional consulting, advisory, and administrative support. All official approvals, registrations, and documents are issued solely by the relevant government authorities.",
     },
   },
   id: {
@@ -394,6 +397,7 @@ export const translations = {
       services: "Layanan",
       announcement: "Regulasi",
       contact: "Hubungi Kami",
+      kbliDirectory: "Direktori KBLI",
     },
     logoSubtext: "Perizinan  |  Laporan Keuangan  |  Kekayaan Intelektual",
     hero: {
@@ -764,6 +768,8 @@ export const translations = {
       servicesTitle: "Layanan",
       connect: "Terhubung Dengan Kami",
       rights: "Hak cipta dilindungi.",
+      disclaimer:
+        "**Pernyataan Penyangkalan**: Informasi yang disediakan di situs web ini oleh **PT Mandiri Cipta Solusi (MCS Consulting)** hanya untuk tujuan informasi umum. Meskipun kami berupaya menjaga informasi tetap akurat dan mutakhir, kami tidak membuat jaminan apa pun mengenai kelengkapan atau keandalannya. MCS Consulting adalah perusahaan konsultan independen dan **tidak berafiliasi dengan, didukung oleh, atau bertindak atas nama Pemerintah Republik Indonesia atau lembaga pemerintah mana pun**. Kami tidak menerbitkan dokumen resmi pemerintah, izin, lisensi, visa, paspor, atau persetujuan lain yang diterbitkan pemerintah. Layanan kami terbatas pada konsultasi profesional, penasihat, dan dukungan administratif. Semua persetujuan, pendaftaran, dan dokumen resmi diterbitkan semata-mata oleh otoritas pemerintah yang berwenang.",
     },
   },
   cn: {
@@ -776,6 +782,7 @@ export const translations = {
       services: "服务项目",
       announcement: "政策法规",
       contact: "联系我们",
+      kbliDirectory: "KBLI 目录",
     },
     logoSubtext: "许可  |  财务报告  |  知识产权",
     hero: {
@@ -1142,6 +1149,8 @@ export const translations = {
       servicesTitle: "服务项目",
       connect: "关注我们",
       rights: "版权所有。",
+      disclaimer:
+        "**免责声明**：**PT Mandiri Cipta Solusi (MCS Consulting)** 在本网站上提供的信息仅用于一般信息目的。尽管我们努力确保信息的准确性和及时性，但我们对其完整性或可靠性不作任何保证。MCS Consulting 是一家独立的咨询公司，**与印度尼西亚共和国政府或任何政府机构均无隶属关系、未获其认可，也不代表其行事**。我们不签发官方政府文件、准持证、执照、签证、护照或其他政府签发的批准文件。我们的服务仅限于专业的咨询、顾问和行政支持。所有官方批准、注册和文件均由相关政府部门全权签发。",
     },
   },
 };
