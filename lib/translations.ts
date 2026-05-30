@@ -38,6 +38,12 @@ export const translations = {
       advisors: {
         title: "Expert Business Consultants",
         description: "Providing practical guidance on company formation, compliance, and business growth."
+      },
+      cta: {
+        title: "Ready to Start Your Business in Indonesia?",
+        description: "Whether you're establishing a local company, registering a foreign-owned business (PT PMA), or obtaining business licenses, our team is ready to help.",
+        scheduleBtn: "Schedule a Consultation",
+        whatsappBtn: "Contact Us on WhatsApp"
       }
     },
     about: {
@@ -444,6 +450,12 @@ export const translations = {
       advisors: {
         title: "Penasihat Tepercaya",
         description: "Memberikan panduan strategis dan keahlian regulasi untuk membantu bisnis sukses di Indonesia."
+      },
+      cta: {
+        title: "Siap Memulai Bisnis Anda di Indonesia?",
+        description: "Baik Anda mendirikan perusahaan lokal, mendaftarkan perusahaan penanaman modal asing (PT PMA), atau mengurus izin usaha, tim kami siap membantu.",
+        scheduleBtn: "Jadwalkan Konsultasi",
+        whatsappBtn: "Hubungi Kami di WhatsApp"
       }
     },
     about: {
@@ -815,109 +827,112 @@ export const translations = {
   cn: {
     nav: {
       home: "首页",
-      intellectualProperty: "知识产权",
-      brandClassification: "商标分类",
+      intellectualProperty: "资源",
+      brandClassification: "品牌分类",
       checkApplicationStatus: "查询申请状态",
       about: "关于我们",
-      services: "服务项目",
-      announcement: "政策法规",
+      services: "服务",
+      announcement: "法规",
       contact: "联系我们",
-      kbliDirectory: "KBLI 目录",
+      kbliDirectory: "KBLI目录",
     },
     logoSubtext: "许可  |  财务报告  |  知识产权",
     hero: {
-      title: "全面的业务许可解决方案",
+      title: "印尼业务设立和许可专家",
       description:
-        "您在印度尼西亚企业设立、许可、合规与增长的值得信赖的合作伙伴",
+        "自2013年以来，协助本地和国际企业完成公司注册、许可、合规及市场准入。",
       cta: "联系我们",
     },
     stats: {
       sectionTitle: "经验、专业与成果",
-      sectionDescription: "MCS Consulting 已经协助数百家本地及跨国企业在印度尼西亚完成公司注册、商业许可、合规、税务、会计以及各项企业服务。",
+      sectionDescription: "MCS Consulting 在印尼各地协助了数百家本地和国际企业进行公司注册、营业执照办理、合规、税务、会计及企业服务。",
       decade: {
-        title: "十年经验",
-        description: "服务遍及印度尼西亚，以及来自新加坡、马来西亚、中国等国家和地区的国际客户"
+        title: "10年以上经验",
+        description: "自2013年起服务印尼各地企业并支持国际投资者。"
       },
       assisted: {
-        title: "协助 500+ 家企业",
-        description: "在印度尼西亚公司注册、商业许可和合规方面值得信赖的合作伙伴。"
+        title: "协助500+家企业",
+        description: "在注册、许可和合规方面深受本地和国际公司的信任。"
       },
       projects: {
-        title: "完成 1,000+ 个许可项目",
-        description: "成功管理印度尼西亚各地的营业执照、许可证和监管审批。"
+        title: "完成1,000+许可项目",
+        description: "在全印尼成功办理营业执照、许可证及监管审批。"
       },
       advisors: {
-        title: "值得信赖的顾问",
-        description: "提供战略指导和监管专业知识，帮助企业在印度尼西亚取得成功。"
+        title: "专业商业顾问",
+        description: "提供关于公司成立、合规和业务增长的实用指导。"
+      },
+      cta: {
+        title: "准备好在印尼开展业务了吗？",
+        description: "无论您是成立本地公司、注册外资企业（PT PMA），还是获取营业执照，我们的团队都已准备好为您提供帮助。",
+        scheduleBtn: "预约咨询",
+        whatsappBtn: "通过WhatsApp联系我们"
       }
     },
     about: {
       title: "关于我们",
       description:
-        "自 2013 年以来，MCS Consulting 已经帮助本地企业、外国投资者和跨国公司在印度尼西亚成功建立和扩展业务。凭借十多年的经验，我们的团队提供端到端的解决方案，涵盖公司注册、商业许可、监管合规、商标注册、会计、税务和虚拟办公室服务。",
+        "自2013年以来，MCS Consulting 协助本地企业、外国投资者及跨国公司在印尼成功设立并扩展业务。凭借十多年的经验，我们团队提供端到端的解决方案，涵盖公司注册、营业执照办理、监管合规、商标注册、会计、税务及虚拟办公室服务。",
       fullDescription: [
-        "MCS Consulting 是一家领先的商业咨询公司，致力于帮助印度尼西亚公司、中国投资者和国际企业在印度尼西亚建立和发展业务。自 2013 年以来，我们提供包括公司注册（PT 和 PT PMA）、商业许可、OSS RBA 合规、商标注册、会计和簿记、税务合规以及虚拟办公室解决方案在内的全方位服务。",
-        "我们经验丰富的顾问在业务生命周期的每个阶段为客户提供指导——从市场准入和公司成立，到持续的监管合规和运营支持。凭借对印度尼西亚法规的深刻了解和协助外资企业的丰富经验，我们简化复杂的流程，帮助企业更快、风险更低地实现目标。",
-        "无论您是开展新业务、向印度尼西亚扩张，还是寻求可靠的合规支持，MCS Consulting 都能提供您在东南亚增长最快的市场之一取得成功所需的专业知识和本地洞察。",
-        "自 2013 年起帮助企业在印度尼西亚取得成功"
+        "MCS Consulting 是一家领先的商业咨询公司，致力于帮助印尼企业、中国投资者以及国际企业在印尼开展并壮大业务。自2013年以来，我们提供全面的服务，包括公司注册（PT及PT PMA）、营业执照办理、OSS RBA合规、商标注册、会计及簿记、税务合规以及虚拟办公解决方案。",
+        "我们经验丰富的顾问指导客户完成业务生命周期的每个阶段——从市场准入和公司成立，到持续的监管合规和运营支持。凭借对印尼法规的深入了解及协助外资企业的丰富经验，我们简化复杂流程，助力企业以更低风险更快地实现目标。",
+        "无论您是开创新事业、进军印尼市场，还是寻求可靠的合规支持，MCS Consulting 都能提供所需的专业知识和本地洞察，助您在东南亚增长最快的市场之一取得成功。",
+        "自2013年起，助力企业在印尼取得成功"
       ],
       staffTitle: "我们的团队",
       staffDescription:
-        "在 PT Mandiri Cipta Solusi，我们的成功离不开一支专注于业务许可、税务和会计服务的专业团队的推动。每个部门均由经验丰富的专家组成，他们具备深厚的行业知识、技术专长，并致力于为客户提供卓越的成果。\n\n我们相信，出色的服务是通过个人卓越表现与紧密协作的结合来实现的。我们的专业人员不仅因其资质和专长被精心挑选，更因其诚信、敬业精神以及以客户为中心的思维方式而受到认可。通过密切合作，我们的团队确保每一个项目都能高效、准确且完全符合印度尼西亚的法规要求。",
+        "在 PT Mandiri Cipta Solusi，我们的成功源自一支专注于商业许可、税务及会计服务的敬业专业团队。每个部门均由经验丰富的专家组成，他们带来深厚的行业知识、技术专长，并致力于为客户交付卓越成果。\n\n我们深信，卓越服务源自个人卓越与团队紧密协作的结合。我们的专业人员经过严格挑选，不仅基于其资质与专长，更看重其诚信、奉献精神及以客户为中心的心态。通过密切协作，我们的团队确保每一个项目均以高效、准确并完全符合印尼法规的方式执行。",
       staffTrips:
-        "<strong class=\"text-foreground font-semibold text-2xl \">建立在协作基础上的文化</strong>\n\n在 MCS Consulting，我们认识到强大的团队合作是提供卓越客户服务的基础。为了在工作场所之外促进协作并加强联系，我们每年组织团队建设之旅，以鼓励沟通、相互理解和职业发展。\n\n这些经历帮助我们建立了一个具有凝聚力、积极向上且高度协作的团队——使我们能够无缝协作，并为客户提供最高水平的服务。\n\n<strong class=\"text-foreground font-semibold text-2xl\">为什么客户信任我们</strong>\n\n• 许可、税务和会计领域的资深专家\n• 为本地和国际企业提供专属支持\n• 协作且以客户为中心的方法\n• 致力于准确性、合规性和专业性\n• 为印度尼西亚各地企业提供超过十年的服务经验\n\n专业知识、团队合作和承诺的完美结合，使我们成为寻求在印度尼西亚成功建立、运营和发展的企业值得信赖的合作伙伴。",
+        "<strong class=\"text-foreground font-semibold text-2xl\">建立在协作之上的文化</strong>\n\n在 MCS Consulting，我们认识到强大的团队合作是提供卓越客户服务的基础。为了促进合作并加强工作之外的联系，我们每年组织团队建设活动，以鼓励相互联系、增进理解及促进职业成长。\n\n这些经历帮助我们建立起一支有凝聚力、充满动力且高度协作的团队——使我们能够无缝合作，为客户提供最高水平的服务。\n\n<strong class=\"text-foreground font-semibold text-2xl\">为什么客户信任我们</strong>\n\n• 在许可、税务及会计领域拥有经验丰富的专家\n• 为本地及国际企业提供专门支持\n• 注重协作，以客户为中心的方法\n• 致力于准确、合规及专业\n• 在全印尼拥有十多年的企业服务经验\n\n这种将专业知识、团队合作和奉献精神相结合的强大力量，使我们成为企业在印尼成功设立、运营及发展的可信赖伙伴。"
     },
     services: {
-      title: "服务项目",
+      title: "服务",
       dropdown: {
-        establishment: "业务实体设立",
-        businessLicense: "业务许可",
+        establishment: "商业实体设立",
+        businessLicense: "营业执照",
         companyChanges: "公司文件变更",
-        agreements: "协议草案",
+        agreements: "起草协议",
         virtualOffice: "虚拟办公室",
         workPermit: "工作许可",
-        intellectualProperty: "知识产权",
+        intellectualProperty: "知识产权"
       },
       items: [
         {
           id: "establishment",
-          title: "业务实体/法人实体设立",
-          description: "设立本地 PT、PMA PT、个人 PT、基金会、商号、CV、合作社",
+          title: "商业实体/法律实体设立",
+          description: "设立本地PT、PMA PT、个人PT、基金会、商号、CV及合作社。"
         },
         {
           id: "business-license",
-          title: "业务许可",
-          description:
-            "注册/变更业务识别号码 (NIB)、PKKPR、个人/业务实体、法人实体的 NPWP、NPWPD、NOPD：餐厅税 (PB1) 和广告税、BPJS 健康、BPJS 就业、LKPM 报告",
+          title: "营业执照",
+          description: "商业识别号（NIB）注册/变更、PKKPR、个人/企业实体及法律实体税务识别号（NPWP）、NPWPD、NOPD：餐饮税（PB1）及广告税、BPJS健康、BPJS就业、LKPM报告。"
         },
         {
           id: "company-changes",
           title: "公司文件/结构变更",
-          description: "PT、CV、个人 PT、基金会、商号、合作社的文件/结构变更",
+          description: "PT、CV、个人PT、基金会、商号、CV及合作社的文件/结构变更。"
         },
         {
           id: "agreements",
-          title: "协议草案",
-          description:
-            "草拟合作协议、买卖绑定协议、买卖协议（公证）、转租协议、婚前协议（公证）、利润分享协议、权利许可协议、文件合法化、文件认证。",
+          title: "起草协议",
+          description: "起草合作协议、买卖约束协议、买卖协议（公证）、转租协议、婚姻协议（公证）、利润分享协议、权利许可协议、文件合法化及文件加注。"
         },
         {
           id: "virtual-office",
           title: "虚拟办公室",
-          description: "提供位于唐格朗县和北雅加达的虚拟办公室 (VO)。",
+          description: "提供位于唐格朗县及北雅加达的虚拟办公室（VO）。"
         },
         {
           id: "work-permit",
           title: "工作许可",
-          description:
-            "办理外国人许可，如 KITAS、KITAP、报告证明 (STM)、居住证明 (SKTT)、RPTKA、强制报告、仅限出境许可 (EPO)、出境重入境许可 (ERP)",
+          description: "管理外籍人士许可，如KITAS、KITAP、报告证明（STM）、居留证明（SKTT）、RPTKA、强制报告、仅出境许可（EPO）及出境重入许可（ERP）。"
         },
         {
           id: "intellectual-property",
           title: "知识产权",
-          description: "商标、工业设计、版权的注册和后期注册",
-        },
-      ],
+          description: "商标、工业设计、版权的注册及注册后管理。"
+        }
+      ]
     },
     announcement: {
       title: "政策法规",
