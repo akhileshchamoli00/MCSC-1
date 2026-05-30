@@ -1,9 +1,10 @@
 "use client"
 
 import { X } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/contexts/language-context"
+import { usePathname } from "next/navigation"
 
 // Official pixel-perfect solid-filled WhatsApp brand SVG Icon
 const WhatsAppIcon = ({ className = "h-6 w-6" }: { className?: string }) => (
@@ -20,6 +21,31 @@ const WhatsAppIcon = ({ className = "h-6 w-6" }: { className?: string }) => (
 export function WhatsAppWidget() {
   const { language } = useLanguage()
   const [isOpen, setIsOpen] = useState(false)
+  const pathname = usePathname()
+  const [showOnHome, setShowOnHome] = useState(false)
+
+  useEffect(() => {
+    if (pathname !== '/') return
+
+    const handleScroll = () => {
+      const statsSection = document.getElementById('stats')
+      if (statsSection) {
+        const rect = statsSection.getBoundingClientRect()
+        if (rect.top <= window.innerHeight - 100) {
+          setShowOnHome(true)
+        } else {
+          setShowOnHome(false)
+        }
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    handleScroll()
+
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [pathname])
+
+  if (pathname === '/' && !showOnHome) return null
 
   const localT = {
     en: {

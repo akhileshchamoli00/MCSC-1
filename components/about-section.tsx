@@ -10,7 +10,7 @@ export function AboutSection() {
   const t = translations[language]
 
   return (
-    <section id="about" className="pt-20 pb-10 md:pt-32 md:pb-16 overflow-hidden">
+    <section id="about" className="pt-8 pb-10 md:pt-16 md:pb-16 overflow-hidden">
       <div className="container mx-auto px-4">
         {/* Header Section */}
         <div className="mx-auto max-w-3xl text-center mb-16">

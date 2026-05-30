@@ -14,7 +14,7 @@ export default function AboutPage() {
       icon: Globe,
       title:
         language === "en"
-          ? "1 Decade"
+          ? "10+ Years of Experience"
           : language === "cn"
             ? "10年经验"
             : "1 Dekade",
@@ -62,7 +62,7 @@ export default function AboutPage() {
       icon: Gem,
       title:
         language === "en"
-          ? "Trusted Advisors"
+          ? "Expert Business Consultants"
           : language === "cn"
             ? "值得信赖的顾问"
             : "Penasihat Terpercaya",
@@ -123,28 +123,25 @@ export default function AboutPage() {
                 className="h-full"
               >
                 <div
-                  className={`group rounded-3xl p-8 transition-all hover:shadow-xl text-center h-full flex flex-col items-center shadow-md ${
-                    value.variant === "orange"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-background/40 backdrop-blur-md text-foreground border border-border/50 dark:border-white/10"
-                  }`}
+                  className={`group rounded-3xl p-8 transition-all hover:shadow-xl text-center h-full flex flex-col items-center shadow-md ${value.variant === "orange"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background/40 backdrop-blur-md text-foreground border border-border/50 dark:border-white/10"
+                    }`}
                 >
                   <div
-                    className={`mb-8 inline-flex items-center justify-center rounded-full p-4 border-[6px] w-24 h-24 ${
-                      value.variant === "orange"
-                        ? "border-primary-foreground/40 bg-transparent text-primary-foreground"
-                        : "border-primary/40 bg-transparent text-primary"
-                    }`}
+                    className={`mb-8 inline-flex items-center justify-center rounded-full p-4 border-[6px] w-24 h-24 ${value.variant === "orange"
+                      ? "border-primary-foreground/40 bg-transparent text-primary-foreground"
+                      : "border-primary/40 bg-transparent text-primary"
+                      }`}
                   >
                     <value.icon className="h-10 w-10" />
                   </div>
                   <h3 className="mb-4 text-2xl font-bold">{value.title}</h3>
                   <p
-                    className={`text-sm leading-relaxed ${
-                      value.variant === "orange"
-                        ? "text-primary-foreground/90"
-                        : "text-muted-foreground"
-                    }`}
+                    className={`text-sm leading-relaxed ${value.variant === "orange"
+                      ? "text-primary-foreground/90"
+                      : "text-muted-foreground"
+                      }`}
                   >
                     {value.description}
                   </p>

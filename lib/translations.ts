@@ -20,6 +20,26 @@ export const translations = {
         "Helping Local and International Businesses Navigate Company Registration, Licensing, Compliance, and Market Entry Since 2013.",
       cta: "Contact Us",
     },
+    stats: {
+      sectionTitle: "Experience, Expertise & Results",
+      sectionDescription: "MCS Consulting has supported hundreds of local and international businesses with company registration, business licensing, regulatory compliance, tax, accounting, and corporate services throughout Indonesia.",
+      decade: {
+        title: "10+ Years of Experience",
+        description: "Serving businesses across Indonesia and supporting international investors since 2013."
+      },
+      assisted: {
+        title: "500+ Businesses Assisted",
+        description: "Trusted by local and international companies for registration, licensing, and compliance."
+      },
+      projects: {
+        title: "1,000+ Licensing Projects Completed",
+        description: "Delivering business licenses, permits, and regulatory approvals across Indonesia."
+      },
+      advisors: {
+        title: "Expert Business Consultants",
+        description: "Providing practical guidance on company formation, compliance, and business growth."
+      }
+    },
     about: {
       title: "About Us",
       description:
@@ -406,6 +426,26 @@ export const translations = {
         "Mitra Terpercaya Anda untuk Pendirian Usaha, Perizinan, Kepatuhan, dan Pertumbuhan di Indonesia",
       cta: "Hubungi Kami",
     },
+    stats: {
+      sectionTitle: "Pengalaman, Keahlian & Hasil",
+      sectionDescription: "MCS Consulting telah mendukung ratusan bisnis lokal dan internasional dalam pendaftaran perusahaan, perizinan bisnis, kepatuhan regulasi, pajak, akuntansi, dan layanan perusahaan di seluruh Indonesia.",
+      decade: {
+        title: "1 Dekade",
+        description: "Melayani klien di seluruh Indonesia dan klien internasional dari Singapura, Malaysia, Tiongkok, dan negara lainnya"
+      },
+      assisted: {
+        title: "500+ Bisnis Terbantu",
+        description: "Mitra tepercaya untuk pendaftaran perusahaan, perizinan bisnis, dan kepatuhan peraturan di Indonesia."
+      },
+      projects: {
+        title: "1.000+ Proyek Perizinan Selesai",
+        description: "Berhasil mengelola izin usaha, persetujuan, dan regulasi di seluruh Indonesia."
+      },
+      advisors: {
+        title: "Penasihat Tepercaya",
+        description: "Memberikan panduan strategis dan keahlian regulasi untuk membantu bisnis sukses di Indonesia."
+      }
+    },
     about: {
       title: "Tentang Kami",
       description:
@@ -790,6 +830,26 @@ export const translations = {
       description:
         "您在印度尼西亚企业设立、许可、合规与增长的值得信赖的合作伙伴",
       cta: "联系我们",
+    },
+    stats: {
+      sectionTitle: "经验、专业与成果",
+      sectionDescription: "MCS Consulting 已经协助数百家本地及跨国企业在印度尼西亚完成公司注册、商业许可、合规、税务、会计以及各项企业服务。",
+      decade: {
+        title: "十年经验",
+        description: "服务遍及印度尼西亚，以及来自新加坡、马来西亚、中国等国家和地区的国际客户"
+      },
+      assisted: {
+        title: "协助 500+ 家企业",
+        description: "在印度尼西亚公司注册、商业许可和合规方面值得信赖的合作伙伴。"
+      },
+      projects: {
+        title: "完成 1,000+ 个许可项目",
+        description: "成功管理印度尼西亚各地的营业执照、许可证和监管审批。"
+      },
+      advisors: {
+        title: "值得信赖的顾问",
+        description: "提供战略指导和监管专业知识，帮助企业在印度尼西亚取得成功。"
+      }
     },
     about: {
       title: "关于我们",
