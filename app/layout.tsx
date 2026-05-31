@@ -16,10 +16,25 @@ const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-serif"
 const antonio = Antonio({ subsets: ["latin"], variable: "--font-antonio" })
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://mcsc.co.id"),
   title: "MCS Consulting - Company Registration, Business Licensing, Tax & Compliance Services in Indonesia",
   description:
     "Your trusted partner in managing all aspects of business licensing with over 10 years of professional experience.",
+  keywords: ["MCS Consulting", "Indonesia Business Consulting", "Company Registration Indonesia", "Business Licensing", "Tax Services Indonesia", "Compliance Services", "BPK Regulations"],
   generator: "v0.app",
+  openGraph: {
+    title: "MCS Consulting - Your Business Partner in Indonesia",
+    description: "Your trusted partner in managing all aspects of business licensing with over 10 years of professional experience.",
+    url: "https://mcsc.co.id",
+    siteName: "MCS Consulting",
+    locale: "en_ID",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "MCS Consulting",
+    description: "Your trusted partner in managing all aspects of business licensing with over 10 years of professional experience.",
+  },
   icons: {
     icon: "/icon.png",
     shortcut: "/icon.png",
