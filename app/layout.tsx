@@ -22,6 +22,9 @@ export const metadata: Metadata = {
     "Your trusted partner in managing all aspects of business licensing with over 10 years of professional experience.",
   keywords: ["MCS Consulting", "Indonesia Business Consulting", "Company Registration Indonesia", "Business Licensing", "Tax Services Indonesia", "Compliance Services", "BPK Regulations"],
   generator: "v0.app",
+  alternates: {
+    canonical: "https://mcsc.co.id",
+  },
   openGraph: {
     title: "MCS Consulting - Your Business Partner in Indonesia",
     description: "Your trusted partner in managing all aspects of business licensing with over 10 years of professional experience.",

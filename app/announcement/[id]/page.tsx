@@ -24,6 +24,9 @@ export async function generateMetadata(
   return {
     title: `${announcement.title} - MCS Consulting`,
     description: description,
+    alternates: {
+      canonical: `https://mcsc.co.id/announcement/${id}`,
+    },
     openGraph: {
       title: `${announcement.title} - MCS Consulting`,
       description: description,
