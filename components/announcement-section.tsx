@@ -1,69 +1,72 @@
-"use client"
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useLanguage } from "@/contexts/language-context"
-import { translations } from "@/lib/translations"
-import { Calendar, ChevronLeft, ChevronRight, ArrowRight } from "lucide-react"
-import { useState, useEffect, useCallback } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import Link from "next/link"
-import BorderGlow from "./ui/BorderGlow"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLanguage } from "@/contexts/language-context";
+import { translations } from "@/lib/translations";
+import { Calendar, ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
+import BorderGlow from "./ui/BorderGlow";
 
 export function AnnouncementSection() {
-  const { language } = useLanguage()
-  const t = translations[language]
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [direction, setDirection] = useState(0)
-  const [isAutoPlaying, setIsAutoPlaying] = useState(true)
+  const { language } = useLanguage();
+  const t = translations[language];
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [direction, setDirection] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
 
-  const announcements = t.announcement.items
-  const totalSlides = announcements.length
+  const announcements = t.announcement.items;
+  const totalSlides = announcements.length;
 
   const nextSlide = useCallback(() => {
-    setDirection(1)
-    setCurrentIndex((prev) => (prev + 1) % totalSlides)
-  }, [totalSlides])
+    setDirection(1);
+    setCurrentIndex((prev) => (prev + 1) % totalSlides);
+  }, [totalSlides]);
 
   const prevSlide = useCallback(() => {
-    setDirection(-1)
-    setCurrentIndex((prev) => (prev - 1 + totalSlides) % totalSlides)
-  }, [totalSlides])
+    setDirection(-1);
+    setCurrentIndex((prev) => (prev - 1 + totalSlides) % totalSlides);
+  }, [totalSlides]);
 
   useEffect(() => {
-    if (!isAutoPlaying) return
-    const interval = setInterval(nextSlide, 5000)
-    return () => clearInterval(interval)
-  }, [isAutoPlaying, nextSlide])
+    if (!isAutoPlaying) return;
+    const interval = setInterval(nextSlide, 5000);
+    return () => clearInterval(interval);
+  }, [isAutoPlaying, nextSlide]);
 
   const variants = {
     enter: (direction: number) => ({
       x: direction > 0 ? 500 : -500,
-      opacity: 0
+      opacity: 0,
     }),
     center: {
       zIndex: 1,
       x: 0,
-      opacity: 1
+      opacity: 1,
     },
     exit: (direction: number) => ({
       zIndex: 0,
       x: direction < 0 ? 500 : -500,
-      opacity: 0
-    })
-  }
+      opacity: 0,
+    }),
+  };
 
   // Get visible announcements (1 on mobile, 3 on desktop)
   const getVisibleItems = () => {
-    const visible = []
+    const visible = [];
     // For simplicity and matching the service section logic:
     for (let i = 0; i < 3; i++) {
-      visible.push(announcements[(currentIndex + i) % totalSlides])
+      visible.push(announcements[(currentIndex + i) % totalSlides]);
     }
-    return visible
-  }
+    return visible;
+  };
 
   return (
-    <section id="announcement" className="pt-12 pb-24 md:pt-16 md:pb-32 overflow-hidden">
+    <section
+      id="announcement"
+      className="pt-12 pb-24 md:pt-16 md:pb-32 overflow-hidden"
+    >
       <div className="container mx-auto px-4 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -76,11 +79,12 @@ export function AnnouncementSection() {
             {t.announcement.title}
           </h2>
           <p className="mx-auto max-w-3xl text-xl leading-relaxed text-muted-foreground">
-            {(t.announcement as any).description || (language === "en"
-              ? "Stay informed with the latest governmental regulations, laws, and announcements affecting business in Indonesia."
-              : (language === "cn"
-                ? "随时了解影响印度尼西亚商业的最新政府法规、法律和公告动态。"
-                : "Tetap terinformasi dengan regulasi, undang-undang, dan pengumuman pemerintah terbaru yang memengaruhi bisnis di Indonesia."))}
+            {(t.announcement as any).description ||
+              (language === "en"
+                ? "Stay informed with the latest governmental regulations, laws, and announcements affecting business in Indonesia."
+                : language === "cn"
+                  ? "随时了解影响印度尼西亚商业的最新政府法规、法律和公告动态。"
+                  : "Tetap terinformasi dengan regulasi, undang-undang, dan pengumuman pemerintah terbaru yang memengaruhi bisnis di Indonesia.")}
           </p>
         </motion.div>
 
@@ -90,7 +94,11 @@ export function AnnouncementSection() {
           onMouseLeave={() => setIsAutoPlaying(true)}
         >
           <div className="flex justify-center items-center min-h-[400px]">
-            <AnimatePresence initial={false} custom={direction} mode="popLayout">
+            <AnimatePresence
+              initial={false}
+              custom={direction}
+              mode="popLayout"
+            >
               <motion.div
                 key={currentIndex}
                 custom={direction}
@@ -100,7 +108,7 @@ export function AnnouncementSection() {
                 exit="exit"
                 transition={{
                   x: { type: "spring", stiffness: 300, damping: 30 },
-                  opacity: { duration: 0.2 }
+                  opacity: { duration: 0.2 },
                 }}
                 className="grid gap-8 w-full md:grid-cols-3"
               >
@@ -116,10 +124,10 @@ export function AnnouncementSection() {
                         glowIntensity={1}
                         coneSpread={25}
                         animated={false}
-                        colors={['#1e40af', '#10b981', '#f97316']}
+                        colors={["#1e40af", "#10b981", "#f97316"]}
                         className="h-full"
                       >
-                        <Card className="hover-lift h-full border-none bg-background/50 backdrop-blur-md transition-all duration-300 hover:shadow-xl hover:bg-background/70 cursor-pointer flex flex-col">
+                        <Card className="hover-lift h-full border border-border/50 dark:border-white/20 bg-background/50 backdrop-blur-md transition-all duration-300 hover:shadow-xl hover:bg-background/70 cursor-pointer flex flex-col">
                           <CardHeader className="pb-4">
                             <div className="flex items-center gap-2 text-sm text-primary mb-3 font-medium">
                               <Calendar className="h-4 w-4" />
@@ -134,7 +142,9 @@ export function AnnouncementSection() {
                               {announcement.content}
                             </p>
                             <span className="text-primary font-semibold flex items-center gap-1 group/btn">
-                              {language === "en" ? "Read More" : "Baca Selengkapnya"}
+                              {language === "en"
+                                ? "Read More"
+                                : "Baca Selengkapnya"}
                               <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
                             </span>
                           </CardContent>
@@ -171,13 +181,13 @@ export function AnnouncementSection() {
               <button
                 key={index}
                 onClick={() => {
-                  setDirection(index > currentIndex ? 1 : -1)
-                  setCurrentIndex(index)
-                  setIsAutoPlaying(false)
+                  setDirection(index > currentIndex ? 1 : -1);
+                  setCurrentIndex(index);
+                  setIsAutoPlaying(false);
                 }}
                 className={`h-2 rounded-full transition-all duration-300 ${index === currentIndex
-                    ? "w-8 bg-primary"
-                    : "w-2 bg-muted-foreground/30 hover:bg-muted-foreground/60"
+                  ? "w-8 bg-primary"
+                  : "w-2 bg-muted-foreground/30 hover:bg-muted-foreground/60"
                   }`}
                 aria-label={`Go to slide ${index + 1}`}
               />
@@ -186,6 +196,5 @@ export function AnnouncementSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }
-

@@ -4,35 +4,63 @@ export const translations = {
   en: {
     nav: {
       home: "Home",
-      intellectualProperty: "Intellectual Property",
+      intellectualProperty: "Resources",
       brandClassification: "Brand Classification",
       checkApplicationStatus: "Check Application Status",
       about: "About Us",
       services: "Services",
       announcement: "Regulations",
       contact: "Contact Us",
+      kbliDirectory: "KBLI Directory",
     },
     logoSubtext: "License  |  Financial Reports  |  Intellectual Property",
     hero: {
-      title: "Comprehensive Business Licensing Solution",
+      title: "Business Setup & Licensing Experts in Indonesia",
       description:
-        "We are here as your strategic partner in managing all aspects of business licensing. With in-depth expertise in business regulation, we ensure the smooth operation of your company.",
+        "Helping Local and International Businesses Navigate Company Registration, Licensing, Compliance, and Market Entry Since 2013.",
       cta: "Contact Us",
+    },
+    stats: {
+      sectionTitle: "Experience, Expertise & Results",
+      sectionDescription: "MCS Consulting has supported hundreds of local and international businesses with company registration, business licensing, regulatory compliance, tax, accounting, and corporate services throughout Indonesia.",
+      decade: {
+        title: "10+ Years of Experience",
+        description: "Serving businesses across Indonesia and supporting international investors since 2013."
+      },
+      assisted: {
+        title: "500+ Businesses Assisted",
+        description: "Trusted by local and international companies for registration, licensing, and compliance."
+      },
+      projects: {
+        title: "1,000+ Licensing Projects Completed",
+        description: "Delivering business licenses, permits, and regulatory approvals across Indonesia."
+      },
+      advisors: {
+        title: "Expert Business Consultants",
+        description: "Providing practical guidance on company formation, compliance, and business growth."
+      },
+      cta: {
+        title: "Ready to Start Your Business in Indonesia?",
+        description: "Whether you're establishing a local company, registering a foreign-owned business (PT PMA), or obtaining business licenses, our team is ready to help.",
+        scheduleBtn: "Schedule a Consultation",
+        whatsappBtn: "Contact Us on WhatsApp"
+      }
     },
     about: {
       title: "About Us",
       description:
-        "Founded in November 2013, PT Mandiri Cipta Solusi (MCS Consulting) has operated professionally in the business licensing field for over 10 years. We are committed to being a trusted partner for business owners by providing reliable, comprehensive, and professional services.",
+        "Since 2013, MCS Consulting has helped local businesses, foreign investors, and multinational companies successfully establish and expand their operations in Indonesia. With more than a decade of experience, our team provides end-to-end solutions covering company registration, business licensing, regulatory compliance, trademark registration, accounting, taxation, and virtual office services.",
       fullDescription: [
-        "MCS Consulting assists clients in establishing legal entities and business entities, ensuring each step is conducted accurately and in compliance with regulations. In addition, we offer intellectual property services, including trademark registration and license recording, to help protect your company's valuable assets.",
-        "Beyond entity establishment and brand protection, we also provide meticulous and professional bookkeeping services, supporting you in managing your business finances efficiently and transparently. With a complete range of services from licensing to bookkeeping, MCS Consulting is here to support the growth and success of your business.",
-        "Client trust is our priority, and with an experienced and skilled team, we are dedicated to delivering the best solutions for every business need.",
+        "MCS Consulting is a leading business consulting firm helping Indonesian companies, Chinese investors, and international businesses establish and grow their operations in Indonesia. Since 2013, we have provided comprehensive services including company registration (PT & PT PMA), business licensing, OSS RBA compliance, trademark registration, accounting and bookkeeping, tax compliance, and virtual office solutions.",
+        "Our experienced consultants guide clients through every stage of the business lifecycle—from market entry and company incorporation to ongoing regulatory compliance and operational support. With deep knowledge of Indonesian regulations and extensive experience assisting foreign-owned companies, we simplify complex processes and help businesses achieve their goals faster and with lower risk.",
+        "Whether you are starting a new venture, expanding into Indonesia, or seeking reliable compliance support, MCS Consulting provides the expertise and local knowledge needed to succeed in one of Southeast Asia's fastest-growing markets.",
+        "Helping Businesses Succeed in Indonesia Since 2013",
       ],
       staffTitle: "Our Staff",
       staffDescription:
-        "PT Mandiri Cipta Solusi is divided into three divisions: Tax, Accounting and Licenses. We have teams of professionals who are experts in their own fields. We depend on the skills as individual person and team work to complete tasks and company duty reliably and to perfection. Our teams are specifically hand selected to work with us because of their dedications to finish their work and focus for the satisfaction of our clients.",
+        "At PT Mandiri Cipta Solusi, our success is driven by a team of dedicated professionals specializing in Business Licensing, Taxation, and Accounting Services. Each division is staffed by experienced specialists who bring deep industry knowledge, technical expertise, and a commitment to delivering exceptional results for our clients.\n\nWe believe that outstanding service is achieved through a combination of individual excellence and strong collaboration. Our professionals are carefully selected not only for their qualifications and expertise but also for their integrity, dedication, and client-focused mindset. By working closely together, our teams ensure that every project is handled efficiently, accurately, and in full compliance with Indonesian regulations.",
       staffTrips:
-        "Our team have annual trip since 2016 to bond even more outside of working environment and learn about individual personality to work in perfect sync during working environment. Our most recent trip was to Bali in 2019, we also went to Japan in 2018, Malang in 2017 and Carita, Anyer in Banten in 2016.",
+        "<strong class=\"text-foreground font-semibold text-2xl \">A Culture Built on Collaboration</strong>\n\nAt MCS Consulting, we recognize that strong teamwork is the foundation of excellent client service. To foster collaboration and strengthen relationships beyond the workplace, we organize annual team-building trips that encourage connection, mutual understanding, and professional growth.\n\nThese experiences help us build a cohesive, motivated, and highly collaborative team—allowing us to work seamlessly together and deliver the highest level of service to our clients.\n\n<strong class=\"text-foreground font-semibold text-2xl\">Why Clients Trust Us</strong>\n\n• Experienced specialists in Licensing, Tax, and Accounting\n• Dedicated support for local and international businesses\n• Collaborative, client-focused approach\n• Commitment to accuracy, compliance, and professionalism\n• More than a decade of experience serving businesses across Indonesia\n\nThis strong combination of expertise, teamwork, and commitment enables us to be a trusted partner for businesses seeking to establish, operate, and grow successfully in Indonesia.",
     },
     services: {
       title: "Services",
@@ -376,11 +404,13 @@ export const translations = {
     },
     footer: {
       tagline:
-        "Your trusted partner in business licensing solutions since 2013.",
+        "Serving clients throughout Indonesia and international clients from Singapore, Malaysia, China, and other countries.",
       quickLinks: "Quick Links",
       servicesTitle: "Services",
       connect: "Connect With Us",
       rights: "All rights reserved.",
+      disclaimer:
+        "**Disclaimer**: The information provided on this website by **PT Mandiri Cipta Solusi (MCS Consulting)** is for general informational purposes only. While we strive to keep information accurate and up to date, we make no warranties regarding its completeness or reliability. MCS Consulting is an independent consulting firm and is **not affiliated with, endorsed by, or acting on behalf of the Government of the Republic of Indonesia or any government agency**. We do not issue official government documents, permits, licenses, visas, passports, or other government-issued approvals. Our services are limited to professional consulting, advisory, and administrative support. All official approvals, registrations, and documents are issued solely by the relevant government authorities.",
     },
   },
   id: {
@@ -393,28 +423,56 @@ export const translations = {
       services: "Layanan",
       announcement: "Regulasi",
       contact: "Hubungi Kami",
+      kbliDirectory: "Direktori KBLI",
     },
     logoSubtext: "Perizinan  |  Laporan Keuangan  |  Kekayaan Intelektual",
     hero: {
       title: "Solusi Perizinan Usaha Komprehensif",
       description:
-        "Kami hadir sebagai mitra strategis Anda dalam mengelola segala aspek perizinan usaha. Dengan keahlian mendalam dalam regulasi bisnis, kami memastikan kelancaran operasional perusahaan Anda.",
+        "Mitra Terpercaya Anda untuk Pendirian Usaha, Perizinan, Kepatuhan, dan Pertumbuhan di Indonesia",
       cta: "Hubungi Kami",
+    },
+    stats: {
+      sectionTitle: "Pengalaman, Keahlian & Hasil",
+      sectionDescription: "MCS Consulting telah mendukung ratusan bisnis lokal dan internasional dalam pendaftaran perusahaan, perizinan bisnis, kepatuhan regulasi, pajak, akuntansi, dan layanan perusahaan di seluruh Indonesia.",
+      decade: {
+        title: "1 Dekade",
+        description: "Melayani klien di seluruh Indonesia dan klien internasional dari Singapura, Malaysia, Tiongkok, dan negara lainnya"
+      },
+      assisted: {
+        title: "500+ Bisnis Terbantu",
+        description: "Mitra tepercaya untuk pendaftaran perusahaan, perizinan bisnis, dan kepatuhan peraturan di Indonesia."
+      },
+      projects: {
+        title: "1.000+ Proyek Perizinan Selesai",
+        description: "Berhasil mengelola izin usaha, persetujuan, dan regulasi di seluruh Indonesia."
+      },
+      advisors: {
+        title: "Penasihat Tepercaya",
+        description: "Memberikan panduan strategis dan keahlian regulasi untuk membantu bisnis sukses di Indonesia."
+      },
+      cta: {
+        title: "Siap Memulai Bisnis Anda di Indonesia?",
+        description: "Baik Anda mendirikan perusahaan lokal, mendaftarkan perusahaan penanaman modal asing (PT PMA), atau mengurus izin usaha, tim kami siap membantu.",
+        scheduleBtn: "Jadwalkan Konsultasi",
+        whatsappBtn: "Hubungi Kami di WhatsApp"
+      }
     },
     about: {
       title: "Tentang Kami",
       description:
-        "Didirikan pada November 2013, PT Mandiri Cipta Solusi (MCS Consulting) telah beroperasi secara profesional di bidang perizinan usaha selama lebih dari 10 tahun. Kami berkomitmen menjadi mitra terpercaya bagi pemilik usaha dengan memberikan layanan yang handal, komprehensif, dan profesional.",
+        "Sejak 2013, MCS Consulting telah membantu bisnis lokal, investor asing, dan perusahaan multinasional berhasil mendirikan dan memperluas operasi mereka di Indonesia. Dengan pengalaman lebih dari satu dekade, tim kami menyediakan solusi menyeluruh yang mencakup pendaftaran perusahaan, perizinan bisnis, kepatuhan regulasi, pendaftaran merek dagang, akuntansi, perpajakan, dan layanan kantor virtual.",
       fullDescription: [
-        "MCS Consulting membantu klien dalam mendirikan badan hukum dan badan usaha, memastikan setiap langkah dilakukan dengan akurat dan sesuai peraturan. Selain itu, kami menawarkan layanan kekayaan intelektual, termasuk pendaftaran merek dan pencatatan lisensi, untuk membantu melindungi aset berharga perusahaan Anda.",
-        "Selain pendirian badan usaha dan perlindungan merek, kami juga menyediakan layanan pembukuan yang teliti dan profesional, mendukung Anda dalam mengelola keuangan bisnis secara efisien dan transparan. Dengan rangkaian layanan lengkap dari perizinan hingga pembukuan, MCS Consulting hadir untuk mendukung pertumbuhan dan kesuksesan bisnis Anda.",
-        "Kepercayaan klien adalah prioritas kami, dan dengan tim yang berpengalaman dan terampil, kami berdedikasi untuk memberikan solusi terbaik untuk setiap kebutuhan bisnis.",
+        "MCS Consulting adalah perusahaan konsultan bisnis terkemuka yang membantu perusahaan Indonesia, investor Cina, dan bisnis internasional mendirikan dan mengembangkan operasi mereka di Indonesia. Sejak 2013, kami telah menyediakan layanan komprehensif termasuk pendaftaran perusahaan (PT & PT PMA), perizinan usaha, kepatuhan OSS RBA, pendaftaran merek dagang, akuntansi dan pembukuan, kepatuhan pajak, serta solusi virtual office.",
+        "Konsultan kami yang berpengalaman membimbing klien melalui setiap tahap siklus hidup bisnis—mulai dari masuk ke pasar dan pendirian perusahaan hingga kepatuhan regulasi yang berkelanjutan serta dukungan operasional. Dengan pengetahuan mendalam tentang regulasi Indonesia dan pengalaman luas dalam membantu perusahaan milik asing, kami menyederhanakan proses yang kompleks dan membantu bisnis mencapai tujuannya dengan lebih cepat dan risiko yang lebih rendah.",
+        "Baik Anda memulai usaha baru, melakukan ekspansi ke Indonesia, maupun mencari dukungan kepatuhan yang dapat diandalkan, MCS Consulting memberikan keahlian dan pengetahuan lokal yang dibutuhkan untuk sukses di salah satu pasar dengan pertumbuhan tercepat di Asia Tenggara.",
+        "Membantu Bisnis Sukses di Indonesia Sejak 2013"
       ],
       staffTitle: "Tim Kami",
       staffDescription:
-        "PT Mandiri Cipta Solusi terbagi menjadi tiga divisi: Pajak, Akuntansi, dan Perizinan. Kami memiliki tim profesional yang ahli di bidangnya masing-masing. Kami mengandalkan keterampilan individu dan kerja sama tim untuk menyelesaikan tugas dan kewajiban perusahaan dengan andal dan sempurna. Tim kami dipilih secara khusus untuk bekerja dengan kami karena dedikasi mereka dalam menyelesaikan pekerjaan dan fokus untuk kepuasan klien kami.",
+        "Di PT Mandiri Cipta Solusi, kesuksesan kami didorong oleh tim profesional yang berdedikasi dan berspesialisasi dalam Layanan Perizinan Usaha, Perpajakan, dan Akuntansi. Setiap divisi diisi oleh spesialis berpengalaman yang membawa pengetahuan industri mendalam, keahlian teknis, dan komitmen untuk memberikan hasil yang luar biasa bagi klien kami.\n\nKami percaya bahwa layanan yang luar biasa dicapai melalui kombinasi keunggulan individu dan kolaborasi yang kuat. Para profesional kami dipilih secara cermat bukan hanya karena kualifikasi dan keahlian mereka, tetapi juga karena integritas, dedikasi, dan pola pikir yang berfokus pada klien. Dengan bekerja sama dengan erat, tim kami memastikan bahwa setiap proyek ditangani secara efisien, akurat, dan mematuhi sepenuhnya regulasi di Indonesia.",
       staffTrips:
-        "Tim kami memiliki perjalanan tahunan sejak 2016 untuk lebih mendekatkan diri di luar lingkungan kerja dan mempelajari kepribadian individu untuk bekerja dengan sinkronisasi sempurna selama lingkungan kerja. Perjalanan terbaru kami adalah ke Bali pada tahun 2019, kami juga pergi ke Jepang pada tahun 2018, Malang pada tahun 2017 dan Carita, Anyer di Banten pada tahun 2016.",
+        "<strong class=\"text-foreground font-semibold text-2xl \">Budaya yang Dibangun di Atas Kolaborasi</strong>\n\nDi MCS Consulting, kami menyadari bahwa kerja sama tim yang kuat adalah fondasi dari layanan klien yang prima. Untuk membina kolaborasi dan memperkuat hubungan di luar tempat kerja, kami menyelenggarakan perjalanan peningkatan kapasitas tim (team-building) tahunan yang mendorong koneksi, saling pengertian, dan pertumbuhan profesional.\n\nPengalaman ini membantu kami membangun tim yang solid, termotivasi, dan sangat kolaboratif—memungkinkan kami bekerja bersama dengan mulus dan memberikan tingkat layanan tertinggi kepada klien kami.\n\n<strong class=\"text-foreground font-semibold text-2xl\">Mengapa Klien Mempercayai Kami</strong>\n\n• Spesialis berpengalaman dalam Perizinan, Pajak, dan Akuntansi\n• Dukungan khusus untuk bisnis lokal dan internasional\n• Pendekatan kolaboratif dan berfokus pada klien\n• Komitmen terhadap akurasi, kepatuhan, dan profesionalisme\n• Lebih dari satu dekade pengalaman melayani bisnis di seluruh Indonesia\n\nKombinasi kuat antara keahlian, kerja sama tim, dan komitmen ini menjadikan kami sebagai mitra terpercaya bagi bisnis yang ingin mendirikan, beroperasi, dan tumbuh sukses di Indonesia.",
     },
     services: {
       title: "Layanan",
@@ -499,22 +557,7 @@ export const translations = {
           referenceUrl: "#",
           downloadUrl: "/AnnouncementDocs/PERMENKUM%20NO.%2049.pdf",
         },
-        {
-          id: "new-tax-reg-2026",
-          title:
-            "PERATURAN PEMERINTAH TENTANG PENYELENGGARAAN PERIZINAN BERUSAHA BERBASIS RISIKO",
-          date: "27 May 2026",
-          summary:
-            "Peraturan ini berkaitan dengan penyelenggaraan perizinan berusaha berbasis risiko untuk mendukung cipta kerja dan menyederhanakan proses bisnis.",
-          keyPoints: [
-            "Penyederhanaan perizinan berusaha.",
-            "Pendekatan berbasis risiko.",
-          ],
-          content:
-            "TENTANG\nPENYELENGGARAAN PERIZINAN BERUSAHA BERBASIS RISIKO\n\nDENGAN RAHMAT TUHAN YANG MAHA ESA\n\nPRESIDEN REPUBLIK INDONESIA,\n\nMenimbang :\na. bahwa penyederhanaan perizinan Berusaha melalui penerapan Perizinan Berusaha Berbasis Risiko perlu dilakukan reformasi kebijakan secara berkelanjutan dalam mewujudkan kemudahan dalam memulai dan menjalankan usaha guna mendukung cipta kerja;\n\nb. bahwa penyederhanaan perizinan Berusaha melalui penerapan Perizinan Berusaha Berbasis Risiko sebagaimana telah diatur dalam Peraturan Pemerintah Nomor 5 Tahun 2021 tentang Penyelenggaraan Perizinan Berusaha Berbasis Risiko yang merupakan peraturan pelaksanaan Undang-Undang Nomor 11 Tahun 2020 tentang Cipta Kerja perlu disempurnakan untuk semakin memberikan kepastian hukum kepada pelaku usaha terutama mengenai proses bisnis dan jaminan kualitas layanan;\n\nc. bahwa dengan berlakunya Undang-Undang Nomor 6 Tahun 2023 tentang Penetapan Peraturan Pemerintah Pengganti Undang-Undang Nomor 2 Tahun 2022 tentang Cipta Kerja menjadi Undang-Undang, Peraturan Pemerintah Nomor 5 Tahun 2021 tentang Penyelenggaraan Perizinan Berusaha Berbasis Risiko perlu diganti;\n\nd. bahwa berdasarkan pertimbangan sebagaimana dimaksud dalam huruf a, huruf b, dan huruf c, perlu menetapkan Peraturan Pemerintah tentang Penyelenggaraan Perizinan Berusaha Berbasis Risiko;\n\nMengingat :\n1. Pasal 5 ayat (2) Undang-Undang Dasar Negara Republik Indonesia Tahun 1945;\n\n2. Undang-Undang Nomor 6 Tahun 2023 tentang Penetapan Peraturan Pemerintah Pengganti Undang-Undang Nomor 2 Tahun 2022 tentang Cipta Kerja menjadi Undang-Undang (Lembaran Negara Republik Indonesia Tahun 2023 Nomor 41, Tambahan Lembaran Negara Republik Indonesia Nomor 6856);\n\nMEMUTUSKAN :\n\nMenetapkan :\nPERATURAN PEMERINTAH TENTANG PENYELENGGARAAN PERIZINAN BERUSAHA BERBASIS RISIKO.\n",
-          referenceUrl: "#",
-          downloadUrl: "#",
-        },
+
         {
           id: "kepgub-310-2026",
           summary:
@@ -777,92 +820,119 @@ export const translations = {
       servicesTitle: "Layanan",
       connect: "Terhubung Dengan Kami",
       rights: "Hak cipta dilindungi.",
+      disclaimer:
+        "**Pernyataan Penyangkalan**: Informasi yang disediakan di situs web ini oleh **PT Mandiri Cipta Solusi (MCS Consulting)** hanya untuk tujuan informasi umum. Meskipun kami berupaya menjaga informasi tetap akurat dan mutakhir, kami tidak membuat jaminan apa pun mengenai kelengkapan atau keandalannya. MCS Consulting adalah perusahaan konsultan independen dan **tidak berafiliasi dengan, didukung oleh, atau bertindak atas nama Pemerintah Republik Indonesia atau lembaga pemerintah mana pun**. Kami tidak menerbitkan dokumen resmi pemerintah, izin, lisensi, visa, paspor, atau persetujuan lain yang diterbitkan pemerintah. Layanan kami terbatas pada konsultasi profesional, penasihat, dan dukungan administratif. Semua persetujuan, pendaftaran, dan dokumen resmi diterbitkan semata-mata oleh otoritas pemerintah yang berwenang.",
     },
   },
   cn: {
     nav: {
       home: "首页",
-      intellectualProperty: "知识产权",
-      brandClassification: "商标分类",
+      intellectualProperty: "资源",
+      brandClassification: "品牌分类",
       checkApplicationStatus: "查询申请状态",
       about: "关于我们",
-      services: "服务项目",
-      announcement: "政策法规",
+      services: "服务",
+      announcement: "法规",
       contact: "联系我们",
+      kbliDirectory: "KBLI目录",
     },
     logoSubtext: "许可  |  财务报告  |  知识产权",
     hero: {
-      title: "全方位的业务许可解决方案",
+      title: "印尼业务设立和许可专家",
       description:
-        "我们是您管理各项业务许可的战略合作伙伴。凭籍在业务法规方面的深厚专业知识，我们确保您的公司运营顺畅。",
+        "自2013年以来，协助本地和国际企业完成公司注册、许可、合规及市场准入。",
       cta: "联系我们",
+    },
+    stats: {
+      sectionTitle: "经验、专业与成果",
+      sectionDescription: "MCS Consulting 在印尼各地协助了数百家本地和国际企业进行公司注册、营业执照办理、合规、税务、会计及企业服务。",
+      decade: {
+        title: "10年以上经验",
+        description: "自2013年起服务印尼各地企业并支持国际投资者。"
+      },
+      assisted: {
+        title: "协助500+家企业",
+        description: "在注册、许可和合规方面深受本地和国际公司的信任。"
+      },
+      projects: {
+        title: "完成1,000+许可项目",
+        description: "在全印尼成功办理营业执照、许可证及监管审批。"
+      },
+      advisors: {
+        title: "专业商业顾问",
+        description: "提供关于公司成立、合规和业务增长的实用指导。"
+      },
+      cta: {
+        title: "准备好在印尼开展业务了吗？",
+        description: "无论您是成立本地公司、注册外资企业（PT PMA），还是获取营业执照，我们的团队都已准备好为您提供帮助。",
+        scheduleBtn: "预约咨询",
+        whatsappBtn: "通过WhatsApp联系我们"
+      }
     },
     about: {
       title: "关于我们",
       description:
-        "PT Mandiri Cipta Solusi (MCS Consulting) 成立于2013年11月，在业务许可领域专业运营超过10年。我们致力于通过提供可靠、全面且专业的服务，成为企业主值得信赖的合作伙伴。",
+        "自2013年以来，MCS Consulting 协助本地企业、外国投资者及跨国公司在印尼成功设立并扩展业务。凭借十多年的经验，我们团队提供端到端的解决方案，涵盖公司注册、营业执照办理、监管合规、商标注册、会计、税务及虚拟办公室服务。",
       fullDescription: [
-        "MCS Consulting 协助客户建立法人实体和业务实体，确保每一步都准确无误并符合法规。此外，我们还提供知识产权服务，包括商标注册和许可记录，以帮助保护您公司的宝贵资产。",
-        "除了实体建立和品牌保护，我们还提供细致且专业的簿记服务，支持您高效透明地管理业务财务。凭借从许可到簿记的全方位服务，MCS Consulting 致力于支持您业务的增长和成功。",
-        "客户的信任是我们的首要任务，凭借经验丰富且技术精湛的团队，我们致力于为每一个业务需求提供最佳解决方案。",
+        "MCS Consulting 是一家领先的商业咨询公司，致力于帮助印尼企业、中国投资者以及国际企业在印尼开展并壮大业务。自2013年以来，我们提供全面的服务，包括公司注册（PT及PT PMA）、营业执照办理、OSS RBA合规、商标注册、会计及簿记、税务合规以及虚拟办公解决方案。",
+        "我们经验丰富的顾问指导客户完成业务生命周期的每个阶段——从市场准入和公司成立，到持续的监管合规和运营支持。凭借对印尼法规的深入了解及协助外资企业的丰富经验，我们简化复杂流程，助力企业以更低风险更快地实现目标。",
+        "无论您是开创新事业、进军印尼市场，还是寻求可靠的合规支持，MCS Consulting 都能提供所需的专业知识和本地洞察，助您在东南亚增长最快的市场之一取得成功。",
+        "自2013年起，助力企业在印尼取得成功"
       ],
       staffTitle: "我们的团队",
       staffDescription:
-        "PT Mandiri Cipta Solusi 分为三个部门：税务、会计和许可。我们拥有各领域的专家专业团队。我们依靠个人技能和团队协作，可靠且完美地完成任务和公司职责。我们的团队是经过专门挑选的，因为他们致力于完成工作并专注于客户的满意度。",
+        "在 PT Mandiri Cipta Solusi，我们的成功源自一支专注于商业许可、税务及会计服务的敬业专业团队。每个部门均由经验丰富的专家组成，他们带来深厚的行业知识、技术专长，并致力于为客户交付卓越成果。\n\n我们深信，卓越服务源自个人卓越与团队紧密协作的结合。我们的专业人员经过严格挑选，不仅基于其资质与专长，更看重其诚信、奉献精神及以客户为中心的心态。通过密切协作，我们的团队确保每一个项目均以高效、准确并完全符合印尼法规的方式执行。",
       staffTrips:
-        "自2016年以来，我们的团队每年都会进行旅行，以便在工作环境之外建立更紧密的联系，并了解个人性格，以便在工作环境中实现完美同步。我们最近一次旅行是2019年去巴厘岛，我们还在2018年去了日本，2017年去了马朗，2016年去了万丹的安耶尔卡里塔。",
+        "<strong class=\"text-foreground font-semibold text-2xl\">建立在协作之上的文化</strong>\n\n在 MCS Consulting，我们认识到强大的团队合作是提供卓越客户服务的基础。为了促进合作并加强工作之外的联系，我们每年组织团队建设活动，以鼓励相互联系、增进理解及促进职业成长。\n\n这些经历帮助我们建立起一支有凝聚力、充满动力且高度协作的团队——使我们能够无缝合作，为客户提供最高水平的服务。\n\n<strong class=\"text-foreground font-semibold text-2xl\">为什么客户信任我们</strong>\n\n• 在许可、税务及会计领域拥有经验丰富的专家\n• 为本地及国际企业提供专门支持\n• 注重协作，以客户为中心的方法\n• 致力于准确、合规及专业\n• 在全印尼拥有十多年的企业服务经验\n\n这种将专业知识、团队合作和奉献精神相结合的强大力量，使我们成为企业在印尼成功设立、运营及发展的可信赖伙伴。"
     },
     services: {
-      title: "服务项目",
+      title: "服务",
       dropdown: {
-        establishment: "业务实体设立",
-        businessLicense: "业务许可",
+        establishment: "商业实体设立",
+        businessLicense: "营业执照",
         companyChanges: "公司文件变更",
-        agreements: "协议草案",
+        agreements: "起草协议",
         virtualOffice: "虚拟办公室",
         workPermit: "工作许可",
-        intellectualProperty: "知识产权",
+        intellectualProperty: "知识产权"
       },
       items: [
         {
           id: "establishment",
-          title: "业务实体/法人实体设立",
-          description: "设立本地 PT、PMA PT、个人 PT、基金会、商号、CV、合作社",
+          title: "商业实体/法律实体设立",
+          description: "设立本地PT、PMA PT、个人PT、基金会、商号、CV及合作社。"
         },
         {
           id: "business-license",
-          title: "业务许可",
-          description:
-            "注册/变更业务识别号码 (NIB)、PKKPR、个人/业务实体、法人实体的 NPWP、NPWPD、NOPD：餐厅税 (PB1) 和广告税、BPJS 健康、BPJS 就业、LKPM 报告",
+          title: "营业执照",
+          description: "商业识别号（NIB）注册/变更、PKKPR、个人/企业实体及法律实体税务识别号（NPWP）、NPWPD、NOPD：餐饮税（PB1）及广告税、BPJS健康、BPJS就业、LKPM报告。"
         },
         {
           id: "company-changes",
           title: "公司文件/结构变更",
-          description: "PT、CV、个人 PT、基金会、商号、合作社的文件/结构变更",
+          description: "PT、CV、个人PT、基金会、商号、CV及合作社的文件/结构变更。"
         },
         {
           id: "agreements",
-          title: "协议草案",
-          description:
-            "草拟合作协议、买卖绑定协议、买卖协议（公证）、转租协议、婚前协议（公证）、利润分享协议、权利许可协议、文件合法化、文件认证。",
+          title: "起草协议",
+          description: "起草合作协议、买卖约束协议、买卖协议（公证）、转租协议、婚姻协议（公证）、利润分享协议、权利许可协议、文件合法化及文件加注。"
         },
         {
           id: "virtual-office",
           title: "虚拟办公室",
-          description: "提供位于唐格朗县和北雅加达的虚拟办公室 (VO)。",
+          description: "提供位于唐格朗县及北雅加达的虚拟办公室（VO）。"
         },
         {
           id: "work-permit",
           title: "工作许可",
-          description:
-            "办理外国人许可，如 KITAS、KITAP、报告证明 (STM)、居住证明 (SKTT)、RPTKA、强制报告、仅限出境许可 (EPO)、出境重入境许可 (ERP)",
+          description: "管理外籍人士许可，如KITAS、KITAP、报告证明（STM）、居留证明（SKTT）、RPTKA、强制报告、仅出境许可（EPO）及出境重入许可（ERP）。"
         },
         {
           id: "intellectual-property",
           title: "知识产权",
-          description: "商标、工业设计、版权的注册和后期注册",
-        },
-      ],
+          description: "商标、工业设计、版权的注册及注册后管理。"
+        }
+      ]
     },
     announcement: {
       title: "政策法规",
@@ -891,18 +961,7 @@ export const translations = {
           referenceUrl: "#",
           downloadUrl: "/AnnouncementDocs/PERMENKUM%20NO.%2049.pdf",
         },
-        {
-          id: "new-tax-reg-2026",
-          title: "关于实施基于风险的商业许可的政府法规",
-          date: "27 May 2026",
-          summary:
-            "本法规涉及实施基于风险的商业许可，以支持创造就业机会并简化业务流程。",
-          keyPoints: ["简化业务许可。", "基于风险的方法。"],
-          content:
-            "TENTANG\nPENYELENGGARAAN PERIZINAN BERUSAHA BERBASIS RISIKO\n\nDENGAN RAHMAT TUHAN YANG MAHA ESA\n\nPRESIDEN REPUBLIK INDONESIA,\n\nMenimbang :\na. bahwa penyederhanaan perizinan Berusaha melalui penerapan Perizinan Berusaha Berbasis Risiko perlu dilakukan reformasi kebijakan secara berkelanjutan dalam mewujudkan kemudahan dalam memulai dan menjalankan usaha guna mendukung cipta kerja;\n\nb. bahwa penyederhanaan perizinan Berusaha melalui penerapan Perizinan Berusaha Berbasis Risiko sebagaimana telah diatur dalam Peraturan Pemerintah Nomor 5 Tahun 2021 tentang Penyelenggaraan Perizinan Berusaha Berbasis Risiko yang merupakan peraturan pelaksanaan Undang-Undang Nomor 11 Tahun 2020 tentang Cipta Kerja perlu disempurnakan untuk semakin memberikan kepastian hukum kepada pelaku usaha terutama mengenai proses bisnis dan jaminan kualitas layanan;\n\nc. bahwa dengan berlakunya Undang-Undang Nomor 6 Tahun 2023 tentang Penetapan Peraturan Pemerintah Pengganti Undang-Undang Nomor 2 Tahun 2022 tentang Cipta Kerja menjadi Undang-Undang, Peraturan Pemerintah Nomor 5 Tahun 2021 tentang Penyelenggaraan Perizinan Berusaha Berbasis Risiko perlu diganti;\n\nd. bahwa berdasarkan pertimbangan sebagaimana dimaksud dalam huruf a, huruf b, dan huruf c, perlu menetapkan Peraturan Pemerintah tentang Penyelenggaraan Perizinan Berusaha Berbasis Risiko;\n\nMengingat :\n1. Pasal 5 ayat (2) Undang-Undang Dasar Negara Republik Indonesia Tahun 1945;\n\n2. Undang-Undang Nomor 6 Tahun 2023 tentang Penetapan Peraturan Pemerintah Pengganti Undang-Undang Nomor 2 Tahun 2022 tentang Cipta Kerja menjadi Undang-Undang (Lembaran Negara Republik Indonesia Tahun 2023 Nomor 41, Tambahan Lembaran Negara Republik Indonesia Nomor 6856);\n\nMEMUTUSKAN :\n\nMenetapkan :\nPERATURAN PEMERINTAH TENTANG PENYELENGGARAAN PERIZINAN BERUSAHA BERBASIS RISIKO.\n",
-          referenceUrl: "#",
-          downloadUrl: "#",
-        },
+
         {
           id: "kepgub-310-2026",
           summary:
@@ -1165,6 +1224,8 @@ export const translations = {
       servicesTitle: "服务项目",
       connect: "关注我们",
       rights: "版权所有。",
+      disclaimer:
+        "**免责声明**：**PT Mandiri Cipta Solusi (MCS Consulting)** 在本网站上提供的信息仅用于一般信息目的。尽管我们努力确保信息的准确性和及时性，但我们对其完整性或可靠性不作任何保证。MCS Consulting 是一家独立的咨询公司，**与印度尼西亚共和国政府或任何政府机构均无隶属关系、未获其认可，也不代表其行事**。我们不签发官方政府文件、准持证、执照、签证、护照或其他政府签发的批准文件。我们的服务仅限于专业的咨询、顾问和行政支持。所有官方批准、注册和文件均由相关政府部门全权签发。",
     },
   },
 };
