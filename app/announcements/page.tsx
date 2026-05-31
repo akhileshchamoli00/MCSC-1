@@ -50,11 +50,18 @@ export default function AnnouncementsPage() {
     setIsLoading(false);
     setIsSubscribed(true);
   };
+  const getParsedDate = (id: string) => {
+    const enItem = translations["en"].announcement.items.find((i: any) => i.id === id);
+    return enItem && enItem.date ? new Date(enItem.date).getTime() : 0;
+  };
+
+  const sortedItems = [...t.announcement.items].sort((a, b) => getParsedDate(b.id) - getParsedDate(a.id));
+
   const licenseRegulationIds = ["pmk-28-2026", "permenkum-5-2026"];
-  const taxLicenseRegulations = t.announcement.items.filter((item) =>
+  const taxLicenseRegulations = sortedItems.filter((item) =>
     licenseRegulationIds.includes(item.id),
   );
-  const financeRegulations = t.announcement.items.filter(
+  const financeRegulations = sortedItems.filter(
     (item) => !licenseRegulationIds.includes(item.id),
   );
 

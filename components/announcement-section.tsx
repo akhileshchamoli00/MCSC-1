@@ -16,7 +16,12 @@ export function AnnouncementSection() {
   const [direction, setDirection] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
 
-  const announcements = t.announcement.items;
+  const getParsedDate = (id: string) => {
+    const enItem = translations["en"].announcement.items.find((i: any) => i.id === id);
+    return enItem && enItem.date ? new Date(enItem.date).getTime() : 0;
+  };
+
+  const announcements = [...t.announcement.items].sort((a, b) => getParsedDate(b.id) - getParsedDate(a.id));
   const totalSlides = announcements.length;
 
   const nextSlide = useCallback(() => {
