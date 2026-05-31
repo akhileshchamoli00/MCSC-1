@@ -122,7 +122,7 @@ export const translations = {
       title: "Regulations",
       items: [
         {
-          id: "pp-20-2026",
+          id: "PERATURAN-PEMERINTAH-REPUBLIK-INDONESIA-NOMOR-20-TAHUN-2026",
           title: "PERATURAN PEMERINTAH REPUBLIK INDONESIA NOMOR 20 TAHUN 2026",
           date: "22 April 2026",
           summary: "This government regulation amends PP 55/2022 regarding income tax adjustments. It clarifies the taxation of income for taxpayers with a certain gross turnover, aiming to support healthy business practices. Notably, it specifies that expenses such as bribes or gratifications cannot be deducted from gross income.",
@@ -560,7 +560,7 @@ export const translations = {
       title: "Regulasi",
       items: [
         {
-          id: "pp-20-2026",
+          id: "PERATURAN-PEMERINTAH-REPUBLIK-INDONESIA-NOMOR-20-TAHUN-2026",
           title: "PERATURAN PEMERINTAH REPUBLIK INDONESIA NOMOR 20 TAHUN 2026",
           date: "22 April 2026",
           summary: "Peraturan Pemerintah ini mengubah PP 55/2022 terkait penyesuaian pajak penghasilan. Ini memperjelas pengenaan pajak bagi wajib pajak dengan peredaran bruto tertentu untuk mendukung praktik bisnis yang sehat. Secara khusus, biaya seperti suap atau gratifikasi tidak dapat dikurangkan dari penghasilan bruto.",
@@ -990,7 +990,7 @@ export const translations = {
       title: "政策法规",
       items: [
         {
-          id: "pp-20-2026",
+          id: "PERATURAN-PEMERINTAH-REPUBLIK-INDONESIA-NOMOR-20-TAHUN-2026",
           title: "PERATURAN PEMERINTAH REPUBLIK INDONESIA NOMOR 20 TAHUN 2026",
           date: "22 April 2026",
           summary: "本政府法规修订了关于所得税调整的第55/2022号PP。它澄清了具有特定总营业额的纳税人的所得税，旨在支持健康的商业实践。值得注意的是，它规定贿赂或酬金等费用不能从总收入中扣除。",
