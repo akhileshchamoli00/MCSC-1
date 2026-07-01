@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import BorderGlow from "./ui/BorderGlow";
 import {
   Card,
@@ -213,21 +213,19 @@ export function BaseServicePage({
                           }`}
                         />
                       </button>
-                      <AnimatePresence initial={false}>
-                        {isOpen && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.3 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="pb-5 pt-1 pr-8 text-sm text-muted-foreground leading-relaxed">
-                              {getTranslation(faq.answer, language)}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+                      <motion.div
+                        initial={false}
+                        animate={{
+                          height: isOpen ? "auto" : 0,
+                          opacity: isOpen ? 1 : 0,
+                        }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pb-5 pt-1 pr-8 text-sm text-muted-foreground leading-relaxed">
+                          {getTranslation(faq.answer, language)}
+                        </div>
+                      </motion.div>
                     </div>
                   );
                 })}

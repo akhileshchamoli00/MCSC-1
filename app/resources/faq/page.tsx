@@ -2,7 +2,7 @@
 
 import { useLanguage } from "@/contexts/language-context";
 import { HelpCircle, ChevronDown } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useState } from "react";
 import BorderGlow from "@/components/ui/BorderGlow";
 import { Card, CardContent } from "@/components/ui/card";
@@ -1043,21 +1043,19 @@ export default function FAQPage() {
                       }`}
                     />
                   </button>
-                  <AnimatePresence initial={false}>
-                    {isOpen && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="pb-4 pt-1 pr-8 text-sm text-muted-foreground leading-relaxed">
-                          {getTranslation(faq.answer, language)}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <motion.div
+                    initial={false}
+                    animate={{
+                      height: isOpen ? "auto" : 0,
+                      opacity: isOpen ? 1 : 0,
+                    }}
+                    transition={{ duration: 0.3 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pb-4 pt-1 pr-8 text-sm text-muted-foreground leading-relaxed">
+                      {getTranslation(faq.answer, language)}
+                    </div>
+                  </motion.div>
                 </div>
               );
             })}
