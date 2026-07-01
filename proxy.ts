@@ -13,6 +13,13 @@ export function proxy(request: NextRequest) {
         return response
     }
 
+    // Redirect non-www to www
+    if (hostname === 'mcsc.co.id') {
+        const url = request.nextUrl.clone()
+        url.hostname = 'www.mcsc.co.id'
+        return NextResponse.redirect(url, 301)
+    }
+
     if (deadPatterns.some((p) => path.startsWith(p))) {
         return new NextResponse('Gone', { status: 410 })
     }
