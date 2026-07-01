@@ -25,4 +25,19 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# python venv and caches
+/backend/venv/
+**/__pycache__/
+
+# databases and temp pdfs
+/backend/*.db
+/backend/*.pdf
+
+# scratch folders
+/scratch/
+/backend/scratch/
+/backend/debug.log
+/backend/uploads/
+
 backend/venv/

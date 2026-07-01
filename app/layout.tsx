@@ -5,9 +5,9 @@ import { Analytics } from "@vercel/analytics/next"
 import { LanguageProvider } from "@/contexts/language-context"
 import { ThemeProvider } from "@/components/theme-provider"
 import { GlobalGalaxy } from "@/components/global-galaxy"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
-import { WhatsAppWidget } from "@/components/whatsapp-widget"
+import { PublicLayoutWrapper } from "@/components/public-layout-wrapper"
+import { TooltipProvider } from "@/components/ui/tooltip"
+import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
 const geistSans = Geist({ subsets: ["latin"], variable: "--font-sans" })
@@ -20,24 +20,7 @@ export const metadata: Metadata = {
   title: "MCS Consulting - Company Registration, Business Licensing, Tax & Compliance Services in Indonesia",
   description:
     "Your trusted partner in managing all aspects of business licensing with over 10 years of professional experience.",
-  keywords: ["MCS Consulting", "Indonesia Business Consulting", "Company Registration Indonesia", "Business Licensing", "Tax Services Indonesia", "Compliance Services", "BPK Regulations"],
-  generator: "v0.app",
-  alternates: {
-    canonical: "https://mcsc.co.id",
-  },
-  openGraph: {
-    title: "MCS Consulting - Your Business Partner in Indonesia",
-    description: "Your trusted partner in managing all aspects of business licensing with over 10 years of professional experience.",
-    url: "https://mcsc.co.id",
-    siteName: "MCS Consulting",
-    locale: "en_ID",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "MCS Consulting",
-    description: "Your trusted partner in managing all aspects of business licensing with over 10 years of professional experience.",
-  },
+  generator: "https://www.mcsc.co.id",
   icons: {
     icon: "/icon.png",
     shortcut: "/icon.png",
@@ -54,6 +37,7 @@ export default function RootLayout({
     <html
       lang="en"
       className={`scroll-smooth ${antonio.variable} ${geistSans.variable} ${geistMono.variable} ${playfair.variable}`}
+      data-scroll-behavior="smooth"
       suppressHydrationWarning
     >
       <body className="font-sans antialiased min-h-screen bg-transparent text-foreground selection:bg-primary/30 relative">
@@ -65,12 +49,14 @@ export default function RootLayout({
         >
           <GlobalGalaxy />
           <LanguageProvider>
-            <Header />
-            {children}
-            <Footer />
-            <WhatsAppWidget />
+            <TooltipProvider>
+              <PublicLayoutWrapper>
+                {children}
+              </PublicLayoutWrapper>
+            </TooltipProvider>
           </LanguageProvider>
         </ThemeProvider>
+        <Toaster richColors />
         <Analytics />
       </body>
     </html>

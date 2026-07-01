@@ -20,6 +20,7 @@ import {
 import BorderGlow from "@/components/ui/BorderGlow";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from "@/components/ui/select";
 
 // Types matching scraped data structure
 interface NiceItem {
@@ -421,33 +422,37 @@ export default function BrandClassificationPage() {
             <div className="lg:hidden block space-y-4 col-span-1">
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-grow">
-                  <select
+                  <Select
                     value={activeClass}
-                    onChange={(e) => {
-                      setActiveClass(e.target.value);
+                    onValueChange={(val) => {
+                      setActiveClass(val);
                       setGlobalSearch(false);
                     }}
                     disabled={globalSearch}
-                    className="w-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg py-2.5 pl-4 pr-10 text-sm font-semibold focus:outline-none focus:border-primary text-zinc-900 dark:text-foreground disabled:opacity-40"
                   >
-                    <optgroup label={ui.goodsSection}>
-                      {classList.goods.map((cls) => (
-                        <option key={cls.id} value={cls.id}>
-                          {ui.classTab.replace("{id}", cls.id.padStart(2, "0"))}{" "}
-                          - {cls.desc.substring(0, 50)}...
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label={ui.servicesSection}>
-                      {classList.services.map((cls) => (
-                        <option key={cls.id} value={cls.id}>
-                          {ui.classTab.replace("{id}", cls.id)} -{" "}
-                          {cls.desc.substring(0, 50)}...
-                        </option>
-                      ))}
-                    </optgroup>
-                  </select>
-                  <ChevronDown className="absolute right-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <SelectTrigger className="w-full h-10 border border-zinc-300 dark:border-zinc-700 bg-background px-3 py-2 text-sm font-semibold text-zinc-900 dark:text-foreground">
+                      <SelectValue placeholder="Select Class..." />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      <SelectGroup>
+                        <SelectLabel className="text-primary font-bold uppercase tracking-wider text-xs">{ui.goodsSection}</SelectLabel>
+                        {classList.goods.map((cls) => (
+                          <SelectItem key={cls.id} value={cls.id}>
+                            {ui.classTab.replace("{id}", cls.id.padStart(2, "0"))} - {cls.desc.substring(0, 50)}...
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                      <SelectSeparator />
+                      <SelectGroup>
+                        <SelectLabel className="text-primary font-bold uppercase tracking-wider text-xs">{ui.servicesSection}</SelectLabel>
+                        {classList.services.map((cls) => (
+                          <SelectItem key={cls.id} value={cls.id}>
+                            {ui.classTab.replace("{id}", cls.id)} - {cls.desc.substring(0, 50)}...
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
