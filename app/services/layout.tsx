@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Our Business & Licensing Services in Indonesia | MCS Consulting",
-  description: "Explore our complete range of company establishment, business licensing, tax compliance, virtual office, and work permit services in Indonesia.",
+  title: "Our Services | Business Setup, Licensing & Compliance in Indonesia",
+  description: "Company registration, business licensing, document changes, agreements, virtual office, work permits, and IP registration — all in one place.",
+  alternates: {
+    canonical: "https://www.mcsc.co.id/services",
+  },
 };
 
 export default function ServicesLayout({ children }: { children: React.ReactNode }) {

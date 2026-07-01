@@ -8,6 +8,9 @@ import type { Metadata } from "next"
 export const metadata: Metadata = {
   title: "MCS Consulting | Business Registration & Licensing in Indonesia",
   description: "PT & PT PMA registration, business licensing, tax and compliance services in Indonesia. 500+ businesses assisted since 2013. Free consultation.",
+  alternates: {
+    canonical: "https://www.mcsc.co.id",
+  },
 }
 
 export default function Home() {
