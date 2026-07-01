@@ -1,34 +1,38 @@
-import { MetadataRoute } from 'next'
+import type { MetadataRoute } from 'next'
 import { translations } from '@/lib/translations'
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://mcsc.co.id'
-  
-  // Base static routes
-  const routes = [
-    '',
-    '/about',
-    '/services',
-    '/announcements',
-    '/resources',
-    '/contact',
-  ].map((route) => ({
-    url: `${baseUrl}${route}`,
-    lastModified: new Date().toISOString(),
-    changeFrequency: 'weekly' as const,
-    priority: route === '' ? 1 : 0.8,
-  }))
+    const base = 'https://www.mcsc.co.id'
+    const pages = [
+        '',
+        '/about',
+        '/services',
+        '/services/establishment',
+        '/services/business-license',
+        '/services/company-changes',
+        '/services/agreements',
+        '/services/virtual-office',
+        '/services/work-permit',
+        '/services/intellectual-property',
+        '/resources',
+        '/resources/brand-classification',
+        '/resources/check-application-status',
+        '/resources/kbli',
+        '/resources/faq',
+        '/announcements',
+        '/contact',
+    ]
 
-  // Dynamic announcement routes
-  // Using English as the source of truth for the available IDs
-  const announcementIds = translations['en'].announcement.items.map((item: any) => item.id)
-  
-  const announcementRoutes = announcementIds.map((id: string) => ({
-    url: `${baseUrl}/announcement/${id}`,
-    lastModified: new Date().toISOString(),
-    changeFrequency: 'monthly' as const,
-    priority: 0.6,
-  }))
+    // Dynamically append all individual regulatory announcement paths
+    const dynamicAnnouncements = translations.en.announcement.items.map(
+        (item) => `/announcement/${item.id}`
+    )
+    const allPages = [...pages, ...dynamicAnnouncements]
 
-  return [...routes, ...announcementRoutes]
+    return allPages.map((path) => ({
+        url: `${base}${path}`,
+        lastModified: new Date(),
+        changeFrequency: path.startsWith('/announcement/') ? 'weekly' : 'monthly',
+        priority: path === '' ? 1.0 : path.startsWith('/announcement/') ? 0.6 : 0.8,
+    }))
 }
