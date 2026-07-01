@@ -9,6 +9,19 @@ const nextConfig = {
   },
   // Allow hot module reloading (HMR) websocket from the production/test domain
   allowedDevOrigins: ["hrms.indotax.co.id", "localhost:3000"],
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=0, s-maxage=600, stale-while-revalidate=86400',
+          },
+        ],
+      },
+    ]
+  },
   async rewrites() {
     return [
       {
