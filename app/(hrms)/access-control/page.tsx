@@ -84,6 +84,11 @@ export default function AccessControlPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedModules, setExpandedModules] = useState<Record<number, boolean>>({});
   const [activeTab, setActiveTab] = useState("permissions");
+  const [auditLogsPage, setAuditLogsPage] = useState(1);
+
+  useEffect(() => {
+    setAuditLogsPage(1);
+  }, [activeTab]);
 
   // Redirect if not admin
   useEffect(() => {
@@ -398,6 +403,11 @@ export default function AccessControlPage() {
   };
 
   const currentRoleName = roles.find(r => r.id.toString() === selectedRoleId)?.name || "Selected Role";
+
+  const auditLogsTotalPages = Math.ceil(auditLogs.length / 10);
+  const auditLogsStartIndex = (auditLogsPage - 1) * 10;
+  const auditLogsEndIndex = auditLogsStartIndex + 10;
+  const paginatedAuditLogs = auditLogs.slice(auditLogsStartIndex, auditLogsEndIndex);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto animate-in fade-in duration-500 pb-16">
@@ -773,7 +783,7 @@ export default function AccessControlPage() {
                           </td>
                         </TableRow>
                       ) : (
-                        auditLogs.map(log => (
+                        paginatedAuditLogs.map(log => (
                           <TableRow key={log.id} className="hover:bg-muted/20">
                             <td className="py-4 pl-6 font-mono text-muted-foreground text-xs">#{log.id}</td>
                             <td className="py-4 font-semibold text-sm">{log.employee_name}</td>
@@ -794,6 +804,39 @@ export default function AccessControlPage() {
                     </TableBody>
                   </Table>
                 </div>
+
+                {auditLogsTotalPages > 1 && (
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+                    <div className="text-xs text-muted-foreground">
+                      Showing <span className="font-medium text-foreground">{auditLogsStartIndex + 1}</span> to{" "}
+                      <span className="font-medium text-foreground">{Math.min(auditLogs.length, auditLogsEndIndex)}</span> of{" "}
+                      <span className="font-medium text-foreground">{auditLogs.length}</span> entries
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAuditLogsPage(prev => Math.max(1, prev - 1))}
+                        disabled={auditLogsPage === 1}
+                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800 animate-none shrink-0"
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-xs text-muted-foreground px-2">
+                        Page {auditLogsPage} of {auditLogsTotalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAuditLogsPage(prev => Math.min(auditLogsTotalPages, prev + 1))}
+                        disabled={auditLogsPage === auditLogsTotalPages}
+                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800 animate-none shrink-0"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

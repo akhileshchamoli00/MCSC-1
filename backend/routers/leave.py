@@ -46,7 +46,15 @@ def calculate_working_days(start_date, end_date, db: Session = None):
 def get_all_leave_balances(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     if not current_user.role or "ADMIN" not in current_user.role.name.upper():
         raise HTTPException(status_code=403, detail="Admin access required")
-    return db.query(models.LeaveBalance).join(models.Employee).order_by(models.Employee.first_name, models.Employee.last_name).offset(skip).limit(limit).all()
+    balances = db.query(models.LeaveBalance).join(models.Employee).order_by(models.Employee.first_name, models.Employee.last_name).offset(skip).limit(limit).all()
+    for balance in balances:
+        allocations = db.query(models.LeaveRequest).filter(
+            models.LeaveRequest.employee_id == balance.employee_id,
+            models.LeaveRequest.leave_type == "Leave Allocation",
+            models.LeaveRequest.status == "APPROVED"
+        ).all()
+        balance.bonus_allocated = sum(req.days_requested for req in allocations)
+    return balances
 
 @router.put("/balances/{employee_id}", response_model=schemas.LeaveBalanceResponse)
 def update_leave_balance(employee_id: int, payload: schemas.LeaveBalanceUpdate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
@@ -56,6 +64,9 @@ def update_leave_balance(employee_id: int, payload: schemas.LeaveBalanceUpdate, 
     balance = db.query(models.LeaveBalance).filter(models.LeaveBalance.employee_id == employee_id).first()
     if not balance:
         raise HTTPException(status_code=404, detail="Leave balance not found for this employee")
+
+    if payload.bonus_allocated is not None and (payload.bonus_allocated * 2) % 1 != 0:
+        raise HTTPException(status_code=400, detail="Bonus allocated days must be in increments of 0.5 (half-day or full-day).")
 
     # Create Audit Log
     audit = models.LeaveBalanceAudit(
@@ -83,6 +94,85 @@ def update_leave_balance(employee_id: int, payload: schemas.LeaveBalanceUpdate, 
 
     db.commit()
     db.refresh(balance)
+    return balance
+
+@router.post("/allocate", response_model=schemas.LeaveBalanceResponse)
+def allocate_leave(payload: schemas.LeaveAllocationRequest, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    balance = db.query(models.LeaveBalance).filter(models.LeaveBalance.employee_id == payload.employee_id).first()
+    if not balance:
+        raise HTTPException(status_code=404, detail="Leave balance not found for this employee")
+
+    if (payload.amount * 2) % 1 != 0:
+        raise HTTPException(status_code=400, detail="Leave days must be in increments of 0.5 (half-day or full-day).")
+
+    # Record old balance
+    old_annual = balance.annual_leave_balance
+
+    # Update Balance
+    balance.annual_leave_balance += payload.amount
+    balance.updated_by = current_user.id
+    balance.updated_at = datetime.now()
+
+    # Create Audit Log
+    audit = models.LeaveBalanceAudit(
+        employee_id=payload.employee_id,
+        old_annual_balance=old_annual,
+        new_annual_balance=balance.annual_leave_balance,
+        old_sick_balance=balance.sick_leave_balance,
+        new_sick_balance=balance.sick_leave_balance,
+        old_annual_taken=balance.annual_leave_taken,
+        new_annual_taken=balance.annual_leave_taken,
+        old_sick_taken=balance.sick_leave_taken,
+        new_sick_taken=balance.sick_leave_taken,
+        reason=payload.reason,
+        updated_by=current_user.id
+    )
+    db.add(audit)
+
+    # Create Leave Request Addition Entry
+    allocation_date = datetime.now().date()
+    leave_req = models.LeaveRequest(
+        employee_id=payload.employee_id,
+        start_date=allocation_date,
+        end_date=allocation_date,
+        leave_type="Leave Allocation",
+        days_requested=payload.amount,
+        reason=payload.reason,
+        status=models.LeaveStatus.APPROVED,
+        approved_by=current_user.id,
+        approved_at=datetime.now()
+    )
+    db.add(leave_req)
+
+    db.commit()
+    db.refresh(balance)
+
+    # Notify Employee
+    try:
+        manager.notify_user_sync(
+            db=db,
+            user_id=balance.employee.user_id,
+            title="Leave Balance Allocated",
+            message=f"{payload.amount} days of annual leave have been allocated to your balance.",
+            type="leave_allocated",
+            module="Leave",
+            reference_id=leave_req.id,
+            action_url="/apply-leave"
+        )
+    except Exception as e:
+        print(f"Failed to notify employee: {e}")
+
+    # Compute bonus_allocated
+    allocations = db.query(models.LeaveRequest).filter(
+        models.LeaveRequest.employee_id == balance.employee_id,
+        models.LeaveRequest.leave_type == "Leave Allocation",
+        models.LeaveRequest.status == "APPROVED"
+    ).all()
+    balance.bonus_allocated = sum(req.days_requested for req in allocations)
+
     return balance
 
 @router.get("/requests", response_model=List[schemas.LeaveRequestResponse])
@@ -205,10 +295,12 @@ def get_my_leave_balances(db: Session = Depends(database.get_db), current_user: 
     used_unpaid = sum(req.days_requested for req in approved_requests if req.leave_type == "Unpaid Leave")
     used_emergency = sum(req.days_requested for req in approved_requests if req.leave_type == "Emergency Leave")
     used_maternity = sum(req.days_requested for req in approved_requests if req.leave_type == "Maternity Leave")
+    allocated_additions = sum(req.days_requested for req in approved_requests if req.leave_type == "Leave Allocation")
 
     return {
         "annual_leave": {
-            "allocated": balance.annual_leave_balance + used_annual + used_emergency - (balance.annual_leave_taken or 0.0),
+            "allocated": balance.annual_leave_balance + used_annual + used_emergency - (balance.annual_leave_taken or 0.0) - allocated_additions,
+            "additions": allocated_additions,
             "used": used_annual,
             "remaining": balance.annual_leave_balance
         },
@@ -483,6 +575,59 @@ def update_my_leave_request(request_id: int, leave_update: schemas.LeaveRequestU
             action_url="/leave-approval"
         )
         
+    return leave_req
+
+@router.put("/requests/{request_id}/allocation", response_model=schemas.LeaveRequestResponse)
+def update_leave_allocation(request_id: int, payload: schemas.LeaveAllocationUpdate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    leave_req = db.query(models.LeaveRequest).filter(models.LeaveRequest.id == request_id).first()
+    if not leave_req:
+        raise HTTPException(status_code=404, detail="Leave request not found")
+    
+    if leave_req.leave_type != "Leave Allocation":
+        raise HTTPException(status_code=400, detail="Only Leave Allocation requests can be edited via this endpoint")
+
+    if (payload.days_requested * 2) % 1 != 0:
+        raise HTTPException(status_code=400, detail="Leave days must be in increments of 0.5 (half-day or full-day).")
+
+    # Calculate delta
+    old_days = leave_req.days_requested
+    delta = payload.days_requested - old_days
+    
+    # Update LeaveRequest
+    leave_req.days_requested = payload.days_requested
+    leave_req.reason = payload.reason
+    leave_req.approved_by = current_user.id
+    leave_req.approved_at = datetime.now()
+    
+    # Update Employee Balance
+    balance = db.query(models.LeaveBalance).filter(models.LeaveBalance.employee_id == leave_req.employee_id).first()
+    if balance:
+        old_annual = balance.annual_leave_balance
+        balance.annual_leave_balance += delta
+        balance.updated_by = current_user.id
+        balance.updated_at = datetime.now()
+        
+        # Create Audit Log
+        audit = models.LeaveBalanceAudit(
+            employee_id=leave_req.employee_id,
+            old_annual_balance=old_annual,
+            new_annual_balance=balance.annual_leave_balance,
+            old_sick_balance=balance.sick_leave_balance,
+            new_sick_balance=balance.sick_leave_balance,
+            old_annual_taken=balance.annual_leave_taken,
+            new_annual_taken=balance.annual_leave_taken,
+            old_sick_taken=balance.sick_leave_taken,
+            new_sick_taken=balance.sick_leave_taken,
+            reason=f"Revised Leave Allocation: {payload.reason}",
+            updated_by=current_user.id
+        )
+        db.add(audit)
+        
+    db.commit()
+    db.refresh(leave_req)
     return leave_req
 
 from fastapi import UploadFile, File

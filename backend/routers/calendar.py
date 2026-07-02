@@ -46,6 +46,8 @@ def get_monthly_overview(
     # Base query for leaves
     query = db.query(models.LeaveRequest).join(
         models.Employee, models.LeaveRequest.employee_id == models.Employee.id
+    ).filter(
+        models.LeaveRequest.leave_type != "Leave Allocation"
     )
     if user_company:
         query = query.filter(models.Employee.company_name == user_company)
@@ -119,13 +121,17 @@ def get_monthly_overview(
     on_leave_today_count = db.query(models.LeaveRequest).filter(
         and_(
             models.LeaveRequest.status == models.LeaveStatus.APPROVED,
+            models.LeaveRequest.leave_type != "Leave Allocation",
             models.LeaveRequest.start_date <= today,
             models.LeaveRequest.end_date >= today
         )
     ).count()
 
     pending_leaves_count = db.query(models.LeaveRequest).filter(
-        models.LeaveRequest.status == models.LeaveStatus.PENDING
+        and_(
+            models.LeaveRequest.status == models.LeaveStatus.PENDING,
+            models.LeaveRequest.leave_type != "Leave Allocation"
+        )
     ).count()
 
     total_active_employees = db.query(models.Employee).filter(
@@ -237,6 +243,7 @@ def get_upcoming_leaves(
     ).filter(
         and_(
             models.LeaveRequest.status == models.LeaveStatus.APPROVED,
+            models.LeaveRequest.leave_type != "Leave Allocation",
             models.LeaveRequest.end_date >= today
         )
     )

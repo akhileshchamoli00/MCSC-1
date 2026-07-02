@@ -37,10 +37,11 @@ interface BaseServicePageProps {
   icon: LucideIcon;
   title: { en: string; id: string; cn?: string };
   description: { en: string; id: string; cn?: string };
-  subServices: SubService[];
+  subServices?: SubService[];
   faqs?: FAQ[];
   ctaText?: { en: string; id: string; cn?: string };
   ctaDescription?: { en: string; id: string; cn?: string };
+  children?: React.ReactNode;
 }
 
 export function BaseServicePage({
@@ -51,6 +52,7 @@ export function BaseServicePage({
   faqs,
   ctaText,
   ctaDescription,
+  children,
 }: BaseServicePageProps) {
   const { language } = useLanguage();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -89,88 +91,94 @@ export function BaseServicePage({
         </div>
       </section>
 
-      {/* Services Grid */}
-      <section className="pt-4 pb-20 bg-background/20 backdrop-blur-[2px]">
-        <div className="container mx-auto px-4">
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 max-w-7xl mx-auto">
-            {subServices.map((service, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-              >
-                <BorderGlow
-                  edgeSensitivity={30}
-                  glowColor="220 80 80"
-                  backgroundColor="transparent"
-                  borderRadius={16}
-                  glowRadius={40}
-                  glowIntensity={1}
-                  coneSpread={25}
-                  animated={false}
-                  colors={["#1e40af", "#10b981", "#f97316"]}
-                  className="h-full"
-                >
-                  <Card className="h-full border border-border/50 dark:border-white/20 bg-background/50 backdrop-blur-md transition-all duration-300 hover:bg-background/70 flex flex-col">
-                    <CardHeader className="pb-6">
-                      <CardTitle className="text-2xl font-bold leading-tight mb-2">
-                        {getTranslation(service.title, language)}
-                      </CardTitle>
-                      {service.subtitle && (
-                        <CardDescription className="text-sm font-medium text-primary/80">
-                          {getTranslation(service.subtitle, language)}
-                        </CardDescription>
-                      )}
-                    </CardHeader>
-                    <CardContent className="flex-grow flex flex-col justify-between">
-                      {service.items && (
-                        <ul className="space-y-4 mb-8">
-                          {getTranslationArray(service.items, language).map(
-                            (item, itemIndex) => (
-                              <li
-                                key={itemIndex}
-                                className="flex items-start gap-3 text-base"
-                              >
-                                <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                                <span className="text-muted-foreground">
-                                  {item}
-                                </span>
-                              </li>
-                            ),
+      {/* Services Grid or Custom Content */}
+      {children ? (
+        children
+      ) : (
+        subServices && subServices.length > 0 && (
+          <section className="pt-4 pb-20 bg-background/20 backdrop-blur-[2px]">
+            <div className="container mx-auto px-4">
+              <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 max-w-7xl mx-auto">
+                {subServices.map((service, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                  >
+                    <BorderGlow
+                      edgeSensitivity={30}
+                      glowColor="220 80 80"
+                      backgroundColor="transparent"
+                      borderRadius={16}
+                      glowRadius={40}
+                      glowIntensity={1}
+                      coneSpread={25}
+                      animated={false}
+                      colors={["#1e40af", "#10b981", "#f97316"]}
+                      className="h-full"
+                    >
+                      <Card className="h-full border border-border/50 dark:border-white/20 bg-background/50 backdrop-blur-md transition-all duration-300 hover:bg-background/70 flex flex-col">
+                        <CardHeader className="pb-6">
+                          <CardTitle className="text-2xl font-bold leading-tight mb-2">
+                            {getTranslation(service.title, language)}
+                          </CardTitle>
+                          {service.subtitle && (
+                            <CardDescription className="text-sm font-medium text-primary/80">
+                              {getTranslation(service.subtitle, language)}
+                            </CardDescription>
                           )}
-                        </ul>
-                      )}
-                      <Button
-                        className="w-full h-12 text-lg font-semibold group mt-auto"
-                        asChild
-                      >
-                        <a
-                          href="https://wa.me/6285718189799"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {language === "en"
-                            ? "Consult Now"
-                            : language === "cn"
-                              ? "立即咨询"
-                              : "Konsultasi Sekarang"}
-                          <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-                        </a>
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </BorderGlow>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+                        </CardHeader>
+                        <CardContent className="flex-grow flex flex-col justify-between">
+                          {service.items && (
+                            <ul className="space-y-4 mb-8">
+                              {getTranslationArray(service.items, language).map(
+                                (item, itemIndex) => (
+                                  <li
+                                    key={itemIndex}
+                                    className="flex items-start gap-3 text-base"
+                                  >
+                                    <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                                    <span className="text-muted-foreground">
+                                      {item}
+                                    </span>
+                                  </li>
+                                ),
+                              )}
+                            </ul>
+                          )}
+                          <Button
+                            className="w-full h-12 text-lg font-semibold group mt-auto"
+                            asChild
+                          >
+                            <a
+                              href="https://wa.me/6285718189799"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {language === "en"
+                                ? "Consult Now"
+                                : language === "cn"
+                                  ? "立即咨询"
+                                  : "Konsultasi Sekarang"}
+                              <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
+                            </a>
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    </BorderGlow>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )
+      )}
 
       {/* FAQ Section */}
       {faqs && faqs.length > 0 && (
-        <section className="pt-8 pb-8 relative overflow-hidden">
+        <section id="faq" className="scroll-mt-24 pt-8 pb-8 relative overflow-hidden">
           <div className="container mx-auto px-4 relative z-10">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -213,19 +221,15 @@ export function BaseServicePage({
                           }`}
                         />
                       </button>
-                      <motion.div
-                        initial={false}
-                        animate={{
-                          height: isOpen ? "auto" : 0,
-                          opacity: isOpen ? 1 : 0,
-                        }}
-                        transition={{ duration: 0.3 }}
-                        className="overflow-hidden"
+                      <div
+                        className={`overflow-hidden transition-all duration-300 ${
+                          isOpen ? "max-h-[1000px] opacity-100 pb-5 pt-1" : "max-h-0 opacity-0 pb-0 pt-0"
+                        }`}
                       >
-                        <div className="pb-5 pt-1 pr-8 text-sm text-muted-foreground leading-relaxed">
+                        <div className="pr-8 text-sm text-muted-foreground leading-relaxed">
                           {getTranslation(faq.answer, language)}
                         </div>
-                      </motion.div>
+                      </div>
                     </div>
                   );
                 })}

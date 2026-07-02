@@ -41,6 +41,11 @@ export default function PerformancePage() {
   const [role, setRole] = useState("EMPLOYEE");
   const [loading, setLoading] = useState(true);
 
+  // Pagination states
+  const [reviewsPage, setReviewsPage] = useState(1);
+  const [cyclesPage, setCyclesPage] = useState(1);
+  const [selfReviewsPage, setSelfReviewsPage] = useState(1);
+
   // Lists
   const [cycles, setCycles] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
@@ -478,6 +483,25 @@ export default function PerformancePage() {
     );
   }
 
+  // Reviews Pagination
+  const reviewsTotalPages = Math.ceil(reviews.length / 10);
+  const reviewsStartIndex = (reviewsPage - 1) * 10;
+  const reviewsEndIndex = reviewsStartIndex + 10;
+  const paginatedReviews = reviews.slice(reviewsStartIndex, reviewsEndIndex);
+
+  // Cycles Pagination
+  const cyclesTotalPages = Math.ceil(cycles.length / 10);
+  const cyclesStartIndex = (cyclesPage - 1) * 10;
+  const cyclesEndIndex = cyclesStartIndex + 10;
+  const paginatedCycles = cycles.slice(cyclesStartIndex, cyclesEndIndex);
+
+  // Self-Reviews Pagination
+  const mySelfReviews = selfReviews.filter(sr => sr.employee_id === profile?.id);
+  const selfReviewsTotalPages = Math.ceil(mySelfReviews.length / 10);
+  const selfReviewsStartIndex = (selfReviewsPage - 1) * 10;
+  const selfReviewsEndIndex = selfReviewsStartIndex + 10;
+  const paginatedSelfReviews = mySelfReviews.slice(selfReviewsStartIndex, selfReviewsEndIndex);
+
   return (
     <div className="flex-1 space-y-8 pb-10">
       
@@ -641,7 +665,7 @@ export default function PerformancePage() {
                   </thead>
                   <tbody className="divide-y divide-border/20">
                     {reviews.length > 0 ? (
-                      reviews.map((r) => (
+                      paginatedReviews.map((r) => (
                         <tr key={r.id} className="hover:bg-muted/10 transition-colors">
                           <td className="px-5 py-4 font-bold text-foreground">
                             {r.employee ? `${r.employee.first_name} ${r.employee.last_name}` : "Unknown"}
@@ -689,6 +713,39 @@ export default function PerformancePage() {
                   </tbody>
                 </table>
               </div>
+
+              {reviewsTotalPages > 1 && (
+                <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+                  <div className="text-xs text-muted-foreground">
+                    Showing <span className="font-medium text-foreground">{reviewsStartIndex + 1}</span> to{" "}
+                    <span className="font-medium text-foreground">{Math.min(reviews.length, reviewsEndIndex)}</span> of{" "}
+                    <span className="font-medium text-foreground">{reviews.length}</span> entries
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setReviewsPage(prev => Math.max(1, prev - 1))}
+                      disabled={reviewsPage === 1}
+                      className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-xs text-muted-foreground px-2">
+                      Page {reviewsPage} of {reviewsTotalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setReviewsPage(prev => Math.min(reviewsTotalPages, prev + 1))}
+                      disabled={reviewsPage === reviewsTotalPages}
+                      className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -951,7 +1008,7 @@ export default function PerformancePage() {
                     </thead>
                     <tbody className="divide-y divide-border/20">
                       {cycles.length > 0 ? (
-                        cycles.map((c) => (
+                        paginatedCycles.map((c) => (
                           <tr key={c.id} className="hover:bg-muted/10 transition-colors">
                             <td className="px-5 py-4 font-bold text-foreground">{c.name}</td>
                             <td className="px-5 py-4 text-center font-medium text-muted-foreground">{c.start_date}</td>
@@ -993,6 +1050,39 @@ export default function PerformancePage() {
                     </tbody>
                   </table>
                 </div>
+
+                {cyclesTotalPages > 1 && (
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+                    <div className="text-xs text-muted-foreground">
+                      Showing <span className="font-medium text-foreground">{cyclesStartIndex + 1}</span> to{" "}
+                      <span className="font-medium text-foreground">{Math.min(cycles.length, cyclesEndIndex)}</span> of{" "}
+                      <span className="font-medium text-foreground">{cycles.length}</span> entries
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCyclesPage(prev => Math.max(1, prev - 1))}
+                        disabled={cyclesPage === 1}
+                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-xs text-muted-foreground px-2">
+                        Page {cyclesPage} of {cyclesTotalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCyclesPage(prev => Math.min(cyclesTotalPages, prev + 1))}
+                        disabled={cyclesPage === cyclesTotalPages}
+                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1256,8 +1346,8 @@ export default function PerformancePage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/20">
-                      {selfReviews.filter(sr => sr.employee_id === profile?.id).length > 0 ? (
-                        selfReviews.filter(sr => sr.employee_id === profile?.id).map((sr) => (
+                      {mySelfReviews.length > 0 ? (
+                        paginatedSelfReviews.map((sr) => (
                           <tr key={sr.id} className="hover:bg-muted/10 transition-colors">
                             <td className="px-5 py-4 font-bold text-foreground">Cycle ID: {sr.review_cycle_id}</td>
                             <td className="px-5 py-4">
@@ -1275,6 +1365,39 @@ export default function PerformancePage() {
                     </tbody>
                   </table>
                 </div>
+
+                {selfReviewsTotalPages > 1 && (
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+                    <div className="text-xs text-muted-foreground">
+                      Showing <span className="font-medium text-foreground">{selfReviewsStartIndex + 1}</span> to{" "}
+                      <span className="font-medium text-foreground">{Math.min(mySelfReviews.length, selfReviewsEndIndex)}</span> of{" "}
+                      <span className="font-medium text-foreground">{mySelfReviews.length}</span> entries
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelfReviewsPage(prev => Math.max(1, prev - 1))}
+                        disabled={selfReviewsPage === 1}
+                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-xs text-muted-foreground px-2">
+                        Page {selfReviewsPage} of {selfReviewsTotalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelfReviewsPage(prev => Math.min(selfReviewsTotalPages, prev + 1))}
+                        disabled={selfReviewsPage === selfReviewsTotalPages}
+                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

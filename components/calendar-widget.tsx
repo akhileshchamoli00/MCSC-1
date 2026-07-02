@@ -173,7 +173,7 @@ export default function CalendarWidget() {
       
       if (res.ok) {
         const data = await res.json();
-        setLeaves(data.leaves);
+        setLeaves((data.leaves || []).filter((l: Leave) => l.leave_type !== "Leave Allocation"));
         setHolidays(data.holidays);
         setStats(data.stats);
         

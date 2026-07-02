@@ -242,49 +242,47 @@ export default function MyTimesheets() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-blue-500/10 rounded-xl">
-                <Clock className="w-6 h-6 text-blue-500" />
-              </div>
+          <div className="py-1 px-3">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Hours</p>
-                <h3 className="text-2xl font-bold">{totalHours.toFixed(1)}h</h3>
+                <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Total Hours</p>
+                <p className="text-lg font-bold text-foreground mt-0">{totalHours.toFixed(1)}h</p>
+              </div>
+              <div className="p-1.5 bg-blue-500/10 rounded-lg">
+                <Clock className="w-4 h-4 text-blue-500" />
               </div>
             </div>
-            <Progress value={(totalHours / 40) * 100} className="h-1.5 mt-4" />
-            <p className="text-xs text-muted-foreground mt-2">{Math.max(0, 40 - totalHours).toFixed(1)}h remaining this week</p>
-          </CardContent>
+          </div>
         </Card>
         
         <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-orange-500/10 rounded-xl">
-                <Clock4 className="w-6 h-6 text-orange-500" />
-              </div>
+          <div className="py-1 px-3">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Overtime</p>
-                <h3 className="text-2xl font-bold">{overtimeHours.toFixed(1)}h</h3>
+                <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Overtime</p>
+                <p className="text-lg font-bold text-foreground mt-0">{overtimeHours.toFixed(1)}h</p>
+              </div>
+              <div className="p-1.5 bg-orange-500/10 rounded-lg">
+                <Clock4 className="w-4 h-4 text-orange-500" />
               </div>
             </div>
-          </CardContent>
+          </div>
         </Card>
 
         <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm md:col-span-2">
-          <CardContent className="p-6 flex flex-col justify-center h-full">
-            <div className="flex items-center justify-between">
+          <div className="py-1 px-3 h-full flex flex-col justify-center">
+            <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">Current Status</p>
-                <div className="flex items-center gap-3">
-                  <Badge variant="outline" className={`font-semibold px-3 py-1 text-sm ${getStatusColor(currentTimesheet?.status || "DRAFT")}`}>
+                <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Current Status</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <Badge variant="outline" className={`font-semibold px-2 py-0 text-[10px] ${getStatusColor(currentTimesheet?.status || "DRAFT")}`}>
                     {currentTimesheet?.status || "NO TIMESHEET"}
                   </Badge>
                   {currentTimesheet?.status === "REJECTED" && (
-                    <span className="text-xs text-red-500 flex items-center gap-1 bg-red-500/10 px-2 py-1 rounded-md">
-                      <AlertCircle className="w-3.5 h-3.5" />
+                    <span className="text-[10px] text-red-500 flex items-center gap-1 bg-red-500/10 px-1.5 py-0.5 rounded-md">
+                      <AlertCircle className="w-3 h-3" />
                       {currentTimesheet.comments}
                     </span>
                   )}
@@ -294,12 +292,14 @@ export default function MyTimesheets() {
                 onClick={handleSubmitTimesheet}
                 disabled={!currentTimesheet || isReadOnly || totalHours === 0}
                 variant={isReadOnly ? "secondary" : "default"}
+                size="sm"
+                className="h-7 text-xs px-3"
               >
                 {currentTimesheet?.status === "SUBMITTED" ? "Awaiting Approval" : 
                  currentTimesheet?.status === "APPROVED" ? "Approved" : "Submit Timesheet"}
               </Button>
             </div>
-          </CardContent>
+          </div>
         </Card>
       </div>
 

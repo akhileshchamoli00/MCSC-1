@@ -25,6 +25,7 @@ export default function AttendancePage() {
   const [settings, setSettings] = useState<any>(null);
   const [myHistory, setMyHistory] = useState<any[]>([]);
   const [todayRecord, setTodayRecord] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   
   const [locationError, setLocationError] = useState("");
   const [currentDistance, setCurrentDistance] = useState<number | null>(null);
@@ -125,6 +126,11 @@ export default function AttendancePage() {
       setSubmitting(false);
     }
   };
+
+  const totalPages = Math.ceil(myHistory.length / 10);
+  const startIndex = (currentPage - 1) * 10;
+  const endIndex = startIndex + 10;
+  const paginatedHistory = myHistory.slice(startIndex, endIndex);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto">
@@ -243,7 +249,7 @@ export default function AttendancePage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
-              {myHistory.map((rec) => (
+              {paginatedHistory.map((rec) => (
                 <tr key={rec.id} className="hover:bg-muted/30">
                   <td className="px-4 py-3 font-medium">{rec.attendance_date}</td>
                   <td className="px-4 py-3">{rec.clock_in_time ? new Date(rec.clock_in_time).toLocaleTimeString() : "-"}</td>
@@ -261,6 +267,39 @@ export default function AttendancePage() {
               )}
             </tbody>
           </table>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+              <div className="text-xs text-muted-foreground">
+                Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
+                <span className="font-medium text-foreground">{Math.min(myHistory.length, endIndex)}</span> of{" "}
+                <span className="font-medium text-foreground">{myHistory.length}</span> entries
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Previous
+                </Button>
+                <span className="text-xs text-muted-foreground px-2">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

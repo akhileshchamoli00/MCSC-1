@@ -31,12 +31,16 @@ def get_admin_kpis(db: Session = Depends(get_db), current_user: models.User = De
     # 3. Employees on Leave
     on_leave = db.query(models.LeaveRequest).filter(
         models.LeaveRequest.status == "APPROVED",
+        models.LeaveRequest.leave_type != "Leave Allocation",
         models.LeaveRequest.start_date <= today,
         models.LeaveRequest.end_date >= today
     ).count()
     
     # 4. Pending Leave Requests
-    pending_leaves = db.query(models.LeaveRequest).filter(models.LeaveRequest.status == "PENDING").count()
+    pending_leaves = db.query(models.LeaveRequest).filter(
+        models.LeaveRequest.status == "PENDING",
+        models.LeaveRequest.leave_type != "Leave Allocation"
+    ).count()
     
     # 5. Monthly Payroll Cost
     # We use payrolls where status != Draft, for the current month
@@ -124,7 +128,8 @@ def get_leave_distribution(db: Session = Depends(get_db), current_user: models.U
         models.LeaveRequest.leave_type,
         func.count(models.LeaveRequest.id)
     ).filter(
-        models.LeaveRequest.status == "APPROVED"
+        models.LeaveRequest.status == "APPROVED",
+        models.LeaveRequest.leave_type != "Leave Allocation"
     ).group_by(models.LeaveRequest.leave_type).all()
     
     return [{"name": r[0], "value": r[1]} for r in results]
@@ -146,7 +151,9 @@ def get_recent_leaves(db: Session = Depends(get_db), current_user: models.User =
     if "ADMIN" not in current_user.role.name.upper():
         raise HTTPException(status_code=403, detail="Not authorized")
         
-    leaves = db.query(models.LeaveRequest).options(joinedload(models.LeaveRequest.employee)).order_by(models.LeaveRequest.created_at.desc()).limit(10).all()
+    leaves = db.query(models.LeaveRequest).options(joinedload(models.LeaveRequest.employee)).filter(
+        models.LeaveRequest.leave_type != "Leave Allocation"
+    ).order_by(models.LeaveRequest.created_at.desc()).limit(10).all()
     data = []
     for l in leaves:
         data.append({
@@ -349,10 +356,14 @@ def get_admin_dashboard_summary(db: Session = Depends(get_db), current_user: mod
     ).count()
     on_leave = db.query(models.LeaveRequest).filter(
         models.LeaveRequest.status == "APPROVED",
+        models.LeaveRequest.leave_type != "Leave Allocation",
         models.LeaveRequest.start_date <= today,
         models.LeaveRequest.end_date >= today
     ).count()
-    pending_leaves = db.query(models.LeaveRequest).filter(models.LeaveRequest.status == "PENDING").count()
+    pending_leaves = db.query(models.LeaveRequest).filter(
+        models.LeaveRequest.status == "PENDING",
+        models.LeaveRequest.leave_type != "Leave Allocation"
+    ).count()
     payroll_cost = db.query(func.sum(models.Payroll.net_salary)).filter(
         models.Payroll.payroll_month == current_month,
         models.Payroll.payroll_year == current_year,
@@ -406,7 +417,8 @@ def get_admin_dashboard_summary(db: Session = Depends(get_db), current_user: mod
         models.LeaveRequest.leave_type,
         func.count(models.LeaveRequest.id)
     ).filter(
-        models.LeaveRequest.status == "APPROVED"
+        models.LeaveRequest.status == "APPROVED",
+        models.LeaveRequest.leave_type != "Leave Allocation"
     ).group_by(models.LeaveRequest.leave_type).all()
     leave_distribution = [{"name": r[0], "value": r[1]} for r in leave_dist_results]
 
@@ -418,7 +430,9 @@ def get_admin_dashboard_summary(db: Session = Depends(get_db), current_user: mod
     department_headcount = [{"name": r[0], "value": r[1]} for r in dept_results]
 
     # 6. Recent Leaves
-    recent_leaves_query = db.query(models.LeaveRequest).options(joinedload(models.LeaveRequest.employee)).order_by(models.LeaveRequest.created_at.desc()).limit(10).all()
+    recent_leaves_query = db.query(models.LeaveRequest).options(joinedload(models.LeaveRequest.employee)).filter(
+        models.LeaveRequest.leave_type != "Leave Allocation"
+    ).order_by(models.LeaveRequest.created_at.desc()).limit(10).all()
     recent_leaves = []
     for l in recent_leaves_query:
         recent_leaves.append({

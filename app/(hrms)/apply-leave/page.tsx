@@ -35,6 +35,7 @@ export default function ApplyLeavePage() {
   const [balances, setBalances] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [errorModalOpen, setErrorModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -193,6 +194,11 @@ export default function ApplyLeavePage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const totalPages = Math.ceil(history.length / 10);
+  const startIndex = (currentPage - 1) * 10;
+  const endIndex = startIndex + 10;
+  const paginatedHistory = history.slice(startIndex, endIndex);
 
   const executeSubmit = async (values: LeaveFormValues) => {
     try {
@@ -383,22 +389,22 @@ export default function ApplyLeavePage() {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto pb-10">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Apply Leave</h1>
-        <p className="text-muted-foreground mt-1">Submit a new leave request and view your balance.</p>
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto pb-6">
+      <div className="flex flex-col gap-0.5">
+        <h1 className="text-2xl font-bold tracking-tight">Apply Leave</h1>
+        <p className="text-muted-foreground text-xs">Submit a new leave request and view your balance.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
         {/* Application Form */}
         <Card className="border-border/50 shadow-sm md:col-span-1 h-fit">
-          <CardHeader>
-            <CardTitle className="text-lg">New Request</CardTitle>
+          <CardHeader className="py-4">
+            <CardTitle className="text-base font-bold">New Request</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Leave Type</label>
+                <label className="text-xs font-semibold text-muted-foreground">Leave Type</label>
                 <Select 
                   value={form.watch("leave_type") || ""} 
                   onValueChange={(val) => form.setValue("leave_type", val)}
@@ -407,33 +413,33 @@ export default function ApplyLeavePage() {
                     <SelectValue placeholder="Select Leave Type" />
                   </SelectTrigger>
                   <SelectContent position="popper">
-                    <SelectItem value="Annual Leave">Annual Leave</SelectItem>
-                    <SelectItem value="Sick Leave">Sick Leave</SelectItem>
-                    <SelectItem value="Unpaid Leave">Unpaid Leave</SelectItem>
-                    <SelectItem value="Emergency Leave">Emergency Leave</SelectItem>
-                    <SelectItem value="Maternity Leave">Maternity Leave</SelectItem>
+                    <SelectItem value="Annual Leave" className="text-xs">Annual Leave</SelectItem>
+                    <SelectItem value="Sick Leave" className="text-xs">Sick Leave</SelectItem>
+                    <SelectItem value="Unpaid Leave" className="text-xs">Unpaid Leave</SelectItem>
+                    <SelectItem value="Emergency Leave" className="text-xs">Emergency Leave</SelectItem>
+                    <SelectItem value="Maternity Leave" className="text-xs">Maternity Leave</SelectItem>
                   </SelectContent>
                 </Select>
-                {form.formState.errors.leave_type && <p className="text-xs text-red-500">{form.formState.errors.leave_type.message}</p>}
+                {form.formState.errors.leave_type && <p className="text-[10px] text-red-500 mt-0.5">{form.formState.errors.leave_type.message}</p>}
               </div>
 
               {(form.watch("leave_type") === "Annual Leave" || form.watch("leave_type") === "Emergency Leave") && (balances?.annual_leave?.remaining ?? 0) <= 0 && (
-                <div className="p-3 rounded-md bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <div className="p-2 rounded-md bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-[10px] flex items-start gap-2 leading-normal">
+                  <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                   <span>You cannot apply for Annual Leave or Emergency Leave because your remaining Annual Leave balance is 0 or less.</span>
                 </div>
               )}
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Start Date</label>
-                <Input type="date" {...form.register("start_date")} />
-                {form.formState.errors.start_date && <p className="text-xs text-red-500">{form.formState.errors.start_date.message}</p>}
+                <label className="text-xs font-semibold text-muted-foreground">Start Date</label>
+                <Input type="date" className="h-10 text-sm py-2" {...form.register("start_date")} />
+                {form.formState.errors.start_date && <p className="text-[10px] text-red-500 mt-0.5">{form.formState.errors.start_date.message}</p>}
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">End Date</label>
-                <Input type="date" {...form.register("end_date")} disabled={watchIsHalfDay} />
-                {form.formState.errors.end_date && <p className="text-xs text-red-500">{form.formState.errors.end_date.message}</p>}
+                <label className="text-xs font-semibold text-muted-foreground">End Date</label>
+                <Input type="date" className="h-10 text-sm py-2" {...form.register("end_date")} disabled={watchIsHalfDay} />
+                {form.formState.errors.end_date && <p className="text-[10px] text-red-500 mt-0.5">{form.formState.errors.end_date.message}</p>}
               </div>
 
               <div className="flex items-center space-x-2 pt-2 pb-2">
@@ -443,17 +449,18 @@ export default function ApplyLeavePage() {
                   {...form.register("is_half_day")}
                   className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                 />
-                <label htmlFor="is_half_day" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                <label htmlFor="is_half_day" className="text-xs font-semibold leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                   Half-Day Leave
                 </label>
               </div>
 
               {form.watch("leave_type") === "Sick Leave" && (
-                <div className="space-y-2 p-3 bg-muted/30 border border-border/50 rounded-md">
-                  <label className="text-sm font-medium">Medical Certificate (Optional)</label>
+                <div className="space-y-2 p-2.5 bg-muted/30 border border-border/50 rounded-md">
+                  <label className="text-xs font-semibold text-muted-foreground">Medical Certificate (Optional)</label>
                   <Input 
                     type="file" 
                     accept="image/png, image/jpeg, image/jpg" 
+                    className="h-10 text-sm py-2"
                     onChange={(e) => {
                       if (e.target.files && e.target.files.length > 0) {
                         setAttachment(e.target.files[0]);
@@ -462,24 +469,24 @@ export default function ApplyLeavePage() {
                       }
                     }}
                   />
-                  <p className="text-xs text-muted-foreground">Only image files (PNG, JPEG) are allowed to keep file size small.</p>
+                  <p className="text-[9px] text-muted-foreground leading-normal">Only image files (PNG, JPEG) are allowed to keep file size small.</p>
                 </div>
               )}
 
-              <div className="space-y-2 bg-muted/50 p-3 rounded-md border border-border/50">
-                <label className="text-sm font-medium text-muted-foreground block">Number of Days (Excl. Weekends)</label>
-                <span className="text-2xl font-bold text-foreground">{calculatedDays}</span>
+              <div className="space-y-2 bg-muted/50 p-2.5 rounded-md border border-border/50 flex justify-between items-center">
+                <label className="text-xs font-semibold text-muted-foreground">Number of Days (Excl. Weekends)</label>
+                <span className="text-lg font-bold text-foreground">{calculatedDays}</span>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Reason</label>
+                <label className="text-xs font-semibold text-muted-foreground">Reason</label>
                 <Textarea 
                   {...form.register("reason")} 
                   placeholder="Reason for taking leave..." 
-                  className="min-h-[100px]"
+                  className="min-h-[140px] text-sm py-2"
                   maxLength={100}
                 />
-                <div className="flex justify-between items-center text-xs mt-1">
+                <div className="flex justify-between items-center text-[10px] mt-1">
                   {form.formState.errors.reason ? (
                     <p className="text-red-500">{form.formState.errors.reason.message}</p>
                   ) : (
@@ -489,167 +496,216 @@ export default function ApplyLeavePage() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full mt-2" disabled={submitting || calculatedDays <= 0}>
+              <Button type="submit" className="w-full mt-2 h-10 text-sm font-semibold" disabled={submitting || calculatedDays <= 0}>
                 {submitting ? "Submitting..." : "Submit Leave Request"}
               </Button>
             </form>
           </CardContent>
         </Card>
 
-        {/* Balance Summary Table */}
-        <Card className="border-border/50 shadow-sm overflow-hidden md:col-span-2">
-          <CardHeader className="bg-muted/20 border-b border-border/50 py-4">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Coffee className="h-4 w-4" /> My Leave Balances
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50">
-                  <tr>
-                    <th className="px-6 py-3 font-medium">Leave Type</th>
-                    <th className="px-6 py-3 font-medium text-center">Allocated</th>
-                    <th className="px-6 py-3 font-medium text-center">Used</th>
-                    <th className="px-6 py-3 font-medium text-center">Remaining</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50">
-                  {loading || !balances ? (
+        {/* Right Column: Stack of Balances and History */}
+        <div className="md:col-span-2 flex flex-col gap-4 animate-in fade-in duration-500">
+          {/* Balance Summary Table */}
+          <Card className="border-border/50 shadow-sm overflow-hidden">
+            <CardHeader className="bg-muted/20 border-b border-border/50 py-2.5">
+              <CardTitle className="flex items-center gap-2 text-sm font-bold">
+                <Coffee className="h-4 w-4 text-primary" /> My Leave Balances
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="text-[10px] text-muted-foreground uppercase bg-muted/50 border-b border-border/50">
                     <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">
-                        <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                      </td>
+                      <th className="px-4 py-2 font-semibold">Leave Type</th>
+                      <th className="px-4 py-2 font-semibold text-center">Allocated</th>
+                      <th className="px-4 py-2 font-semibold text-center">Used</th>
+                      <th className="px-4 py-2 font-semibold text-center">Remaining</th>
                     </tr>
-                  ) : (
-                    <>
-                      <tr className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-3 font-medium">Annual Leave</td>
-                        <td className="px-6 py-3 text-center">{balances.annual_leave.allocated}</td>
-                        <td className="px-6 py-3 text-center">{balances.annual_leave.used}</td>
-                        <td className="px-6 py-3 text-center font-bold text-primary">{balances.annual_leave.remaining}</td>
-                      </tr>
-                      <tr className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-3 font-medium">Sick Leave</td>
-                        <td className="px-6 py-3 text-center">
-                          {balances.sick_leave.allocated === 0 ? "-" : balances.sick_leave.allocated}
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {loading || !balances ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
+                          <Loader2 className="h-5 w-5 animate-spin mx-auto" />
                         </td>
-                        <td className="px-6 py-3 text-center">{balances.sick_leave.used}</td>
-                        <td className="px-6 py-3 text-center font-bold text-orange-600">{balances.sick_leave.remaining}</td>
                       </tr>
-                      <tr className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-3 font-medium">Unpaid Leave</td>
-                        <td className="px-6 py-3 text-center">-</td>
-                        <td className="px-6 py-3 text-center">{balances.unpaid_leave?.used || 0}</td>
-                        <td className="px-6 py-3 text-center font-bold text-muted-foreground">-</td>
-                      </tr>
-                      <tr className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-3 font-medium">Emergency Leave</td>
-                        <td className="px-6 py-3 text-center">-</td>
-                        <td className="px-6 py-3 text-center">{balances.emergency_leave?.used || 0}</td>
-                        <td className="px-6 py-3 text-center font-bold text-muted-foreground">-</td>
-                      </tr>
-                      <tr className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-3 font-medium">Maternity Leave</td>
-                        <td className="px-6 py-3 text-center">-</td>
-                        <td className="px-6 py-3 text-center">{balances.maternity_leave?.used || 0}</td>
-                        <td className="px-6 py-3 text-center font-bold text-muted-foreground">-</td>
-                      </tr>
-                    </>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                    ) : (
+                      <>
+                        <tr className="hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-2 font-medium">Annual Leave</td>
+                          <td className="px-4 py-2 text-center">
+                            {balances.annual_leave.allocated}
+                            {balances.annual_leave.additions > 0 && (
+                              <span className="text-[10px] text-green-600 dark:text-green-400 font-semibold block mt-0.5 animate-pulse">
+                                (+{balances.annual_leave.additions} Added)
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2 text-center">{balances.annual_leave.used}</td>
+                          <td className="px-4 py-2 text-center font-bold text-primary">{balances.annual_leave.remaining}</td>
+                        </tr>
+                        <tr className="hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-2 font-medium">Sick Leave</td>
+                          <td className="px-4 py-2 text-center">
+                            {balances.sick_leave.allocated === 0 ? "-" : balances.sick_leave.allocated}
+                          </td>
+                          <td className="px-4 py-2 text-center">{balances.sick_leave.used}</td>
+                          <td className="px-4 py-2 text-center font-bold text-orange-600">{balances.sick_leave.remaining}</td>
+                        </tr>
+                        <tr className="hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-2 font-medium">Unpaid Leave</td>
+                          <td className="px-4 py-2 text-center">-</td>
+                          <td className="px-4 py-2 text-center">{balances.unpaid_leave?.used || 0}</td>
+                          <td className="px-4 py-2 text-center font-bold text-muted-foreground">-</td>
+                        </tr>
+                        <tr className="hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-2 font-medium">Emergency Leave</td>
+                          <td className="px-4 py-2 text-center">-</td>
+                          <td className="px-4 py-2 text-center">{balances.emergency_leave?.used || 0}</td>
+                          <td className="px-4 py-2 text-center font-bold text-muted-foreground">-</td>
+                        </tr>
+                        <tr className="hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-2 font-medium">Maternity Leave</td>
+                          <td className="px-4 py-2 text-center">-</td>
+                          <td className="px-4 py-2 text-center">{balances.maternity_leave?.used || 0}</td>
+                          <td className="px-4 py-2 text-center font-bold text-muted-foreground">-</td>
+                        </tr>
+                      </>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Leave History */}
-      <Card className="border-border/50 shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <List className="h-5 w-5" /> My Leave History
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50">
-                <tr>
-                  <th className="px-6 py-4 font-medium">Leave Type</th>
-                  <th className="px-6 py-4 font-medium">Start Date</th>
-                  <th className="px-6 py-4 font-medium">End Date</th>
-                  <th className="px-6 py-4 font-medium text-center">Days</th>
-                  <th className="px-6 py-4 font-medium">Reason</th>
-                  <th className="px-6 py-4 font-medium">Status</th>
-                  <th className="px-6 py-4 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
-                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-4" />
-                      Loading history...
-                    </td>
-                  </tr>
-                ) : history.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
-                      You have not submitted any leave requests yet.
-                    </td>
-                  </tr>
-                ) : (
-                  history.map((req) => (
-                    <tr key={req.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-6 py-4 font-medium">
-                        {req.leave_type}
-                      </td>
-                      <td className="px-6 py-4 text-muted-foreground text-sm">
-                        {req.start_date}
-                      </td>
-                      <td className="px-6 py-4 text-muted-foreground text-sm">
-                        {req.end_date}
-                      </td>
-                      <td className="px-6 py-4 font-medium text-center">
-                        {req.days_requested}
-                      </td>
-                      <td className="px-6 py-4 text-muted-foreground text-sm max-w-xs truncate" title={req.reason && req.reason.startsWith("Forced Leave") ? "Forced Leave" : (req.reason || "N/A")}>
-                        {req.reason && req.reason.startsWith("Forced Leave") ? "Forced Leave" : (req.reason || "N/A")}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          {req.status === "PENDING" && <Badge variant="outline" className="text-orange-600 bg-orange-50 border-orange-200">Pending</Badge>}
-                          {req.status === "APPROVED" && <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">Approved</Badge>}
-                          {req.status === "REJECTED" && <Badge variant="outline" className="text-red-600 bg-red-50 border-red-200">Rejected</Badge>}
-                          {req.status === "CANCELLED" && <Badge variant="outline" className="text-gray-600 bg-gray-50 border-gray-200">Cancelled</Badge>}
-                          {req.attachment_url && (
-                            <a href={`${process.env.NEXT_PUBLIC_API_URL}${req.attachment_url}`} target="_blank" rel="noreferrer" title="View Medical Certificate">
-                              <Paperclip className="h-4 w-4 text-blue-600 hover:text-blue-800" />
-                            </a>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        {req.status === "PENDING" && req.leave_type !== "Emergency Leave" && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => handleStartEdit(req)}
-                            className="text-xs h-8 flex items-center gap-1.5 border-zinc-200 hover:bg-muted dark:border-zinc-800"
-                          >
-                            <Pencil className="h-3.5 w-3.5" /> Edit
-                          </Button>
-                        )}
-                      </td>
+          {/* Leave History */}
+          <Card className="border-border/50 shadow-sm">
+            <CardHeader className="py-2.5">
+              <CardTitle className="flex items-center gap-2 text-sm font-bold">
+                <List className="h-4 w-4 text-primary" /> My Leave History
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="text-[10px] text-muted-foreground uppercase bg-muted/50 border-b border-border/50">
+                    <tr>
+                      <th className="px-4 py-2 font-semibold">Leave Type</th>
+                      <th className="px-4 py-2 font-semibold">Start Date</th>
+                      <th className="px-4 py-2 font-semibold">End Date</th>
+                      <th className="px-4 py-2 font-semibold text-center">Days</th>
+                      <th className="px-4 py-2 font-semibold">Reason</th>
+                      <th className="px-4 py-2 font-semibold">Status</th>
+                      <th className="px-4 py-2 font-semibold text-right">Actions</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                          <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                          Loading history...
+                        </td>
+                      </tr>
+                    ) : history.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground italic">
+                          You have not submitted any leave requests yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedHistory.map((req) => (
+                        <tr key={req.id} className={req.leave_type === "Leave Allocation" ? "bg-green-100 dark:bg-green-950/40 text-green-900 dark:text-green-250 hover:bg-green-200/85" : "hover:bg-muted/30 transition-colors"}>
+                          <td className="px-4 py-2 font-medium">
+                            {req.leave_type}
+                          </td>
+                          <td className={`px-4 py-2 text-xs ${req.leave_type === "Leave Allocation" ? "text-green-800 dark:text-green-300 font-medium" : "text-muted-foreground"}`}>
+                            {req.start_date}
+                          </td>
+                          <td className={`px-4 py-2 text-xs ${req.leave_type === "Leave Allocation" ? "text-green-800 dark:text-green-300 font-medium" : "text-muted-foreground"}`}>
+                            {req.leave_type === "Leave Allocation" ? "-" : req.end_date}
+                          </td>
+                          <td className={`px-4 py-2 font-medium text-center ${req.leave_type === "Leave Allocation" ? "text-green-700 font-bold dark:text-green-400" : ""}`}>
+                            {req.leave_type === "Leave Allocation" ? `+${req.days_requested}` : req.days_requested}
+                          </td>
+                          <td className={`px-4 py-2 text-xs max-w-xs truncate ${req.leave_type === "Leave Allocation" ? "text-green-800 dark:text-green-300 font-medium" : "text-muted-foreground"}`} title={req.reason && req.reason.startsWith("Forced Leave") ? "Forced Leave" : (req.reason || "N/A")}>
+                            {req.reason && req.reason.startsWith("Forced Leave") ? "Forced Leave" : (req.reason || "N/A")}
+                          </td>
+                          <td className="px-4 py-2">
+                            <div className="flex items-center gap-1.5">
+                              {req.leave_type === "Leave Allocation" ? (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-green-600 bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900/50 dark:text-green-400">Allocated</Badge>
+                              ) : (
+                                <>
+                                  {req.status === "PENDING" && <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-orange-600 bg-orange-50 border-orange-200">Pending</Badge>}
+                                  {req.status === "APPROVED" && <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-green-600 bg-green-50 border-green-200">Approved</Badge>}
+                                  {req.status === "REJECTED" && <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-red-600 bg-red-50 border-red-200">Rejected</Badge>}
+                                  {req.status === "CANCELLED" && <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-gray-600 bg-gray-50 border-gray-200">Cancelled</Badge>}
+                                </>
+                              )}
+                              {req.attachment_url && (
+                                <a href={`${process.env.NEXT_PUBLIC_API_URL}${req.attachment_url}`} target="_blank" rel="noreferrer" title="View Medical Certificate">
+                                  <Paperclip className="h-3.5 w-3.5 text-blue-600 hover:text-blue-800" />
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            {req.status === "PENDING" && req.leave_type !== "Emergency Leave" && (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleStartEdit(req)}
+                                className="text-[10px] h-7 px-2 flex items-center gap-1 border-zinc-200 hover:bg-muted dark:border-zinc-800"
+                              >
+                                <Pencil className="h-3 w-3" /> Edit
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-2.5 border-t border-border/50 bg-transparent mt-0">
+                  <div className="text-[11px] text-muted-foreground">
+                    Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
+                    <span className="font-medium text-foreground">{Math.min(history.length, endIndex)}</span> of{" "}
+                    <span className="font-medium text-foreground">{history.length}</span> entries
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="h-7 text-[10px] bg-background border-zinc-200 dark:border-zinc-800"
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-[10px] text-muted-foreground px-1.5">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      className="h-7 text-[10px] bg-background border-zinc-200 dark:border-zinc-800"
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {/* Edit Leave Request Dialog */}
       <Dialog open={!!editingLeave} onOpenChange={(open) => !open && setEditingLeave(null)}>

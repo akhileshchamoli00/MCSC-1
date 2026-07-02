@@ -44,6 +44,11 @@ export default function CompaniesDirectory() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
 
   // Dialog states
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -232,6 +237,11 @@ export default function CompaniesDirectory() {
     return matchesSearch && matchesStatus;
   });
 
+  const totalPages = Math.ceil(filteredCompanies.length / 10);
+  const startIndex = (currentPage - 1) * 10;
+  const endIndex = startIndex + 10;
+  const paginatedCompanies = filteredCompanies.slice(startIndex, endIndex);
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -333,7 +343,7 @@ export default function CompaniesDirectory() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {filteredCompanies.map((company) => {
+                  {paginatedCompanies.map((company) => {
                     const isRep = company.key_contact_person === company.client?.contact_person &&
                                   company.key_contact_email === company.client?.email &&
                                   (company.key_contact_phone || "") === (company.client?.phone || "");
@@ -451,6 +461,39 @@ export default function CompaniesDirectory() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+              <div className="text-xs text-muted-foreground">
+                Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
+                <span className="font-medium text-foreground">{Math.min(filteredCompanies.length, endIndex)}</span> of{" "}
+                <span className="font-medium text-foreground">{filteredCompanies.length}</span> entries
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Previous
+                </Button>
+                <span className="text-xs text-muted-foreground px-2">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

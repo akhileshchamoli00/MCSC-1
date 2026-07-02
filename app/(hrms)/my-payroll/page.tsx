@@ -10,6 +10,7 @@ import { toast } from "sonner";
 export default function MyPayrollPage() {
   const [payrolls, setPayrolls] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const fetchMyPayroll = async () => {
@@ -33,6 +34,11 @@ export default function MyPayrollPage() {
     };
     fetchMyPayroll();
   }, []);
+
+  const totalPages = Math.ceil(payrolls.length / 10);
+  const startIndex = (currentPage - 1) * 10;
+  const endIndex = startIndex + 10;
+  const paginatedPayrolls = payrolls.slice(startIndex, endIndex);
 
   const getMonthName = (month: number) => {
     const date = new Date();
@@ -144,7 +150,7 @@ export default function MyPayrollPage() {
                     </td>
                   </tr>
                 ) : (
-                  payrolls.map((payroll) => (
+                  paginatedPayrolls.map((payroll) => (
                     <tr key={payroll.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-6 py-4 font-medium text-primary">
                         {getMonthName(payroll.payroll_month)} {payroll.payroll_year}
@@ -168,6 +174,39 @@ export default function MyPayrollPage() {
               </tbody>
             </table>
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+              <div className="text-xs text-muted-foreground">
+                Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
+                <span className="font-medium text-foreground">{Math.min(payrolls.length, endIndex)}</span> of{" "}
+                <span className="font-medium text-foreground">{payrolls.length}</span> entries
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Previous
+                </Button>
+                <span className="text-xs text-muted-foreground px-2">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

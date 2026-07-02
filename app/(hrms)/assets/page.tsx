@@ -16,6 +16,11 @@ export default function AssetsAdminPage() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   // Modals
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
@@ -202,6 +207,11 @@ export default function AssetsAdminPage() {
            empName.includes(s);
   });
 
+  const totalPages = Math.ceil(filteredAssets.length / 10);
+  const startIndex = (currentPage - 1) * 10;
+  const endIndex = startIndex + 10;
+  const paginatedAssets = filteredAssets.slice(startIndex, endIndex);
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex justify-between items-center">
@@ -215,38 +225,30 @@ export default function AssetsAdminPage() {
       </div>
 
       {/* Dashboard Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="border border-border/50 bg-card shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Assets</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-normal text-foreground tracking-tight">{totalAssets}</div>
-          </CardContent>
+          <div className="py-1 px-3">
+            <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Total Assets</p>
+            <p className="text-lg md:text-xl font-bold text-foreground mt-0">{totalAssets}</p>
+          </div>
         </Card>
         <Card className="border border-border/50 bg-card shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Assigned Assets</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-normal text-foreground tracking-tight">{assignedAssets}</div>
-          </CardContent>
+          <div className="py-1 px-3">
+            <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Assigned Assets</p>
+            <p className="text-lg md:text-xl font-bold text-foreground mt-0">{assignedAssets}</p>
+          </div>
         </Card>
         <Card className="border border-border/50 bg-card shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Available</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-normal text-foreground tracking-tight">{availableAssets}</div>
-          </CardContent>
+          <div className="py-1 px-3">
+            <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Available</p>
+            <p className="text-lg md:text-xl font-bold text-foreground mt-0">{availableAssets}</p>
+          </div>
         </Card>
         <Card className="border border-border/50 bg-card shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Damaged</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-normal text-foreground tracking-tight">{damagedAssets}</div>
-          </CardContent>
+          <div className="py-1 px-3">
+            <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Damaged</p>
+            <p className="text-lg md:text-xl font-bold text-foreground mt-0">{damagedAssets}</p>
+          </div>
         </Card>
       </div>
 
@@ -288,7 +290,7 @@ export default function AssetsAdminPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredAssets.map((asset) => (
+                  paginatedAssets.map((asset) => (
                     <tr key={asset.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3">
                         <p className="font-medium">{asset.brand} {asset.model}</p>
@@ -334,6 +336,39 @@ export default function AssetsAdminPage() {
               </tbody>
             </table>
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+              <div className="text-xs text-muted-foreground">
+                Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
+                <span className="font-medium text-foreground">{Math.min(filteredAssets.length, endIndex)}</span> of{" "}
+                <span className="font-medium text-foreground">{filteredAssets.length}</span> entries
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Previous
+                </Button>
+                <span className="text-xs text-muted-foreground px-2">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
