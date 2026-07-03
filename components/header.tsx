@@ -226,12 +226,6 @@ export function Header() {
           <div className="ml-4 border-l border-border/40 pl-4 flex items-center gap-2">
             <LanguageSwitcher />
             <ThemeToggle />
-            <Link
-              href="/login"
-              className="ml-2 rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition-all duration-300 hover:bg-foreground hover:text-background dark:hover:bg-white dark:hover:text-black"
-            >
-              Login
-            </Link>
           </div>
         </nav>
 
@@ -354,13 +348,6 @@ export function Header() {
             ))}
 
             <div className="mt-6 border-t border-border/40 pt-6 flex flex-col gap-4">
-              <Link
-                href="/login"
-                className="w-full rounded-lg bg-primary px-4 py-3 text-center text-sm font-semibold text-primary-foreground transition-colors hover:bg-foreground hover:text-background dark:hover:bg-white dark:hover:text-black"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Login to HRMS
-              </Link>
               <div className="flex items-center justify-around gap-4">
                 <LanguageSwitcher />
                 <ThemeToggle />
