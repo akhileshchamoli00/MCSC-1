@@ -269,6 +269,7 @@ class LeaveBalanceResponse(LeaveBalanceBase):
     updated_by: Optional[int] = None
     updated_at: Optional[datetime] = None
     employee: Optional[EmployeeSummary] = None
+    bonus_allocated: Optional[float] = 0.0
 
     class Config:
         from_attributes = True
@@ -278,6 +279,15 @@ class LeaveBalanceUpdate(BaseModel):
     sick_leave_balance: float
     annual_leave_taken: float
     sick_leave_taken: float
+    reason: str
+
+class LeaveAllocationRequest(BaseModel):
+    employee_id: int
+    amount: float
+    reason: str
+
+class LeaveAllocationUpdate(BaseModel):
+    days_requested: float
     reason: str
 
 class LeaveBalanceAuditResponse(BaseModel):

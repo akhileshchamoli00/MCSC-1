@@ -14,16 +14,16 @@ export default function EmployeesPage() {
   const [departments, setDepartments] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Filters & Sorting
   const [searchQuery, setSearchQuery] = useState("");
   const [deptFilter, setDeptFilter] = useState("ALL");
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  
+
   const [sortField, setSortField] = useState("employee_id_custom");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -39,20 +39,20 @@ export default function EmployeesPage() {
         setDepartments(JSON.parse(cachedDept));
         setRoles(JSON.parse(cachedRoles));
         setLoading(false);
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const fetchData = async () => {
       try {
         const token = localStorage.getItem("hrms_token");
         const headers = { "Authorization": `Bearer ${token}` };
-        
+
         const [empRes, deptRes, roleRes] = await Promise.all([
           fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/`, { headers }),
           fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/departments/`, { headers }),
           fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/roles/`, { headers })
         ]);
-        
+
         if (empRes.ok) {
           const freshEmp = await empRes.json();
           setEmployees(freshEmp);
@@ -68,7 +68,7 @@ export default function EmployeesPage() {
           setRoles(freshRoles);
           localStorage.setItem("hrms_roles_data", JSON.stringify(freshRoles));
         }
-        
+
       } catch (err) {
         console.error("Failed to fetch data:", err);
       } finally {
@@ -91,11 +91,11 @@ export default function EmployeesPage() {
     let result = employees.filter(emp => {
       const searchStr = `${emp.first_name} ${emp.last_name} ${emp.user?.email || ""} ${emp.employee_id_custom || ""}`.toLowerCase();
       const matchesSearch = searchStr.includes(searchQuery.toLowerCase());
-      
+
       const matchesDept = deptFilter === "ALL" || emp.department_id?.toString() === deptFilter;
       const matchesRole = roleFilter === "ALL" || emp.user?.role_id?.toString() === roleFilter;
       const matchesStatus = statusFilter === "ALL" || emp.status === statusFilter;
-      
+
       return matchesSearch && matchesDept && matchesRole && matchesStatus;
     });
 
@@ -103,19 +103,19 @@ export default function EmployeesPage() {
       // Keep terminated employees at the bottom of the list
       const aTerminated = a.status === "TERMINATED";
       const bTerminated = b.status === "TERMINATED";
-      
+
       if (aTerminated && !bTerminated) return 1;
       if (!aTerminated && bTerminated) return -1;
 
       let aVal = a[sortField];
       let bVal = b[sortField];
-      
+
       if (sortField === "employee_id_custom") {
         if (!aVal && bVal) return 1;
         if (aVal && !bVal) return -1;
         if (!aVal && !bVal) return 0;
       }
-      
+
       // Handle nested fields
       if (sortField === "department") {
         aVal = a.department?.name || "";
@@ -145,7 +145,7 @@ export default function EmployeesPage() {
 
   const exportCSV = () => {
     if (filteredAndSortedEmployees.length === 0) return;
-    
+
     const headers = ["Employee ID", "First Name", "Last Name", "Email", "Phone", "Department", "Designation", "Join Date", "Status"];
     const rows = filteredAndSortedEmployees.map(emp => [
       emp.employee_id_custom || emp.id,
@@ -158,11 +158,11 @@ export default function EmployeesPage() {
       emp.hire_date || "",
       emp.status || ""
     ]);
-    
-    let csvContent = "data:text/csv;charset=utf-8," 
+
+    let csvContent = "data:text/csv;charset=utf-8,"
       + headers.join(",") + "\n"
       + rows.map(e => e.map(item => `"${item}"`).join(",")).join("\n");
-      
+
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -206,14 +206,14 @@ export default function EmployeesPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search by name, ID, email..." 
-              className="pl-9" 
+            <Input
+              placeholder="Search by name, ID, email..."
+              className="pl-9"
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             />
           </div>
-          
+
           <Select value={deptFilter} onValueChange={(v) => { setDeptFilter(v); setCurrentPage(1); }}>
             <SelectTrigger>
               <SelectValue placeholder="Department" />
@@ -258,42 +258,42 @@ export default function EmployeesPage() {
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50">
               <tr>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:bg-muted/80 transition-colors" onClick={() => handleSort('employee_id_custom')}>
+                <th className="px-6 py-3.5 font-medium cursor-pointer hover:bg-muted/80 transition-colors" onClick={() => handleSort('employee_id_custom')}>
                   Employee <SortIcon field="employee_id_custom" />
                 </th>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:bg-muted/80 transition-colors" onClick={() => handleSort('email')}>
+                <th className="px-6 py-3.5 font-medium cursor-pointer hover:bg-muted/80 transition-colors" onClick={() => handleSort('email')}>
                   Contact <SortIcon field="email" />
                 </th>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:bg-muted/80 transition-colors" onClick={() => handleSort('role')}>
+                <th className="px-6 py-3.5 font-medium cursor-pointer hover:bg-muted/80 transition-colors" onClick={() => handleSort('role')}>
                   Designation & Dept <SortIcon field="role" />
                 </th>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:bg-muted/80 transition-colors" onClick={() => handleSort('hire_date')}>
+                <th className="px-6 py-3.5 font-medium cursor-pointer hover:bg-muted/80 transition-colors" onClick={() => handleSort('hire_date')}>
                   Join Date <SortIcon field="hire_date" />
                 </th>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:bg-muted/80 transition-colors" onClick={() => handleSort('status')}>
+                <th className="px-6 py-3.5 font-medium cursor-pointer hover:bg-muted/80 transition-colors" onClick={() => handleSort('status')}>
                   Status <SortIcon field="status" />
                 </th>
-                <th className="px-6 py-4 font-medium text-right">Actions</th>
+                <th className="px-6 py-3.5 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
                     Loading directory...
                   </td>
                 </tr>
               ) : paginatedEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
                     No employees found matching filters.
                   </td>
                 </tr>
               ) : (
                 paginatedEmployees.map((employee) => (
                   <tr key={employee.id} className="hover:bg-muted/30 transition-colors group">
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-3">
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm overflow-hidden shrink-0 border border-primary/20">
                           {employee.profile_photo ? (
@@ -310,8 +310,8 @@ export default function EmployeesPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-1.5">
+                    <td className="px-6 py-3">
+                      <div className="space-y-1">
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <Mail className="h-3.5 w-3.5 shrink-0" />
                           <span className="text-xs truncate max-w-[150px]">{employee.user?.email || "No email"}</span>
@@ -322,8 +322,8 @@ export default function EmployeesPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-1.5">
+                    <td className="px-6 py-3">
+                      <div className="space-y-1">
                         <div className="flex items-center gap-2 font-medium">
                           <Briefcase className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                           <span className="text-sm truncate max-w-[150px]">{employee.user?.role?.name || "No Designation"}</span>
@@ -334,19 +334,19 @@ export default function EmployeesPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-muted-foreground">
+                    <td className="px-6 py-3 text-muted-foreground">
                       {employee.hire_date || "-"}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-3">
                       <Badge variant={
-                        employee.status === "ACTIVE" ? "default" : 
-                        employee.status === "PROBATION" ? "secondary" : 
+                        employee.status === "ACTIVE" ? "default" :
+                        employee.status === "PROBATION" ? "secondary" :
                         employee.status === "TERMINATED" ? "destructive" : "outline"
                       }>
                         {employee.status || "ACTIVE"}
                       </Badge>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-3 text-right">
                       <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Link href={`/employees/${employee.id}`}>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
@@ -366,7 +366,7 @@ export default function EmployeesPage() {
             </tbody>
           </table>
         </div>
-        
+
         {/* Pagination Controls */}
         {totalPages > 1 && (
           <div className="p-4 border-t border-border/50 flex items-center justify-between text-sm text-muted-foreground">
@@ -374,9 +374,9 @@ export default function EmployeesPage() {
               Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredAndSortedEmployees.length)} of {filteredAndSortedEmployees.length} entries
             </div>
             <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
               >
@@ -385,9 +385,9 @@ export default function EmployeesPage() {
               <div className="px-2">
                 Page {currentPage} of {totalPages}
               </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
               >

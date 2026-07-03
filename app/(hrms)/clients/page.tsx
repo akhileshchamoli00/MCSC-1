@@ -47,6 +47,11 @@ export default function ClientList() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
   
   // Dialogs
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -193,6 +198,11 @@ export default function ClientList() {
     return matchesSearch && matchesStatus;
   });
 
+  const totalPages = Math.ceil(filteredClients.length / 10);
+  const startIndex = (currentPage - 1) * 10;
+  const endIndex = startIndex + 10;
+  const paginatedClients = filteredClients.slice(startIndex, endIndex);
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -286,7 +296,7 @@ export default function ClientList() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {filteredClients.map((client) => (
+                  {paginatedClients.map((client) => (
                     <tr key={client.id} className="hover:bg-muted/30 transition-colors">
                       <td className="p-4 text-muted-foreground space-y-1">
                         <div className="flex items-center gap-2">
@@ -379,6 +389,39 @@ export default function ClientList() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+              <div className="text-xs text-muted-foreground">
+                Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
+                <span className="font-medium text-foreground">{Math.min(filteredClients.length, endIndex)}</span> of{" "}
+                <span className="font-medium text-foreground">{filteredClients.length}</span> entries
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Previous
+                </Button>
+                <span className="text-xs text-muted-foreground px-2">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

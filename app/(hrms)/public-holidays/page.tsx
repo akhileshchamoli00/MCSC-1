@@ -74,6 +74,11 @@ export default function PublicHolidaysPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [yearFilter, setYearFilter] = useState<string>(new Date().getFullYear().toString());
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, yearFilter]);
   
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -266,6 +271,11 @@ export default function PublicHolidaysPage() {
     h.holiday_name.toLowerCase().includes(search.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filteredHolidays.length / 10);
+  const startIndex = (currentPage - 1) * 10;
+  const endIndex = startIndex + 10;
+  const paginatedHolidays = filteredHolidays.slice(startIndex, endIndex);
+
   return (
     <div className="w-full max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
@@ -349,7 +359,7 @@ export default function PublicHolidaysPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredHolidays.map((holiday) => (
+                      paginatedHolidays.map((holiday) => (
                         <TableRow key={holiday.id} className="group hover:bg-muted/30 transition-colors">
                           <TableCell className="font-medium">
                             {holiday.holiday_name}
@@ -406,6 +416,39 @@ export default function PublicHolidaysPage() {
                     )}
                   </TableBody>
                 </Table>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+                    <div className="text-xs text-muted-foreground">
+                      Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
+                      <span className="font-medium text-foreground">{Math.min(filteredHolidays.length, endIndex)}</span> of{" "}
+                      <span className="font-medium text-foreground">{filteredHolidays.length}</span> entries
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-xs text-muted-foreground px-2">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </motion.div>
             ) : (
               <motion.div

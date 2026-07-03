@@ -9,6 +9,7 @@ export default function RolesPage() {
   const [roles, setRoles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const fetchRoles = async () => {
@@ -36,6 +37,11 @@ export default function RolesPage() {
     
     fetchRoles();
   }, []);
+
+  const totalPages = Math.ceil(roles.length / 10);
+  const startIndex = (currentPage - 1) * 10;
+  const endIndex = startIndex + 10;
+  const paginatedRoles = roles.slice(startIndex, endIndex);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -65,7 +71,7 @@ export default function RolesPage() {
             <tbody className="divide-y divide-border/50">
               {loading ? (
                 <tr>
-                  <td colSpan={3} className="px-6 py-12 text-center">
+                  <td colSpan={4} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                       <Loader2 className="h-8 w-8 animate-spin mb-4 text-primary" />
                       <p>Loading roles...</p>
@@ -74,19 +80,19 @@ export default function RolesPage() {
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={3} className="px-6 py-12 text-center text-destructive">
+                  <td colSpan={4} className="px-6 py-12 text-center text-destructive">
                     {error}
                   </td>
                 </tr>
               ) : roles.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="px-6 py-12 text-center text-muted-foreground">
+                  <td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">
                     <Shield className="h-12 w-12 mx-auto mb-4 opacity-20" />
                     <p className="text-lg font-medium">No roles found</p>
                   </td>
                 </tr>
               ) : (
-                roles.map((role) => (
+                paginatedRoles.map((role) => (
                   <tr key={role.id} className="hover:bg-muted/30 transition-colors group">
                     <td className="px-6 py-4 font-mono text-muted-foreground">
                       #{role.id}
@@ -117,6 +123,39 @@ export default function RolesPage() {
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+            <div className="text-xs text-muted-foreground">
+              Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
+              <span className="font-medium text-foreground">{Math.min(roles.length, endIndex)}</span> of{" "}
+              <span className="font-medium text-foreground">{roles.length}</span> entries
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+              >
+                Previous
+              </Button>
+              <span className="text-xs text-muted-foreground px-2">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

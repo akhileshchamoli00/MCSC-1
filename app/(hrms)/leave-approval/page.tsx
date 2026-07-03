@@ -5,15 +5,26 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle, XCircle, Clock, FileText, Eye, Paperclip } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Clock, FileText, Eye, Paperclip, Pencil } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function LeaveApprovalPage() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
   
   // View Request Modal State
   const [viewingRequest, setViewingRequest] = useState<any | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Edit Allocation Modal State
+  const [editingAllocation, setEditingAllocation] = useState<any | null>(null);
+  const [allocationForm, setAllocationForm] = useState({
+    days_requested: 0.0,
+    reason: ""
+  });
+  const [updatingAllocation, setUpdatingAllocation] = useState(false);
 
   const fetchRequests = async () => {
     try {
@@ -65,10 +76,65 @@ export default function LeaveApprovalPage() {
     }
   };
 
+  const handleEditAllocationClick = (req: any) => {
+    setEditingAllocation(req);
+    setAllocationForm({
+      days_requested: req.days_requested,
+      reason: req.reason || ""
+    });
+  };
+
+  const handleEditAllocationSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (allocationForm.days_requested <= 0) {
+      alert("Allocated days must be greater than 0.");
+      return;
+    }
+    if ((allocationForm.days_requested * 2) % 1 !== 0) {
+      alert("Allocated days must be in increments of 0.5 (half-day or full-day).");
+      return;
+    }
+    if (!allocationForm.reason.trim()) {
+      alert("Reason for revision is required.");
+      return;
+    }
+    
+    try {
+      setUpdatingAllocation(true);
+      const token = localStorage.getItem("hrms_token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/leave/requests/${editingAllocation.id}/allocation`, {
+        method: "PUT",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(allocationForm)
+      });
+      
+      if (res.ok) {
+        setEditingAllocation(null);
+        fetchRequests();
+      } else {
+        const error = await res.json();
+        alert(error.detail || "Failed to update allocation");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error updating allocation");
+    } finally {
+      setUpdatingAllocation(false);
+    }
+  };
+
   const total = requests.length;
   const pending = requests.filter(r => r.status === "PENDING").length;
   const approved = requests.filter(r => r.status === "APPROVED").length;
   const rejected = requests.filter(r => r.status === "REJECTED").length;
+
+  const totalPages = Math.ceil(requests.length / 10);
+  const startIndex = (currentPage - 1) * 10;
+  const endIndex = startIndex + 10;
+  const paginatedRequests = requests.slice(startIndex, endIndex);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -150,7 +216,7 @@ export default function LeaveApprovalPage() {
                     </td>
                   </tr>
                 ) : (
-                  requests.map((req) => (
+                  paginatedRequests.map((req) => (
                     <tr key={req.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 font-medium">
                         {req.employee ? `${req.employee.first_name} ${req.employee.last_name}` : `EMP ID: ${req.employee_id}`}
@@ -181,6 +247,11 @@ export default function LeaveApprovalPage() {
                             </Button>
                           </a>
                         )}
+                        {req.leave_type === "Leave Allocation" && (
+                          <Button variant="ghost" size="sm" className="h-8 gap-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:text-emerald-300 dark:hover:bg-emerald-950/20" onClick={() => handleEditAllocationClick(req)}>
+                            <Pencil className="h-4 w-4" /> Edit
+                          </Button>
+                        )}
                         <Button variant="ghost" size="sm" className="h-8 gap-2" onClick={() => setViewingRequest(req)}>
                           <Eye className="h-4 w-4" /> View
                         </Button>
@@ -191,6 +262,39 @@ export default function LeaveApprovalPage() {
               </tbody>
             </table>
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+              <div className="text-xs text-muted-foreground">
+                Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
+                <span className="font-medium text-foreground">{Math.min(requests.length, endIndex)}</span> of{" "}
+                <span className="font-medium text-foreground">{requests.length}</span> entries
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Previous
+                </Button>
+                <span className="text-xs text-muted-foreground px-2">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -298,6 +402,63 @@ export default function LeaveApprovalPage() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+      {/* Edit Allocation Modal */}
+      <Dialog open={!!editingAllocation} onOpenChange={(open) => !open && setEditingAllocation(null)}>
+        <DialogContent 
+          className="sm:max-w-md border border-zinc-200 dark:border-zinc-800 bg-background/95 backdrop-blur-xl shadow-2xl rounded-xl relative overflow-hidden"
+          overlayClassName="backdrop-blur-md bg-black/60"
+        >
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-600" />
+          <DialogHeader className="border-b border-border/50 pb-4">
+            <DialogTitle className="text-xl font-semibold tracking-tight">Revise Leave Allocation</DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
+              Revise the number of days added for this allocation. The employee's annual leave balance will be updated by the difference.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditAllocationSave} className="space-y-4">
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Employee Name</label>
+                <p className="font-semibold mt-1">
+                  {editingAllocation?.employee ? `${editingAllocation.employee.first_name} ${editingAllocation.employee.last_name}` : `EMP ID: ${editingAllocation?.employee_id}`}
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Allocated Days</label>
+                <Input 
+                  type="number" 
+                  step="0.5"
+                  min="0.5"
+                  value={allocationForm.days_requested} 
+                  onChange={(e) => setAllocationForm({...allocationForm, days_requested: parseFloat(e.target.value) || 0.0})}
+                  required
+                  className="mt-1"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Reason for Revision</label>
+                <Textarea 
+                  value={allocationForm.reason}
+                  onChange={(e) => setAllocationForm({...allocationForm, reason: e.target.value})}
+                  placeholder="e.g. Correcting typos in initial allocation"
+                  required
+                  className="min-h-[100px] mt-1"
+                />
+              </div>
+            </div>
+            <DialogFooter className="border-t border-border/50 pt-4 mt-2">
+              <Button type="button" variant="outline" onClick={() => setEditingAllocation(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={updatingAllocation} className="bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-700 dark:hover:bg-emerald-800">
+                {updatingAllocation ? "Updating..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

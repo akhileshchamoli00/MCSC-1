@@ -19,11 +19,16 @@ export default function AdminPayrollPage() {
   const [confirmSendAllOpen, setConfirmSendAllOpen] = useState(false);
   const [generatingAll, setGeneratingAll] = useState(false);
   const [restrictedPromptOpen, setRestrictedPromptOpen] = useState(false);
-  
+
   // Search State
   const [searchMonth, setSearchMonth] = useState(new Date().getMonth() + 1);
   const [searchYear, setSearchYear] = useState(new Date().getFullYear());
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, searchMonth, searchYear]);
 
   const isPayslipGenerationRestricted = (month: number, year: number) => {
     const today = new Date();
@@ -46,7 +51,7 @@ export default function AdminPayrollPage() {
     }
     handleGeneratePayroll(false);
   };
-  
+
   // Publish/Generate State
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -143,27 +148,27 @@ export default function AdminPayrollPage() {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payroll/${id}/download`, {
       headers: { "Authorization": `Bearer ${token}` }
     })
-    .then(async res => {
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: "Download failed" }));
-        throw new Error(err.detail || "Failed to download PDF");
-      }
-      return res.blob();
-    })
-    .then(blob => {
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const formattedMonth = month.toString().padStart(2, '0');
-      a.download = `${formattedMonth}${year}_${empId}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    })
-    .catch(err => {
-      toast.error("Download Error", { description: err.message });
-    });
+      .then(async res => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: "Download failed" }));
+          throw new Error(err.detail || "Failed to download PDF");
+        }
+        return res.blob();
+      })
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const formattedMonth = month.toString().padStart(2, '0');
+        a.download = `${formattedMonth}${year}_${empId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      })
+      .catch(err => {
+        toast.error("Download Error", { description: err.message });
+      });
   };
 
   const handleSendPayslip = async (id: number) => {
@@ -203,7 +208,7 @@ export default function AdminPayrollPage() {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payroll/generate-all-payslips`, {
         method: "POST",
-        headers: { 
+        headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
@@ -248,21 +253,31 @@ export default function AdminPayrollPage() {
     const empId = p.employee?.employee_id_custom || "";
     return `${empName} ${empId}`.toLowerCase().includes(searchQuery.toLowerCase());
   });
+  const totalPages = Math.ceil(filteredPayrolls.length / 10);
+  const startIndex = (currentPage - 1) * 10;
+  const endIndex = startIndex + 10;
+  const paginatedPayrolls = filteredPayrolls.slice(startIndex, endIndex);
   const totalEmployees = currentMonthPayrolls.length;
   const currentMonthCost = currentMonthPayrolls.reduce((sum, p) => sum + p.net_salary, 0);
   const generatedCount = currentMonthPayrolls.filter(p => p.status === "Paid").length;
-  const pendingCount = currentMonthPayrolls.filter(p => p.status === "Draft").length;
+  const pendingCount = currentMonthPayrolls.filter(p => p.status === "Draft" || p.status === "Generated").length;
+
+  // Previous Month Cost Calculation
+  const prevMonth = searchMonth === 1 ? 12 : searchMonth - 1;
+  const prevYear = searchMonth === 1 ? searchYear - 1 : searchYear;
+  const prevMonthPayrolls = payrolls.filter(p => p.payroll_month === prevMonth && p.payroll_year === prevYear);
+  const prevMonthCost = prevMonthPayrolls.reduce((sum, p) => sum + p.net_salary, 0);
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-0">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Payroll Management</h1>
           <p className="text-muted-foreground mt-1">Manage employee salaries and generate payslips.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Select 
-            value={searchMonth.toString()} 
+          <Select
+            value={searchMonth.toString()}
             onValueChange={(val) => setSearchMonth(parseInt(val))}
           >
             <SelectTrigger className="h-9 w-32 bg-background border border-input text-sm shadow-sm font-medium">
@@ -270,15 +285,15 @@ export default function AdminPayrollPage() {
             </SelectTrigger>
             <SelectContent position="popper">
               {[...Array(12)].map((_, i) => (
-                <SelectItem key={i+1} value={(i+1).toString()}>
-                  {getMonthName(i+1)}
+                <SelectItem key={i + 1} value={(i + 1).toString()}>
+                  {getMonthName(i + 1)}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Input 
-            type="number" 
-            value={searchYear} 
+          <Input
+            type="number"
+            value={searchYear}
             onChange={(e) => setSearchYear(parseInt(e.target.value))}
             className="w-24 h-9"
           />
@@ -300,42 +315,51 @@ export default function AdminPayrollPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
         <Card className="border border-border/50 bg-card shadow-sm">
-          <CardContent className="p-4 flex items-center justify-between">
+          <div className="py-0.5 px-3 flex items-center justify-between w-full">
             <div>
-              <p className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Employees</p>
-              <p className="text-3xl md:text-4xl font-normal text-foreground tracking-tight mt-1">{totalEmployees}</p>
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Total Employees</p>
+              <p className="text-lg md:text-xl font-bold text-foreground tracking-tight">{totalEmployees}</p>
             </div>
-            <Users className="w-8 h-8 text-muted-foreground/30" />
-          </CardContent>
+            <Users className="w-5 h-5 text-muted-foreground/30" />
+          </div>
         </Card>
         <Card className="border border-border/50 bg-card shadow-sm">
-          <CardContent className="p-4 flex items-center justify-between">
+          <div className="py-0.5 px-3 flex items-center justify-between w-full">
             <div>
-              <p className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider">Current Month Payroll</p>
-              <p className="text-3xl md:text-4xl font-normal text-foreground tracking-tight mt-1">IDR {currentMonthCost.toLocaleString()}</p>
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Payslips Generated</p>
+              <p className="text-lg md:text-xl font-bold text-foreground tracking-tight">{generatedCount}</p>
             </div>
-            <Wallet className="w-8 h-8 text-muted-foreground/30" />
-          </CardContent>
+            <CheckCircle className="w-5 h-5 text-muted-foreground/30" />
+          </div>
         </Card>
         <Card className="border border-border/50 bg-card shadow-sm">
-          <CardContent className="p-4 flex items-center justify-between">
+          <div className="py-0.5 px-3 flex items-center justify-between w-full">
             <div>
-              <p className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider">Payslips Generated</p>
-              <p className="text-3xl md:text-4xl font-normal text-foreground tracking-tight mt-1">{generatedCount}</p>
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Pending Payroll</p>
+              <p className="text-lg md:text-xl font-bold text-foreground tracking-tight">{pendingCount}</p>
             </div>
-            <CheckCircle className="w-8 h-8 text-muted-foreground/30" />
-          </CardContent>
+            <Clock className="w-5 h-5 text-muted-foreground/30" />
+          </div>
         </Card>
         <Card className="border border-border/50 bg-card shadow-sm">
-          <CardContent className="p-4 flex items-center justify-between">
+          <div className="py-0.5 px-3 flex items-center justify-between w-full">
             <div>
-              <p className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider">Pending Payroll</p>
-              <p className="text-3xl md:text-4xl font-normal text-foreground tracking-tight mt-1">{pendingCount}</p>
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Current Month Payroll</p>
+              <p className="text-lg md:text-xl font-bold text-foreground tracking-tight">IDR {currentMonthCost.toLocaleString()}</p>
             </div>
-            <Clock className="w-8 h-8 text-muted-foreground/30" />
-          </CardContent>
+            <Wallet className="w-5 h-5 text-muted-foreground/30" />
+          </div>
+        </Card>
+        <Card className="border border-border/50 bg-card shadow-sm">
+          <div className="py-0.5 px-3 flex items-center justify-between w-full">
+            <div>
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Previous Month Payroll</p>
+              <p className="text-lg md:text-xl font-bold text-foreground tracking-tight">IDR {prevMonthCost.toLocaleString()}</p>
+            </div>
+            <Wallet className="w-5 h-5 text-muted-foreground/30" />
+          </div>
         </Card>
       </div>
 
@@ -353,8 +377,8 @@ export default function AdminPayrollPage() {
               />
             </div>
           </div>
-          <Button 
-            onClick={() => setConfirmSendAllOpen(true)} 
+          <Button
+            onClick={() => setConfirmSendAllOpen(true)}
             className="h-9 shadow-sm shrink-0 w-full sm:w-auto"
             disabled={isPayslipGenerationRestricted(searchMonth, searchYear)}
           >
@@ -385,7 +409,7 @@ export default function AdminPayrollPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredPayrolls.map((payroll) => (
+                  paginatedPayrolls.map((payroll) => (
                     <tr key={payroll.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 font-medium">
                         {payroll.employee?.employee_id_custom || `EMP${payroll.employee_id}`}
@@ -416,17 +440,17 @@ export default function AdminPayrollPage() {
                       </td>
                       <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
                         {payroll.status === "Draft" ? (
-                          <Button 
-                            size="sm" 
-                            className="h-8 gap-1" 
+                          <Button
+                            size="sm"
+                            className="h-8 gap-1"
                             onClick={() => handleSendPayslip(payroll.id)}
                             disabled={isPayslipGenerationRestricted(payroll.payroll_month, payroll.payroll_year)}
                           >
                             <Send className="h-3 w-3" /> Lock & Send
                           </Button>
                         ) : (
-                          <Button size="icon" onClick={() => handleDownload(payroll.id, payroll.payroll_month, payroll.payroll_year, payroll.employee?.employee_id_custom || payroll.employee_id || `EMP00${payroll.employee?.id || ''}`)} title="Download Encrypted PDF">
-                            <Download className="h-4 w-4" />
+                          <Button size="icon" className="h-7 w-7" onClick={() => handleDownload(payroll.id, payroll.payroll_month, payroll.payroll_year, payroll.employee?.employee_id_custom || payroll.employee_id || `EMP00${payroll.employee?.id || ''}`)} title="Download Encrypted PDF">
+                            <Download className="h-3.5 w-3.5" />
                           </Button>
                         )}
                         <Button variant="ghost" size="sm" className="h-8 gap-1" onClick={() => router.push(`/payroll/${payroll.id}`)}>
@@ -439,6 +463,39 @@ export default function AdminPayrollPage() {
               </tbody>
             </table>
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4 border-t border-border/50 bg-transparent mt-4">
+              <div className="text-xs text-muted-foreground">
+                Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
+                <span className="font-medium text-foreground">{Math.min(filteredPayrolls.length, endIndex)}</span> of{" "}
+                <span className="font-medium text-foreground">{filteredPayrolls.length}</span> entries
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Previous
+                </Button>
+                <span className="text-xs text-muted-foreground px-2">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -456,13 +513,13 @@ export default function AdminPayrollPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-2 text-sm text-muted-foreground">
-              This will:
-              <ul className="list-disc list-inside mt-2 text-sm space-y-1">
-                <li>Generate a secure random password for each employee</li>
-                <li>Encrypt all PDF payslips</li>
-                <li>Send an email to each employee with their password</li>
-                <li>Make the payslip visible and downloadable in their Employee Portal</li>
-              </ul>
+            This will:
+            <ul className="list-disc list-inside mt-2 text-sm space-y-1">
+              <li>Generate a secure random password for each employee</li>
+              <li>Encrypt all PDF payslips</li>
+              <li>Send an email to each employee with their password</li>
+              <li>Make the payslip visible and downloadable in their Employee Portal</li>
+            </ul>
           </div>
           <DialogFooter className="mt-4 flex gap-2 sm:justify-end">
             <Button variant="outline" onClick={() => setConfirmSendAllOpen(false)} disabled={generatingAll}>

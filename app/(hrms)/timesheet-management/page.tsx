@@ -38,6 +38,11 @@ export default function TimesheetManagement() {
   const [timesheets, setTimesheets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
   
   const [selectedTimesheet, setSelectedTimesheet] = useState<any>(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
@@ -134,6 +139,11 @@ export default function TimesheetManagement() {
     return true;
   });
 
+  const totalPages = Math.ceil(filteredTimesheets.length / 10);
+  const startIndex = (currentPage - 1) * 10;
+  const endIndex = startIndex + 10;
+  const paginatedTimesheets = filteredTimesheets.slice(startIndex, endIndex);
+
   const pendingCount = timesheets.filter(t => t.status === "SUBMITTED").length;
 
   return (
@@ -148,19 +158,19 @@ export default function TimesheetManagement() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-blue-500/10 rounded-xl">
-                <Clock className="w-6 h-6 text-blue-500" />
-              </div>
+          <div className="py-1 px-3">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Pending Reviews</p>
-                <h3 className="text-3xl font-bold text-foreground">{pendingCount}</h3>
+                <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Pending Reviews</p>
+                <p className="text-lg md:text-xl font-bold text-foreground mt-0">{pendingCount}</p>
+              </div>
+              <div className="p-1.5 bg-blue-500/10 rounded-lg">
+                <Clock className="w-4 h-4 text-blue-500" />
               </div>
             </div>
-          </CardContent>
+          </div>
         </Card>
       </div>
 
@@ -206,7 +216,7 @@ export default function TimesheetManagement() {
                   <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No timesheets found.</TableCell>
                 </TableRow>
               ) : (
-                filteredTimesheets.map((timesheet) => (
+                paginatedTimesheets.map((timesheet) => (
                   <TableRow key={timesheet.id} className="border-border/40 hover:bg-muted/20 transition-colors">
                     <TableCell>
                       <div className="font-medium text-foreground">
@@ -238,6 +248,39 @@ export default function TimesheetManagement() {
               )}
             </TableBody>
           </Table>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+              <div className="text-xs text-muted-foreground">
+                Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
+                <span className="font-medium text-foreground">{Math.min(filteredTimesheets.length, endIndex)}</span> of{" "}
+                <span className="font-medium text-foreground">{filteredTimesheets.length}</span> entries
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Previous
+                </Button>
+                <span className="text-xs text-muted-foreground px-2">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

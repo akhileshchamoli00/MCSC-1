@@ -1043,19 +1043,15 @@ export default function FAQPage() {
                       }`}
                     />
                   </button>
-                  <motion.div
-                    initial={false}
-                    animate={{
-                      height: isOpen ? "auto" : 0,
-                      opacity: isOpen ? 1 : 0,
-                    }}
-                    transition={{ duration: 0.3 }}
-                    className="overflow-hidden"
+                  <div
+                    className={`overflow-hidden transition-all duration-300 ${
+                      isOpen ? "max-h-[1000px] opacity-100 pb-4 pt-1" : "max-h-0 opacity-0 pb-0 pt-0"
+                    }`}
                   >
-                    <div className="pb-4 pt-1 pr-8 text-sm text-muted-foreground leading-relaxed">
+                    <div className="pr-8 text-sm text-muted-foreground leading-relaxed">
                       {getTranslation(faq.answer, language)}
                     </div>
-                  </motion.div>
+                  </div>
                 </div>
               );
             })}

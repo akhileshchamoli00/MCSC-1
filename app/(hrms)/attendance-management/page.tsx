@@ -13,6 +13,7 @@ export default function AttendanceManagementPage() {
   const [summary, setSummary] = useState<any>(null);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [corrections, setCorrections] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
@@ -114,6 +115,11 @@ export default function AttendanceManagementPage() {
     }
   };
 
+  const totalPages = Math.ceil(attendance.length / 10);
+  const startIndex = (currentPage - 1) * 10;
+  const endIndex = startIndex + 10;
+  const paginatedAttendance = attendance.slice(startIndex, endIndex);
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
@@ -122,36 +128,36 @@ export default function AttendanceManagementPage() {
       </div>
 
       {summary && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <Card className="border border-border/50 bg-card shadow-sm">
-            <CardContent className="p-4">
-              <p className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Staff</p>
-              <p className="text-3xl md:text-4xl font-normal text-foreground tracking-tight mt-1">{summary.total_employees}</p>
-            </CardContent>
+            <div className="py-1 px-3">
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Total Staff</p>
+              <p className="text-lg md:text-xl font-bold text-foreground mt-0">{summary.total_employees}</p>
+            </div>
           </Card>
           <Card className="border border-border/50 bg-card shadow-sm">
-            <CardContent className="p-4">
-              <p className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider">Present</p>
-              <p className="text-3xl md:text-4xl font-normal text-foreground tracking-tight mt-1">{summary.present}</p>
-            </CardContent>
+            <div className="py-1 px-3">
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Present</p>
+              <p className="text-lg md:text-xl font-bold text-foreground mt-0">{summary.present}</p>
+            </div>
           </Card>
           <Card className="border border-border/50 bg-card shadow-sm">
-            <CardContent className="p-4">
-              <p className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider">Absent</p>
-              <p className="text-3xl md:text-4xl font-normal text-foreground tracking-tight mt-1">{summary.absent}</p>
-            </CardContent>
+            <div className="py-1 px-3">
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Absent</p>
+              <p className="text-lg md:text-xl font-bold text-foreground mt-0">{summary.absent}</p>
+            </div>
           </Card>
           <Card className="border border-border/50 bg-card shadow-sm">
-            <CardContent className="p-4">
-              <p className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider">Late</p>
-              <p className="text-3xl md:text-4xl font-normal text-foreground tracking-tight mt-1">{summary.late}</p>
-            </CardContent>
+            <div className="py-1 px-3">
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Late</p>
+              <p className="text-lg md:text-xl font-bold text-foreground mt-0">{summary.late}</p>
+            </div>
           </Card>
           <Card className="border border-border/50 bg-card shadow-sm">
-            <CardContent className="p-4">
-              <p className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider">Attendance %</p>
-              <p className="text-3xl md:text-4xl font-normal text-foreground tracking-tight mt-1">{summary.percentage}%</p>
-            </CardContent>
+            <div className="py-1 px-3">
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Attendance %</p>
+              <p className="text-lg md:text-xl font-bold text-foreground mt-0">{summary.percentage}%</p>
+            </div>
           </Card>
         </div>
       )}
@@ -213,7 +219,7 @@ export default function AttendanceManagementPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {attendance.map((rec) => (
+                {paginatedAttendance.map((rec) => (
                   <tr key={rec.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3 font-medium">
                       {rec.employee ? `${rec.employee.first_name} ${rec.employee.last_name}` : rec.employee_id}
@@ -242,6 +248,39 @@ export default function AttendanceManagementPage() {
               </tbody>
             </table>
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+              <div className="text-xs text-muted-foreground">
+                Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
+                <span className="font-medium text-foreground">{Math.min(attendance.length, endIndex)}</span> of{" "}
+                <span className="font-medium text-foreground">{attendance.length}</span> entries
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Previous
+                </Button>
+                <span className="text-xs text-muted-foreground px-2">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
