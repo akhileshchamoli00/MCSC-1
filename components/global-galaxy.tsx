@@ -23,15 +23,15 @@ export function GlobalGalaxy() {
           style={{ width: "1080px", height: "1080px", position: "relative" }}
         >
           <SplashCursor
-            SIM_RESOLUTION={64}
-            DYE_RESOLUTION={512}
-            DENSITY_DISSIPATION={3.5}
-            VELOCITY_DISSIPATION={2}
+            SIM_RESOLUTION={32}
+            DYE_RESOLUTION={256}
+            DENSITY_DISSIPATION={2}
+            VELOCITY_DISSIPATION={1}
             PRESSURE={0.1}
-            CURL={3}
-            SPLAT_RADIUS={0.2}
-            SPLAT_FORCE={6000}
-            COLOR_UPDATE_SPEED={10}
+            CURL={1}
+            SPLAT_RADIUS={0.1}
+            SPLAT_FORCE={1000}
+            COLOR_UPDATE_SPEED={2}
           />
         </div>
       </div>
