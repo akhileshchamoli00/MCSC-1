@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const deadPatterns = ['/en/product/', '/en/blog/', '/en/sbu-standar-badan-usaha-sijuk', '/en/contact']
+const deadPatterns = [
+    '/en/product/',
+    '/en/blog/',
+    '/en/sbu-standar-badan-usaha-sijuk',
+    '/en/contact',
+    '/pengurusan-perizinan-badan-usaha',
+]
 
 export function proxy(request: NextRequest) {
     const hostname = request.headers.get('host') || ''

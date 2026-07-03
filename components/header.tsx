@@ -89,17 +89,15 @@ export function Header() {
             <Link
               key={item.href}
               href={item.href}
-              className={`group relative px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${
-                pathname === item.href
-                  ? "text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`group relative px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${pathname === item.href
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               {item.label}
               <span
-                className={`absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-300 ${
-                  pathname === item.href ? "w-full" : "w-0 group-hover:w-full"
-                }`}
+                className={`absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-300 ${pathname === item.href ? "w-full" : "w-0 group-hover:w-full"
+                  }`}
               />
             </Link>
           ))}
@@ -111,22 +109,20 @@ export function Header() {
           >
             <Link
               href="/services"
-              className={`group relative flex items-center gap-1 px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${
-                pathname.startsWith("/services")
-                  ? "text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`group relative flex items-center gap-1 px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${pathname.startsWith("/services")
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               {t.nav.services}
               <ChevronDown
                 className={`h-4 w-4 transition-transform duration-300 ${servicesDropdownOpen ? "rotate-180" : ""}`}
               />
               <span
-                className={`absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-300 ${
-                  pathname.startsWith("/services")
-                    ? "w-full"
-                    : "w-0 group-hover:w-full"
-                }`}
+                className={`absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-300 ${pathname.startsWith("/services")
+                  ? "w-full"
+                  : "w-0 group-hover:w-full"
+                  }`}
               />
             </Link>
 
@@ -139,11 +135,10 @@ export function Header() {
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`block px-4 py-2.5 text-sm transition-colors duration-200 ${
-                          pathname === item.href
-                            ? "bg-muted text-foreground"
-                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                        }`}
+                        className={`block px-4 py-2.5 text-sm transition-colors duration-200 ${pathname === item.href
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                          }`}
                       >
                         {item.label}
                       </Link>
@@ -161,22 +156,20 @@ export function Header() {
           >
             <Link
               href="/resources"
-              className={`group relative flex items-center gap-1 px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${
-                pathname.startsWith("/resources")
-                  ? "text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`group relative flex items-center gap-1 px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${pathname.startsWith("/resources")
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               {t.nav.intellectualProperty}
               <ChevronDown
                 className={`h-4 w-4 transition-transform duration-300 ${ipDropdownOpen ? "rotate-180" : ""}`}
               />
               <span
-                className={`absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-300 ${
-                  pathname.startsWith("/resources")
-                    ? "w-full"
-                    : "w-0 group-hover:w-full"
-                }`}
+                className={`absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-300 ${pathname.startsWith("/resources")
+                  ? "w-full"
+                  : "w-0 group-hover:w-full"
+                  }`}
               />
             </Link>
 
@@ -189,11 +182,10 @@ export function Header() {
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`block px-4 py-2.5 text-sm transition-colors duration-200 ${
-                          pathname === item.href
-                            ? "bg-muted text-foreground"
-                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                        }`}
+                        className={`block px-4 py-2.5 text-sm transition-colors duration-200 ${pathname === item.href
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                          }`}
                       >
                         {item.label}
                       </Link>
@@ -208,17 +200,15 @@ export function Header() {
             <Link
               key={item.href}
               href={item.href}
-              className={`group relative px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${
-                pathname === item.href
-                  ? "text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`group relative px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${pathname === item.href
+                ? "text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               {item.label}
               <span
-                className={`absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-300 ${
-                  pathname === item.href ? "w-full" : "w-0 group-hover:w-full"
-                }`}
+                className={`absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-300 ${pathname === item.href ? "w-full" : "w-0 group-hover:w-full"
+                  }`}
               />
             </Link>
           ))}
@@ -226,6 +216,12 @@ export function Header() {
           <div className="ml-4 border-l border-border/40 pl-4 flex items-center gap-2">
             <LanguageSwitcher />
             <ThemeToggle />
+            {/* <Link
+              href="/login"
+              className="ml-2 rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition-all duration-300 hover:bg-foreground hover:text-background dark:hover:bg-white dark:hover:text-black"
+            >
+              Login
+            </Link> */}
           </div>
         </nav>
 
@@ -251,11 +247,10 @@ export function Header() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
-                  pathname === item.href
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                }`}
+                className={`rounded-lg px-4 py-3 text-sm font-medium transition-colors ${pathname === item.href
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  }`}
                 onClick={() => setMobileMenuOpen(false)}
               >
                 {item.label}
@@ -265,11 +260,10 @@ export function Header() {
             <div className="flex flex-col">
               <button
                 onClick={() => setServicesDropdownOpen(!servicesDropdownOpen)}
-                className={`flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
-                  pathname.startsWith("/services")
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                }`}
+                className={`flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors ${pathname.startsWith("/services")
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  }`}
               >
                 {t.nav.services}
                 <ChevronDown
@@ -283,11 +277,10 @@ export function Header() {
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`rounded-lg px-4 py-2.5 text-sm transition-colors ${
-                        pathname === item.href
-                          ? "bg-muted text-foreground"
-                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                      }`}
+                      className={`rounded-lg px-4 py-2.5 text-sm transition-colors ${pathname === item.href
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        }`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {item.label}
@@ -300,11 +293,10 @@ export function Header() {
             <div className="flex flex-col">
               <button
                 onClick={() => setIpDropdownOpen(!ipDropdownOpen)}
-                className={`flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
-                  pathname.startsWith("/resources")
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                }`}
+                className={`flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors ${pathname.startsWith("/resources")
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  }`}
               >
                 {t.nav.intellectualProperty}
                 <ChevronDown
@@ -318,11 +310,10 @@ export function Header() {
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`rounded-lg px-4 py-2.5 text-sm transition-colors ${
-                        pathname === item.href
-                          ? "bg-muted text-foreground"
-                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                      }`}
+                      className={`rounded-lg px-4 py-2.5 text-sm transition-colors ${pathname === item.href
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        }`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {item.label}
@@ -336,11 +327,10 @@ export function Header() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
-                  pathname === item.href
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                }`}
+                className={`rounded-lg px-4 py-3 text-sm font-medium transition-colors ${pathname === item.href
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  }`}
                 onClick={() => setMobileMenuOpen(false)}
               >
                 {item.label}
@@ -348,6 +338,13 @@ export function Header() {
             ))}
 
             <div className="mt-6 border-t border-border/40 pt-6 flex flex-col gap-4">
+              <Link
+                href="/login"
+                className="w-full rounded-lg bg-primary px-4 py-3 text-center text-sm font-semibold text-primary-foreground transition-colors hover:bg-foreground hover:text-background dark:hover:bg-white dark:hover:text-black"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Login to HRMS
+              </Link>
               <div className="flex items-center justify-around gap-4">
                 <LanguageSwitcher />
                 <ThemeToggle />
