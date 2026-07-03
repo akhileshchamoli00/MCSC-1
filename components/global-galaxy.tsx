@@ -7,12 +7,14 @@ import { useEffect, useState } from "react";
 export function GlobalGalaxy() {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    setIsMobile(window.innerWidth < 768);
   }, []);
 
-  if (!mounted) return null;
+  if (!mounted || isMobile) return null;
 
   return (
     <div className="fixed inset-0 z-[-1] pointer-events-auto bg-background transition-colors duration-500">
@@ -21,8 +23,8 @@ export function GlobalGalaxy() {
           style={{ width: "1080px", height: "1080px", position: "relative" }}
         >
           <SplashCursor
-            SIM_RESOLUTION={128}
-            DYE_RESOLUTION={1440}
+            SIM_RESOLUTION={64}
+            DYE_RESOLUTION={512}
             DENSITY_DISSIPATION={3.5}
             VELOCITY_DISSIPATION={2}
             PRESSURE={0.1}
