@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: ['/api/'],
     },
-    sitemap: 'https://mcsc.co.id/sitemap.xml',
+    sitemap: 'https://www.mcsc.co.id/sitemap.xml',
   }
 }

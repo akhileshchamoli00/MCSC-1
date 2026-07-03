@@ -11,21 +11,21 @@ export async function generateMetadata(
   parent: ResolvingMetadata
 ): Promise<Metadata> {
   const id = (await params).id
-  
+
   // We use English as the default for metadata since language context is client-side
   const announcement = translations["en"].announcement.items.find((item: any) => item.id === id)
-  
+
   if (!announcement) {
     return { title: "Regulation Not Found - MCS Consulting" }
   }
-  
+
   const description = (announcement as any).summary || announcement.content.substring(0, 160) + "..."
 
   return {
     title: `${announcement.title} - MCS Consulting`,
     description: description,
     alternates: {
-      canonical: `https://mcsc.co.id/announcement/${id}`,
+      canonical: `https://www.mcsc.co.id/announcement/${id}`,
     },
     openGraph: {
       title: `${announcement.title} - MCS Consulting`,
@@ -57,14 +57,14 @@ export default async function AnnouncementDetailPage({ params }: Props) {
               "author": {
                 "@type": "Organization",
                 "name": "MCS Consulting",
-                "url": "https://mcsc.co.id"
+                "url": "https://www.mcsc.co.id"
               },
               "publisher": {
                 "@type": "Organization",
                 "name": "MCS Consulting",
                 "logo": {
                   "@type": "ImageObject",
-                  "url": "https://mcsc.co.id/logo.png"
+                  "url": "https://www.mcsc.co.id/logo.png"
                 }
               }
             })
