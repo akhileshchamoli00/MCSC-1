@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime
 
 import models, schemas, auth, database
+from storage import upload_file_to_supabase
 
 router = APIRouter(
     prefix="/api/clients",
@@ -278,15 +279,12 @@ def upload_company_logo(company_id: int, file: UploadFile = File(...), db: Sessi
     if file.content_type not in ["image/png", "image/jpeg", "image/jpg"]:
         raise HTTPException(status_code=400, detail="Only PNG and JPEG images are allowed")
         
-    os.makedirs(os.path.join("uploads", "logos"), exist_ok=True)
-    ext = file.filename.split(".")[-1]
-    filename = f"company_logo_{db_company.id}_{uuid.uuid4().hex[:8]}.{ext}"
-    filepath = os.path.join("uploads", "logos", filename)
-    
-    with open(filepath, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    try:
+        public_url = upload_file_to_supabase(file, "avatars", "company_logo")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload to storage: {str(e)}")
         
-    db_company.logo_url = f"/uploads/logos/{filename}"
+    db_company.logo_url = public_url
     db_company.updated_at = datetime.now()
     db.commit()
     db.refresh(db_company)
@@ -358,19 +356,15 @@ def upload_client_document(company_id: int, file: UploadFile = File(...), db: Se
     if not (is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client_themselves_for_company(current_user, company_id, db)):
         raise HTTPException(status_code=403, detail="Not authorized to upload documents for this company")
         
-    os.makedirs(os.path.join("uploads", "client_documents"), exist_ok=True)
-    ext = file.filename.split(".")[-1]
-    base_name = os.path.basename(file.filename)
-    filename = f"doc_{company.id}_{uuid.uuid4().hex[:8]}_{base_name}"
-    filepath = os.path.join("uploads", "client_documents", filename)
-    
-    with open(filepath, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    try:
+        public_url = upload_file_to_supabase(file, "documents", "client_doc")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload to storage: {str(e)}")
         
     db_doc = models.ClientDocument(
         company_id=company_id,
         file_name=file.filename,
-        file_url=f"/uploads/client_documents/{filename}",
+        file_url=public_url,
         uploaded_by=current_user.id
     )
     db.add(db_doc)
