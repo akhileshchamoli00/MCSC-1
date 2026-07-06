@@ -47,7 +47,10 @@ def get_monthly_overview(
     query = db.query(models.LeaveRequest).join(
         models.Employee, models.LeaveRequest.employee_id == models.Employee.id
     ).filter(
-        models.LeaveRequest.leave_type != "Leave Allocation"
+        and_(
+            models.LeaveRequest.leave_type != "Leave Allocation",
+            models.LeaveRequest.status == models.LeaveStatus.APPROVED
+        )
     )
     if user_company:
         query = query.filter(models.Employee.company_name == user_company)
