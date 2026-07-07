@@ -85,7 +85,7 @@ async def startup_event():
     manager.loop = asyncio.get_running_loop()
     
     # Run migrations check on startup
-    from scratch.apply_migrations import run_migrations
+    from utils.apply_migrations import run_migrations
     try:
         run_migrations()
     except Exception as e:

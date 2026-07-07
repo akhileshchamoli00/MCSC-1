@@ -64,20 +64,15 @@ export function NotificationBell() {
       // Resolve WebSocket URL robustly for local development and production
       let wsUrl = "";
       const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-      const nextPublicApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const nextPublicApiUrl = process.env.NEXT_PUBLIC_API_URL || "/api-proxy";
       
       if (nextPublicApiUrl.startsWith("http")) {
         const wsProtocol = nextPublicApiUrl.startsWith("https") ? "wss" : "ws";
         const hostPart = nextPublicApiUrl.replace(/^https?:\/\//, "");
         wsUrl = `${wsProtocol}://${hostPart}/api/notifications/ws?token=${token}`;
       } else {
-        if (window.location.port) {
-          const hostname = window.location.hostname === "localhost" ? "127.0.0.1" : window.location.hostname;
-          wsUrl = `${protocol}://${hostname}:8000/api/notifications/ws?token=${token}`;
-        } else {
-          const apiPath = nextPublicApiUrl.includes("proxy") ? "/api" : (nextPublicApiUrl || "/api");
-          wsUrl = `${protocol}://${window.location.host}${apiPath}/notifications/ws?token=${token}`;
-        }
+        const cleanPath = nextPublicApiUrl.replace(/\/$/, "");
+        wsUrl = `${protocol}://${window.location.host}${cleanPath}/api/notifications/ws?token=${token}`;
       }
       const socket = new WebSocket(wsUrl);
       
