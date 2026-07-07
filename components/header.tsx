@@ -343,7 +343,7 @@ export function Header() {
                 className="w-full rounded-lg bg-primary px-4 py-3 text-center text-sm font-semibold text-primary-foreground transition-colors hover:bg-foreground hover:text-background dark:hover:bg-white dark:hover:text-black"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Login to HRMS
+                Login
               </Link>
               <div className="flex items-center justify-around gap-4">
                 <LanguageSwitcher />

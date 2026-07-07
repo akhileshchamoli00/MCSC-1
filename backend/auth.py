@@ -37,6 +37,7 @@ class CachedUser:
     def __init__(self, user_dict):
         self.id = user_dict["id"]
         self.email = user_dict["email"]
+        self.hashed_password = user_dict.get("hashed_password")
         self.is_active = user_dict["is_active"]
         self.role_id = user_dict["role_id"]
         self.created_at = user_dict["created_at"]
@@ -57,6 +58,11 @@ class CachedUser:
                 self.__dict__.update(emp_dict)
         self.employee = CachedEmployee(user_dict["employee"]) if user_dict["employee"] else None
 
+        class CachedClient:
+            def __init__(self, client_dict):
+                self.__dict__.update(client_dict)
+        self.client = CachedClient(user_dict["client"]) if user_dict.get("client") else None
+
 # In-memory authentication cache: email -> (user_dict, expiry_timestamp)
 _user_cache = {}
 CACHE_TTL_SECONDS = 30
@@ -74,7 +80,8 @@ def get_cached_user(db: Session, email: str):
     # Eagerly load user, role, and employee relationships
     db_user = db.query(models.User).options(
         joinedload(models.User.role),
-        joinedload(models.User.employee)
+        joinedload(models.User.employee),
+        joinedload(models.User.client)
     ).filter(models.User.email == email).first()
     
     if not db_user:
@@ -87,17 +94,27 @@ def get_cached_user(db: Session, email: str):
         mapper = inspect(db_employee.__class__)
         for col in mapper.columns:
             employee_dict[col.key] = getattr(db_employee, col.key)
+            
+    db_client = db_user.client
+    client_dict = None
+    if db_client:
+        client_dict = {}
+        mapper = inspect(db_client.__class__)
+        for col in mapper.columns:
+            client_dict[col.key] = getattr(db_client, col.key)
         
     user_dict = {
         "id": db_user.id,
         "email": db_user.email,
+        "hashed_password": db_user.hashed_password,
         "is_active": db_user.is_active,
         "role_id": db_user.role_id,
         "created_at": db_user.created_at,
         "role_name": db_user.role.name if db_user.role else None,
         "role_description": db_user.role.description if db_user.role else None,
         "role_id_db": db_user.role.id if db_user.role else None,
-        "employee": employee_dict
+        "employee": employee_dict,
+        "client": client_dict
     }
     
     _user_cache[email] = (user_dict, now + CACHE_TTL_SECONDS)

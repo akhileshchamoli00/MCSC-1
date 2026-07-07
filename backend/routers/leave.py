@@ -636,7 +636,7 @@ import shutil
 import uuid
 
 @router.post("/request/{id}/upload-attachment")
-def upload_leave_attachment(id: int, file: UploadFile = File(...), db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+async def upload_leave_attachment(id: int, file: UploadFile = File(...), db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     if not current_user.employee:
         raise HTTPException(status_code=403, detail="Not an employee")
     
@@ -648,18 +648,14 @@ def upload_leave_attachment(id: int, file: UploadFile = File(...), db: Session =
     if not leave_req:
         raise HTTPException(status_code=404, detail="Leave request not found or not owned by user")
     
-    if file.content_type not in ["image/png", "image/jpeg", "image/jpg"]:
-        raise HTTPException(status_code=400, detail="Only PNG and JPEG images are allowed")
+    if file.content_type not in ["image/png", "image/jpeg", "image/jpg", "application/pdf"]:
+        raise HTTPException(status_code=400, detail="Only PNG, JPEG images, and PDF are allowed")
         
-    os.makedirs(os.path.join("uploads", "documents"), exist_ok=True)
-    ext = file.filename.split(".")[-1]
-    filename = f"leave_{leave_req.id}_{uuid.uuid4().hex[:8]}.{ext}"
-    filepath = os.path.join("uploads", "documents", filename)
+    from storage import upload_file_to_supabase
+    file_bytes = await file.read()
+    file_url = upload_file_to_supabase(file_bytes, file.filename, "hrms-documents")
     
-    with open(filepath, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-        
-    leave_req.attachment_url = f"/uploads/documents/{filename}"
+    leave_req.attachment_url = file_url
     db.commit()
     
     return {"message": "Attachment uploaded successfully", "attachment_url": leave_req.attachment_url}

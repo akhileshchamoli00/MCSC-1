@@ -141,27 +141,19 @@ def get_employee_documents(employee_id: int, db: Session = Depends(database.get_
     return documents
 
 @router.post("/{employee_id}/documents", response_model=schemas.EmployeeDocumentResponse)
-def upload_employee_document(
+async def upload_employee_document(
     employee_id: int, 
     document_type: str = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(database.get_db)
 ):
+    from storage import upload_file_to_supabase
     employee = db.query(models.Employee).filter(models.Employee.id == employee_id).first()
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
 
-    upload_dir = os.path.join("uploads", "documents")
-    os.makedirs(upload_dir, exist_ok=True)
-    
-    file_extension = os.path.splitext(file.filename)[1]
-    safe_filename = f"emp_{employee_id}_{document_type.replace(' ', '_')}_{file.filename}"
-    file_path = os.path.join(upload_dir, safe_filename)
-    
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-        
-    file_url = f"/uploads/documents/{safe_filename}"
+    file_bytes = await file.read()
+    file_url = upload_file_to_supabase(file_bytes, file.filename, "hrms-documents")
     
     new_doc = models.EmployeeDocument(
         employee_id=employee_id,
@@ -176,26 +168,19 @@ def upload_employee_document(
     return new_doc
 
 @router.post("/{employee_id}/photo", response_model=schemas.EmployeeResponse)
-def upload_employee_photo(
+async def upload_employee_photo(
     employee_id: int, 
     file: UploadFile = File(...),
     db: Session = Depends(database.get_db)
 ):
+    from storage import upload_file_to_supabase
     employee = db.query(models.Employee).filter(models.Employee.id == employee_id).first()
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
 
-    upload_dir = os.path.join("uploads", "profiles")
-    os.makedirs(upload_dir, exist_ok=True)
+    file_bytes = await file.read()
+    file_url = upload_file_to_supabase(file_bytes, file.filename, "hrms-documents")
     
-    file_extension = os.path.splitext(file.filename)[1]
-    safe_filename = f"emp_{employee_id}_photo{file_extension}"
-    file_path = os.path.join(upload_dir, safe_filename)
-    
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-        
-    file_url = f"/uploads/profiles/{safe_filename}"
     employee.profile_photo = file_url
     
     db.commit()

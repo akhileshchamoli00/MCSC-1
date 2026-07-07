@@ -284,16 +284,10 @@ def get_or_create_conversation(payload: dict, db: Session = Depends(database.get
 
 
 @router.post("/upload")
-def upload_chat_attachment(file: UploadFile = File(...), db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    # Create directory if it doesn't exist
-    os.makedirs(os.path.join("uploads", "chat_attachments"), exist_ok=True)
+async def upload_chat_attachment(file: UploadFile = File(...), db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    from storage import upload_file_to_supabase
     
-    ext = file.filename.split(".")[-1]
-    base_name = os.path.basename(file.filename)
-    filename = f"chat_{current_user.id}_{uuid.uuid4().hex[:8]}_{base_name}"
-    filepath = os.path.join("uploads", "chat_attachments", filename)
-    
-    with open(filepath, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    file_bytes = await file.read()
+    file_url = upload_file_to_supabase(file_bytes, file.filename, "hrms-documents")
         
-    return {"attachment_url": f"/uploads/chat_attachments/{filename}", "filename": file.filename}
+    return {"attachment_url": file_url, "filename": file.filename}
