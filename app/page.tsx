@@ -17,7 +17,6 @@ export default function Home() {
   return (
     <main>
       <Hero />
-      <p>Deployment test: d176831</p>
       <StatsSection />
       <AboutSection />
       <ServicesSection />

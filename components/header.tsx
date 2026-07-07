@@ -216,12 +216,12 @@ export function Header() {
           <div className="ml-4 border-l border-border/40 pl-4 flex items-center gap-2">
             <LanguageSwitcher />
             <ThemeToggle />
-            {/* <Link
+            <Link
               href="/login"
               className="ml-2 rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition-all duration-300 hover:bg-foreground hover:text-background dark:hover:bg-white dark:hover:text-black"
             >
-              Login
-            </Link> */}
+              Login to HRMS
+            </Link>
           </div>
         </nav>
 
