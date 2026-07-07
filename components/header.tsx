@@ -220,7 +220,7 @@ export function Header() {
               href="/login"
               className="ml-2 rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition-all duration-300 hover:bg-foreground hover:text-background dark:hover:bg-white dark:hover:text-black"
             >
-              Login to HRMS
+              Login
             </Link>
           </div>
         </nav>
