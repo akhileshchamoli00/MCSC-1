@@ -1,7 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono, Playfair_Display, Antonio } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
 import { LanguageProvider } from "@/contexts/language-context"
 import { ThemeProvider } from "@/components/theme-provider"
 import { GlobalGalaxy } from "@/components/global-galaxy"
@@ -85,7 +84,6 @@ export default function RootLayout({
           </LanguageProvider>
         </ThemeProvider>
         <Toaster richColors />
-        <Analytics />
       </body>
     </html>
   )

@@ -14,11 +14,16 @@ router = APIRouter(
 )
 
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, token: str):
+async def websocket_endpoint(websocket: WebSocket, token: str = None):
     db = database.SessionLocal()
     try:
-        # Validate token manually since Depends(auth.get_current_user) doesn't work out of the box with WS in the same way
-        payload = jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
+        # If token is the placeholder from localStorage, grab the real one from HttpOnly cookies
+        actual_token = websocket.cookies.get("hrms_token") or token
+        if not actual_token or actual_token == "cookie_based_session_active":
+            await websocket.close(code=1008)
+            return
+            
+        payload = jwt.decode(actual_token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
         email: str = payload.get("sub")
         if email is None:
             await websocket.close(code=1008)
