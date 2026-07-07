@@ -9,6 +9,9 @@ const nextConfig = {
   },
   // Allow hot module reloading (HMR) websocket from the production/test domain
   allowedDevOrigins: ["hrms.indotax.co.id", "localhost:3000"],
+  env: {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api-proxy',
+  },
   async headers() {
     return [
       {
