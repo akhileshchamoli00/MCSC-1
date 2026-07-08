@@ -241,7 +241,7 @@ export default function LeaveApprovalPage() {
                       </td>
                       <td className="px-4 py-3 text-right space-x-2">
                         {req.attachment_url && (
-                          <a href={`${process.env.NEXT_PUBLIC_API_URL}${req.attachment_url}`} target="_blank" rel="noreferrer" title="View Medical Certificate">
+                          <a href={req.attachment_url.startsWith('http') ? req.attachment_url : `${process.env.NEXT_PUBLIC_API_URL}${req.attachment_url}`} target="_blank" rel="noreferrer" title="View Medical Certificate">
                             <Button variant="ghost" size="sm" className="h-8 gap-2 text-blue-600">
                               <Paperclip className="h-4 w-4" /> Cert
                             </Button>
@@ -363,14 +363,28 @@ export default function LeaveApprovalPage() {
                   {viewingRequest.attachment_url && (
                     <div className="space-y-1.5">
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Attachment</p>
-                      <a 
-                        href={`${process.env.NEXT_PUBLIC_API_URL}${viewingRequest.attachment_url}`} 
-                        target="_blank" 
-                        rel="noreferrer" 
-                        className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors bg-blue-50 dark:bg-blue-950/20 px-3 py-2 rounded-md border border-blue-100 dark:border-blue-900/30"
-                      >
-                        <Paperclip className="h-4 w-4" /> View Medical Certificate
-                      </a>
+                      {(() => {
+                        const url = viewingRequest.attachment_url;
+                        const fullUrl = url.startsWith("http") ? url : `${process.env.NEXT_PUBLIC_API_URL}${url}`;
+                        const isImage = /\.(jpeg|jpg|png|gif|webp)$/i.test(url);
+                        
+                        return isImage ? (
+                          <div className="mt-2 border border-border/50 rounded-md overflow-hidden bg-muted/10 max-w-sm">
+                            <a href={fullUrl} target="_blank" rel="noreferrer">
+                              <img src={fullUrl} alt="Medical Certificate" className="w-full h-auto object-contain max-h-48" />
+                            </a>
+                          </div>
+                        ) : (
+                          <a 
+                            href={fullUrl} 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors bg-blue-50 dark:bg-blue-950/20 px-3 py-2 rounded-md border border-blue-100 dark:border-blue-900/30"
+                          >
+                            <Paperclip className="h-4 w-4" /> View Medical Certificate
+                          </a>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>

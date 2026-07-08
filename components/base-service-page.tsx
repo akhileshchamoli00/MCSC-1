@@ -34,7 +34,7 @@ interface FAQ {
 }
 
 interface BaseServicePageProps {
-  icon: LucideIcon;
+  icon?: React.ReactNode;
   title: { en: string; id: string; cn?: string };
   description: { en: string; id: string; cn?: string };
   subServices?: SubService[];
@@ -42,10 +42,11 @@ interface BaseServicePageProps {
   ctaText?: { en: string; id: string; cn?: string };
   ctaDescription?: { en: string; id: string; cn?: string };
   children?: React.ReactNode;
+  lang?: string;
 }
 
 export function BaseServicePage({
-  icon: Icon,
+  icon: IconNode,
   title,
   description,
   subServices,
@@ -53,8 +54,9 @@ export function BaseServicePage({
   ctaText,
   ctaDescription,
   children,
+  lang = 'en',
 }: BaseServicePageProps) {
-  const { language } = useLanguage();
+  const language = lang;
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   const getTranslation = (obj: any, lang: string) => {
@@ -69,27 +71,6 @@ export function BaseServicePage({
 
   return (
     <main className="flex-grow relative z-10">
-      {/* FAQPage structured data — always uses English text regardless of active UI language, since schema.org content should be consistent for crawlers */}
-      {faqs && faqs.length > 0 && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "FAQPage",
-              mainEntity: faqs.map((faq) => ({
-                "@type": "Question",
-                name: getTranslation(faq.question, "en"),
-                acceptedAnswer: {
-                  "@type": "Answer",
-                  text: getTranslation(faq.answer, "en"),
-                },
-              })),
-            }),
-          }}
-        />
-      )}
-
       {/* Hero Section */}
       <section className="pt-6 pb-4 md:pt-10 md:pb-6">
         <div className="container mx-auto px-4">
@@ -100,7 +81,7 @@ export function BaseServicePage({
             className="mx-auto max-w-4xl text-center"
           >
             <div className="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 mb-8 backdrop-blur-sm border border-primary/20">
-              <Icon className="h-10 w-10 text-primary" />
+              {IconNode}
             </div>
             <h1 className="mb-6 text-4xl font-bold tracking-tight text-foreground md:text-6xl font-sans">
               {getTranslation(title, language)}
@@ -195,71 +176,70 @@ export function BaseServicePage({
             </div>
           </section>
         )
-      )
-      }
+      )}
 
       {/* FAQ Section */}
-      {
-        faqs && faqs.length > 0 && (
-          <section id="faq" className="scroll-mt-24 pt-8 pb-8 relative overflow-hidden">
-            <div className="container mx-auto px-4 relative z-10">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5 }}
-                className="mx-auto max-w-3xl rounded-3xl border border-border/50 dark:border-white/20 bg-background/50 backdrop-blur-md p-8 md:p-12 shadow-sm"
-              >
-                <div className="text-center mb-8">
-                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 mb-4 backdrop-blur-sm border border-primary/20">
-                    <HelpCircle className="h-6 w-6 text-primary" />
-                  </div>
-                  <h2 className="text-3xl font-bold tracking-tight mb-2 text-foreground">
-                    {language === "en"
-                      ? "Frequently Asked Questions"
-                      : language === "cn"
-                        ? "常见问题"
-                        : "Pertanyaan yang Sering Diajukan"}
-                  </h2>
+      {faqs && faqs.length > 0 && (
+        <section id="faq" className="scroll-mt-24 pt-0 pb-8 relative overflow-hidden">
+          <div className="container mx-auto px-4 relative z-10">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="mx-auto max-w-3xl rounded-3xl border border-border/50 dark:border-white/20 bg-background/50 backdrop-blur-md p-8 md:p-12 shadow-sm"
+            >
+              <div className="text-center mb-8">
+                <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 mb-4 backdrop-blur-sm border border-primary/20">
+                  <HelpCircle className="h-6 w-6 text-primary" />
                 </div>
-                <div className="divide-y divide-border/50 dark:divide-white/40">
-                  {faqs.map((faq, index) => {
-                    const isOpen = openIndex === index;
-                    return (
-                      <div key={index} className="group">
-                        <button
-                          onClick={() => setOpenIndex(isOpen ? null : index)}
-                          className="w-full text-left py-5 flex items-start justify-between gap-4 focus:outline-none transition-colors"
+                <h2 className="text-3xl font-bold tracking-tight mb-2 text-foreground">
+                  {language === "en"
+                    ? "Frequently Asked Questions"
+                    : language === "cn"
+                      ? "常见问题"
+                      : "Pertanyaan yang Sering Diajukan"}
+                </h2>
+              </div>
+              <div className="divide-y divide-border/50 dark:divide-white/40">
+                {faqs.map((faq, index) => {
+                  const isOpen = openIndex === index;
+                  return (
+                    <div key={index} className="group">
+                      <button
+                        onClick={() => setOpenIndex(isOpen ? null : index)}
+                        className="w-full text-left py-5 flex items-start justify-between gap-4 focus:outline-none transition-colors"
+                      >
+                        <h3
+                          className={`font-medium text-base transition-colors ${isOpen ? "text-primary" : "text-foreground group-hover:text-primary/80"}`}
                         >
-                          <h3
-                            className={`font-medium text-base transition-colors ${isOpen ? "text-primary" : "text-foreground group-hover:text-primary/80"}`}
-                          >
-                            {getTranslation(faq.question, language)}
-                          </h3>
-                          <ChevronDown
-                            className={`h-5 w-5 mt-0.5 shrink-0 transition-transform duration-300 ${isOpen
+                          {getTranslation(faq.question, language)}
+                        </h3>
+                        <ChevronDown
+                          className={`h-5 w-5 mt-0.5 shrink-0 transition-transform duration-300 ${
+                            isOpen
                               ? "rotate-180 text-primary"
                               : "text-muted-foreground group-hover:text-primary/80"
-                              }`}
-                          />
-                        </button>
-                        <div
-                          className={`overflow-hidden transition-all duration-300 ${isOpen ? "max-h-[1000px] opacity-100 pb-5 pt-1" : "max-h-0 opacity-0 pb-0 pt-0"
-                            }`}
-                        >
-                          <div className="pr-8 text-sm text-muted-foreground leading-relaxed">
-                            {getTranslation(faq.answer, language)}
-                          </div>
+                          }`}
+                        />
+                      </button>
+                      <div
+                        className={`overflow-hidden transition-all duration-300 ${
+                          isOpen ? "max-h-[1000px] opacity-100 pb-5 pt-1" : "max-h-0 opacity-0 pb-0 pt-0"
+                        }`}
+                      >
+                        <div className="pr-8 text-sm text-muted-foreground leading-relaxed">
+                          {getTranslation(faq.answer, language)}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            </div>
-          </section>
-        )
-      }
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </div>
+        </section>
+      )}
 
       {/* CTA Section */}
       <section className="pt-8 pb-24 relative overflow-hidden">
@@ -323,8 +303,8 @@ export function BaseServicePage({
               </Button>
             </div>
           </motion.div>
-        </div >
-      </section >
-    </main >
+        </div>
+      </section>
+    </main>
   );
 }

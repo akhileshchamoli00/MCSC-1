@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const deadPatterns = [
+const deadPatterns: string[] = [
     '/en/product/',
-    '/en/blog/',
-    '/en/sbu-standar-badan-usaha-sijuk',
-    '/en/contact',
     '/pengurusan-perizinan-badan-usaha',
 ]
 

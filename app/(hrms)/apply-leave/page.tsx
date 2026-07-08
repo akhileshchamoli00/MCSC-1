@@ -258,6 +258,7 @@ export default function ApplyLeavePage() {
       return;
     }
 
+    /* TEMPORARY: ALLOW NEGATIVE
     if (values.leave_type === "Annual Leave" || values.leave_type === "Emergency Leave") {
       const remainingBalance = balances?.annual_leave?.remaining ?? 0;
       if (remainingBalance <= 0) {
@@ -270,6 +271,18 @@ export default function ApplyLeavePage() {
         });
         return;
       }
+    }
+    */
+
+    if (values.leave_type === "Sick Leave" && !attachment) {
+      toast.error("A Medical Certificate attachment is mandatory for Sick Leave.", {
+        style: {
+          backgroundColor: '#ef4444',
+          color: '#ffffff',
+          borderColor: '#dc2626'
+        }
+      });
+      return;
     }
 
     if (values.leave_type === "Annual Leave") {
@@ -355,6 +368,7 @@ export default function ApplyLeavePage() {
       return;
     }
 
+    /* TEMPORARY: ALLOW NEGATIVE
     if (editForm.leave_type === "Annual Leave" || editForm.leave_type === "Emergency Leave") {
       const remainingBalance = balances?.annual_leave?.remaining ?? 0;
       if (remainingBalance <= 0) {
@@ -368,6 +382,7 @@ export default function ApplyLeavePage() {
         return;
       }
     }
+    */
 
     if (editForm.leave_type === "Annual Leave") {
       const advanceNotice = calculateWorkingDaysAdvance(editForm.start_date);
@@ -423,12 +438,13 @@ export default function ApplyLeavePage() {
                 {form.formState.errors.leave_type && <p className="text-[10px] text-red-500 mt-0.5">{form.formState.errors.leave_type.message}</p>}
               </div>
 
-              {(form.watch("leave_type") === "Annual Leave" || form.watch("leave_type") === "Emergency Leave") && (balances?.annual_leave?.remaining ?? 0) <= 0 && (
+              {/* TEMPORARY: ALLOW NEGATIVE
+              (form.watch("leave_type") === "Annual Leave" || form.watch("leave_type") === "Emergency Leave") && (balances?.annual_leave?.remaining ?? 0) <= 0 && (
                 <div className="p-2 rounded-md bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-[10px] flex items-start gap-2 leading-normal">
                   <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                   <span>You cannot apply for Annual Leave or Emergency Leave because your remaining Annual Leave balance is 0 or less.</span>
                 </div>
-              )}
+              )*/}
 
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-muted-foreground">Start Date</label>
@@ -456,20 +472,33 @@ export default function ApplyLeavePage() {
 
               {form.watch("leave_type") === "Sick Leave" && (
                 <div className="space-y-2 p-2.5 bg-muted/30 border border-border/50 rounded-md">
-                  <label className="text-xs font-semibold text-muted-foreground">Medical Certificate (Optional)</label>
+                  <label className="text-xs font-semibold text-muted-foreground">Medical Certificate (Mandatory)</label>
                   <Input 
                     type="file" 
                     accept="image/png, image/jpeg, image/jpg" 
                     className="h-10 text-sm py-2"
                     onChange={(e) => {
                       if (e.target.files && e.target.files.length > 0) {
-                        setAttachment(e.target.files[0]);
+                        const file = e.target.files[0];
+                        if (file.size > 10 * 1024 * 1024) {
+                          toast.error("File size must be less than 10 MB");
+                          e.target.value = '';
+                          setAttachment(null);
+                          return;
+                        }
+                        if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
+                          toast.error("Only PNG and JPEG images are allowed");
+                          e.target.value = '';
+                          setAttachment(null);
+                          return;
+                        }
+                        setAttachment(file);
                       } else {
                         setAttachment(null);
                       }
                     }}
                   />
-                  <p className="text-[9px] text-muted-foreground leading-normal">Only image files (PNG, JPEG) are allowed to keep file size small.</p>
+                  <p className="text-[9px] text-muted-foreground leading-normal">Required: Only image files (PNG, JPEG) are allowed. Max 10 MB.</p>
                 </div>
               )}
 
@@ -645,7 +674,7 @@ export default function ApplyLeavePage() {
                                 </>
                               )}
                               {req.attachment_url && (
-                                <a href={`${process.env.NEXT_PUBLIC_API_URL}${req.attachment_url}`} target="_blank" rel="noreferrer" title="View Medical Certificate">
+                                <a href={req.attachment_url.startsWith('http') ? req.attachment_url : `${process.env.NEXT_PUBLIC_API_URL}${req.attachment_url}`} target="_blank" rel="noreferrer" title="View Medical Certificate">
                                   <Paperclip className="h-3.5 w-3.5 text-blue-600 hover:text-blue-800" />
                                 </a>
                               )}
@@ -744,12 +773,13 @@ export default function ApplyLeavePage() {
                 </Select>
               </div>
 
-              {(editForm.leave_type === "Annual Leave" || editForm.leave_type === "Emergency Leave") && (balances?.annual_leave?.remaining ?? 0) <= 0 && (
+              {/* TEMPORARY: ALLOW NEGATIVE
+              (editForm.leave_type === "Annual Leave" || editForm.leave_type === "Emergency Leave") && (balances?.annual_leave?.remaining ?? 0) <= 0 && (
                 <div className="p-3 rounded-md bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                   <span>You cannot apply for Annual Leave or Emergency Leave because your remaining Annual Leave balance is 0 or less.</span>
                 </div>
-              )}
+              )*/}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

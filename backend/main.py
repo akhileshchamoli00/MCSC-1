@@ -49,6 +49,8 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "http://0.0.0.0:3000",
         "https://hrms.indotax.co.id",
+        "https://hrms-backend-979749601379.asia-southeast1.run.app",
+        os.getenv("FRONTEND_URL", "https://hrms.mcsc.co.id"),
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -194,13 +196,26 @@ def forgot_password(req: schemas.ForgotPasswordRequest, request: Request, db: Se
     # Send email
     from utils.email_service import send_password_reset_email
     
-    # Get the origin from the request headers to build a dynamic link
-    origin = request.headers.get("origin")
+    # Try to get FRONTEND_URL from environment first
+    origin = os.getenv("FRONTEND_URL")
+    
+    # Next, try to get the origin from the request headers
+    if not origin:
+        origin = request.headers.get("origin")
+        
     if not origin:
         # Fallback to the host header if origin is missing
-        host = request.headers.get("host", "hrms.indotax.co.id")
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host", "hrms.indotax.co.id")
         protocol = request.headers.get("x-forwarded-proto", "http" if "localhost" in host else "https")
-        origin = f"{protocol}://{host}"
+        
+        if "hrms-backend-979749601379.asia-southeast1.run.app" in host:
+            origin = "https://hrms-backend-979749601379.asia-southeast1.run.app"
+        elif "indotax.co.id" in host:
+            origin = "https://hrms.indotax.co.id"
+        elif "127.0.0.1" in host or "localhost" in host:
+            origin = "http://localhost:3000"
+        else:
+            origin = f"{protocol}://{host}"
         
     reset_link = f"{origin}/reset-password?token={reset_token}"
     send_password_reset_email(user.email, reset_link)

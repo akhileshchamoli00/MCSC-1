@@ -19,13 +19,15 @@ def send_welcome_email(employee_email: str, employee_name: str, password: str):
 
     subject = "Welcome to MCS Consulting HRMS"
     
+    frontend_url = os.getenv("FRONTEND_URL", "https://hrms.mcsc.co.id")
+    
     body = f"""Dear {employee_name},
 
 Welcome to MCS Consulting! Your HRMS employee portal account has been created.
 
 Please log in to your dashboard to complete your profile and view your employment details.
 
-URL: https://hrms.indotax.co.id/login
+URL: {frontend_url}/login
 Username: {employee_email}
 Password: {password}
 

@@ -7,6 +7,9 @@ from datetime import datetime, timedelta
 import models, schemas, auth, database
 from notification_manager import manager
 
+# TEMPORARY TOGGLE: Set to False to prevent users from applying for annual leave when balance is negative.
+ALLOW_NEGATIVE_ANNUAL_LEAVE = True
+
 router = APIRouter(
     prefix="/api/leave",
     tags=["leave"],
@@ -65,7 +68,8 @@ def update_leave_balance(employee_id: int, payload: schemas.LeaveBalanceUpdate, 
     if not balance:
         raise HTTPException(status_code=404, detail="Leave balance not found for this employee")
 
-    if payload.bonus_allocated is not None and (payload.bonus_allocated * 2) % 1 != 0:
+    bonus_allocated = getattr(payload, 'bonus_allocated', None)
+    if bonus_allocated is not None and (bonus_allocated * 2) % 1 != 0:
         raise HTTPException(status_code=400, detail="Bonus allocated days must be in increments of 0.5 (half-day or full-day).")
 
     # Create Audit Log
@@ -199,7 +203,7 @@ def approve_leave_request(request_id: int, db: Session = Depends(database.get_db
 
     # Deduct Balance
     if leave_req.leave_type in ["Annual Leave", "Emergency Leave"]:
-        if balance.annual_leave_balance < leave_req.days_requested:
+        if not ALLOW_NEGATIVE_ANNUAL_LEAVE and balance.annual_leave_balance < leave_req.days_requested:
             raise HTTPException(status_code=400, detail="Insufficient Annual Leave balance")
         balance.annual_leave_balance -= leave_req.days_requested
     elif leave_req.leave_type == "Sick Leave":
@@ -341,7 +345,7 @@ def apply_for_leave(leave: schemas.LeaveRequestCreate, db: Session = Depends(dat
     if leave.leave_type in ["Annual Leave", "Emergency Leave"]:
         balance = db.query(models.LeaveBalance).filter(models.LeaveBalance.employee_id == current_user.employee.id).first()
         annual_balance = balance.annual_leave_balance if balance else 14.0
-        if annual_balance <= 0:
+        if not ALLOW_NEGATIVE_ANNUAL_LEAVE and annual_balance <= 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Insufficient Annual Leave balance. You cannot apply for Annual Leave or Emergency Leave with a balance of 0 or less."
@@ -471,7 +475,7 @@ def update_my_leave_request(request_id: int, leave_update: schemas.LeaveRequestU
     if leave_update.leave_type in ["Annual Leave", "Emergency Leave"]:
         balance = db.query(models.LeaveBalance).filter(models.LeaveBalance.employee_id == current_user.employee.id).first()
         annual_balance = balance.annual_leave_balance if balance else 14.0
-        if annual_balance <= 0:
+        if not ALLOW_NEGATIVE_ANNUAL_LEAVE and annual_balance <= 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Insufficient Annual Leave balance. You cannot apply for Annual Leave or Emergency Leave with a balance of 0 or less."
@@ -648,11 +652,15 @@ async def upload_leave_attachment(id: int, file: UploadFile = File(...), db: Ses
     if not leave_req:
         raise HTTPException(status_code=404, detail="Leave request not found or not owned by user")
     
-    if file.content_type not in ["image/png", "image/jpeg", "image/jpg", "application/pdf"]:
-        raise HTTPException(status_code=400, detail="Only PNG, JPEG images, and PDF are allowed")
+    if file.content_type not in ["image/png", "image/jpeg", "image/jpg"]:
+        raise HTTPException(status_code=400, detail="Only PNG and JPEG images are allowed")
         
     from storage import upload_file_to_supabase
     file_bytes = await file.read()
+    
+    if len(file_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size exceeds the 10 MB limit")
+        
     file_url = upload_file_to_supabase(file_bytes, file.filename, "hrms-documents")
     
     leave_req.attachment_url = file_url
