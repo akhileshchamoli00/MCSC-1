@@ -35,6 +35,7 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
         "en": `https://www.mcsc.co.id/en/services/virtual-office`,
         "id": `https://www.mcsc.co.id/id/services/virtual-office`,
         "zh-CN": `https://www.mcsc.co.id/cn/services/virtual-office`,
+        "x-default": `https://www.mcsc.co.id/en/services/virtual-office`,
       },
     },
   };

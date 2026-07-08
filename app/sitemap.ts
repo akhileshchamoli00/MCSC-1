@@ -3,7 +3,9 @@ import { translations } from '@/lib/translations'
 
 export default function sitemap(): MetadataRoute.Sitemap {
     const base = 'https://www.mcsc.co.id'
-    const pages = [
+    
+    // Core localized routes (without lang prefix)
+    const routes = [
         '',
         '/about',
         '/services',
@@ -21,18 +23,34 @@ export default function sitemap(): MetadataRoute.Sitemap {
         '/resources/faq',
         '/announcements',
         '/contact',
+        '/privacy-policy',
     ]
 
-    // Dynamically append all individual regulatory announcement paths
+    // Append dynamic announcement routes
     const dynamicAnnouncements = translations.en.announcement.items.map(
         (item) => `/announcement/${item.id}`
     )
-    const allPages = [...pages, ...dynamicAnnouncements]
+    const allRoutes = [...routes, ...dynamicAnnouncements]
 
-    return allPages.map((path) => ({
-        url: `${base}${path}`,
-        lastModified: new Date(),
-        changeFrequency: path.startsWith('/announcement/') ? 'weekly' : 'monthly',
-        priority: path === '' ? 1.0 : path.startsWith('/announcement/') ? 0.6 : 0.8,
-    }))
+    return allRoutes.map((route) => {
+        // Build the primary EN url
+        const enUrl = `${base}/en${route === '' ? '' : route}`
+        const idUrl = `${base}/id${route === '' ? '' : route}`
+        const cnUrl = `${base}/cn${route === '' ? '' : route}`
+
+        return {
+            url: enUrl,
+            lastModified: new Date(),
+            changeFrequency: route.startsWith('/announcement') ? 'weekly' : 'monthly',
+            priority: route === '' ? 1.0 : route.startsWith('/announcement/') ? 0.6 : 0.8,
+            alternates: {
+                languages: {
+                    'en': enUrl,
+                    'id': idUrl,
+                    'zh-CN': cnUrl,
+                    'x-default': enUrl
+                }
+            }
+        }
+    })
 }

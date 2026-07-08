@@ -15,6 +15,7 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
         "en": `https://www.mcsc.co.id/en/resources/faq`,
         "id": `https://www.mcsc.co.id/id/resources/faq`,
         "zh-CN": `https://www.mcsc.co.id/cn/resources/faq`,
+        "x-default": `https://www.mcsc.co.id/en/resources/faq`,
       },
     },
   };

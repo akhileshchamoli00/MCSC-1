@@ -35,6 +35,7 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
         "en": `https://www.mcsc.co.id/en/services/intellectual-property`,
         "id": `https://www.mcsc.co.id/id/services/intellectual-property`,
         "zh-CN": `https://www.mcsc.co.id/cn/services/intellectual-property`,
+        "x-default": `https://www.mcsc.co.id/en/services/intellectual-property`,
       },
     },
   };
