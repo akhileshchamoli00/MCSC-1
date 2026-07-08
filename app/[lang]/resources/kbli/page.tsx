@@ -341,8 +341,28 @@ export default function KBLIPage() {
     return matchesSearch && matchesCategory;
   });
 
+  const faqSchema = kbliFaqs && kbliFaqs.length > 0 ? {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: kbliFaqs.map((faq) => ({
+      "@type": "Question",
+      name: getTranslation(faq.question, language),
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: getTranslation(faq.answer, language)
+      }
+    }))
+  } : null;
+
   return (
-    <div className="flex flex-col min-h-screen">
+    <>
+      {faqSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+        />
+      )}
+      <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
       <section className="relative pt-12 pb-12 overflow-hidden">
         <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(to_bottom,white,transparent)]" />
@@ -594,7 +614,7 @@ export default function KBLIPage() {
                 ? "我们的法律顾问可以帮助您确定特定运营目标所需的准确业务分类。"
                 : "Konsultan hukum kami dapat membantu Anda menentukan klasifikasi bisnis yang tepat yang diperlukan untuk tujuan operasional spesifik Anda."}
           </p>
-          <Link href="/contact">
+          <Link href={`/${language}/contact`}>
             <Button size="lg" className="rounded-full px-8">
               {language === "en"
                 ? "Consult with an Expert"
@@ -606,5 +626,6 @@ export default function KBLIPage() {
         </div>
       </section>
     </div>
+    </>
   );
 }

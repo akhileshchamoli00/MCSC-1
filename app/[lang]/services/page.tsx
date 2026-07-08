@@ -165,7 +165,7 @@ export default function ServicesPage() {
               asChild
               className="transition-all hover:scale-105 active:scale-95 px-8 py-6 text-md font-semibold shadow-lg"
             >
-              <Link href="/contact">
+              <Link href={`/${language}/contact`}>
                 {language === "en"
                   ? "Contact Us"
                   : language === "cn"

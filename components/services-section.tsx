@@ -146,7 +146,7 @@ export function ServicesSection() {
 
                   return (
                     <div key={`${service.id}-${idx}`} className="h-full">
-                      <Link href={`/services/${service.id}`}>
+                      <Link href={`/${language}/services/${service.id}`}>
                         <BorderGlow
                           edgeSensitivity={30}
                           glowColor="220 80 80"

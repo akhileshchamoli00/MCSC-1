@@ -61,7 +61,7 @@ export function Hero() {
                 </p>
                 <div className="flex flex-col gap-4 group-hover:translate-x-0">
                   <Button asChild size="lg" className="group w-full h-14 gap-2 px-8 text-base font-medium transition-all duration-300 rounded-full bg-primary text-primary-foreground hover:bg-foreground hover:text-background dark:hover:bg-white dark:hover:text-black hover:scale-105 active:scale-95 shadow-lg shadow-primary/20 hover:shadow-xl">
-                    <Link href="/contact">
+                    <Link href={`/${language}/contact`}>
                       {t.stats?.cta?.scheduleBtn || "Schedule a Consultation"}
                       <ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1" />
                     </Link>

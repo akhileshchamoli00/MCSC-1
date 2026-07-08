@@ -23,53 +23,53 @@ export function Header() {
   }, [pathname]);
 
   const navItems = [
-    { label: t.nav.home, href: "/" },
-    { label: t.nav.about, href: "/about" },
-    { label: t.nav.announcement, href: "/announcements" },
-    { label: t.nav.contact, href: "/contact" },
+    { label: t.nav.home, href: `/${language}` },
+    { label: t.nav.about, href: `/${language}/about` },
+    { label: t.nav.announcement, href: `/${language}/announcements` },
+    { label: t.nav.contact, href: `/${language}/contact` },
   ];
 
   const servicesItems = [
     {
       label: t.services.dropdown.establishment,
-      href: "/services/establishment",
+      href: `/${language}/services/establishment`,
     },
     {
       label: t.services.dropdown.businessLicense,
-      href: "/services/business-license",
+      href: `/${language}/services/business-license`,
     },
     {
       label: t.services.dropdown.companyChanges,
-      href: "/services/company-changes",
+      href: `/${language}/services/company-changes`,
     },
-    { label: t.services.dropdown.agreements, href: "/services/agreements" },
+    { label: t.services.dropdown.agreements, href: `/${language}/services/agreements` },
     {
       label: t.services.dropdown.virtualOffice,
-      href: "/services/virtual-office",
+      href: `/${language}/services/virtual-office`,
     },
-    { label: t.services.dropdown.workPermit, href: "/services/work-permit" },
+    { label: t.services.dropdown.workPermit, href: `/${language}/services/work-permit` },
     {
       label: t.services.dropdown.intellectualProperty,
-      href: "/services/intellectual-property",
+      href: `/${language}/services/intellectual-property`,
     },
   ];
 
   const ipItems = [
     {
       label: t.nav.brandClassification,
-      href: "/resources/brand-classification",
+      href: `/${language}/resources/brand-classification`,
     },
     {
       label: t.nav.checkApplicationStatus,
-      href: "/resources/check-application-status",
+      href: `/${language}/resources/check-application-status`,
     },
     {
       label: t.nav.kbliDirectory,
-      href: "/resources/kbli",
+      href: `/${language}/resources/kbli`,
     },
     {
       label: "FAQ",
-      href: "/resources/faq",
+      href: `/${language}/resources/faq`,
     },
   ];
 
@@ -77,7 +77,7 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex py-4 items-center justify-between px-4 lg:px-8">
         <Link
-          href="/"
+          href={`/${language}`}
           className="group flex items-center gap-3 transition-all duration-300"
         >
           <AskLogo className="h-16 w-auto transition-transform duration-300 group-hover:scale-105" />
@@ -108,8 +108,8 @@ export function Header() {
             onMouseLeave={() => setServicesDropdownOpen(false)}
           >
             <Link
-              href="/services"
-              className={`group relative flex items-center gap-1 px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${pathname.startsWith("/services")
+              href={`/${language}/services`}
+              className={`group relative flex items-center gap-1 px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${pathname.startsWith(`/${language}/services`)
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -119,7 +119,7 @@ export function Header() {
                 className={`h-4 w-4 transition-transform duration-300 ${servicesDropdownOpen ? "rotate-180" : ""}`}
               />
               <span
-                className={`absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-300 ${pathname.startsWith("/services")
+                className={`absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-300 ${pathname.startsWith(`/${language}/services`)
                   ? "w-full"
                   : "w-0 group-hover:w-full"
                   }`}
@@ -155,8 +155,8 @@ export function Header() {
             onMouseLeave={() => setIpDropdownOpen(false)}
           >
             <Link
-              href="/resources"
-              className={`group relative flex items-center gap-1 px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${pathname.startsWith("/resources")
+              href={`/${language}/resources`}
+              className={`group relative flex items-center gap-1 px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${pathname.startsWith(`/${language}/resources`)
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -166,7 +166,7 @@ export function Header() {
                 className={`h-4 w-4 transition-transform duration-300 ${ipDropdownOpen ? "rotate-180" : ""}`}
               />
               <span
-                className={`absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-300 ${pathname.startsWith("/resources")
+                className={`absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-300 ${pathname.startsWith(`/${language}/resources`)
                   ? "w-full"
                   : "w-0 group-hover:w-full"
                   }`}
@@ -260,7 +260,7 @@ export function Header() {
             <div className="flex flex-col">
               <button
                 onClick={() => setServicesDropdownOpen(!servicesDropdownOpen)}
-                className={`flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors ${pathname.startsWith("/services")
+                className={`flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors ${pathname.startsWith(`/${language}/services`)
                   ? "bg-muted text-foreground"
                   : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                   }`}
@@ -293,7 +293,7 @@ export function Header() {
             <div className="flex flex-col">
               <button
                 onClick={() => setIpDropdownOpen(!ipDropdownOpen)}
-                className={`flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors ${pathname.startsWith("/resources")
+                className={`flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-colors ${pathname.startsWith(`/${language}/resources`)
                   ? "bg-muted text-foreground"
                   : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                   }`}

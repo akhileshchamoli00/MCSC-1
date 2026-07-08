@@ -69,8 +69,28 @@ export function BaseServicePage({
     return obj[lang] || obj["en"] || obj["id"] || [];
   };
 
+  const faqSchema = faqs && faqs.length > 0 ? {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((faq) => ({
+      "@type": "Question",
+      name: getTranslation(faq.question, language),
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: getTranslation(faq.answer, language)
+      }
+    }))
+  } : null;
+
   return (
-    <main className="flex-grow relative z-10">
+    <>
+      {faqSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+        />
+      )}
+      <main className="flex-grow relative z-10">
       {/* Hero Section */}
       <section className="pt-6 pb-4 md:pt-10 md:pb-6">
         <div className="container mx-auto px-4">
@@ -293,7 +313,7 @@ export function BaseServicePage({
                 className="h-14 px-10 text-lg rounded-full bg-primary text-primary-foreground hover:opacity-90 hover:scale-105 active:scale-95 shadow-lg shadow-primary/20 cursor-pointer"
                 asChild
               >
-                <Link href="/contact">
+                <Link href={`/${language}/contact`}>
                   {language === "en"
                     ? "Contact Form"
                     : language === "cn"
@@ -305,6 +325,7 @@ export function BaseServicePage({
           </motion.div>
         </div>
       </section>
-    </main>
+      </main>
+    </>
   );
 }

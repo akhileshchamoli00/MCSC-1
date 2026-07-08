@@ -43,7 +43,7 @@ export function Footer() {
             <ul className="space-y-2 text-sm">
               <li>
                 <Link
-                  href="/"
+                  href={`/${language}`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t.nav.home}
@@ -51,7 +51,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/about"
+                  href={`/${language}/about`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t.nav.about}
@@ -59,7 +59,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/resources"
+                  href={`/${language}/resources`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t.nav.intellectualProperty}
@@ -67,7 +67,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/services"
+                  href={`/${language}/services`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t.nav.services}
@@ -75,7 +75,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/announcements"
+                  href={`/${language}/announcements`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t.nav.announcement}
@@ -83,7 +83,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/contact"
+                  href={`/${language}/contact`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t.nav.contact}
@@ -99,7 +99,7 @@ export function Footer() {
             <ul className="space-y-2 text-sm">
               <li>
                 <Link
-                  href="/services/establishment"
+                  href={`/${language}/services/establishment`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t.services.dropdown.establishment}
@@ -107,7 +107,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/services/business-license"
+                  href={`/${language}/services/business-license`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t.services.dropdown.businessLicense}
@@ -115,7 +115,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/services/company-changes"
+                  href={`/${language}/services/company-changes`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t.services.dropdown.companyChanges}
@@ -123,7 +123,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/services/agreements"
+                  href={`/${language}/services/agreements`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t.services.dropdown.agreements}
@@ -131,7 +131,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/services/virtual-office"
+                  href={`/${language}/services/virtual-office`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t.services.dropdown.virtualOffice}
@@ -139,7 +139,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/services/work-permit"
+                  href={`/${language}/services/work-permit`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t.services.dropdown.workPermit}
@@ -147,7 +147,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/services/intellectual-property"
+                  href={`/${language}/services/intellectual-property`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t.services.dropdown.intellectualProperty}
@@ -163,7 +163,7 @@ export function Footer() {
             <ul className="space-y-2 text-sm">
               <li>
                 <Link
-                  href="/resources/brand-classification"
+                  href={`/${language}/resources/brand-classification`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t.nav.brandClassification}
@@ -171,7 +171,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/resources/check-application-status"
+                  href={`/${language}/resources/check-application-status`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t.nav.checkApplicationStatus}
@@ -179,7 +179,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/resources/kbli"
+                  href={`/${language}/resources/kbli`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t.nav.kbliDirectory}
@@ -187,7 +187,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/resources/faq"
+                  href={`/${language}/resources/faq`}
                   className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   FAQ

@@ -72,7 +72,7 @@ export default function AnnouncementsPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: index * 0.1 }}
     >
-      <Link href={`/announcement/${announcement.id}`} className="block group">
+      <Link href={`/${language}/announcement/${announcement.id}`} className="block group">
         <BorderGlow
           edgeSensitivity={30}
           glowColor="220 80 80"

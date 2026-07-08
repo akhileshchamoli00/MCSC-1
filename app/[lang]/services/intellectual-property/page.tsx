@@ -349,7 +349,7 @@ export default async function IntellectualPropertyPage(props: PageProps) {
               className="h-12 px-8 text-base rounded-full bg-primary text-primary-foreground hover:opacity-90 hover:scale-105 active:scale-95 shadow-md shadow-primary/10 cursor-pointer group"
               asChild
             >
-              <Link href="/contact">
+              <Link href={`/${language}/contact`}>
                 {language === "en"
                   ? "Schedule a Free Consultation"
                   : language === "cn"
