@@ -48,9 +48,9 @@ app.add_middleware(
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://0.0.0.0:3000",
-        "https://hrms.indotax.co.id",
+        "https://www.mcsc.co.id",
         "https://hrms-backend-979749601379.asia-southeast1.run.app",
-        os.getenv("FRONTEND_URL", "https://hrms.mcsc.co.id"),
+        os.getenv("FRONTEND_URL", "https://www.mcsc.co.id"),
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -205,13 +205,13 @@ def forgot_password(req: schemas.ForgotPasswordRequest, request: Request, db: Se
         
     if not origin:
         # Fallback to the host header if origin is missing
-        host = request.headers.get("x-forwarded-host") or request.headers.get("host", "hrms.indotax.co.id")
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host", "www.mcsc.co.id")
         protocol = request.headers.get("x-forwarded-proto", "http" if "localhost" in host else "https")
         
         if "hrms-backend-979749601379.asia-southeast1.run.app" in host:
             origin = "https://hrms-backend-979749601379.asia-southeast1.run.app"
-        elif "indotax.co.id" in host:
-            origin = "https://hrms.indotax.co.id"
+        elif "mcsc.co.id" in host:
+            origin = "https://www.mcsc.co.id"
         elif "127.0.0.1" in host or "localhost" in host:
             origin = "http://localhost:3000"
         else:

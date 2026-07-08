@@ -19,7 +19,7 @@ def send_welcome_email(employee_email: str, employee_name: str, password: str):
 
     subject = "Welcome to MCS Consulting HRMS"
     
-    frontend_url = os.getenv("FRONTEND_URL", "https://hrms.mcsc.co.id")
+    frontend_url = os.getenv("FRONTEND_URL", "https://www.mcsc.co.id")
     
     body = f"""Dear {employee_name},
 
