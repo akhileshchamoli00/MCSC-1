@@ -365,7 +365,7 @@ def generate_payslip_pdf_buffer(payroll) -> BytesIO:
         
     start_date_str = f"27-{prev_month:02d}-{prev_year}"
     end_date_str = f"26-{req_month:02d}-{req_year}"
-    duration_str = f"{start_date_str} to {end_date_str}"
+    duration_str = f"Calculation Period : {start_date_str} to {end_date_str}"
     
     c.setFillColor(c_slate_medium)
     c.setFont("Helvetica", 8)

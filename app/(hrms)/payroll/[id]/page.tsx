@@ -244,6 +244,10 @@ export default function PayrollDetailsPage() {
               <p className="font-medium">{payroll.employee?.employee_id_custom || `EMP${payroll.employee_id}`}</p>
             </div>
             <div>
+              <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Company Name</p>
+              <p className="font-medium">{payroll.employee?.company_name || "-"}</p>
+            </div>
+            <div>
               <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Department</p>
               <p className="font-medium">{payroll.employee?.department?.name || "-"}</p>
             </div>

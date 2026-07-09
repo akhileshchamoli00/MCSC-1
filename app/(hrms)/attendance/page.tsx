@@ -81,6 +81,7 @@ export default function AttendancePage() {
 
   const handleClockIn = async () => {
     if (!coords) return toast.error("Please get location first.");
+    setLocationError("");
     setSubmitting(true);
     try {
       const token = localStorage.getItem("hrms_token");
@@ -94,10 +95,11 @@ export default function AttendancePage() {
         fetchData();
       } else {
         const err = await res.json();
-        toast.error(err.detail);
+        setLocationError(err.detail || "Failed to clock in");
       }
     } catch (err) {
       console.error(err);
+      setLocationError("Network error occurred.");
     } finally {
       setSubmitting(false);
     }
@@ -105,6 +107,7 @@ export default function AttendancePage() {
 
   const handleClockOut = async () => {
     if (!coords) return toast.error("Please get location first.");
+    setLocationError("");
     setSubmitting(true);
     try {
       const token = localStorage.getItem("hrms_token");
@@ -118,10 +121,11 @@ export default function AttendancePage() {
         fetchData();
       } else {
         const err = await res.json();
-        toast.error(err.detail);
+        setLocationError(err.detail || "Failed to clock out");
       }
     } catch (err) {
       console.error(err);
+      setLocationError("Network error occurred.");
     } finally {
       setSubmitting(false);
     }
