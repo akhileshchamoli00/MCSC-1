@@ -199,11 +199,12 @@ def generate_payslip_pdf_buffer(payroll) -> BytesIO:
     
     for item_name, val in earnings_items:
         safe_val = val if val is not None else 0.0
-        c.setFillColor(c_slate_medium)
-        c.drawString(55, y_earn, item_name)
-        c.setFillColor(c_slate_dark)
-        c.drawRightString(width/2.0 - 20, y_earn, f"{int(round(safe_val)):,}")
-        y_earn -= 15
+        if safe_val > 0 or item_name == "Basic Salary":
+            c.setFillColor(c_slate_medium)
+            c.drawString(55, y_earn, item_name)
+            c.setFillColor(c_slate_dark)
+            c.drawRightString(width/2.0 - 20, y_earn, f"{int(round(safe_val)):,}")
+            y_earn -= 15
         
     # Draw Gross Earnings block
     y_earn_summary = y_salary_start + 45
@@ -230,11 +231,12 @@ def generate_payslip_pdf_buffer(payroll) -> BytesIO:
     
     for item_name, val in deductions_items:
         safe_val = val if val is not None else 0.0
-        c.setFillColor(c_slate_medium)
-        c.drawString(320, y_ded, item_name)
-        c.setFillColor(c_slate_dark)
-        c.drawRightString(width - 55, y_ded, f"{int(round(safe_val)):,}")
-        y_ded -= 15
+        if safe_val > 0:
+            c.setFillColor(c_slate_medium)
+            c.drawString(320, y_ded, item_name)
+            c.setFillColor(c_slate_dark)
+            c.drawRightString(width - 55, y_ded, f"{int(round(safe_val)):,}")
+            y_ded -= 15
         
     # Draw Total Deductions block
     y_ded_summary = y_salary_start + 45
@@ -287,11 +289,12 @@ def generate_payslip_pdf_buffer(payroll) -> BytesIO:
     
     for item_name, val in company_items:
         safe_val = val if val is not None else 0.0
-        c.setFillColor(c_slate_medium)
-        c.drawString(55, y_company, item_name)
-        c.setFillColor(c_slate_dark)
-        c.drawRightString(width/2.0 - 20, y_company, f"{int(round(safe_val)):,}")
-        y_company -= 15
+        if safe_val > 0:
+            c.setFillColor(c_slate_medium)
+            c.drawString(55, y_company, item_name)
+            c.setFillColor(c_slate_dark)
+            c.drawRightString(width/2.0 - 20, y_company, f"{int(round(safe_val)):,}")
+            y_company -= 15
         
     # Draw Taxable Income block
     y_tax_summary = y_company_start + 35
@@ -315,11 +318,12 @@ def generate_payslip_pdf_buffer(payroll) -> BytesIO:
     
     for item_name, val in company_right_items:
         safe_val = val if val is not None else 0.0
-        c.setFillColor(c_slate_medium)
-        c.drawString(320, y_comp_right, item_name)
-        c.setFillColor(c_slate_dark)
-        c.drawRightString(width - 55, y_comp_right, f"{int(round(safe_val)):,}")
-        y_comp_right -= 15
+        if safe_val > 0:
+            c.setFillColor(c_slate_medium)
+            c.drawString(320, y_comp_right, item_name)
+            c.setFillColor(c_slate_dark)
+            c.drawRightString(width - 55, y_comp_right, f"{int(round(safe_val)):,}")
+            y_comp_right -= 15
         
     # Single line above Total Compensation Highlight Box
     c.setStrokeColor(c_slate_dark)
@@ -343,14 +347,14 @@ def generate_payslip_pdf_buffer(payroll) -> BytesIO:
     # Footer
     c.setFillColor(c_slate_medium)
     c.setFont("Helvetica-Oblique", 8)
-    c.drawCentredString(width / 2.0, 25, "This is a computer generated document. No signature is required.")
+    c.drawString(40, 25, "This is a computer generated document. No signature is required.")
     
     # Draw Company Name under the disclaimer
     company_name = "MCS Consulting"
     if payroll.employee and payroll.employee.company_name:
         company_name = payroll.employee.company_name
     c.setFont("Helvetica-Bold", 8)
-    c.drawCentredString(width / 2.0, 14, company_name)
+    c.drawString(40, 14, company_name)
     
     # Duration / Period at bottom right
     import datetime
