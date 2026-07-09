@@ -6,12 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Edit, Mail, Phone, Calendar, Briefcase, MapPin, Building, User, Wallet, Landmark, FileText, Monitor, Upload, Download, Loader2, Camera, Award } from "lucide-react";
+import { ArrowLeft, Edit, Mail, Phone, Calendar, Briefcase, MapPin, Building, User, Wallet, Landmark, FileText, Monitor, Upload, Download, Loader2, Camera, Award, Trash2 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { resolveImageUrl } from "@/lib/utils";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 export default function EmployeeProfilePage() {
   const params = useParams();
@@ -29,6 +30,9 @@ export default function EmployeeProfilePage() {
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const [deletingDocumentId, setDeletingDocumentId] = useState<number | null>(null);
+  const [isDeletingDoc, setIsDeletingDoc] = useState(false);
 
   const fetchData = async () => {
     const token = localStorage.getItem("hrms_token");
@@ -105,6 +109,31 @@ export default function EmployeeProfilePage() {
       toast.error("Upload Error: Failed to complete request. Please ensure the file is under 10MB and try again.");
     } finally {
       setUploadingDoc(false);
+    }
+  };
+
+  const handleDeleteDocumentConfirm = async () => {
+    if (!deletingDocumentId) return;
+    
+    setIsDeletingDoc(true);
+    const token = localStorage.getItem("hrms_token");
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/${employeeId}/documents/${deletingDocumentId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success("Document deleted successfully");
+        await fetchData();
+        setDeletingDocumentId(null);
+      } else {
+        toast.error("Failed to delete document");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error deleting document");
+    } finally {
+      setIsDeletingDoc(false);
     }
   };
 
@@ -410,11 +439,16 @@ export default function EmployeeProfilePage() {
                               </div>
                             </div>
                           </div>
-                          <a href={resolveImageUrl(doc.file_url)} target="_blank" rel="noopener noreferrer">
-                            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary">
-                              <Download className="h-4 w-4" />
+                          <div className="flex items-center gap-1">
+                            <a href={resolveImageUrl(doc.file_url)} target="_blank" rel="noopener noreferrer">
+                              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary">
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            </a>
+                            <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20" onClick={() => setDeletingDocumentId(doc.id)}>
+                              <Trash2 className="h-4 w-4" />
                             </Button>
-                          </a>
+                          </div>
                         </div>
                       ))
                     )}
@@ -498,6 +532,35 @@ export default function EmployeeProfilePage() {
           </Tabs>
         </div>
       </div>
+
+      {/* Delete Document Modal */}
+      <Dialog open={!!deletingDocumentId} onOpenChange={(open) => !open && !isDeletingDoc && setDeletingDocumentId(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-red-600 flex items-center gap-2">
+              <Trash2 className="h-5 w-5" /> Delete Document
+            </DialogTitle>
+            <DialogDescription className="mt-2 text-foreground">
+              Are you sure you want to delete this document?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-sm text-muted-foreground">
+            This action cannot be undone. The file will be permanently removed from the employee's profile.
+          </div>
+          <DialogFooter className="mt-4 flex sm:justify-end gap-2">
+            <Button variant="outline" onClick={() => setDeletingDocumentId(null)} disabled={isDeletingDoc}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteDocumentConfirm} disabled={isDeletingDoc}>
+              {isDeletingDoc ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...</>
+              ) : (
+                "Delete Document"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

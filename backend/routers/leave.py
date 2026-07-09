@@ -207,9 +207,8 @@ def approve_leave_request(request_id: int, db: Session = Depends(database.get_db
             raise HTTPException(status_code=400, detail="Insufficient Annual Leave balance")
         balance.annual_leave_balance -= leave_req.days_requested
     elif leave_req.leave_type == "Sick Leave":
-        if balance.sick_leave_balance < leave_req.days_requested:
-            raise HTTPException(status_code=400, detail="Insufficient Sick Leave balance")
-        balance.sick_leave_balance -= leave_req.days_requested
+        # Sick leave doesn't have a balance limit, just approve it
+        pass
 
     # Update Request
     leave_req.status = "APPROVED"
@@ -269,6 +268,71 @@ def reject_leave_request(request_id: int, db: Session = Depends(database.get_db)
 # EMPLOYEE ENDPOINTS
 # ==========================================
 
+
+@router.delete("/requests/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_leave_request(request_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    leave_req = db.query(models.LeaveRequest).filter(models.LeaveRequest.id == request_id).first()
+    if not leave_req:
+        raise HTTPException(status_code=404, detail="Leave request not found")
+        
+    balance = db.query(models.LeaveBalance).filter(models.LeaveBalance.employee_id == leave_req.employee_id).first()
+    if not balance:
+        raise HTTPException(status_code=404, detail="Employee balance not found")
+
+    old_annual = balance.annual_leave_balance
+    old_sick = balance.sick_leave_balance
+    old_sick_taken = balance.sick_leave_taken or 0.0
+    balance_changed = False
+    audit_reason = ""
+
+    # Reconcile Balances
+    if leave_req.leave_type == "Leave Allocation":
+        # Deduct the allocated amount since we are reverting a bonus
+        balance.annual_leave_balance -= leave_req.days_requested
+        balance_changed = True
+        audit_reason = f"Deleted Leave Allocation ID {request_id}"
+    elif leave_req.status == "APPROVED":
+        # If it was an approved request, refund the deducted days back to the balance
+        if leave_req.leave_type in ["Annual Leave", "Emergency Leave"]:
+            balance.annual_leave_balance += leave_req.days_requested
+            balance_changed = True
+            audit_reason = f"Refunded deleted {leave_req.leave_type} ID {request_id}"
+        elif leave_req.leave_type == "Sick Leave":
+            # Sick leave doesn't use a balance, so no refund needed to the manual override field
+            audit_reason = f"Deleted Sick Leave ID {request_id}"
+
+    if balance_changed:
+        balance.updated_by = current_user.id
+        balance.updated_at = datetime.now()
+
+        # Create Audit Log
+        audit = models.LeaveBalanceAudit(
+            employee_id=leave_req.employee_id,
+            old_annual_balance=old_annual,
+            new_annual_balance=balance.annual_leave_balance,
+            old_sick_balance=old_sick,
+            new_sick_balance=balance.sick_leave_balance,
+            old_annual_taken=balance.annual_leave_taken,
+            new_annual_taken=balance.annual_leave_taken,
+            old_sick_taken=old_sick_taken,
+            new_sick_taken=balance.sick_leave_taken,
+            reason=audit_reason,
+            updated_by=current_user.id
+        )
+        db.add(audit)
+
+    if leave_req.attachment_url:
+        from storage import delete_file_from_supabase
+        delete_file_from_supabase(leave_req.attachment_url, "hrms-documents")
+
+    db.delete(leave_req)
+    db.commit()
+    
+    return None
+
 @router.get("/my-balances")
 def get_my_leave_balances(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     if not current_user.employee:
@@ -309,9 +373,9 @@ def get_my_leave_balances(db: Session = Depends(database.get_db), current_user: 
             "remaining": balance.annual_leave_balance
         },
         "sick_leave": {
-            "allocated": balance.sick_leave_balance + used_sick - (balance.sick_leave_taken or 0.0),
+            "allocated": "-",
             "used": used_sick,
-            "remaining": balance.sick_leave_balance
+            "remaining": "-"
         },
         "unpaid_leave": {
             "allocated": "N/A",
@@ -339,11 +403,20 @@ def get_my_leave_requests(skip: int = 0, limit: int = 100, db: Session = Depends
 
 @router.post("/request", response_model=schemas.LeaveRequestResponse)
 def apply_for_leave(leave: schemas.LeaveRequestCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not current_user.employee:
+    target_employee_id = None
+    if current_user.role and "ADMIN" in current_user.role.name.upper() and leave.employee_id is not None:
+        target_employee_id = leave.employee_id
+    elif current_user.employee:
+        target_employee_id = current_user.employee.id
+    else:
         raise HTTPException(status_code=400, detail="User is not linked to an employee profile")
 
+    target_emp = db.query(models.Employee).filter(models.Employee.id == target_employee_id).first()
+    if not target_emp:
+        raise HTTPException(status_code=404, detail="Target employee not found")
+
     if leave.leave_type in ["Annual Leave", "Emergency Leave"]:
-        balance = db.query(models.LeaveBalance).filter(models.LeaveBalance.employee_id == current_user.employee.id).first()
+        balance = db.query(models.LeaveBalance).filter(models.LeaveBalance.employee_id == target_employee_id).first()
         annual_balance = balance.annual_leave_balance if balance else 14.0
         if not ALLOW_NEGATIVE_ANNUAL_LEAVE and annual_balance <= 0:
             raise HTTPException(
@@ -360,7 +433,7 @@ def apply_for_leave(leave: schemas.LeaveRequestCreate, db: Session = Depends(dat
 
     # Check for overlapping leaves
     overlapping = db.query(models.LeaveRequest).filter(
-        models.LeaveRequest.employee_id == current_user.employee.id,
+        models.LeaveRequest.employee_id == target_employee_id,
         models.LeaveRequest.status.in_(["APPROVED", "PENDING"]),
         models.LeaveRequest.start_date <= leave.end_date,
         models.LeaveRequest.end_date >= leave.start_date
@@ -428,7 +501,7 @@ def apply_for_leave(leave: schemas.LeaveRequestCreate, db: Session = Depends(dat
 
     data = leave.model_dump() if hasattr(leave, "model_dump") else leave.dict()
     data.pop("is_half_day", None) # Remove from model dump as it's not in LeaveRequest
-    data["employee_id"] = current_user.employee.id
+    data["employee_id"] = target_employee_id
     data["days_requested"] = days_requested
     data["status"] = "PENDING"
     
@@ -661,7 +734,19 @@ async def upload_leave_attachment(id: int, file: UploadFile = File(...), db: Ses
     if len(file_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File size exceeds the 10 MB limit")
         
-    file_url = upload_file_to_supabase(file_bytes, file.filename, "hrms-documents")
+    import datetime
+    import re
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    emp_name = f"{current_user.employee.first_name}_{current_user.employee.last_name or ''}".strip()
+    emp_name_clean = re.sub(r'[^a-zA-Z0-9_]', '', emp_name.replace(" ", "_"))
+    
+    file_ext = file.filename.split(".")[-1] if "." in file.filename else ""
+    orig_name = file.filename.rsplit(".", 1)[0]
+    orig_name_clean = re.sub(r'[^a-zA-Z0-9_]', '_', orig_name)
+    
+    new_filename = f"medcert_{emp_name_clean}_{timestamp}_{orig_name_clean}.{file_ext}" if file_ext else f"medcert_{emp_name_clean}_{timestamp}_{orig_name_clean}"
+        
+    file_url = upload_file_to_supabase(file_bytes, new_filename, "hrms-documents")
     
     leave_req.attachment_url = file_url
     db.commit()

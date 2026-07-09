@@ -123,6 +123,7 @@ class EmployeeSummary(BaseModel):
     job_title: Optional[str] = None
     bank_name: Optional[str] = None
     bank_account_number: Optional[str] = None
+    company_name: Optional[str] = None
     department: Optional[DepartmentResponse] = None
     
     class Config:

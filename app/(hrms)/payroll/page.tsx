@@ -21,8 +21,14 @@ export default function AdminPayrollPage() {
   const [restrictedPromptOpen, setRestrictedPromptOpen] = useState(false);
 
   // Search State
-  const [searchMonth, setSearchMonth] = useState(new Date().getMonth() + 1);
-  const [searchYear, setSearchYear] = useState(new Date().getFullYear());
+  const [searchMonth, setSearchMonth] = useState(() => {
+    const today = new Date();
+    return today.getDate() < 27 ? (today.getMonth() === 0 ? 12 : today.getMonth()) : today.getMonth() + 1;
+  });
+  const [searchYear, setSearchYear] = useState(() => {
+    const today = new Date();
+    return (today.getDate() < 27 && today.getMonth() === 0) ? today.getFullYear() - 1 : today.getFullYear();
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -248,10 +254,11 @@ export default function AdminPayrollPage() {
 
   // Calculate Summary Data
   const currentMonthPayrolls = payrolls.filter(p => p.payroll_month === searchMonth && p.payroll_year === searchYear);
-  const filteredPayrolls = currentMonthPayrolls.filter(p => {
-    const empName = p.employee ? `${p.employee.first_name} ${p.employee.last_name}` : "";
-    const empId = p.employee?.employee_id_custom || "";
-    return `${empName} ${empId}`.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredPayrolls = currentMonthPayrolls.filter((payroll) => {
+    const empName = `${payroll.employee?.first_name} ${payroll.employee?.last_name || ""}`.trim();
+    const empId = payroll.employee?.employee_id_custom || "";
+    const companyName = payroll.employee?.company_name || "";
+    return `${empName} ${empId} ${companyName}`.toLowerCase().includes(searchQuery.toLowerCase());
   });
   const totalPages = Math.ceil(filteredPayrolls.length / 10);
   const startIndex = (currentPage - 1) * 10;
@@ -392,7 +399,7 @@ export default function AdminPayrollPage() {
                 <tr>
                   <th className="px-4 py-3 font-medium">Employee ID</th>
                   <th className="px-4 py-3 font-medium">Employee Name</th>
-                  <th className="px-4 py-3 font-medium">Department</th>
+                  <th className="px-4 py-3 font-medium">Company Name</th>
                   <th className="px-4 py-3 font-medium">Month</th>
                   <th className="px-4 py-3 font-medium">Basic Salary</th>
                   <th className="px-4 py-3 font-medium">Net Salary</th>
@@ -418,7 +425,7 @@ export default function AdminPayrollPage() {
                         {payroll.employee ? `${payroll.employee.first_name} ${payroll.employee.last_name}` : "-"}
                       </td>
                       <td className="px-4 py-3">
-                        {payroll.employee?.department?.name || "-"}
+                        {payroll.employee?.company_name || "-"}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">
                         {getMonthName(payroll.payroll_month)} {payroll.payroll_year}
@@ -509,7 +516,7 @@ export default function AdminPayrollPage() {
               <Send className="h-5 w-5" /> Lock & Send All Payslips
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to finalize and lock ALL draft payslips for <strong>{getMonthName(searchMonth)} {searchYear}</strong>?
+              Are you sure you want to finalize and lock ALL Draft and Generated payslips for <strong>{getMonthName(searchMonth)} {searchYear}</strong>?
             </DialogDescription>
           </DialogHeader>
           <div className="py-2 text-sm text-muted-foreground">

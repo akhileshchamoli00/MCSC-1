@@ -134,7 +134,6 @@ def delete_employee(employee_id: int, db: Session = Depends(database.get_db)):
     db.delete(db_employee)
     db.commit()
     return
-
 @router.get("/{employee_id}/documents", response_model=List[schemas.EmployeeDocumentResponse])
 def get_employee_documents(employee_id: int, db: Session = Depends(database.get_db)):
     documents = db.query(models.EmployeeDocument).filter(models.EmployeeDocument.employee_id == employee_id).all()
@@ -152,13 +151,25 @@ async def upload_employee_document(
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
 
+    import datetime
+    import re
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    emp_name = f"{employee.first_name}_{employee.last_name or ''}".strip()
+    emp_name_clean = re.sub(r'[^a-zA-Z0-9_]', '', emp_name.replace(" ", "_"))
+    
+    file_ext = file.filename.split(".")[-1] if "." in file.filename else ""
+    orig_name = file.filename.rsplit(".", 1)[0]
+    orig_name_clean = re.sub(r'[^a-zA-Z0-9_]', '_', orig_name)
+    
+    new_filename = f"{emp_name_clean}_{timestamp}_{orig_name_clean}.{file_ext}" if file_ext else f"{emp_name_clean}_{timestamp}_{orig_name_clean}"
+
     file_bytes = await file.read()
-    file_url = upload_file_to_supabase(file_bytes, file.filename, "hrms-documents")
+    file_url = upload_file_to_supabase(file_bytes, new_filename, "hrms-documents")
     
     new_doc = models.EmployeeDocument(
         employee_id=employee_id,
         document_type=document_type,
-        file_name=file.filename,
+        file_name=new_filename,
         file_url=file_url
     )
     
@@ -178,8 +189,17 @@ async def upload_employee_photo(
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
 
+    import datetime
+    import re
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    emp_name = f"{employee.first_name}_{employee.last_name or ''}".strip()
+    emp_name_clean = re.sub(r'[^a-zA-Z0-9_]', '', emp_name.replace(" ", "_"))
+    
+    file_ext = file.filename.split(".")[-1] if "." in file.filename else ""
+    new_filename = f"photo_{emp_name_clean}_{timestamp}.{file_ext}" if file_ext else f"photo_{emp_name_clean}_{timestamp}"
+
     file_bytes = await file.read()
-    file_url = upload_file_to_supabase(file_bytes, file.filename, "hrms-documents")
+    file_url = upload_file_to_supabase(file_bytes, new_filename, "hrms-documents")
     
     employee.profile_photo = file_url
     
@@ -187,3 +207,23 @@ async def upload_employee_photo(
     db.refresh(employee)
     return employee
 
+@router.delete("/{employee_id}/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_employee_document(employee_id: int, document_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    doc = db.query(models.EmployeeDocument).filter(
+        models.EmployeeDocument.id == document_id, 
+        models.EmployeeDocument.employee_id == employee_id
+    ).first()
+    
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    from storage import delete_file_from_supabase
+    if doc.file_url:
+        delete_file_from_supabase(doc.file_url, "hrms-documents")
+        
+    db.delete(doc)
+    db.commit()
+    return None

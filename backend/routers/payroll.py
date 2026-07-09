@@ -406,13 +406,13 @@ def generate_all_payslips(req: GenerateAllPayslipsRequest, request: Request, db:
         )
         
     drafts = db.query(models.Payroll).filter(
-        models.Payroll.status == "Draft",
+        models.Payroll.status.in_(["Draft", "Generated"]),
         models.Payroll.payroll_month == req.month,
         models.Payroll.payroll_year == req.year
     ).all()
     
     if not drafts:
-        return {"message": "No draft payslips found for this month."}
+        return {"message": "No draft or generated payslips found for this month."}
         
     generated_count = 0
     

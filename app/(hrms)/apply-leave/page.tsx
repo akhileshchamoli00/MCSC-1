@@ -254,7 +254,8 @@ export default function ApplyLeavePage() {
 
   const onSubmit = async (values: LeaveFormValues) => {
     if (calculatedDays <= 0) {
-      alert("Requested period contains no working days.");
+      setErrorMessage("Requested period contains no available working days. The dates fall on weekends, public holidays, or you already have leaves booked.");
+      setErrorModalOpen(true);
       return;
     }
 
@@ -354,7 +355,8 @@ export default function ApplyLeavePage() {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editCalculatedDays <= 0) {
-      alert("Requested period contains no working days.");
+      setErrorMessage("Requested period contains no available working days. The dates fall on weekends, public holidays, or you already have leaves booked.");
+      setErrorModalOpen(true);
       return;
     }
 
