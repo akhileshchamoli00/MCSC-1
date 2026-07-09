@@ -5,13 +5,14 @@ import { useForm } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { MapPin, Target, Loader2, Save } from "lucide-react";
+import { MapPin, Target, Loader2, Save, Wifi } from "lucide-react";
+import { toast } from "sonner";
 
 export default function AttendanceSettingsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const { register, handleSubmit, reset } = useForm();
+  const { register, handleSubmit, reset, setValue } = useForm();
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -35,12 +36,13 @@ export default function AttendanceSettingsPage() {
         });
         if (setRes.ok) {
           const s = await setRes.json();
-          reset({
-            office_name: s.office_name,
-            latitude: s.latitude,
-            longitude: s.longitude,
-            radius_meters: s.radius_meters
-          });
+            reset({
+              office_name: s.office_name,
+              latitude: s.latitude,
+              longitude: s.longitude,
+              radius_meters: s.radius_meters,
+              allowed_ip_address: s.allowed_ip_address || ""
+            });
         }
       } catch (err) {
         console.error(err);
@@ -50,6 +52,21 @@ export default function AttendanceSettingsPage() {
     };
     fetchSettings();
   }, [reset]);
+
+  const handleAutoDetectIP = async () => {
+    try {
+      const res = await fetch("https://api.ipify.org?format=json");
+      if (res.ok) {
+        const data = await res.json();
+        setValue("allowed_ip_address", data.ip);
+        toast.success("IP Address detected successfully!");
+      } else {
+        toast.error("Failed to detect IP");
+      }
+    } catch (err) {
+      toast.error("Network error detecting IP");
+    }
+  };
 
   const onSubmit = async (values: any) => {
     setSaving(true);
@@ -62,14 +79,18 @@ export default function AttendanceSettingsPage() {
           office_name: values.office_name,
           latitude: parseFloat(values.latitude),
           longitude: parseFloat(values.longitude),
-          radius_meters: parseInt(values.radius_meters)
+          radius_meters: parseInt(values.radius_meters),
+          allowed_ip_address: values.allowed_ip_address
         })
       });
       if (res.ok) {
-        alert("Attendance Settings saved successfully!");
+        toast.success("Attendance Settings saved successfully!");
+      } else {
+        toast.error("Failed to save settings");
       }
     } catch (err) {
       console.error(err);
+      toast.error("An error occurred while saving settings");
     } finally {
       setSaving(false);
     }
@@ -126,8 +147,22 @@ export default function AttendanceSettingsPage() {
               <label className="text-sm font-medium">Geofence Radius (Meters)</label>
               <div className="flex items-center gap-4">
                 <Input type="number" {...register("radius_meters")} className="w-32" required />
-                <span className="text-sm text-muted-foreground">Default is 500m</span>
               </div>
+            </div>
+
+            <div className="space-y-2 bg-muted/40 p-4 rounded-lg border border-border/50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Wifi className="h-4 w-4 text-primary" /> Allowed Office IP Address (Optional)
+                  </label>
+                  <p className="text-xs text-muted-foreground mt-1">Restrict clock-ins to a specific Wi-Fi network. Leave blank to disable.</p>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={handleAutoDetectIP}>
+                  Auto-Detect My IP
+                </Button>
+              </div>
+              <Input placeholder="e.g. 192.168.1.1 or 203.0.113.45" {...register("allowed_ip_address")} />
             </div>
 
             <Button type="submit" disabled={saving} className="w-full">

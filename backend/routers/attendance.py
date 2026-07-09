@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import List
@@ -45,8 +45,28 @@ def get_settings(db: Session):
 # EMPLOYEE ENDPOINTS
 # ==========================================
 
+def validate_ip(request: Request, settings):
+    if settings.allowed_ip_address and settings.allowed_ip_address.strip():
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            client_ip = forwarded.split(",")[0].strip()
+        else:
+            client_ip = request.client.host
+            
+        print(f"DEBUG IP VALIDATION: Headers={request.headers}, client_ip={client_ip}, allowed={settings.allowed_ip_address}")
+        
+        # In development/local testing, if client_ip is local loopback but settings has public IP, 
+        # it might cause false positives/negatives if the dev environment isn't forwarding IPs correctly.
+        allowed_ips = [ip.strip() for ip in settings.allowed_ip_address.split(",") if ip.strip()]
+        
+        if client_ip not in allowed_ips:
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Network Access Denied: You must be connected to the Office Wi-Fi to clock in/out. (Detected IP: {client_ip})"
+            )
+
 @router.post("/clock-in", response_model=schemas.AttendanceResponse)
-def clock_in(req: schemas.AttendanceClockInRequest, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+def clock_in(request: Request, req: schemas.AttendanceClockInRequest, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     if not current_user.employee:
         raise HTTPException(status_code=400, detail="User is not linked to an employee profile")
     
@@ -55,6 +75,8 @@ def clock_in(req: schemas.AttendanceClockInRequest, db: Session = Depends(databa
     distance = haversine(req.latitude, req.longitude, settings.latitude, settings.longitude)
     if distance > settings.radius_meters:
         raise HTTPException(status_code=400, detail=f"You are outside the allowed office attendance zone (Distance: {int(distance)}m). Move within {settings.radius_meters} meters.")
+        
+    validate_ip(request, settings)
         
     today = get_kl_today()
     now = get_kl_now()
@@ -96,7 +118,7 @@ def clock_in(req: schemas.AttendanceClockInRequest, db: Session = Depends(databa
     return attendance
 
 @router.post("/clock-out", response_model=schemas.AttendanceResponse)
-def clock_out(req: schemas.AttendanceClockOutRequest, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+def clock_out(request: Request, req: schemas.AttendanceClockOutRequest, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     if not current_user.employee:
         raise HTTPException(status_code=400, detail="User is not linked to an employee profile")
         
@@ -104,6 +126,8 @@ def clock_out(req: schemas.AttendanceClockOutRequest, db: Session = Depends(data
     distance = haversine(req.latitude, req.longitude, settings.latitude, settings.longitude)
     if distance > settings.radius_meters:
         raise HTTPException(status_code=400, detail=f"You are outside the allowed office attendance zone (Distance: {int(distance)}m). Move within {settings.radius_meters} meters.")
+        
+    validate_ip(request, settings)
         
     today = get_kl_today()
     now = get_kl_now()
@@ -189,6 +213,7 @@ def update_admin_settings(req: schemas.AttendanceSettingsBase, db: Session = Dep
     settings.latitude = req.latitude
     settings.longitude = req.longitude
     settings.radius_meters = req.radius_meters
+    settings.allowed_ip_address = req.allowed_ip_address
     
     db.commit()
     db.refresh(settings)

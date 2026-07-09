@@ -120,6 +120,7 @@ class AttendanceSettings(Base):
     latitude = Column(Float, default=3.073800)
     longitude = Column(Float, default=101.518300)
     radius_meters = Column(Integer, default=500)
+    allowed_ip_address = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

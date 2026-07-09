@@ -162,6 +162,7 @@ class AttendanceSettingsBase(BaseModel):
     latitude: float
     longitude: float
     radius_meters: int
+    allowed_ip_address: Optional[str] = None
 
 class AttendanceSettingsResponse(AttendanceSettingsBase):
     id: int

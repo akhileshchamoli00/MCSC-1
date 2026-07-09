@@ -352,6 +352,25 @@ def generate_payslip_pdf_buffer(payroll) -> BytesIO:
     c.setFont("Helvetica-Bold", 8)
     c.drawCentredString(width / 2.0, 14, company_name)
     
+    # Duration / Period at bottom right
+    import datetime
+    req_month = payroll.payroll_month
+    req_year = payroll.payroll_year
+    if req_month == 1:
+        prev_month = 12
+        prev_year = req_year - 1
+    else:
+        prev_month = req_month - 1
+        prev_year = req_year
+        
+    start_date_str = f"27-{prev_month:02d}-{prev_year}"
+    end_date_str = f"26-{req_month:02d}-{req_year}"
+    duration_str = f"{start_date_str} to {end_date_str}"
+    
+    c.setFillColor(c_slate_medium)
+    c.setFont("Helvetica", 8)
+    c.drawRightString(width - 40, 14, duration_str)
+    
     c.save()
     pdf_buffer.seek(0)
     return pdf_buffer
