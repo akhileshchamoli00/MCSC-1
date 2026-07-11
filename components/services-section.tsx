@@ -146,7 +146,7 @@ export function ServicesSection() {
 
                   return (
                     <div key={`${service.id}-${idx}`} className="h-full">
-                      <Link 
+                      <Link
                         href={`/${language}/services/${service.id}`}
                         aria-label={`${language === "en" ? "Learn more about" : "Pelajari selengkapnya tentang"} ${service.title}`}
                       >
@@ -179,6 +179,7 @@ export function ServicesSection() {
                                 {language === "en"
                                   ? "Learn More"
                                   : "Pelajari Selengkapnya"}
+                                <span className="sr-only"> {service.title}</span>
                                 <ChevronRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
                               </span>
                             </CardContent>
@@ -225,12 +226,11 @@ export function ServicesSection() {
                 className="py-4 px-2 group focus:outline-none"
                 aria-label={`Go to service ${index + 1}`}
               >
-                <div 
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    index === currentIndex
+                <div
+                  className={`h-2 rounded-full transition-all duration-300 ${index === currentIndex
                       ? "w-8 bg-primary"
                       : "w-2 bg-muted-foreground/30 group-hover:bg-muted-foreground/60"
-                  }`}
+                    }`}
                 />
               </button>
             ))}

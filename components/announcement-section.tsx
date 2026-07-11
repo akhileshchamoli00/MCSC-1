@@ -120,7 +120,7 @@ export function AnnouncementSection() {
                 {getVisibleItems().map((announcement, idx) => (
                   <div key={`${announcement.id}-${idx}`} className="h-full">
                     <Link 
-                      href={`/announcement/${announcement.id}`}
+                      href={`/${language}/announcement/${announcement.id}`}
                       aria-label={`${language === "en" ? "Read more about" : "Baca selengkapnya tentang"} ${announcement.title}`}
                     >
                       <BorderGlow
@@ -153,6 +153,7 @@ export function AnnouncementSection() {
                               {language === "en"
                                 ? "Read More"
                                 : "Baca Selengkapnya"}
+                              <span className="sr-only"> {announcement.title}</span>
                               <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
                             </span>
                           </CardContent>

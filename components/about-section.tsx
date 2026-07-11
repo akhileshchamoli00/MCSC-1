@@ -44,6 +44,13 @@ export function AboutSection() {
                     id: "Baca Selengkapnya",
                     cn: "了解更多"
                   }[language] || "Read More"}
+                  <span className="sr-only">
+                    {{
+                      en: " about MCS Consulting",
+                      id: " tentang MCS Consulting",
+                      cn: " 关于 MCS Consulting"
+                    }[language] || " about MCS Consulting"}
+                  </span>
                 </Link>
               </Button>
             </div>
