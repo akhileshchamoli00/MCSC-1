@@ -55,11 +55,27 @@ def validate_ip(request: Request, settings):
             
         print(f"DEBUG IP VALIDATION: Headers={request.headers}, client_ip={client_ip}, allowed={settings.allowed_ip_address}")
         
-        # In development/local testing, if client_ip is local loopback but settings has public IP, 
-        # it might cause false positives/negatives if the dev environment isn't forwarding IPs correctly.
         allowed_ips = [ip.strip() for ip in settings.allowed_ip_address.split(",") if ip.strip()]
         
-        if client_ip not in allowed_ips:
+        is_allowed = False
+        import ipaddress
+        try:
+            client_ip_obj = ipaddress.ip_address(client_ip)
+            for allowed in allowed_ips:
+                if '/' in allowed:
+                    if client_ip_obj in ipaddress.ip_network(allowed, strict=False):
+                        is_allowed = True
+                        break
+                else:
+                    if client_ip == allowed:
+                        is_allowed = True
+                        break
+        except ValueError:
+            # Fallback to simple string match if parsing fails
+            if client_ip in allowed_ips:
+                is_allowed = True
+                
+        if not is_allowed:
             raise HTTPException(
                 status_code=403, 
                 detail=f"Network Access Denied: You must be connected to the Office Wi-Fi to clock in/out. (Detected IP: {client_ip})"

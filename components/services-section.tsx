@@ -146,7 +146,10 @@ export function ServicesSection() {
 
                   return (
                     <div key={`${service.id}-${idx}`} className="h-full">
-                      <Link href={`/${language}/services/${service.id}`}>
+                      <Link 
+                        href={`/${language}/services/${service.id}`}
+                        aria-label={`${language === "en" ? "Learn more about" : "Pelajari selengkapnya tentang"} ${service.title}`}
+                      >
                         <BorderGlow
                           edgeSensitivity={30}
                           glowColor="220 80 80"
@@ -210,7 +213,7 @@ export function ServicesSection() {
           </div>
 
           {/* Pagination Indicators */}
-          <div className="mt-12 flex justify-center gap-3">
+          <div className="mt-12 flex justify-center items-center">
             {services.map((_, index) => (
               <button
                 key={index}
@@ -219,13 +222,17 @@ export function ServicesSection() {
                   setCurrentIndex(index);
                   setIsAutoPlaying(false);
                 }}
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  index === currentIndex
-                    ? "w-8 bg-primary"
-                    : "w-2 bg-muted-foreground/30 hover:bg-muted-foreground/60"
-                }`}
+                className="py-4 px-2 group focus:outline-none"
                 aria-label={`Go to service ${index + 1}`}
-              />
+              >
+                <div 
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    index === currentIndex
+                      ? "w-8 bg-primary"
+                      : "w-2 bg-muted-foreground/30 group-hover:bg-muted-foreground/60"
+                  }`}
+                />
+              </button>
             ))}
           </div>
         </div>

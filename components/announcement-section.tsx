@@ -119,7 +119,10 @@ export function AnnouncementSection() {
               >
                 {getVisibleItems().map((announcement, idx) => (
                   <div key={`${announcement.id}-${idx}`} className="h-full">
-                    <Link href={`/announcement/${announcement.id}`}>
+                    <Link 
+                      href={`/announcement/${announcement.id}`}
+                      aria-label={`${language === "en" ? "Read more about" : "Baca selengkapnya tentang"} ${announcement.title}`}
+                    >
                       <BorderGlow
                         edgeSensitivity={30}
                         glowColor="220 80 80"
@@ -144,7 +147,7 @@ export function AnnouncementSection() {
                           </CardHeader>
                           <CardContent className="flex-grow flex flex-col justify-between">
                             <p className="text-muted-foreground text-base leading-relaxed line-clamp-3 mb-6">
-                              {announcement.content}
+                              {announcement.summary || announcement.content.substring(0, 150) + "..."}
                             </p>
                             <span className="text-primary font-semibold flex items-center gap-1 group/btn">
                               {language === "en"
@@ -166,6 +169,7 @@ export function AnnouncementSection() {
           <div className="absolute top-1/2 -left-4 -translate-y-1/2 md:-left-12 opacity-0 group-hover:opacity-100 transition-opacity hidden md:block">
             <button
               onClick={prevSlide}
+              aria-label="Previous slide"
               className="p-3 rounded-full bg-background/20 backdrop-blur-md border border-white/10 hover:bg-primary hover:text-white transition-all shadow-xl"
             >
               <ChevronLeft className="h-6 w-6" />
@@ -174,6 +178,7 @@ export function AnnouncementSection() {
           <div className="absolute top-1/2 -right-4 -translate-y-1/2 md:-right-12 opacity-0 group-hover:opacity-100 transition-opacity hidden md:block">
             <button
               onClick={nextSlide}
+              aria-label="Next slide"
               className="p-3 rounded-full bg-background/20 backdrop-blur-md border border-white/10 hover:bg-primary hover:text-white transition-all shadow-xl"
             >
               <ChevronRight className="h-6 w-6" />
@@ -181,7 +186,7 @@ export function AnnouncementSection() {
           </div>
 
           {/* Pagination Indicators */}
-          <div className="mt-12 flex justify-center gap-2">
+          <div className="mt-12 flex justify-center items-center">
             {announcements.map((_, index) => (
               <button
                 key={index}
@@ -190,12 +195,16 @@ export function AnnouncementSection() {
                   setCurrentIndex(index);
                   setIsAutoPlaying(false);
                 }}
-                className={`h-2 rounded-full transition-all duration-300 ${index === currentIndex
-                  ? "w-8 bg-primary"
-                  : "w-2 bg-muted-foreground/30 hover:bg-muted-foreground/60"
-                  }`}
+                className="py-4 px-2 group focus:outline-none"
                 aria-label={`Go to slide ${index + 1}`}
-              />
+              >
+                <div 
+                  className={`h-2 rounded-full transition-all duration-300 ${index === currentIndex
+                    ? "w-8 bg-primary"
+                    : "w-2 bg-muted-foreground/30 group-hover:bg-muted-foreground/60"
+                  }`}
+                />
+              </button>
             ))}
           </div>
         </div>

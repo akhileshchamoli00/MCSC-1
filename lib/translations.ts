@@ -122,7 +122,7 @@ export const translations = {
       title: "Regulations",
       items: [
         {
-          id: "PERATURAN-PEMERINTAH-REPUBLIK-INDONESIA-NOMOR-20-TAHUN-2026",
+          id: "pp-20-2026",
           title: "PERATURAN PEMERINTAH REPUBLIK INDONESIA NOMOR 20 TAHUN 2026",
           date: "22 April 2026",
           summary: "This government regulation amends PP 55/2022 regarding income tax adjustments. It clarifies the taxation of income for taxpayers with a certain gross turnover, aiming to support healthy business practices. Notably, it specifies that expenses such as bribes or gratifications cannot be deducted from gross income.",

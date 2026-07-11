@@ -31,7 +31,14 @@ export function AboutSection() {
                 className="group px-8 py-6 text-base font-medium transition-all duration-300 rounded-full bg-primary text-primary-foreground hover:opacity-90 hover:scale-105 active:scale-95 shadow-lg shadow-primary/20 cursor-pointer"
                 asChild
               >
-                <Link href={`/${language}/about`}>
+                <Link 
+                  href={`/${language}/about`}
+                  aria-label={{
+                    en: "Read more about MCS Consulting",
+                    id: "Baca lebih lanjut tentang MCS Consulting",
+                    cn: "了解更多关于 MCS Consulting 的信息"
+                  }[language] || "Read more about MCS Consulting"}
+                >
                   {{
                     en: "Read More",
                     id: "Baca Selengkapnya",

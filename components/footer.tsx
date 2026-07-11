@@ -31,7 +31,7 @@ export function Footer() {
             <div className="mb-4 flex items-center gap-2">
               <AskLogo className="h-16 w-auto" />
             </div>
-            <p className="text-sm leading-relaxed text-muted-foreground lg:pr-8">
+            <p className="text-sm leading-relaxed text-foreground/80 lg:pr-8">
               {t.footer.tagline}
             </p>
           </div>
@@ -44,7 +44,7 @@ export function Footer() {
               <li>
                 <Link
                   href={`/${language}`}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-foreground/80 transition-colors hover:text-foreground"
                 >
                   {t.nav.home}
                 </Link>
@@ -52,7 +52,7 @@ export function Footer() {
               <li>
                 <Link
                   href={`/${language}/about`}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-foreground/80 transition-colors hover:text-foreground"
                 >
                   {t.nav.about}
                 </Link>
@@ -60,7 +60,7 @@ export function Footer() {
               <li>
                 <Link
                   href={`/${language}/resources`}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-foreground/80 transition-colors hover:text-foreground"
                 >
                   {t.nav.intellectualProperty}
                 </Link>
@@ -68,7 +68,7 @@ export function Footer() {
               <li>
                 <Link
                   href={`/${language}/services`}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-foreground/80 transition-colors hover:text-foreground"
                 >
                   {t.nav.services}
                 </Link>
@@ -76,7 +76,7 @@ export function Footer() {
               <li>
                 <Link
                   href={`/${language}/announcements`}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-foreground/80 transition-colors hover:text-foreground"
                 >
                   {t.nav.announcement}
                 </Link>
@@ -84,7 +84,7 @@ export function Footer() {
               <li>
                 <Link
                   href={`/${language}/contact`}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-foreground/80 transition-colors hover:text-foreground"
                 >
                   {t.nav.contact}
                 </Link>
@@ -100,7 +100,7 @@ export function Footer() {
               <li>
                 <Link
                   href={`/${language}/services/establishment`}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-foreground/80 transition-colors hover:text-foreground"
                 >
                   {t.services.dropdown.establishment}
                 </Link>
@@ -108,7 +108,7 @@ export function Footer() {
               <li>
                 <Link
                   href={`/${language}/services/business-license`}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-foreground/80 transition-colors hover:text-foreground"
                 >
                   {t.services.dropdown.businessLicense}
                 </Link>
@@ -116,7 +116,7 @@ export function Footer() {
               <li>
                 <Link
                   href={`/${language}/services/company-changes`}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-foreground/80 transition-colors hover:text-foreground"
                 >
                   {t.services.dropdown.companyChanges}
                 </Link>
@@ -124,7 +124,7 @@ export function Footer() {
               <li>
                 <Link
                   href={`/${language}/services/agreements`}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-foreground/80 transition-colors hover:text-foreground"
                 >
                   {t.services.dropdown.agreements}
                 </Link>
@@ -132,7 +132,7 @@ export function Footer() {
               <li>
                 <Link
                   href={`/${language}/services/virtual-office`}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-foreground/80 transition-colors hover:text-foreground"
                 >
                   {t.services.dropdown.virtualOffice}
                 </Link>
@@ -140,7 +140,7 @@ export function Footer() {
               <li>
                 <Link
                   href={`/${language}/services/work-permit`}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-foreground/80 transition-colors hover:text-foreground"
                 >
                   {t.services.dropdown.workPermit}
                 </Link>
@@ -148,7 +148,7 @@ export function Footer() {
               <li>
                 <Link
                   href={`/${language}/services/intellectual-property`}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-foreground/80 transition-colors hover:text-foreground"
                 >
                   {t.services.dropdown.intellectualProperty}
                 </Link>
@@ -164,7 +164,7 @@ export function Footer() {
               <li>
                 <Link
                   href={`/${language}/resources/brand-classification`}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-foreground/80 transition-colors hover:text-foreground"
                 >
                   {t.nav.brandClassification}
                 </Link>
@@ -172,7 +172,7 @@ export function Footer() {
               <li>
                 <Link
                   href={`/${language}/resources/check-application-status`}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-foreground/80 transition-colors hover:text-foreground"
                 >
                   {t.nav.checkApplicationStatus}
                 </Link>
@@ -180,7 +180,7 @@ export function Footer() {
               <li>
                 <Link
                   href={`/${language}/resources/kbli`}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-foreground/80 transition-colors hover:text-foreground"
                 >
                   {t.nav.kbliDirectory}
                 </Link>
@@ -188,7 +188,7 @@ export function Footer() {
               <li>
                 <Link
                   href={`/${language}/resources/faq`}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-foreground/80 transition-colors hover:text-foreground"
                 >
                   FAQ
                 </Link>
@@ -205,7 +205,7 @@ export function Footer() {
                 href="https://www.facebook.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground transition-all hover:bg-primary hover:text-primary-foreground hover:scale-110"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground/80 transition-all hover:bg-primary hover:text-primary-foreground hover:scale-110"
                 aria-label="Facebook"
               >
                 <Facebook className="h-5 w-5" />
@@ -214,7 +214,7 @@ export function Footer() {
                 href="https://www.instagram.com/mcsc.id/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground transition-all hover:bg-primary hover:text-primary-foreground hover:scale-110"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground/80 transition-all hover:bg-primary hover:text-primary-foreground hover:scale-110"
                 aria-label="Instagram"
               >
                 <Instagram className="h-5 w-5" />
@@ -223,7 +223,7 @@ export function Footer() {
                 href="https://wa.me/6285718189799"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground transition-all hover:bg-primary hover:text-primary-foreground hover:scale-110"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground/80 transition-all hover:bg-primary hover:text-primary-foreground hover:scale-110"
                 aria-label="WhatsApp"
               >
                 <MessageCircle className="h-5 w-5" />
@@ -232,12 +232,12 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-4 border-t border-border pt-4 text-center text-sm text-muted-foreground">
+        <div className="mt-4 border-t border-border pt-4 text-center text-sm text-foreground/80">
           <p className="mb-2">
             © {new Date().getFullYear()} MCS Consulting. {t.footer.rights}
           </p>
           {t.footer.disclaimer && (
-            <p className="mt-2 border-t border-border/10 pt-2 text-[11px] leading-relaxed text-muted-foreground/50 max-w-5xl mx-auto text-justify md:text-center">
+            <p className="mt-2 border-t border-border/10 pt-2 text-[11px] leading-relaxed text-foreground/70 max-w-5xl mx-auto text-justify md:text-center">
               {renderDisclaimerText(t.footer.disclaimer)}
             </p>
           )}

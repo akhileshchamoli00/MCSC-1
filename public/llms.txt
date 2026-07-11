@@ -1,0 +1,19 @@
+# MCS Consulting - LLM Reference
+
+Welcome to the MCS Consulting website AI documentation file. 
+
+## About Us
+MCS Consulting has supported hundreds of local and international businesses with company registration, business licensing, regulatory compliance, tax, accounting, and corporate services throughout Indonesia since 2013.
+
+## Key Services
+- [Establishment of Business Entities](/en/services/establishment)
+- [Business Licenses](/en/services/business-license)
+- [Changes in Company Documents](/en/services/company-changes)
+- [Draft Agreement](/en/services/agreements)
+- [Virtual Office](/en/services/virtual-office)
+- [Work Permit](/en/services/work-permit)
+- [Intellectual Property Rights](/en/services/intellectual-property)
+
+## Contact Information
+- [Contact Us](/en/contact)
+- Main Website: [https://www.mcsc.co.id/en](https://www.mcsc.co.id/en)

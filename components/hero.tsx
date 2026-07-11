@@ -53,9 +53,9 @@ export function Hero() {
           >
             <div className="bg-white dark:bg-zinc-950/80 border border-black/5 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none rounded-3xl p-8 md:p-10 relative overflow-hidden transition-transform duration-300 hover:-translate-y-1">
               <div className="relative z-10 text-center">
-                <h3 className="font-sans text-3xl font-bold mb-4 text-foreground">
+                <h2 className="font-sans text-3xl font-bold mb-4 text-foreground">
                   {t.stats?.cta?.title || "Ready to Start Your Business in Indonesia?"}
-                </h3>
+                </h2>
                 <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
                   {t.stats?.cta?.description || "Whether you're establishing a local company, registering a foreign-owned business (PT PMA), or obtaining business licenses, our team is ready to help."}
                 </p>

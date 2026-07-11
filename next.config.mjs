@@ -69,6 +69,22 @@ const nextConfig = {
         destination: '/en/announcement/:path*',
         permanent: true,
       },
+      // SEO Redirects
+      {
+        source: '/en/announcement/PERATURAN-PEMERINTAH-REPUBLIK-INDONESIA-NOMOR-20-TAHUN-2026',
+        destination: '/en/announcement/pp-20-2026',
+        permanent: true,
+      },
+      {
+        source: '/id/announcement/PERATURAN-PEMERINTAH-REPUBLIK-INDONESIA-NOMOR-20-TAHUN-2026',
+        destination: '/id/announcement/pp-20-2026',
+        permanent: true,
+      },
+      {
+        source: '/cn/announcement/PERATURAN-PEMERINTAH-REPUBLIK-INDONESIA-NOMOR-20-TAHUN-2026',
+        destination: '/cn/announcement/pp-20-2026',
+        permanent: true,
+      },
       // Mapped Legacy URL Redirects
       { source: '/pendirianperusahaan', destination: '/id/services/establishment', permanent: true },
       { source: '/perubahan-dokumenstruktur-perusahaan', destination: '/id/services/company-changes', permanent: true },
