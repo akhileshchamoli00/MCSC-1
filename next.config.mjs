@@ -98,7 +98,6 @@ const nextConfig = {
       { source: '/pengurusan-perizinan-badan-usaha', destination: '/id/services/business-license', permanent: true },
       { source: '/en/pengurusan-perizinan-badan-usaha', destination: '/en/services/business-license', permanent: true },
       { source: '/privacy-policy', destination: '/en/privacy-policy', permanent: true },
-      { source: '/en/privacy-policy', destination: '/en/privacy-policy', permanent: true },
       
       // Keep these as homepage dumps since they don't have exact matches
       { source: '/blog/:path*', destination: '/en', permanent: true },
