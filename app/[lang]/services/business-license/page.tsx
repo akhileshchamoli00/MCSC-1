@@ -32,7 +32,7 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
       languages: {
         "en": `https://www.mcsc.co.id/en/services/business-license`,
         "id": `https://www.mcsc.co.id/id/services/business-license`,
-        "zh-CN": `https://www.mcsc.co.id/cn/services/business-license`,
+        "zh": `https://www.mcsc.co.id/cn/services/business-license`,
         "x-default": `https://www.mcsc.co.id/en/services/business-license`,
       },
     },

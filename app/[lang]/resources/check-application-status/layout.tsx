@@ -14,7 +14,7 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
       languages: {
         "en": `https://www.mcsc.co.id/en/resources/check-application-status`,
         "id": `https://www.mcsc.co.id/id/resources/check-application-status`,
-        "zh-CN": `https://www.mcsc.co.id/cn/resources/check-application-status`,
+        "zh": `https://www.mcsc.co.id/cn/resources/check-application-status`,
         "x-default": `https://www.mcsc.co.id/en/resources/check-application-status`,
       },
     },

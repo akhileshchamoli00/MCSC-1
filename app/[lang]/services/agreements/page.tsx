@@ -36,7 +36,7 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
       languages: {
         "en": `https://www.mcsc.co.id/en/services/agreements`,
         "id": `https://www.mcsc.co.id/id/services/agreements`,
-        "zh-CN": `https://www.mcsc.co.id/cn/services/agreements`,
+        "zh": `https://www.mcsc.co.id/cn/services/agreements`,
         "x-default": `https://www.mcsc.co.id/en/services/agreements`,
       },
     },

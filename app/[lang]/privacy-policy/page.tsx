@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
       languages: {
         "en": "https://www.mcsc.co.id/en/privacy-policy",
         "id": "https://www.mcsc.co.id/id/privacy-policy",
-        "zh-CN": "https://www.mcsc.co.id/cn/privacy-policy",
+        "zh": "https://www.mcsc.co.id/cn/privacy-policy",
         "x-default": "https://www.mcsc.co.id/en/privacy-policy"
       },
     },

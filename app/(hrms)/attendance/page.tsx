@@ -26,10 +26,10 @@ export default function AttendancePage() {
   const [myHistory, setMyHistory] = useState<any[]>([]);
   const [todayRecord, setTodayRecord] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  
+
   const [locationError, setLocationError] = useState("");
   const [currentDistance, setCurrentDistance] = useState<number | null>(null);
-  const [coords, setCoords] = useState<{lat: number, lng: number} | null>(null);
+  const [coords, setCoords] = useState<{ lat: number, lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -157,12 +157,12 @@ export default function AttendancePage() {
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">GPS Status:</span>
                 {coords ? (
-                  <Badge className="bg-green-100 text-green-700 hover:bg-green-100"><CheckCircle2 className="w-3 h-3 mr-1"/> Location Acquired</Badge>
+                  <Badge className="bg-green-100 text-green-700 hover:bg-green-100"><CheckCircle2 className="w-3 h-3 mr-1" /> Location Acquired</Badge>
                 ) : (
-                  <Badge variant="outline" className="text-muted-foreground"><AlertTriangle className="w-3 h-3 mr-1"/> Not Acquired</Badge>
+                  <Badge variant="outline" className="text-muted-foreground"><AlertTriangle className="w-3 h-3 mr-1" /> Not Acquired</Badge>
                 )}
               </div>
-              
+
               {locationError && (
                 <div className="text-sm text-red-600 bg-red-50 p-2 rounded border border-red-100">
                   {locationError}
@@ -175,16 +175,16 @@ export default function AttendancePage() {
                 </Button>
               ) : (
                 <div className="flex gap-3">
-                  <Button 
-                    onClick={handleClockIn} 
-                    disabled={submitting || !!todayRecord?.clock_in_time} 
+                  <Button
+                    onClick={handleClockIn}
+                    disabled={submitting || !!todayRecord?.clock_in_time}
                     className="flex-1"
                   >
                     Clock In
                   </Button>
-                  <Button 
-                    onClick={handleClockOut} 
-                    disabled={submitting || !todayRecord?.clock_in_time || !!todayRecord?.clock_out_time} 
+                  <Button
+                    onClick={handleClockOut}
+                    disabled={submitting || !todayRecord?.clock_in_time || !!todayRecord?.clock_out_time}
                     variant="outline"
                     className="flex-1"
                   >
@@ -215,19 +215,19 @@ export default function AttendancePage() {
           <CardContent>
             <div className="space-y-4">
               <div className="flex justify-between items-center p-3 border-b border-border/30">
-                <span className="text-muted-foreground flex items-center gap-2"><Clock className="w-4 h-4"/> Clock In</span>
+                <span className="text-muted-foreground flex items-center gap-2"><Clock className="w-4 h-4" /> Clock In</span>
                 <span className="font-medium">
                   {todayRecord?.clock_in_time ? new Date(todayRecord.clock_in_time).toLocaleTimeString() : "--:--"}
                 </span>
               </div>
               <div className="flex justify-between items-center p-3 border-b border-border/30">
-                <span className="text-muted-foreground flex items-center gap-2"><Clock className="w-4 h-4"/> Clock Out</span>
+                <span className="text-muted-foreground flex items-center gap-2"><Clock className="w-4 h-4" /> Clock Out</span>
                 <span className="font-medium">
                   {todayRecord?.clock_out_time ? new Date(todayRecord.clock_out_time).toLocaleTimeString() : "--:--"}
                 </span>
               </div>
               <div className="flex justify-between items-center p-3 border-b border-border/30">
-                <span className="text-muted-foreground flex items-center gap-2"><AlertTriangle className="w-4 h-4"/> Late</span>
+                <span className="text-muted-foreground flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> Late</span>
                 <span className="font-medium text-red-600">
                   {todayRecord?.late_minutes ? `${todayRecord.late_minutes} mins` : "0 mins"}
                 </span>

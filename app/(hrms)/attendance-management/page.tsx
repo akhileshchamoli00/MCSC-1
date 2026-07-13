@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Pencil, Save, X } from "lucide-react";
+import { AlertTriangle, Pencil, Save, X, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ export default function AttendanceManagementPage() {
   const [attendance, setAttendance] = useState<any[]>([]);
   const [corrections, setCorrections] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState("");
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
@@ -115,10 +116,18 @@ export default function AttendanceManagementPage() {
     }
   };
 
-  const totalPages = Math.ceil(attendance.length / 10);
+  const filteredAttendance = attendance.filter((rec) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    const name = rec.employee ? `${rec.employee.first_name} ${rec.employee.last_name}`.toLowerCase() : String(rec.employee_id);
+    const date = rec.attendance_date.toLowerCase();
+    return name.includes(term) || date.includes(term);
+  });
+
+  const totalPages = Math.ceil(filteredAttendance.length / 10);
   const startIndex = (currentPage - 1) * 10;
   const endIndex = startIndex + 10;
-  const paginatedAttendance = attendance.slice(startIndex, endIndex);
+  const paginatedAttendance = filteredAttendance.slice(startIndex, endIndex);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -204,6 +213,20 @@ export default function AttendanceManagementPage() {
 
       {/* Main Table */}
       <Card className="border-border/50 shadow-sm">
+        <div className="px-4 border-b border-border/50 bg-muted/5 flex justify-between items-center">
+          <div className="relative w-full max-w-sm flex items-center">
+            <Search className="absolute left-2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input 
+              placeholder="Search by employee name or date..." 
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="h-8 text-xs pl-8 bg-transparent border-none shadow-none focus-visible:ring-0"
+            />
+          </div>
+        </div>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -250,11 +273,11 @@ export default function AttendanceManagementPage() {
           </div>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+            <div className="flex items-center justify-between px-4 py-2 border-t border-border/50 bg-transparent mt-0">
               <div className="text-xs text-muted-foreground">
                 Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
-                <span className="font-medium text-foreground">{Math.min(attendance.length, endIndex)}</span> of{" "}
-                <span className="font-medium text-foreground">{attendance.length}</span> entries
+                <span className="font-medium text-foreground">{Math.min(filteredAttendance.length, endIndex)}</span> of{" "}
+                <span className="font-medium text-foreground">{filteredAttendance.length}</span> entries
               </div>
               <div className="flex items-center space-x-2">
                 <Button

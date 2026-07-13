@@ -33,7 +33,7 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
       languages: {
         "en": `https://www.mcsc.co.id/en/services/company-changes`,
         "id": `https://www.mcsc.co.id/id/services/company-changes`,
-        "zh-CN": `https://www.mcsc.co.id/cn/services/company-changes`,
+        "zh": `https://www.mcsc.co.id/cn/services/company-changes`,
         "x-default": `https://www.mcsc.co.id/en/services/company-changes`,
       },
     },

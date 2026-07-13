@@ -14,7 +14,7 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
       languages: {
         "en": `https://www.mcsc.co.id/en/resources/brand-classification`,
         "id": `https://www.mcsc.co.id/id/resources/brand-classification`,
-        "zh-CN": `https://www.mcsc.co.id/cn/resources/brand-classification`,
+        "zh": `https://www.mcsc.co.id/cn/resources/brand-classification`,
         "x-default": `https://www.mcsc.co.id/en/resources/brand-classification`,
       },
     },

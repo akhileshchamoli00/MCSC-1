@@ -35,7 +35,7 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
       languages: {
         "en": `https://www.mcsc.co.id/en/services/work-permit`,
         "id": `https://www.mcsc.co.id/id/services/work-permit`,
-        "zh-CN": `https://www.mcsc.co.id/cn/services/work-permit`,
+        "zh": `https://www.mcsc.co.id/cn/services/work-permit`,
         "x-default": `https://www.mcsc.co.id/en/services/work-permit`,
       },
     },
