@@ -12,7 +12,7 @@ export default function AttendanceSettingsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const { register, handleSubmit, reset, setValue } = useForm();
+  const { register, handleSubmit, reset, setValue, getValues } = useForm();
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -58,8 +58,19 @@ export default function AttendanceSettingsPage() {
       const res = await fetch("https://api.ipify.org?format=json");
       if (res.ok) {
         const data = await res.json();
-        setValue("allowed_ip_address", data.ip);
-        toast.success("IP Address detected successfully!");
+        const currentIPs = getValues("allowed_ip_address") || "";
+        
+        if (currentIPs) {
+          if (!currentIPs.includes(data.ip)) {
+            setValue("allowed_ip_address", `${currentIPs.trim().replace(/,$/, "")}, ${data.ip}`);
+            toast.success("IP Address appended successfully!");
+          } else {
+            toast.info("IP Address is already in the list");
+          }
+        } else {
+          setValue("allowed_ip_address", data.ip);
+          toast.success("IP Address detected successfully!");
+        }
       } else {
         toast.error("Failed to detect IP");
       }

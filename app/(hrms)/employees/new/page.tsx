@@ -68,7 +68,8 @@ export default function NewEmployeePage() {
     annual_leave: "14",
     payslip_password: "",
     meal_allowance_per_day: "40000",
-    work_support_allowance_per_day: "30000"
+    work_support_allowance_per_day: "30000",
+    has_calendar_access: false
   });
 
   useEffect(() => {
@@ -100,6 +101,10 @@ export default function NewEmployeePage() {
 
   const handleSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value === "none" ? "" : value }));
+  };
+
+  const handleCheckedChange = (name: string, checked: boolean) => {
+    setFormData((prev) => ({ ...prev, [name]: checked }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -158,6 +163,7 @@ export default function NewEmployeePage() {
       if (formData.employment_type) employeePayload.employment_type = formData.employment_type;
       if (formData.company_name) employeePayload.company_name = formData.company_name;
       if (formData.job_title) employeePayload.job_title = formData.job_title;
+      employeePayload.has_calendar_access = formData.has_calendar_access;
       
       if (formData.annual_leave) employeePayload.annual_leave_balance = parseInt(formData.annual_leave);
       
@@ -435,6 +441,22 @@ export default function NewEmployeePage() {
                         <SelectItem value="PROBATION">Probation</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2 flex flex-col justify-center">
+                    <label className="text-sm font-medium mb-3">Calendar Access</label>
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="checkbox" 
+                        id="has_calendar_access"
+                        name="has_calendar_access"
+                        checked={formData.has_calendar_access} 
+                        onChange={(e) => handleCheckedChange("has_calendar_access", e.target.checked)} 
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <label htmlFor="has_calendar_access" className="text-sm text-muted-foreground leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        Allow access to Google Booking Calendar
+                      </label>
+                    </div>
                   </div>
                 </div>
               </CardContent>

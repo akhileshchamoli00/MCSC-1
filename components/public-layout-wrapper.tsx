@@ -35,7 +35,8 @@ export function PublicLayoutWrapper({ children }: { children: React.ReactNode })
     "/my-clients",
     "/chat",
     "/client",
-    "/access-control"
+    "/access-control",
+    "/calendar"
   ];
   
   const isHrms = hrmsRoutes.some(route => pathname?.startsWith(route));

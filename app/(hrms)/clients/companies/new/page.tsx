@@ -24,7 +24,6 @@ export default function NewCompanyPage() {
   const [loadingClients, setLoadingClients] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("company");
-  const [useClientRep, setUseClientRep] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
 
   const [formData, setFormData] = useState({
@@ -36,7 +35,8 @@ export default function NewCompanyPage() {
     key_contact_person: "",
     key_contact_email: "",
     key_contact_phone: "",
-    status: "ACTIVE"
+    status: "ACTIVE",
+    client_id: null as number | null
   });
 
   const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
@@ -61,20 +61,6 @@ export default function NewCompanyPage() {
     fetchClients();
   }, [token]);
 
-  // Autofill key contact person when useClientRep checkbox toggles
-  useEffect(() => {
-    if (useClientRep && selectedClientId) {
-      const parentClient = clients.find(c => c.id.toString() === selectedClientId);
-      if (parentClient) {
-        setFormData(prev => ({
-          ...prev,
-          key_contact_person: parentClient.contact_person || "",
-          key_contact_email: parentClient.email || "",
-          key_contact_phone: parentClient.phone || ""
-        }));
-      }
-    }
-  }, [useClientRep, selectedClientId, clients]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -83,21 +69,22 @@ export default function NewCompanyPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedClientId) {
-      setError("Please select a parent client representative.");
-      return;
-    }
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/${selectedClientId}/companies`, {
+      const payload = {
+        ...formData,
+        client_id: selectedClientId && selectedClientId !== "none" ? parseInt(selectedClientId) : null
+      };
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/standalone`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -154,16 +141,16 @@ export default function NewCompanyPage() {
                 
                 {/* Select Parent Client Representative */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Parent Client Representative *</label>
+                  <label className="text-sm font-medium">Parent Client Representative (Optional)</label>
                   <Select 
                     value={selectedClientId} 
                     onValueChange={setSelectedClientId}
-                    required
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Choose a client..." />
+                      <SelectValue placeholder="Choose a client... (Optional)" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="none">-- No Parent Client (Standalone) --</SelectItem>
                       {clients.map((cl) => (
                         <SelectItem key={cl.id} value={cl.id.toString()}>
                           {cl.contact_person} ({cl.email})
@@ -249,24 +236,6 @@ export default function NewCompanyPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 
-                {/* Autofill Toggle */}
-                <div className="flex items-center gap-2 pb-4 border-b border-border/40 mb-4">
-                  <Checkbox 
-                    id="use-rep-checkbox"
-                    checked={useClientRep}
-                    onCheckedChange={(checked) => setUseClientRep(!!checked)}
-                    disabled={!selectedClientId}
-                  />
-                  <div className="flex flex-col">
-                    <label 
-                      htmlFor="use-rep-checkbox"
-                      className="text-sm font-semibold text-foreground cursor-pointer select-none"
-                    >
-                      Use Client Representative Details
-                    </label>
-                    <span className="text-xs text-muted-foreground">Autofill the contact fields using the parent client representative's credentials.</span>
-                  </div>
-                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2 md:col-span-2">
@@ -276,7 +245,6 @@ export default function NewCompanyPage() {
                       name="key_contact_person" 
                       value={formData.key_contact_person} 
                       onChange={handleInputChange} 
-                      disabled={useClientRep}
                       placeholder="e.g. John Doe" 
                     />
                   </div>
@@ -288,7 +256,6 @@ export default function NewCompanyPage() {
                       type="email"
                       value={formData.key_contact_email} 
                       onChange={handleInputChange} 
-                      disabled={useClientRep}
                       placeholder="e.g. keycontact@company.com" 
                     />
                   </div>
@@ -299,7 +266,6 @@ export default function NewCompanyPage() {
                       name="key_contact_phone" 
                       value={formData.key_contact_phone} 
                       onChange={handleInputChange} 
-                      disabled={useClientRep}
                       placeholder="e.g. +62 812..." 
                     />
                   </div>

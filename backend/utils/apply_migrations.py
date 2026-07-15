@@ -83,6 +83,15 @@ def run_migrations():
                 conn.rollback()
                 handle_migration_error(col, "employees", e)
 
+        # Columns to add to client_documents
+        try:
+            conn.execute(text("ALTER TABLE client_documents ADD COLUMN document_date DATE"))
+            conn.commit()
+            print("Added column 'document_date' to 'client_documents' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("document_date", "client_documents", e)
+
     print("Migration check complete.")
 
 if __name__ == "__main__":

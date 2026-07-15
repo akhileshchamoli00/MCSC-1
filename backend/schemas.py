@@ -108,6 +108,7 @@ class EmployeeBase(BaseModel):
     department_id: Optional[int] = None
     manager_id: Optional[int] = None
     role_id: Optional[int] = None
+    has_calendar_access: Optional[bool] = False
 
 class EmployeeCreate(EmployeeBase):
     user_id: int
@@ -741,6 +742,7 @@ class ClientCompanyBase(BaseModel):
     key_contact_person: Optional[str] = None
     key_contact_email: Optional[str] = None
     key_contact_phone: Optional[str] = None
+    client_id: Optional[int] = None
 
 class ClientCompanyCreate(ClientCompanyBase):
     pass
@@ -756,7 +758,6 @@ class ClientMin(BaseModel):
 
 class ClientCompanyResponse(ClientCompanyBase):
     id: int
-    client_id: int
     logo_url: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -850,11 +851,19 @@ class AnnouncementResponse(AnnouncementBase):
     class Config:
         from_attributes = True
 
+class ClientDocumentUpdate(BaseModel):
+    document_type: Optional[str] = None
+    description: Optional[str] = None
+    document_date: Optional[date] = None
+
 class ClientDocumentResponse(BaseModel):
     id: int
     company_id: int
     file_name: str
     file_url: str
+    document_type: Optional[str] = None
+    description: Optional[str] = None
+    document_date: Optional[date] = None
     uploaded_at: datetime
     uploaded_by: int
 

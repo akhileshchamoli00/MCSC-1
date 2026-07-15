@@ -99,6 +99,13 @@ const navModules: NavModule[] = [
     moduleCode: "dashboard"
   },
   {
+    title: "Calendar",
+    icon: Calendar,
+    href: "/calendar",
+    adminOnly: true,
+    moduleCode: "calendar"
+  },
+  {
     title: "Employee",
     icon: Users,
     items: [
@@ -176,6 +183,7 @@ const navModules: NavModule[] = [
     items: [
       { name: "All Clients", href: "/clients", adminOnly: true, moduleCode: "clients_all" },
       { name: "Add Company", href: "/clients/companies", adminOnly: true, moduleCode: "clients_company" },
+      { name: "Company Documents", href: "/clients/documents", adminOnly: true, moduleCode: "clients_documents" },
       { name: "Assign Consultant", href: "/clients/assign", adminOnly: true, moduleCode: "clients_assign" },
       { name: "My Clients", href: "/my-clients", adminOnly: false, employeeOnly: true, moduleCode: "clients_my" },
     ]
@@ -342,7 +350,9 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
             let visibleItems: NavItem[] = [];
 
             if (module.href) {
-              if (module.moduleCode) {
+              if (module.href === "/calendar") {
+                isVisible = isAdmin || userProfile?.has_calendar_access;
+              } else if (module.moduleCode) {
                 isVisible = hasPermission(module.moduleCode, "view");
               } else {
                 isVisible = (!module.adminOnly || isAdmin) && (!module.employeeOnly || !isAdmin);

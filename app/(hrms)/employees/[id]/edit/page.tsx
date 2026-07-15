@@ -64,7 +64,8 @@ export default function EditEmployeePage() {
     role_id: "", // Read-only for edit
     payslip_password: "",
     meal_allowance_per_day: "40000",
-    work_support_allowance_per_day: "30000"
+    work_support_allowance_per_day: "30000",
+    has_calendar_access: false
   });
 
   useEffect(() => {
@@ -129,7 +130,8 @@ export default function EditEmployeePage() {
             role_id: empData.user?.role_id?.toString() || "",
             payslip_password: empData.payslip_password || "",
             meal_allowance_per_day: empData.meal_allowance_per_day?.toString() || "40000",
-            work_support_allowance_per_day: empData.work_support_allowance_per_day?.toString() || "30000"
+            work_support_allowance_per_day: empData.work_support_allowance_per_day?.toString() || "30000",
+            has_calendar_access: empData.has_calendar_access || false
           });
         } else {
           setError("Failed to load employee data");
@@ -153,6 +155,10 @@ export default function EditEmployeePage() {
     setFormData((prev) => ({ ...prev, [name]: value === "none" ? "" : value }));
   };
 
+  const handleCheckedChange = (name: string, checked: boolean) => {
+    setFormData((prev) => ({ ...prev, [name]: checked }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -169,7 +175,8 @@ export default function EditEmployeePage() {
         job_title: formData.job_title,
         company_name: formData.company_name,
         hire_date: formData.hire_date,
-        status: formData.status
+        status: formData.status,
+        has_calendar_access: formData.has_calendar_access
       };
 
       if (formData.role_id) employeePayload.role_id = parseInt(formData.role_id);
@@ -451,6 +458,22 @@ export default function EditEmployeePage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2 flex flex-col justify-center">
+                <label className="text-sm font-medium mb-3">Calendar Access</label>
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="checkbox" 
+                    id="has_calendar_access"
+                    name="has_calendar_access"
+                    checked={formData.has_calendar_access} 
+                    onChange={(e) => handleCheckedChange("has_calendar_access", e.target.checked)} 
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <label htmlFor="has_calendar_access" className="text-sm text-muted-foreground leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Allow access to Google Booking Calendar
+                  </label>
+                </div>
               </div>
             </div>
           </CardContent>

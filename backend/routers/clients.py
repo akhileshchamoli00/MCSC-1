@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 
 import models, schemas, auth, database
-from storage import upload_file_to_supabase
+from storage import upload_file_to_supabase, delete_file_from_supabase
 
 router = APIRouter(
     prefix="/api/clients",
@@ -220,6 +220,43 @@ def reset_client_password(id: int, password_data: schemas.ClientPasswordReset, d
 
 # COMPANY ENDPOINTS
 
+@router.get("/companies/all", response_model=List[schemas.ClientCompanyResponse])
+def get_all_client_companies(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    role_name = current_user.role.name.upper() if current_user.role else ""
+    if "ADMIN" in role_name or role_name == "HR":
+        return db.query(models.ClientCompany).order_by(models.ClientCompany.company_name).all()
+        
+    # For regular employees, return only companies they are assigned to
+    assigned_companies = db.query(models.ClientCompany).join(
+        models.CompanyEmployeeAssignment
+    ).filter(
+        models.CompanyEmployeeAssignment.employee_id == current_user.id
+    ).order_by(models.ClientCompany.company_name).all()
+    
+    return assigned_companies
+
+@router.post("/companies/standalone", response_model=schemas.ClientCompanyResponse)
+def create_standalone_client_company(company_data: schemas.ClientCompanyCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    if not is_admin_or_hr(current_user):
+        raise HTTPException(status_code=403, detail="Not authorized to create standalone companies")
+        
+    if company_data.client_id:
+        db_client = db.query(models.Client).filter(models.Client.id == company_data.client_id).first()
+        if not db_client:
+            raise HTTPException(status_code=404, detail="Client not found")
+
+    existing_company_code = db.query(models.ClientCompany).filter(models.ClientCompany.company_code == company_data.company_code).first()
+    if existing_company_code:
+        raise HTTPException(status_code=400, detail="Company code already exists")
+        
+    db_company = models.ClientCompany(
+        **company_data.model_dump() if hasattr(company_data, "model_dump") else company_data.dict()
+    )
+    db.add(db_company)
+    db.commit()
+    db.refresh(db_company)
+    return db_company
+
 @router.post("/{id}/companies", response_model=schemas.ClientCompanyResponse)
 def create_client_company(id: int, company_data: schemas.ClientCompanyCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     if not (is_admin_or_hr(current_user) or is_client_themselves(current_user, id)):
@@ -280,7 +317,9 @@ def upload_company_logo(company_id: int, file: UploadFile = File(...), db: Sessi
         raise HTTPException(status_code=400, detail="Only PNG and JPEG images are allowed")
         
     try:
-        public_url = upload_file_to_supabase(file, "avatars", "company_logo")
+        file_bytes = file.file.read()
+        unique_filename = f"logos/{uuid.uuid4()}_{file.filename}"
+        public_url = upload_file_to_supabase(file_bytes, unique_filename, "client-documents")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload to storage: {str(e)}")
         
@@ -348,7 +387,15 @@ def get_company_consultants(company_id: int, db: Session = Depends(database.get_
     return result
 
 @router.post("/companies/{company_id}/documents", response_model=schemas.ClientDocumentResponse)
-def upload_client_document(company_id: int, file: UploadFile = File(...), db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+def upload_client_document(
+    company_id: int, 
+    file: UploadFile = File(...), 
+    document_type: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    document_date: Optional[str] = Form(None),
+    db: Session = Depends(database.get_db), 
+    current_user: models.User = Depends(auth.get_current_user)
+):
     company = db.query(models.ClientCompany).filter(models.ClientCompany.id == company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
@@ -357,21 +404,98 @@ def upload_client_document(company_id: int, file: UploadFile = File(...), db: Se
         raise HTTPException(status_code=403, detail="Not authorized to upload documents for this company")
         
     try:
-        public_url = upload_file_to_supabase(file, "documents", "client_doc")
+        file_bytes = file.file.read()
+        name, ext = os.path.splitext(file.filename)
+        timestamp = datetime.now().strftime("%H%M%S")
+        new_filename = f"{name}_{timestamp}{ext}"
+        
+        unique_filename = f"documents/{new_filename}"
+        public_url = upload_file_to_supabase(file_bytes, unique_filename, "client-documents")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload to storage: {str(e)}")
         
+    parsed_date = None
+    if document_date:
+        try:
+            parsed_date = datetime.strptime(document_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format, expected YYYY-MM-DD")
+
     db_doc = models.ClientDocument(
         company_id=company_id,
-        file_name=file.filename,
+        file_name=new_filename,
         file_url=public_url,
+        document_type=document_type,
+        description=description,
+        document_date=parsed_date,
+        uploaded_at=datetime.now(),
         uploaded_by=current_user.id
     )
     db.add(db_doc)
+    try:
+        db.commit()
+        db.refresh(db_doc)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    
+    return db_doc
+
+@router.patch("/companies/{company_id}/documents/{document_id}", response_model=schemas.ClientDocumentResponse)
+def update_client_document(
+    company_id: int, 
+    document_id: int, 
+    update_data: schemas.ClientDocumentUpdate,
+    db: Session = Depends(database.get_db), 
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    company = db.query(models.ClientCompany).filter(models.ClientCompany.id == company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+        
+    if not (is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client_themselves_for_company(current_user, company_id, db)):
+        raise HTTPException(status_code=403, detail="Not authorized to edit documents for this company")
+        
+    db_doc = db.query(models.ClientDocument).filter(models.ClientDocument.id == document_id, models.ClientDocument.company_id == company_id).first()
+    if not db_doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    update_dict = update_data.model_dump(exclude_unset=True) if hasattr(update_data, "model_dump") else update_data.dict(exclude_unset=True)
+    
+    for key, value in update_dict.items():
+        setattr(db_doc, key, value)
+        
     db.commit()
     db.refresh(db_doc)
     
     return db_doc
+
+@router.delete("/companies/{company_id}/documents/{document_id}")
+def delete_client_document(
+    company_id: int, 
+    document_id: int, 
+    db: Session = Depends(database.get_db), 
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    from storage import delete_file_from_supabase
+    company = db.query(models.ClientCompany).filter(models.ClientCompany.id == company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+        
+    if not (is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client_themselves_for_company(current_user, company_id, db)):
+        raise HTTPException(status_code=403, detail="Not authorized to delete documents for this company")
+        
+    db_doc = db.query(models.ClientDocument).filter(models.ClientDocument.id == document_id, models.ClientDocument.company_id == company_id).first()
+    if not db_doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    if db_doc.file_url:
+        delete_file_from_supabase(db_doc.file_url, "client-documents")
+        
+    db.delete(db_doc)
+    db.commit()
+    
+    return {"message": "Document deleted successfully"}
 
 @router.get("/companies/{company_id}/documents", response_model=List[schemas.ClientDocumentResponse])
 def get_client_documents(company_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):

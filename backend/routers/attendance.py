@@ -41,6 +41,26 @@ def get_settings(db: Session):
         db.refresh(settings)
     return settings
 
+def recalculate_attendance(attendance: models.Attendance):
+    if attendance.clock_in_time:
+        start_time = kl_tz.localize(datetime.combine(attendance.attendance_date, time(9, 0)))
+        clock_in_kl = attendance.clock_in_time.astimezone(kl_tz) if attendance.clock_in_time.tzinfo else kl_tz.localize(attendance.clock_in_time)
+        if clock_in_kl > start_time:
+            late_diff = clock_in_kl - start_time
+            late_minutes = int(late_diff.total_seconds() / 60)
+            attendance.late_minutes = late_minutes
+            attendance.status = "Late"
+        else:
+            attendance.late_minutes = 0
+            attendance.status = "Present"
+            
+    if attendance.clock_in_time and attendance.clock_out_time:
+        diff = attendance.clock_out_time - attendance.clock_in_time
+        hours = diff.total_seconds() / 3600.0
+        attendance.working_hours = round(hours, 2)
+        if hours < 4.0:
+            attendance.status = "Half Day"
+
 # ==========================================
 # EMPLOYEE ENDPOINTS
 # ==========================================
@@ -292,26 +312,7 @@ def update_attendance_admin(attendance_id: int, req: schemas.AttendanceUpdateAdm
     if req.clock_out_time is not None:
         attendance.clock_out_time = req.clock_out_time
         
-    if attendance.clock_in_time and attendance.clock_out_time:
-        diff = attendance.clock_out_time - attendance.clock_in_time
-        hours = diff.total_seconds() / 3600.0
-        attendance.working_hours = round(hours, 2)
-        if hours < 4.0:
-            attendance.status = "Half Day"
-        else:
-            attendance.status = "Present"
-            
-        # Re-calculate late minutes based on 9 AM KL time
-        start_time = kl_tz.localize(datetime.combine(attendance.attendance_date, time(9, 0)))
-        clock_in_kl = attendance.clock_in_time.astimezone(kl_tz) if attendance.clock_in_time.tzinfo else kl_tz.localize(attendance.clock_in_time)
-        if clock_in_kl > start_time:
-            late_diff = clock_in_kl - start_time
-            late_minutes = int(late_diff.total_seconds() / 60)
-            attendance.late_minutes = late_minutes
-            if late_minutes > 0 and attendance.status != "Half Day":
-                attendance.status = "Late"
-        else:
-            attendance.late_minutes = 0
+    recalculate_attendance(attendance)
             
     db.commit()
     db.refresh(attendance)
@@ -343,9 +344,7 @@ def approve_correction(correction_id: int, db: Session = Depends(database.get_db
     if correction.requested_clock_out:
         attendance.clock_out_time = correction.requested_clock_out
         
-    if attendance.clock_in_time and attendance.clock_out_time:
-        diff = attendance.clock_out_time - attendance.clock_in_time
-        attendance.working_hours = round(diff.total_seconds() / 3600.0, 2)
+    recalculate_attendance(attendance)
         
     db.commit()
     return {"message": "Correction approved"}

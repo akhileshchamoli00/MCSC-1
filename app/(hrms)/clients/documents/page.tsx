@@ -4,72 +4,41 @@ import React, { useEffect, useState } from "react";
 import { 
   Building, 
   Search, 
-  Plus, 
   Loader2, 
   Mail, 
   Phone, 
   MapPin, 
-  Edit2, 
-  CheckCircle, 
-  XCircle, 
   User, 
   ArrowLeft,
-  Building2 
+  Building2,
+  FileText
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter 
-} from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 
-export default function CompaniesDirectory() {
-  const [clients, setClients] = useState<any[]>([]);
+export default function CompanyDocumentsDirectory() {
   const [companies, setCompanies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
-
-
-
-  const [errorMsg, setErrorMsg] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
+  }, [searchTerm]);
 
   const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
 
   const fetchData = async () => {
     if (!token) return;
     try {
-      const [clientsRes, companiesRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, { headers: { "Authorization": `Bearer ${token}` } })
-      ]);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, { 
+        headers: { "Authorization": `Bearer ${token}` } 
+      });
       
-      if (clientsRes.ok) {
-        setClients(await clientsRes.json());
-      }
-      if (companiesRes.ok) {
-        setCompanies(await companiesRes.json());
+      if (response.ok) {
+        setCompanies(await response.json());
       }
     } catch (err) {
       console.error("Error fetching data:", err);
@@ -82,51 +51,6 @@ export default function CompaniesDirectory() {
     fetchData();
   }, []);
 
-
-  // Removed handleOpenAdd (creation is now on a dedicated page)
-
-
-
-  const handleToggleCompanyStatus = async (comp: any) => {
-    if (!token) return;
-    setErrorMsg("");
-    setSuccessMsg("");
-    const newStatus = comp.status === "ACTIVE" ? "DISABLED" : "ACTIVE";
-
-    const payload = {
-      company_name: comp.company_name,
-      company_code: comp.company_code,
-      industry: comp.industry || "",
-      tax_number: comp.tax_number || "",
-      address: comp.address || "",
-      key_contact_person: comp.key_contact_person || "",
-      key_contact_email: comp.key_contact_email || "",
-      key_contact_phone: comp.key_contact_phone || "",
-      status: newStatus
-    };
-
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${comp.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || "Failed to update company status");
-      }
-
-      setSuccessMsg(`Company status toggled to ${newStatus}`);
-      fetchData();
-    } catch (err: any) {
-      setErrorMsg(err.message || "Failed to toggle status");
-    }
-  };
-
   const filteredCompanies = companies.filter(c => {
     const name = c.company_name || "";
     const code = c.company_code || "";
@@ -137,7 +61,8 @@ export default function CompaniesDirectory() {
                           ind.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           contact.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatus = statusFilter === "ALL" || c.status === statusFilter;
+    // Only show active companies in document directory
+    const matchesStatus = c.status === "ACTIVE";
     return matchesSearch && matchesStatus;
   });
 
@@ -166,31 +91,13 @@ export default function CompaniesDirectory() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Company Directory</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Company Documents</h1>
             <p className="text-muted-foreground text-sm">
-              Manage corporate partner profiles, registered codes, and associate custom key contacts.
+              Manage and upload documents for assigned corporate partners.
             </p>
           </div>
         </div>
-        
-        <Link href="/clients/companies/new">
-          <Button className="flex items-center gap-2">
-            <Plus className="h-4 w-4" /> Add New Company
-          </Button>
-        </Link>
       </div>
-
-      {/* Notifications */}
-      {successMsg && (
-        <div className="bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 p-3 rounded-lg text-xs font-medium">
-          {successMsg}
-        </div>
-      )}
-      {errorMsg && (
-        <div className="bg-destructive/10 border border-destructive/25 text-destructive p-3 rounded-lg text-xs font-medium">
-          {errorMsg}
-        </div>
-      )}
 
       {/* Search & Filter Bar */}
       <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
@@ -203,29 +110,13 @@ export default function CompaniesDirectory() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-1 bg-muted p-1 rounded-lg self-end sm:self-auto">
-          {["ALL", "ACTIVE", "DISABLED"].map((statusOpt) => (
-            <button
-              key={statusOpt}
-              onClick={() => setStatusFilter(statusOpt)}
-              className={`px-3 py-1 rounded text-xs font-semibold transition-all
-                ${statusFilter === statusOpt 
-                  ? "bg-background shadow text-foreground" 
-                  : "text-muted-foreground hover:text-foreground"
-                }
-              `}
-            >
-              {statusOpt}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Companies Display Card */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle>Company Directory</CardTitle>
-          <CardDescription>View, edit, toggle status, and manage client corporate partners.</CardDescription>
+          <CardDescription>Select a company below to view and manage its documents.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {filteredCompanies.length === 0 ? (
@@ -242,16 +133,11 @@ export default function CompaniesDirectory() {
                     <th className="p-4">Parent Client</th>
                     <th className="p-4">Key Contact</th>
                     <th className="p-4">Tax & Location</th>
-                    <th className="p-4">Status</th>
                     <th className="p-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {paginatedCompanies.map((company) => {
-                    const isRep = company.key_contact_person === company.client?.contact_person &&
-                                  company.key_contact_email === company.client?.email &&
-                                  (company.key_contact_phone || "") === (company.client?.phone || "");
-                    
                     return (
                       <tr key={company.id} className="hover:bg-muted/30 transition-colors">
                         <td className="p-4 text-muted-foreground space-y-1">
@@ -260,7 +146,7 @@ export default function CompaniesDirectory() {
                               <img
                                 src={`${process.env.NEXT_PUBLIC_API_URL}${company.logo_url}`}
                                 alt={company.company_name}
-                                className="h-10 w-10 rounded-lg object-cover border border-white/10 shadow bg-background animate-in fade-in zoom-in-95 duration-200"
+                                className="h-10 w-10 rounded-lg object-cover border border-white/10 shadow bg-background"
                               />
                             ) : (
                               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 text-primary font-bold">
@@ -304,9 +190,6 @@ export default function CompaniesDirectory() {
                             <>
                               <div className="text-foreground font-semibold flex items-center gap-1">
                                 <span>{company.key_contact_person}</span>
-                                {isRep && (
-                                  <Badge variant="secondary" className="text-[8px] px-1 py-0 h-3.5 bg-primary/10 text-primary border-none font-bold">REP</Badge>
-                                )}
                               </div>
                               {company.key_contact_email && (
                                 <div className="flex items-center gap-1.5 text-[10px] truncate max-w-[150px]">
@@ -341,23 +224,11 @@ export default function CompaniesDirectory() {
                             <span className="text-muted-foreground italic font-normal text-xs">-</span>
                           )}
                         </td>
-                        <td className="p-4">
-                          <Badge 
-                            variant={company.status === "ACTIVE" ? "default" : "destructive"}
-                            className="cursor-pointer"
-                            onClick={() => handleToggleCompanyStatus(company)}
-                          >
-                            {company.status}
-                          </Badge>
-                        </td>
                         <td className="p-4 text-right">
-                          <Link href={`/clients/companies/${company.id}`}>
-                            <Button 
-                              size="icon" 
-                              variant="ghost" 
-                              title="Edit Company"
-                            >
-                              <Edit2 className="h-4 w-4 text-slate-500 hover:text-foreground" />
+                          <Link href={`/clients/documents/${company.id}`}>
+                            <Button size="sm" variant="outline" className="gap-2">
+                              <FileText className="h-4 w-4" />
+                              Manage Documents
                             </Button>
                           </Link>
                         </td>

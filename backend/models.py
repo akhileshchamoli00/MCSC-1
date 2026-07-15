@@ -87,6 +87,7 @@ class Employee(Base):
     status = Column(Enum(EmploymentStatus), default=EmploymentStatus.ACTIVE)
     profile_photo = Column(String, nullable=True)
     payslip_password = Column(String, nullable=True)
+    has_calendar_access = Column(Boolean, default=False)
     
     user_id = Column(Integer, ForeignKey("users.id"), unique=True)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
@@ -483,7 +484,7 @@ class TimesheetEntry(Base):
 class ClientCompany(Base):
     __tablename__ = "client_companies"
     id = Column(Integer, primary_key=True, index=True)
-    client_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), index=True)
+    client_id = Column(Integer, ForeignKey("clients.id", ondelete="SET NULL"), index=True, nullable=True)
     company_name = Column(String, index=True)
     company_code = Column(String, unique=True, index=True)
     address = Column(String, nullable=True)
@@ -585,6 +586,9 @@ class ClientDocument(Base):
     company_id = Column(Integer, ForeignKey("client_companies.id", ondelete="CASCADE"), index=True)
     file_name = Column(String)
     file_url = Column(String)
+    document_type = Column(String, nullable=True)
+    description = Column(String, nullable=True)
+    document_date = Column(Date, nullable=True)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
     uploaded_by = Column(Integer, ForeignKey("users.id"))
     
