@@ -117,8 +117,8 @@ const navModules: NavModule[] = [
     title: "Access Control",
     icon: Shield,
     items: [
-      { name: "Roles List", href: "/roles", adminOnly: true, moduleCode: "settings" },
-      { name: "Permission Matrix", href: "/access-control", adminOnly: true, moduleCode: "settings" },
+      { name: "Roles List", href: "/roles", adminOnly: true, moduleCode: "roles_list" },
+      { name: "Permission Matrix", href: "/access-control", adminOnly: true, moduleCode: "access_control_matrix" },
     ]
   },
   {
@@ -484,7 +484,7 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
           })}
 
           {/* Settings / System at bottom of list */}
-          {isAdmin && (
+          {(isAdmin || hasPermission("settings", "view")) && (
             <div className="pt-4 mt-4 border-t border-slate-100 dark:border-zinc-900">
               <Tooltip delayDuration={300}>
                 <TooltipTrigger asChild>

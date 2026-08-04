@@ -16,10 +16,11 @@ router = APIRouter(
 )
 
 def is_admin_or_hr(user: models.User) -> bool:
-    if not user.role:
+    if not user or not user.role:
         return False
-    role_name = user.role.name.upper()
-    return "ADMIN" in role_name or role_name == "HR"
+    if auth.is_super_admin(user):
+        return True
+    return user.role.name.upper() == "HR"
 
 def is_assigned_employee_to_company(user: models.User, company_id: int, db: Session) -> bool:
     if user.role is not None and user.role.name.upper() == "EMPLOYEE" and user.employee:
@@ -44,7 +45,7 @@ def is_client_themselves_for_company(user: models.User, company_id: int, db: Ses
 def get_clients(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     role_name = current_user.role.name.upper() if current_user.role else ""
     
-    if "ADMIN" in role_name or role_name == "HR":
+    if is_admin_or_hr(current_user):
         return db.query(models.Client).order_by(models.Client.contact_person).all()
     elif role_name == "EMPLOYEE":
         if not current_user.employee:
@@ -223,7 +224,7 @@ def reset_client_password(id: int, password_data: schemas.ClientPasswordReset, d
 @router.get("/companies/all", response_model=List[schemas.ClientCompanyResponse])
 def get_all_client_companies(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     role_name = current_user.role.name.upper() if current_user.role else ""
-    if "ADMIN" in role_name or role_name == "HR":
+    if is_admin_or_hr(current_user):
         return db.query(models.ClientCompany).order_by(models.ClientCompany.company_name).all()
         
     # For regular employees, return only companies they are assigned to

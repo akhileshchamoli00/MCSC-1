@@ -30,7 +30,7 @@ export default function AttendanceManagementPage() {
       const [sumRes, attRes, corrRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance/today-summary`, { headers: { "Authorization": `Bearer ${token}` } }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance/corrections`, { headers: { "Authorization": `Bearer ${token}` } })
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance/corrections?status=PENDING`, { headers: { "Authorization": `Bearer ${token}` } })
       ]);
       
       if (sumRes.ok) setSummary(await sumRes.json());

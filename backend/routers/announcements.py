@@ -12,16 +12,17 @@ router = APIRouter(
 )
 
 def is_admin_or_hr(user: models.User) -> bool:
-    if not user.role:
+    if not user or not user.role:
         return False
-    role_name = user.role.name.upper()
-    return "ADMIN" in role_name or role_name == "HR"
+    if auth.is_super_admin(user):
+        return True
+    return user.role.name.upper() == "HR"
 
 @router.get("", response_model=List[schemas.AnnouncementResponse])
 def get_announcements(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     role_name = current_user.role.name.upper() if current_user.role else ""
     
-    if "ADMIN" in role_name or role_name == "HR":
+    if is_admin_or_hr(current_user):
         return db.query(models.Announcement).order_by(models.Announcement.created_at.desc()).all()
     elif role_name == "EMPLOYEE":
         return db.query(models.Announcement).filter(
@@ -43,7 +44,7 @@ def get_announcement(id: int, db: Session = Depends(database.get_db), current_us
     role_name = current_user.role.name.upper() if current_user.role else ""
     
     # Check permissions
-    if "ADMIN" in role_name or role_name == "HR":
+    if is_admin_or_hr(current_user):
         return announcement
     elif role_name == "EMPLOYEE" and announcement.target_role in ["ALL", "EMPLOYEE"]:
         return announcement

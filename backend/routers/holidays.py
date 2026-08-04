@@ -41,8 +41,8 @@ def create_public_holiday(
     current_user: models.User = Depends(auth.get_current_user)
 ):
     # Only Admin or HR
-    is_admin = current_user.role and "ADMIN" in current_user.role.name.upper()
-    is_hr = current_user.role and "HR" in current_user.role.name.upper()
+    is_admin = auth.is_super_admin(current_user)
+    is_hr = current_user.role and current_user.role.name.upper() == "HR"
     if not (is_admin or is_hr):
         raise HTTPException(status_code=403, detail="Not authorized")
 
@@ -106,8 +106,8 @@ def update_public_holiday(
     current_user: models.User = Depends(auth.get_current_user)
 ):
     # Only Admin or HR
-    is_admin = current_user.role and "ADMIN" in current_user.role.name.upper()
-    is_hr = current_user.role and "HR" in current_user.role.name.upper()
+    is_admin = auth.is_super_admin(current_user)
+    is_hr = current_user.role and current_user.role.name.upper() == "HR"
     if not (is_admin or is_hr):
         raise HTTPException(status_code=403, detail="Not authorized")
 
@@ -198,8 +198,8 @@ def delete_public_holiday(
     current_user: models.User = Depends(auth.get_current_user)
 ):
     # Only Admin or HR
-    is_admin = current_user.role and "ADMIN" in current_user.role.name.upper()
-    is_hr = current_user.role and "HR" in current_user.role.name.upper()
+    is_admin = auth.is_super_admin(current_user)
+    is_hr = current_user.role and current_user.role.name.upper() == "HR"
     if not (is_admin or is_hr):
         raise HTTPException(status_code=403, detail="Not authorized")
 

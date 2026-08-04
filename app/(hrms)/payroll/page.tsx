@@ -9,10 +9,11 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { UserProvider, useUser } from "@/contexts/user-context";
 
 export default function AdminPayrollPage() {
   const router = useRouter();
+  const { hasPermission, isAdmin: contextIsAdmin } = useUser();
   const [payrolls, setPayrolls] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -67,17 +68,12 @@ export default function AdminPayrollPage() {
       const token = localStorage.getItem("hrms_token");
       if (!token) return;
 
-      const userRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (userRes.ok) {
-        const userData = await userRes.json();
-        if (!(userData.role?.name && userData.role.name.toUpperCase().includes("ADMIN"))) {
-          router.push("/my-payroll");
-          return;
-        }
-        setIsAdmin(true);
+      const canView = contextIsAdmin || hasPermission("payroll_management", "view");
+      if (!canView) {
+        router.push("/my-payroll");
+        return;
       }
+      setIsAdmin(true);
 
       const payrollRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payroll/`, {
         headers: { "Authorization": `Bearer ${token}` }

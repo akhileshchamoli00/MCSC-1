@@ -232,6 +232,7 @@ class LeaveRequestBase(BaseModel):
     start_date: date
     end_date: date
     leave_type: str
+    allocation_date: Optional[date] = None
     days_requested: Optional[float] = 0.0
     reason: Optional[str] = None
     attachment_url: Optional[str] = None
@@ -288,10 +289,12 @@ class LeaveAllocationRequest(BaseModel):
     employee_id: int
     amount: float
     reason: str
+    allocation_date: date
 
 class LeaveAllocationUpdate(BaseModel):
     days_requested: float
     reason: str
+    allocation_date: Optional[date] = None
 
 class LeaveBalanceAuditResponse(BaseModel):
     id: int

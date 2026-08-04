@@ -129,7 +129,7 @@ class Attendance(Base):
     __tablename__ = "attendance"
     
     id = Column(Integer, primary_key=True, index=True)
-    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"))
+    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), index=True)
     attendance_date = Column(Date, index=True)
     clock_in_time = Column(DateTime(timezone=True), nullable=True)
     clock_out_time = Column(DateTime(timezone=True), nullable=True)
@@ -152,12 +152,12 @@ class AttendanceCorrection(Base):
     __tablename__ = "attendance_corrections"
 
     id = Column(Integer, primary_key=True, index=True)
-    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"))
-    attendance_id = Column(Integer, ForeignKey("attendance.id", ondelete="CASCADE"))
+    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), index=True)
+    attendance_id = Column(Integer, ForeignKey("attendance.id", ondelete="CASCADE"), index=True)
     requested_clock_in = Column(DateTime(timezone=True), nullable=True)
     requested_clock_out = Column(DateTime(timezone=True), nullable=True)
     reason = Column(String)
-    status = Column(String, default="PENDING")
+    status = Column(String, default="PENDING", index=True)
     approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     approved_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -179,6 +179,7 @@ class LeaveRequest(Base):
     start_date = Column(Date)
     end_date = Column(Date)
     leave_type = Column(String)
+    allocation_date = Column(Date, nullable=True)
     days_requested = Column(Float, default=0.0)
     reason = Column(String, nullable=True)
     attachment_url = Column(String, nullable=True)

@@ -209,7 +209,7 @@ async def upload_employee_photo(
 
 @router.delete("/{employee_id}/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_employee_document(employee_id: int, document_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "employees_all", "delete", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     doc = db.query(models.EmployeeDocument).filter(

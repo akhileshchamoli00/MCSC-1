@@ -17,14 +17,14 @@ router = APIRouter(
 @router.get("/review-cycles", response_model=List[schemas.ReviewCycleResponse])
 def get_review_cycles(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     # Admins see all, others see active or closed
-    if current_user.role and "ADMIN" in current_user.role.name.upper():
+    if auth.is_super_admin(current_user) or auth.has_permission(current_user, "performance", "view", db):
         return db.query(models.ReviewCycle).order_by(models.ReviewCycle.start_date.desc()).all()
     else:
         return db.query(models.ReviewCycle).filter(models.ReviewCycle.status != "Draft").order_by(models.ReviewCycle.start_date.desc()).all()
 
 @router.post("/review-cycles", response_model=schemas.ReviewCycleResponse)
 def create_review_cycle(cycle: schemas.ReviewCycleCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "performance", "create", db)):
         raise HTTPException(status_code=403, detail="Only Admins can create review cycles")
         
     db_cycle = models.ReviewCycle(
@@ -41,7 +41,7 @@ def create_review_cycle(cycle: schemas.ReviewCycleCreate, db: Session = Depends(
 
 @router.put("/review-cycles/{id}", response_model=schemas.ReviewCycleResponse)
 def update_review_cycle(id: int, cycle_update: schemas.ReviewCycleCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "performance", "edit", db)):
         raise HTTPException(status_code=403, detail="Only Admins can update review cycles")
         
     db_cycle = db.query(models.ReviewCycle).filter(models.ReviewCycle.id == id).first()
@@ -71,7 +71,7 @@ def get_reviews(
     query = db.query(models.EmployeeReview)
     
     # Filter based on role/auth context
-    if current_user.role and "ADMIN" in current_user.role.name.upper():
+    if auth.is_super_admin(current_user) or auth.has_permission(current_user, "performance", "view", db):
         # Admin can see everything
         pass
     elif current_user.employee:
@@ -111,7 +111,7 @@ def get_review_by_id(id: int, db: Session = Depends(database.get_db), current_us
         raise HTTPException(status_code=404, detail="Review not found")
         
     # Access check
-    if current_user.role and "ADMIN" in current_user.role.name.upper():
+    if auth.is_super_admin(current_user) or auth.has_permission(current_user, "performance", "view", db):
         return review
         
     if current_user.employee:
@@ -134,7 +134,7 @@ def get_review_by_id(id: int, db: Session = Depends(database.get_db), current_us
 @router.post("/reviews", response_model=schemas.EmployeeReviewResponse)
 def create_employee_review(review: schemas.EmployeeReviewCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     # Validate reviewer roles
-    is_admin = current_user.role and "ADMIN" in current_user.role.name.upper()
+    is_admin = auth.is_super_admin(current_user) or auth.has_permission(current_user, "performance", "create", db)
     is_manager = current_user.employee and db.query(models.Employee).filter(models.Employee.manager_id == current_user.employee.id).first() is not None
     
     if not is_admin and not is_manager:
@@ -183,7 +183,7 @@ def update_employee_review(id: int, review_update: schemas.EmployeeReviewUpdate,
         raise HTTPException(status_code=404, detail="Review not found")
         
     # Access check: only author or admin
-    is_admin = current_user.role and "ADMIN" in current_user.role.name.upper()
+    is_admin = auth.is_super_admin(current_user) or auth.has_permission(current_user, "performance", "edit", db)
     if db_review.reviewer_id != current_user.id and not is_admin:
         raise HTTPException(status_code=403, detail="Not authorized to edit this review")
         
@@ -249,7 +249,7 @@ def get_self_reviews(
 ):
     query = db.query(models.SelfReview)
     
-    if current_user.role and "ADMIN" in current_user.role.name.upper():
+    if auth.is_super_admin(current_user) or auth.has_permission(current_user, "performance", "view", db):
         pass
     elif current_user.employee:
         is_manager = db.query(models.Employee).filter(models.Employee.manager_id == current_user.employee.id).first() is not None
@@ -282,7 +282,7 @@ def get_goals(
 ):
     query = db.query(models.ReviewGoal)
     
-    if current_user.role and "ADMIN" in current_user.role.name.upper():
+    if auth.is_super_admin(current_user) or auth.has_permission(current_user, "performance", "view", db):
         pass
     elif current_user.employee:
         is_manager = db.query(models.Employee).filter(models.Employee.manager_id == current_user.employee.id).first() is not None
@@ -304,7 +304,7 @@ def get_goals(
 
 @router.post("/goals", response_model=schemas.ReviewGoalResponse)
 def create_goal(goal: schemas.ReviewGoalCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    is_admin = current_user.role and "ADMIN" in current_user.role.name.upper()
+    is_admin = auth.is_super_admin(current_user) or auth.has_permission(current_user, "performance", "create", db)
     is_self = current_user.employee and current_user.employee.id == goal.employee_id
     is_manager = False
     
@@ -339,7 +339,7 @@ def update_goal(id: int, goal_update: schemas.ReviewGoalUpdate, db: Session = De
     if not db_goal:
         raise HTTPException(status_code=404, detail="Goal not found")
 
-    is_admin = current_user.role and "ADMIN" in current_user.role.name.upper()
+    is_admin = auth.is_super_admin(current_user) or auth.has_permission(current_user, "performance", "edit", db)
     is_self = current_user.employee and current_user.employee.id == db_goal.employee_id
     is_manager = False
     
@@ -365,7 +365,7 @@ def update_goal(id: int, goal_update: schemas.ReviewGoalUpdate, db: Session = De
 
 @router.get("/dashboard-stats")
 def get_dashboard_stats(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    is_admin = current_user.role and "ADMIN" in current_user.role.name.upper()
+    is_admin = auth.is_super_admin(current_user) or auth.has_permission(current_user, "performance", "view", db)
     is_manager = current_user.employee and db.query(models.Employee).filter(models.Employee.manager_id == current_user.employee.id).first() is not None
     
     reviews_query = db.query(models.EmployeeReview)

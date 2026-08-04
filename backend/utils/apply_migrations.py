@@ -92,6 +92,28 @@ def run_migrations():
             conn.rollback()
             handle_migration_error("document_date", "client_documents", e)
 
+        # Columns to add to leave_requests
+        try:
+            conn.execute(text("ALTER TABLE leave_requests ADD COLUMN allocation_date DATE"))
+            conn.commit()
+            print("Added column 'allocation_date' to 'leave_requests' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("allocation_date", "leave_requests", e)
+
+        # Indexes for attendance and attendance_corrections tables
+        for idx_sql, idx_name in [
+            ("CREATE INDEX IF NOT EXISTS ix_attendance_employee_id ON attendance (employee_id)", "ix_attendance_employee_id"),
+            ("CREATE INDEX IF NOT EXISTS ix_attendance_corrections_employee_id ON attendance_corrections (employee_id)", "ix_attendance_corrections_employee_id"),
+            ("CREATE INDEX IF NOT EXISTS ix_attendance_corrections_status ON attendance_corrections (status)", "ix_attendance_corrections_status")
+        ]:
+            try:
+                conn.execute(text(idx_sql))
+                conn.commit()
+                print(f"Created/verified index '{idx_name}'.")
+            except Exception as e:
+                conn.rollback()
+
     print("Migration check complete.")
 
 if __name__ == "__main__":

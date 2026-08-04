@@ -210,8 +210,8 @@ def generate_monthly_payroll(req: GeneratePayrollRequest, db: Session = Depends(
         
         if existing:
             continue
-            # --- calculate leaves overlapping this period ---
-        
+        base_total_working_days = num_days - total_weekends - total_public_holidays
+
         requests = db.query(models.LeaveRequest).filter(
             models.LeaveRequest.employee_id == emp.id,
             models.LeaveRequest.status == "APPROVED",
@@ -224,8 +224,15 @@ def generate_monthly_payroll(req: GeneratePayrollRequest, db: Session = Depends(
         unpaid_days = 0.0
         emergency_days = 0.0
         maternity_days = 0.0
+        allocated_days = 0.0
         
         for leave_req in requests:
+            if leave_req.leave_type == "Leave Allocation":
+                alloc_dt = leave_req.allocation_date or leave_req.start_date
+                if alloc_dt and start_date <= alloc_dt <= end_date:
+                    allocated_days += leave_req.days_requested
+                continue
+
             # If the request is entirely within the period, use days_requested directly
             if leave_req.start_date >= start_date and leave_req.end_date <= end_date:
                 days_in_month = leave_req.days_requested
@@ -251,14 +258,15 @@ def generate_monthly_payroll(req: GeneratePayrollRequest, db: Session = Depends(
             elif leave_req.leave_type == "Maternity Leave":
                 maternity_days += days_in_month
                 
-        # --- update days worked ---
-        days_worked = max(0.0, float(total_working_days) - (annual_days + sick_days + unpaid_days + emergency_days + maternity_days))
-        payable_working_days = max(0.0, float(total_working_days) - unpaid_days)
+        # --- update days worked & working days based on leave allocations ---
+        emp_total_working_days = float(base_total_working_days) + float(allocated_days)
+        days_worked = max(0.0, emp_total_working_days - (annual_days + sick_days + unpaid_days + emergency_days + maternity_days))
+        payable_working_days = max(0.0, emp_total_working_days - unpaid_days)
         
         # Calculate leave deduction for unpaid leaves
         calculated_leave_deduction = 0.0
-        if total_working_days > 0 and unpaid_days > 0:
-            calculated_leave_deduction = (emp.base_salary / total_working_days) * unpaid_days
+        if emp_total_working_days > 0 and unpaid_days > 0:
+            calculated_leave_deduction = (emp.base_salary / emp_total_working_days) * unpaid_days
             
         payroll = models.Payroll(
             employee_id=emp.id,
@@ -268,7 +276,7 @@ def generate_monthly_payroll(req: GeneratePayrollRequest, db: Session = Depends(
             total_calendar_days=num_days,
             total_weekends=total_weekends,
             total_public_holidays=total_public_holidays,
-            total_working_days=total_working_days,
+            total_working_days=int(emp_total_working_days),
             annual_leave_days=annual_days,
             sick_leave_days=sick_days,
             unpaid_leave_days=unpaid_days,
@@ -310,7 +318,7 @@ def generate_monthly_payroll(req: GeneratePayrollRequest, db: Session = Depends(
 
 @router.post("/{id}/generate-payslip")
 def generate_single_payslip(id: int, request: Request, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+    if not auth.is_super_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
         
     payroll = db.query(models.Payroll).filter(models.Payroll.id == id).first()
@@ -396,7 +404,7 @@ class GenerateAllPayslipsRequest(BaseModel):
 
 @router.post("/generate-all-payslips")
 def generate_all_payslips(req: GenerateAllPayslipsRequest, request: Request, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+    if not auth.is_super_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
         
     if is_payslip_generation_restricted(req.month, req.year):
@@ -484,7 +492,7 @@ def get_payroll(id: int, db: Session = Depends(database.get_db), current_user: m
     if not payroll:
         raise HTTPException(status_code=404, detail="Payroll not found")
         
-    is_admin = current_user.role and "ADMIN" in current_user.role.name.upper()
+    is_admin = auth.is_super_admin(current_user)
     if not is_admin:
         if not current_user.employee or payroll.employee_id != current_user.employee.id:
             raise HTTPException(status_code=403, detail="Not authorized")
@@ -495,7 +503,7 @@ def get_payroll(id: int, db: Session = Depends(database.get_db), current_user: m
 
 @router.put("/{id}", response_model=schemas.PayrollResponse)
 def update_payroll(id: int, payroll_update: schemas.PayrollUpdate, request: Request, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+    if not auth.is_super_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
         
     payroll = db.query(models.Payroll).filter(models.Payroll.id == id).first()
@@ -585,7 +593,7 @@ def download_payslip(id: int, request: Request, db: Session = Depends(database.g
     if not payroll:
         raise HTTPException(status_code=404, detail="Payroll not found")
         
-    is_admin = current_user.role and "ADMIN" in current_user.role.name.upper()
+    is_admin = auth.is_super_admin(current_user)
     if not is_admin:
         if not current_user.employee or payroll.employee_id != current_user.employee.id:
             raise HTTPException(status_code=403, detail="Not authorized")
@@ -638,7 +646,7 @@ def resend_payslip_password(id: int, request: Request, db: Session = Depends(dat
     if not payroll:
         raise HTTPException(status_code=404, detail="Payroll not found")
         
-    is_admin = current_user.role and "ADMIN" in current_user.role.name.upper()
+    is_admin = auth.is_super_admin(current_user)
     if not is_admin and (not current_user.employee or payroll.employee_id != current_user.employee.id):
         raise HTTPException(status_code=403, detail="Not authorized")
         
@@ -693,7 +701,7 @@ def resend_payslip_password(id: int, request: Request, db: Session = Depends(dat
 
 @router.post("/{id}/regenerate")
 def regenerate_single_payroll(id: int, request: Request, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+    if not auth.is_super_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
         
     payroll = db.query(models.Payroll).filter(models.Payroll.id == id).first()
@@ -734,7 +742,7 @@ def regenerate_single_payroll(id: int, request: Request, db: Session = Depends(d
                 total_public_holidays += 1
         curr_dt += datetime.timedelta(days=1)
                 
-    total_working_days = num_days - total_weekends - total_public_holidays
+    base_total_working_days = num_days - total_weekends - total_public_holidays
     
     requests = db.query(models.LeaveRequest).filter(
         models.LeaveRequest.employee_id == emp.id,
@@ -748,8 +756,15 @@ def regenerate_single_payroll(id: int, request: Request, db: Session = Depends(d
     unpaid_days = 0.0
     emergency_days = 0.0
     maternity_days = 0.0
+    allocated_days = 0.0
     
     for leave_req in requests:
+        if leave_req.leave_type == "Leave Allocation":
+            alloc_dt = leave_req.allocation_date or leave_req.start_date
+            if alloc_dt and start_date <= alloc_dt <= end_date:
+                allocated_days += leave_req.days_requested
+            continue
+
         # If the request is entirely within the period, use days_requested directly
         if leave_req.start_date >= start_date and leave_req.end_date <= end_date:
             days_in_month = leave_req.days_requested
@@ -775,17 +790,18 @@ def regenerate_single_payroll(id: int, request: Request, db: Session = Depends(d
         elif leave_req.leave_type == "Maternity Leave":
             maternity_days += days_in_month
             
-    days_worked = max(0.0, float(total_working_days) - (annual_days + sick_days + unpaid_days + emergency_days + maternity_days))
-    payable_working_days = max(0.0, float(total_working_days) - unpaid_days)
+    emp_total_working_days = float(base_total_working_days) + float(allocated_days)
+    days_worked = max(0.0, emp_total_working_days - (annual_days + sick_days + unpaid_days + emergency_days + maternity_days))
+    payable_working_days = max(0.0, emp_total_working_days - unpaid_days)
     
     calculated_leave_deduction = 0.0
-    if total_working_days > 0 and unpaid_days > 0:
-        calculated_leave_deduction = (emp.base_salary / total_working_days) * unpaid_days
+    if emp_total_working_days > 0 and unpaid_days > 0:
+        calculated_leave_deduction = (emp.base_salary / emp_total_working_days) * unpaid_days
         
     payroll.total_calendar_days = num_days
     payroll.total_weekends = total_weekends
     payroll.total_public_holidays = total_public_holidays
-    payroll.total_working_days = total_working_days
+    payroll.total_working_days = int(emp_total_working_days)
     payroll.annual_leave_days = annual_days
     payroll.sick_leave_days = sick_days
     payroll.unpaid_leave_days = unpaid_days

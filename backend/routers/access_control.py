@@ -10,7 +10,7 @@ router = APIRouter(
 )
 
 async def require_admin(current_user: models.User = Depends(auth.get_current_user)):
-    if not current_user.email == "admin@mcs-consulting.com" and not (current_user.role and "ADMIN" in current_user.role.name.upper()):
+    if not auth.is_super_admin(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied. Administrator permissions required."
@@ -118,7 +118,7 @@ def reset_role_permissions(
     
     # Re-seed default permissions if the role is Admin or Employee
     role_name_upper = role.name.upper()
-    if "ADMIN" in role_name_upper or role_name_upper == "SUPER ADMIN":
+    if role_name_upper in ["ADMIN", "SUPER ADMIN", "SUPERADMIN", "SYSTEM ADMIN"]:
         # Seed all permissions for all modules
         all_modules = db.query(models.Module).all()
         all_permissions = db.query(models.Permission).all()

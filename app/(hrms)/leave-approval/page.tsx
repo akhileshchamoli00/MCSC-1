@@ -170,7 +170,8 @@ export default function LeaveApprovalPage() {
     setEditingAllocation(req);
     setAllocationForm({
       days_requested: req.days_requested,
-      reason: req.reason || ""
+      reason: req.reason || "",
+      allocation_date: req.allocation_date || req.start_date || new Date().toISOString().split("T")[0]
     });
   };
 
@@ -182,6 +183,10 @@ export default function LeaveApprovalPage() {
     }
     if ((allocationForm.days_requested * 2) % 1 !== 0) {
       showAlert("Allocated days must be in increments of 0.5 (half-day or full-day).");
+      return;
+    }
+    if (!allocationForm.allocation_date) {
+      showAlert("Allocation date is required.");
       return;
     }
     if (!allocationForm.reason.trim()) {
@@ -562,6 +567,17 @@ export default function LeaveApprovalPage() {
                 </p>
               </div>
               
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Allocation Date</label>
+                <Input 
+                  type="date"
+                  value={allocationForm.allocation_date} 
+                  onChange={(e) => setAllocationForm({...allocationForm, allocation_date: e.target.value})}
+                  required
+                  className="mt-1"
+                />
+              </div>
+
               <div className="space-y-2">
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Allocated Days</label>
                 <Input 

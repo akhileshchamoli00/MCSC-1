@@ -15,7 +15,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 7 days for MVP
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False)
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
@@ -125,7 +125,7 @@ def get_user_by_email(db: Session, email: str):
 
 async def get_current_user(
     request: Request,
-    token: str = Depends(oauth2_scheme),
+    token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(database.get_db)
 ):
     credentials_exception = HTTPException(
@@ -137,6 +137,9 @@ async def get_current_user(
     # 1. Attempt to extract the token from the HttpOnly cookie
     cookie_token = request.cookies.get("hrms_token")
     actual_token = cookie_token if cookie_token else token
+    
+    if not actual_token or actual_token == "cookie_based_session_active":
+        raise credentials_exception
     
     try:
         payload = jwt.decode(actual_token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -153,13 +156,27 @@ async def get_current_user(
     return user
 
 
+def is_super_admin(user) -> bool:
+    if not user:
+        return False
+    if getattr(user, "email", None) == "admin@mcs-consulting.com":
+        return True
+    if getattr(user, "role_id", None) == 1:
+        return True
+    role_obj = getattr(user, "role", None)
+    if role_obj and getattr(role_obj, "name", None):
+        name_upper = str(role_obj.name).strip().upper()
+        if name_upper in ["ADMIN", "SUPER ADMIN", "SUPERADMIN", "SYSTEM ADMIN"]:
+            return True
+    return False
+
 def check_permission(module_code: str, permission_code: str):
     def dependency(
         current_user: models.User = Depends(get_current_user),
         db: Session = Depends(database.get_db)
     ):
-        # Admin override
-        if current_user.email == "admin@mcs-consulting.com" or (current_user.role and "ADMIN" in current_user.role.name.upper()):
+        # Admin override (only for Super Admin / primary admin role)
+        if is_super_admin(current_user):
             return current_user
             
         if not current_user.role_id:
@@ -188,7 +205,7 @@ def check_permission(module_code: str, permission_code: str):
 
 
 def has_permission(current_user: models.User, module_code: str, permission_code: str, db: Session) -> bool:
-    if current_user.email == "admin@mcs-consulting.com" or (current_user.role and "ADMIN" in current_user.role.name.upper()):
+    if is_super_admin(current_user):
         return True
     if not current_user.role_id:
         return False

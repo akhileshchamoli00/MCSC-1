@@ -47,7 +47,7 @@ def calculate_working_days(start_date, end_date, db: Session = None):
 
 @router.get("/balances", response_model=List[schemas.LeaveBalanceResponse])
 def get_all_leave_balances(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "leave_overview", "view", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
     balances = db.query(models.LeaveBalance).join(models.Employee).order_by(models.Employee.first_name, models.Employee.last_name).offset(skip).limit(limit).all()
     for balance in balances:
@@ -61,7 +61,7 @@ def get_all_leave_balances(skip: int = 0, limit: int = 100, db: Session = Depend
 
 @router.put("/balances/{employee_id}", response_model=schemas.LeaveBalanceResponse)
 def update_leave_balance(employee_id: int, payload: schemas.LeaveBalanceUpdate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "leave_management", "edit", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
         
     balance = db.query(models.LeaveBalance).filter(models.LeaveBalance.employee_id == employee_id).first()
@@ -102,7 +102,7 @@ def update_leave_balance(employee_id: int, payload: schemas.LeaveBalanceUpdate, 
 
 @router.post("/allocate", response_model=schemas.LeaveBalanceResponse)
 def allocate_leave(payload: schemas.LeaveAllocationRequest, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "leave_management", "create", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
         
     balance = db.query(models.LeaveBalance).filter(models.LeaveBalance.employee_id == payload.employee_id).first()
@@ -137,11 +137,12 @@ def allocate_leave(payload: schemas.LeaveAllocationRequest, db: Session = Depend
     db.add(audit)
 
     # Create Leave Request Addition Entry
-    allocation_date = datetime.now().date()
+    allocation_date = payload.allocation_date
     leave_req = models.LeaveRequest(
         employee_id=payload.employee_id,
         start_date=allocation_date,
         end_date=allocation_date,
+        allocation_date=allocation_date,
         leave_type="Leave Allocation",
         days_requested=payload.amount,
         reason=payload.reason,
@@ -181,13 +182,13 @@ def allocate_leave(payload: schemas.LeaveAllocationRequest, db: Session = Depend
 
 @router.get("/requests", response_model=List[schemas.LeaveRequestResponse])
 def get_all_leave_requests(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "leave_management", "view", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
     return db.query(models.LeaveRequest).order_by(desc(models.LeaveRequest.created_at)).offset(skip).limit(limit).all()
 
 @router.put("/requests/{request_id}/approve", response_model=schemas.LeaveRequestResponse)
 def approve_leave_request(request_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "leave_management", "approve", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
         
     leave_req = db.query(models.LeaveRequest).filter(models.LeaveRequest.id == request_id).first()
@@ -233,7 +234,7 @@ def approve_leave_request(request_id: int, db: Session = Depends(database.get_db
 
 @router.put("/requests/{request_id}/reject", response_model=schemas.LeaveRequestResponse)
 def reject_leave_request(request_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "leave_management", "approve", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
         
     leave_req = db.query(models.LeaveRequest).filter(models.LeaveRequest.id == request_id).first()
@@ -271,7 +272,7 @@ def reject_leave_request(request_id: int, db: Session = Depends(database.get_db)
 
 @router.delete("/requests/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_leave_request(request_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "leave_management", "delete", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
         
     leave_req = db.query(models.LeaveRequest).filter(models.LeaveRequest.id == request_id).first()
@@ -404,7 +405,7 @@ def get_my_leave_requests(skip: int = 0, limit: int = 100, db: Session = Depends
 @router.post("/request", response_model=schemas.LeaveRequestResponse)
 def apply_for_leave(leave: schemas.LeaveRequestCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     target_employee_id = None
-    if current_user.role and "ADMIN" in current_user.role.name.upper() and leave.employee_id is not None:
+    if (auth.has_permission(current_user, "leave_management", "create", db) or auth.is_super_admin(current_user)) and leave.employee_id is not None:
         target_employee_id = leave.employee_id
     elif current_user.employee:
         target_employee_id = current_user.employee.id
@@ -656,7 +657,7 @@ def update_my_leave_request(request_id: int, leave_update: schemas.LeaveRequestU
 
 @router.put("/requests/{request_id}/allocation", response_model=schemas.LeaveRequestResponse)
 def update_leave_allocation(request_id: int, payload: schemas.LeaveAllocationUpdate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not current_user.role or "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "leave_management", "edit", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     leave_req = db.query(models.LeaveRequest).filter(models.LeaveRequest.id == request_id).first()
@@ -676,6 +677,10 @@ def update_leave_allocation(request_id: int, payload: schemas.LeaveAllocationUpd
     # Update LeaveRequest
     leave_req.days_requested = payload.days_requested
     leave_req.reason = payload.reason
+    if payload.allocation_date:
+        leave_req.allocation_date = payload.allocation_date
+        leave_req.start_date = payload.allocation_date
+        leave_req.end_date = payload.allocation_date
     leave_req.approved_by = current_user.id
     leave_req.approved_at = datetime.now()
     

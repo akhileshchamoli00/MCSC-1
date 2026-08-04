@@ -5,6 +5,7 @@ from datetime import date, datetime
 from database import get_db
 import models
 import schemas
+import auth
 from auth import get_current_user
 
 router = APIRouter(prefix="/api/timesheets", tags=["timesheets"])
@@ -147,16 +148,16 @@ def submit_timesheet(timesheet_id: int, db: Session = Depends(get_db), current_u
 # Admin/Manager Endpoints
 @router.get("/all", response_model=List[schemas.TimesheetResponse])
 def get_all_timesheets(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    is_admin = current_user.role and "ADMIN" in current_user.role.name.upper()
-    if not is_admin and current_user.email != "admin@mcs-consulting.com" and current_user.role_id != 1:
+    is_admin = auth.has_permission(current_user, "timesheets_management", "view", db) or auth.is_super_admin(current_user)
+    if not is_admin:
         raise HTTPException(status_code=403, detail="Not authorized")
         
     return db.query(models.Timesheet).order_by(models.Timesheet.week_start.desc()).all()
 
 @router.put("/{timesheet_id}/approve", response_model=schemas.TimesheetResponse)
 def approve_timesheet(timesheet_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    is_admin = current_user.role and "ADMIN" in current_user.role.name.upper()
-    if not is_admin and current_user.email != "admin@mcs-consulting.com" and current_user.role_id != 1:
+    is_admin = auth.has_permission(current_user, "timesheets_management", "approve", db) or auth.is_super_admin(current_user)
+    if not is_admin:
         raise HTTPException(status_code=403, detail="Not authorized")
         
     timesheet = db.query(models.Timesheet).filter(models.Timesheet.id == timesheet_id).first()
@@ -185,8 +186,8 @@ def approve_timesheet(timesheet_id: int, db: Session = Depends(get_db), current_
 
 @router.put("/{timesheet_id}/reject", response_model=schemas.TimesheetResponse)
 def reject_timesheet(timesheet_id: int, comment: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    is_admin = current_user.role and "ADMIN" in current_user.role.name.upper()
-    if not is_admin and current_user.email != "admin@mcs-consulting.com" and current_user.role_id != 1:
+    is_admin = auth.has_permission(current_user, "timesheets_management", "approve", db) or auth.is_super_admin(current_user)
+    if not is_admin:
         raise HTTPException(status_code=403, detail="Not authorized")
         
     timesheet = db.query(models.Timesheet).filter(models.Timesheet.id == timesheet_id).first()

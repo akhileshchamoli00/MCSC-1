@@ -69,6 +69,10 @@ def seed_rbac_data(db: Session):
             {"name": "Assigned Company", "code": "chat_assigned_companies"},
         ]},
         {"name": "Notifications", "code": "notifications", "submodules": []},
+        {"name": "Access Control", "code": "access_control", "submodules": [
+            {"name": "Roles List", "code": "roles_list"},
+            {"name": "Permission Matrix", "code": "access_control_matrix"},
+        ]},
         {"name": "Settings", "code": "settings", "submodules": []},
     ]
 

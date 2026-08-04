@@ -30,6 +30,13 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+const isSuperAdminRole = (roleName?: string, roleId?: number, email?: string) => {
+  if (email === "admin@mcs-consulting.com" || roleId === 1) return true;
+  if (!roleName) return false;
+  const name = roleName.trim().toUpperCase();
+  return name === "ADMIN" || name === "SUPER ADMIN" || name === "SUPERADMIN" || name === "SYSTEM ADMIN";
+};
+
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -65,11 +72,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         })
       ]);
 
+      if (authRes.status === 401 || profileRes.status === 401) {
+        localStorage.removeItem("hrms_token");
+        localStorage.removeItem("user_role");
+        localStorage.removeItem("user_email");
+        localStorage.removeItem("hrms_permissions");
+        localStorage.removeItem("hrms_profile");
+        setProfile(null);
+        setIsAdmin(false);
+        setPermissions([]);
+        setLoading(false);
+        return;
+      }
+
       if (authRes.ok) {
         const data = await authRes.json();
-        const isAdminFlag = (data.role?.name && data.role.name.toUpperCase().includes("ADMIN")) || 
-          data.email === "admin@mcs-consulting.com" || 
-          data.role_id === 1;
+        const isAdminFlag = isSuperAdminRole(data.role?.name, data.role_id, data.email);
         setIsAdmin(isAdminFlag);
         const freshPermissions = data.permissions || [];
         setPermissions(freshPermissions);
@@ -114,8 +132,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setPermissions(JSON.parse(cachedPermissions));
       }
       
-      const isAdminFlag = cachedRole.toUpperCase().includes("ADMIN") || 
-        localStorage.getItem("user_email") === "admin@mcs-consulting.com";
+      const isAdminFlag = isSuperAdminRole(cachedRole, undefined, localStorage.getItem("user_email") || undefined);
       setIsAdmin(isAdminFlag);
 
       if (cachedProfile && cachedPermissions) {

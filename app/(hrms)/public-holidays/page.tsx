@@ -566,7 +566,7 @@ export default function PublicHolidaysPage() {
                                   try {
                                     const payload = JSON.parse(atob(token.split('.')[1]));
                                     const role = payload.role?.toUpperCase() || "";
-                                    if (role.includes("ADMIN") || role.includes("HR")) {
+                                    if (role === "ADMIN" || role === "SUPER ADMIN" || role === "HR") {
                                       reset({
                                         holiday_name: "",
                                         holiday_date: formatDateString(cell.date),
@@ -835,7 +835,7 @@ export default function PublicHolidaysPage() {
                     try {
                       const payload = JSON.parse(atob(token.split('.')[1]));
                       const role = payload.role?.toUpperCase() || "";
-                      if (role.includes("ADMIN") || role.includes("HR")) {
+                      if (role === "ADMIN" || role === "SUPER ADMIN" || role === "HR") {
                         return (
                           <div className="flex justify-end gap-2 pt-2 border-t border-border/20 mt-2">
                             <Button 

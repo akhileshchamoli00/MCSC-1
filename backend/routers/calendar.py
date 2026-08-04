@@ -27,11 +27,7 @@ def get_monthly_overview(
     current_user: models.User = Depends(auth.get_current_user)
 ):
     # Detect admin role or email
-    is_admin = (
-        (current_user.role and "ADMIN" in current_user.role.name.upper()) or 
-        current_user.email == "admin@mcs-consulting.com" or 
-        current_user.role_id == 1
-    )
+    is_admin = auth.is_super_admin(current_user)
     
     # Filter by user's company if not an admin and company_name is assigned
     user_company = None
@@ -230,11 +226,7 @@ def get_upcoming_leaves(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    is_admin = (
-        (current_user.role and "ADMIN" in current_user.role.name.upper()) or 
-        current_user.email == "admin@mcs-consulting.com" or 
-        current_user.role_id == 1
-    )
+    is_admin = auth.is_super_admin(current_user)
     
     user_company = None
     if not is_admin and current_user.employee and current_user.employee.company_name:

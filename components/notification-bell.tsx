@@ -32,6 +32,7 @@ export function NotificationBell() {
         headers: { "Authorization": `Bearer ${token}` },
         cache: "no-store"
       });
+      if (res.status === 401) return;
       if (res.ok) {
         const data = await res.json();
         setNotifications(data);
@@ -41,6 +42,7 @@ export function NotificationBell() {
         headers: { "Authorization": `Bearer ${token}` },
         cache: "no-store"
       });
+      if (countRes.status === 401) return;
       if (countRes.ok) {
         const countData = await countRes.json();
         setUnreadCount(countData.unread_count);

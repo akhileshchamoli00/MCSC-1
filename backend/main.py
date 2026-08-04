@@ -168,7 +168,7 @@ def logout_user(response: Response):
 def read_users_me(current_user: models.User = Depends(auth.get_current_user), db: Session = Depends(database.get_db)):
     user_response = schemas.UserResponse.model_validate(current_user)
     
-    if current_user.email == "admin@mcs-consulting.com" or (current_user.role and "ADMIN" in current_user.role.name.upper()):
+    if auth.is_super_admin(current_user):
         user_response.permissions = ["*:*"]
     else:
         role_perms = db.query(models.RolePermission)\

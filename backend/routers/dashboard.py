@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 
 @router.get("/admin")
 def get_admin_kpis(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "dashboard", "view", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     today = datetime.date.today()
@@ -68,7 +68,7 @@ def get_admin_kpis(db: Session = Depends(get_db), current_user: models.User = De
 
 @router.get("/employee-growth")
 def get_employee_growth(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "dashboard", "view", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     from collections import Counter
@@ -94,7 +94,7 @@ def get_employee_growth(db: Session = Depends(get_db), current_user: models.User
 
 @router.get("/attendance-trend")
 def get_attendance_trend(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "dashboard", "view", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized")
         
     # Get last 30 days of attendance %
@@ -121,7 +121,7 @@ def get_attendance_trend(db: Session = Depends(get_db), current_user: models.Use
 
 @router.get("/leave-distribution")
 def get_leave_distribution(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "dashboard", "view", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized")
         
     results = db.query(
@@ -136,7 +136,7 @@ def get_leave_distribution(db: Session = Depends(get_db), current_user: models.U
 
 @router.get("/department-headcount")
 def get_department_headcount(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "dashboard", "view", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized")
         
     results = db.query(
@@ -148,7 +148,7 @@ def get_department_headcount(db: Session = Depends(get_db), current_user: models
 
 @router.get("/recent-leaves")
 def get_recent_leaves(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "dashboard", "view", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized")
         
     leaves = db.query(models.LeaveRequest).options(joinedload(models.LeaveRequest.employee)).filter(
@@ -168,7 +168,7 @@ def get_recent_leaves(db: Session = Depends(get_db), current_user: models.User =
 
 @router.get("/pending-timesheets")
 def get_pending_timesheets(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "dashboard", "view", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized")
         
     timesheets = db.query(models.Timesheet).options(joinedload(models.Timesheet.employee)).filter(
@@ -189,7 +189,7 @@ def get_pending_timesheets(db: Session = Depends(get_db), current_user: models.U
 
 @router.get("/recent-activities")
 def get_recent_activities(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "dashboard", "view", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized")
         
     logs = db.query(models.AuditLog).options(joinedload(models.AuditLog.employee)).order_by(models.AuditLog.created_at.desc()).limit(15).all()
@@ -341,7 +341,7 @@ def get_upcoming_holidays(db: Session = Depends(get_db), current_user: models.Us
 
 @router.get("/admin-summary")
 def get_admin_dashboard_summary(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if "ADMIN" not in current_user.role.name.upper():
+    if not (auth.has_permission(current_user, "dashboard", "view", db) or auth.is_super_admin(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized")
         
     today = datetime.date.today()

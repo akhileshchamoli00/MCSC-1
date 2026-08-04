@@ -34,7 +34,8 @@ export default function LeaveManagementPage() {
   const [allocatingBalance, setAllocatingBalance] = useState<any | null>(null);
   const [allocateForm, setAllocateForm] = useState({
     amount: 1.0,
-    reason: ""
+    reason: "",
+    allocation_date: new Date().toISOString().split("T")[0]
   });
   const [allocating, setAllocating] = useState(false);
 
@@ -131,7 +132,8 @@ export default function LeaveManagementPage() {
     setAllocatingBalance(balance);
     setAllocateForm({
       amount: 1.0,
-      reason: ""
+      reason: "",
+      allocation_date: new Date().toISOString().split("T")[0]
     });
   };
 
@@ -143,6 +145,10 @@ export default function LeaveManagementPage() {
     }
     if ((allocateForm.amount * 2) % 1 !== 0) {
       alert("Allocated amount must be in increments of 0.5 (half-day or full-day).");
+      return;
+    }
+    if (!allocateForm.allocation_date) {
+      alert("Allocation date is required.");
       return;
     }
     if (!allocateForm.reason.trim()) {
@@ -162,7 +168,8 @@ export default function LeaveManagementPage() {
         body: JSON.stringify({
           employee_id: allocatingBalance.employee_id,
           amount: allocateForm.amount,
-          reason: allocateForm.reason
+          reason: allocateForm.reason,
+          allocation_date: allocateForm.allocation_date
         })
       });
 
@@ -318,6 +325,17 @@ export default function LeaveManagementPage() {
                 <p className="font-semibold mt-1">
                   {allocatingBalance?.employee ? `${allocatingBalance.employee.first_name} ${allocatingBalance.employee.last_name}` : `EMP ID: ${allocatingBalance?.employee_id}`}
                 </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Allocation Date</label>
+                <Input
+                  type="date"
+                  value={allocateForm.allocation_date}
+                  onChange={(e) => setAllocateForm({ ...allocateForm, allocation_date: e.target.value })}
+                  required
+                  className="mt-1"
+                />
               </div>
 
               <div className="space-y-2">
