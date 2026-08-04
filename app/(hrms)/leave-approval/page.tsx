@@ -24,7 +24,8 @@ export default function LeaveApprovalPage() {
   const [editingAllocation, setEditingAllocation] = useState<any | null>(null);
   const [allocationForm, setAllocationForm] = useState({
     days_requested: 0.0,
-    reason: ""
+    reason: "",
+    allocation_date: ""
   });
   const [updatingAllocation, setUpdatingAllocation] = useState(false);
   
