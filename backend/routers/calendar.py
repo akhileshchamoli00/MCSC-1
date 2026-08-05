@@ -186,13 +186,14 @@ def get_monthly_overview(
     manager_ids = [r[0] for r in db.query(models.Employee.manager_id).distinct().all() if r[0] is not None]
     managers = db.query(models.Employee).filter(models.Employee.id.in_(manager_ids)).all()
 
+    from storage import get_signed_file_url
     serialized_leaves = []
     for leave in leaves:
         serialized_leaves.append({
             "id": leave.id,
             "employee_id": leave.employee_id,
             "employee_name": f"{leave.employee.first_name} {leave.employee.last_name or ''}".strip(),
-            "profile_photo": leave.employee.profile_photo,
+            "profile_photo": get_signed_file_url(leave.employee.profile_photo, "hrms-documents") if leave.employee and leave.employee.profile_photo else None,
             "department_name": leave.employee.department.name if leave.employee.department else "N/A",
             "department_id": leave.employee.department_id,
             "manager_name": f"{leave.employee.manager.first_name} {leave.employee.manager.last_name or ''}".strip() if leave.employee.manager else "N/A",

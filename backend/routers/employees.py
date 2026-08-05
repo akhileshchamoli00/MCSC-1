@@ -184,7 +184,7 @@ async def upload_employee_photo(
     file: UploadFile = File(...),
     db: Session = Depends(database.get_db)
 ):
-    from storage import upload_file_to_supabase
+    from storage import upload_public_file_to_supabase
     employee = db.query(models.Employee).filter(models.Employee.id == employee_id).first()
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
@@ -199,7 +199,7 @@ async def upload_employee_photo(
     new_filename = f"photo_{emp_name_clean}_{timestamp}.{file_ext}" if file_ext else f"photo_{emp_name_clean}_{timestamp}"
 
     file_bytes = await file.read()
-    file_url = upload_file_to_supabase(file_bytes, new_filename, "hrms-documents")
+    file_url = upload_public_file_to_supabase(file_bytes, new_filename, "profile-photos")
     
     employee.profile_photo = file_url
     

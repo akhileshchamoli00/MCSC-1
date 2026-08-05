@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List
 from datetime import datetime, date
 
@@ -142,6 +142,16 @@ class EmployeeResponse(EmployeeBase):
     class Config:
         from_attributes = True
 
+    @field_validator("profile_photo", mode="after")
+    @classmethod
+    def convert_profile_photo_url(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            if "/profile-photos/" in v or v.startswith("/uploads/"):
+                return v
+            from storage import get_signed_file_url
+            return get_signed_file_url(v, bucket_name="hrms-documents")
+        return v
+
 class EmployeeDocumentBase(BaseModel):
     document_type: str
     file_name: str
@@ -157,6 +167,14 @@ class EmployeeDocumentResponse(EmployeeDocumentBase):
 
     class Config:
         from_attributes = True
+
+    @field_validator("file_url", mode="after")
+    @classmethod
+    def convert_employee_doc_url(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            from storage import get_signed_file_url
+            return get_signed_file_url(v, bucket_name="hrms-documents")
+        return v
 
 class AttendanceSettingsBase(BaseModel):
     office_name: str
@@ -260,6 +278,14 @@ class LeaveRequestResponse(LeaveRequestBase):
 
     class Config:
         from_attributes = True
+
+    @field_validator("attachment_url", mode="after")
+    @classmethod
+    def convert_leave_attachment_url(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            from storage import get_signed_file_url
+            return get_signed_file_url(v, bucket_name="hrms-documents")
+        return v
 
 class LeaveBalanceBase(BaseModel):
     annual_leave_balance: float = 14.0
@@ -838,6 +864,14 @@ class MessageResponse(BaseModel):
     class Config:
         from_attributes = True
 
+    @field_validator("attachment", mode="after")
+    @classmethod
+    def convert_chat_attachment_url(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            from storage import get_signed_file_url
+            return get_signed_file_url(v, bucket_name="hrms-documents")
+        return v
+
 class AnnouncementBase(BaseModel):
     title: str
     content: str
@@ -872,6 +906,14 @@ class ClientDocumentResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+    @field_validator("file_url", mode="after")
+    @classmethod
+    def convert_client_doc_url(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            from storage import get_signed_file_url
+            return get_signed_file_url(v, bucket_name="client-documents")
+        return v
 
 
 class PermissionBase(BaseModel):
