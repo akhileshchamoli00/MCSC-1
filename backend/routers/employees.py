@@ -185,22 +185,21 @@ async def upload_employee_photo(
     db: Session = Depends(database.get_db)
 ):
     from storage import upload_public_file_to_supabase
+    from utils.file_sanitizer import validate_and_sanitize_file
+
     employee = db.query(models.Employee).filter(models.Employee.id == employee_id).first()
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
 
-    import datetime
-    import re
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    emp_name = f"{employee.first_name}_{employee.last_name or ''}".strip()
-    emp_name_clean = re.sub(r'[^a-zA-Z0-9_]', '', emp_name.replace(" ", "_"))
-    
-    file_ext = file.filename.split(".")[-1] if "." in file.filename else ""
-    new_filename = f"photo_{emp_name_clean}_{timestamp}.{file_ext}" if file_ext else f"photo_{emp_name_clean}_{timestamp}"
-
     file_bytes = await file.read()
-    file_url = upload_public_file_to_supabase(file_bytes, new_filename, "profile-photos")
+    sanitized_bytes, secure_filename = validate_and_sanitize_file(
+        file_bytes=file_bytes,
+        original_filename=file.filename or "photo.jpg",
+        allowed_types=["jpeg", "png"],
+        strip_exif=True
+    )
     
+    file_url = upload_public_file_to_supabase(sanitized_bytes, f"photo_{secure_filename}", "profile-photos")
     employee.profile_photo = file_url
     
     db.commit()

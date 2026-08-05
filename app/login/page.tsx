@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Briefcase, Loader2, Mail, Lock } from "lucide-react";
+import { ArrowLeft, Briefcase, Loader2, Mail, Lock, ShieldAlert, Clock } from "lucide-react";
 import { AskLogo } from "@/components/ask-logo";
 import FloatingLines from "@/components/floating-lines";
 import {
@@ -26,6 +26,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState<number>(0);
   const router = useRouter();
 
   // Forgot password state
@@ -36,6 +37,12 @@ export default function LoginPage() {
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("reason") === "inactivity") {
+        setError("Session expired: You were automatically logged out due to 30 minutes of inactivity.");
+      }
+    }
     if (localStorage.getItem("hrms_token")) {
       const role = localStorage.getItem("user_role");
       if (role === "CLIENT") {
@@ -46,8 +53,27 @@ export default function LoginPage() {
     }
   }, [router]);
 
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+
+    const interval = setInterval(() => {
+      setCooldownSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setError("");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [cooldownSeconds]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (cooldownSeconds > 0) return;
+    
     setIsLoading(true);
     setError("");
 
@@ -65,7 +91,15 @@ export default function LoginPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Invalid email/username or password");
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 429) {
+          const detail = errorData.detail || "";
+          const match = detail.match(/(\d+)\s*second/i);
+          const secs = match ? parseInt(match[1]) : 60;
+          setCooldownSeconds(secs);
+          throw new Error(`Too many failed login attempts. Please wait ${secs} seconds before trying again.`);
+        }
+        throw new Error(errorData.detail || "Invalid email/username or password");
       }
 
       const data = await response.json();
@@ -172,11 +206,27 @@ export default function LoginPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {error && (
-                <div className="mb-4 rounded-md bg-destructive/15 p-3 text-sm text-destructive text-center">
+              {cooldownSeconds > 0 ? (
+                <div className="mb-5 rounded-xl border border-rose-500/40 bg-gradient-to-br from-rose-950/90 via-rose-900/50 to-black/80 p-4 text-rose-100 shadow-2xl backdrop-blur-md space-y-2 animate-in fade-in zoom-in-95 duration-300">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ShieldAlert className="h-5 w-5 text-rose-400 shrink-0 animate-pulse" />
+                      <span className="font-bold text-sm text-rose-200 tracking-wide">Too Many Failed Attempts</span>
+                    </div>
+                    <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1.5 shadow-inner">
+                      <Clock className="h-3.5 w-3.5 text-rose-400" />
+                      {Math.floor(cooldownSeconds / 60).toString().padStart(2, '0')}:{(cooldownSeconds % 60).toString().padStart(2, '0')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-rose-200/90 leading-relaxed">
+                    Security cooldown active. Please wait <span className="font-mono font-bold text-white bg-rose-950/80 px-1.5 py-0.5 rounded border border-rose-500/30">{Math.floor(cooldownSeconds / 60)}m {cooldownSeconds % 60}s</span> before trying again.
+                  </p>
+                </div>
+              ) : error ? (
+                <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/15 p-3 text-sm text-destructive text-center font-semibold shadow-sm">
                   {error}
                 </div>
-              )}
+              ) : null}
               <form className="space-y-4" onSubmit={handleLogin}>
                 <div className="space-y-2">
                   <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="email">
@@ -301,11 +351,11 @@ export default function LoginPage() {
                 <Button
                   className="w-full transition-all duration-300 hover:scale-[1.02] active:scale-95"
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || cooldownSeconds > 0}
                   suppressHydrationWarning
                 >
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {isLoading ? "Signing in..." : "Sign In"}
+                  {isLoading ? "Signing in..." : cooldownSeconds > 0 ? `Please Wait (${cooldownSeconds >= 60 ? `${Math.floor(cooldownSeconds / 60)}m ${cooldownSeconds % 60}s` : `${cooldownSeconds}s`})` : "Sign In"}
                 </Button>
               </form>
             </CardContent>

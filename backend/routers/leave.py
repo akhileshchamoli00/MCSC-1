@@ -730,28 +730,21 @@ async def upload_leave_attachment(id: int, file: UploadFile = File(...), db: Ses
     if not leave_req:
         raise HTTPException(status_code=404, detail="Leave request not found or not owned by user")
     
-    if file.content_type not in ["image/png", "image/jpeg", "image/jpg"]:
-        raise HTTPException(status_code=400, detail="Only PNG and JPEG images are allowed")
-        
     from storage import upload_file_to_supabase
-    file_bytes = await file.read()
+    from utils.file_sanitizer import validate_and_sanitize_file
     
+    file_bytes = await file.read()
     if len(file_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File size exceeds the 10 MB limit")
+
+    sanitized_bytes, secure_filename = validate_and_sanitize_file(
+        file_bytes=file_bytes,
+        original_filename=file.filename or "attachment.jpg",
+        allowed_types=["jpeg", "png", "pdf"],
+        strip_exif=True
+    )
         
-    import datetime
-    import re
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    emp_name = f"{current_user.employee.first_name}_{current_user.employee.last_name or ''}".strip()
-    emp_name_clean = re.sub(r'[^a-zA-Z0-9_]', '', emp_name.replace(" ", "_"))
-    
-    file_ext = file.filename.split(".")[-1] if "." in file.filename else ""
-    orig_name = file.filename.rsplit(".", 1)[0]
-    orig_name_clean = re.sub(r'[^a-zA-Z0-9_]', '_', orig_name)
-    
-    new_filename = f"medcert_{emp_name_clean}_{timestamp}_{orig_name_clean}.{file_ext}" if file_ext else f"medcert_{emp_name_clean}_{timestamp}_{orig_name_clean}"
-        
-    file_url = upload_file_to_supabase(file_bytes, new_filename, "hrms-documents")
+    file_url = upload_file_to_supabase(sanitized_bytes, f"medcert_{secure_filename}", "hrms-documents")
     
     leave_req.attachment_url = file_url
     db.commit()

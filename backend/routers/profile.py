@@ -63,5 +63,6 @@ def change_my_password(
     hashed_pw = auth.get_password_hash(password_data.new_password)
     current_user.hashed_password = hashed_pw
     db.commit()
+    auth.clear_user_cache(current_user.email)
     return {"message": "Password changed successfully"}
 

@@ -13,6 +13,28 @@ from database import engine
 
 app = FastAPI(title="MCSC HRMS API")
 
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com data:; "
+        "img-src 'self' data: blob: https://*.supabase.co; "
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co http://127.0.0.1:8000 http://localhost:8000 https://*; "
+        "frame-ancestors 'none'; "
+        "object-src 'none'; "
+        "base-uri 'self';"
+    )
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "0"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
 from routers import departments, employees, attendance, leave, payroll, assets, timesheets, performance, roles, profile, dashboard, notifications, holidays, calendar as calendar_router, clients, chat, announcements, access_control, companies
 app.include_router(departments.router)
 app.include_router(employees.router)
@@ -126,15 +148,22 @@ def register(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
     db.refresh(db_user)
     return db_user
 
+from utils.rate_limiter import check_login_rate_limit, record_failed_attempt, clear_failed_attempts
+
 @app.post("/api/auth/login", response_model=schemas.Token)
-def login_for_access_token(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(database.get_db)):
+def login_for_access_token(request: Request, response: Response, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(database.get_db)):
+    check_login_rate_limit(request, max_attempts=5, window_seconds=300)
+    
     user = auth.get_user_by_email(db, email=form_data.username)
     if not user or not user.is_active or not auth.verify_password(form_data.password, user.hashed_password):
+        record_failed_attempt(request)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password, or your account is deactivated",
+            detail="Incorrect email or password.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    clear_failed_attempts(request)
     
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(

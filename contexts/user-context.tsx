@@ -147,6 +147,38 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     fetchProfile(hasCache);
   }, []);
 
+  // 3. Auto-logout after 30 minutes of user inactivity
+  useEffect(() => {
+    let inactivityTimer: NodeJS.Timeout;
+    const INACTIVITY_LIMIT_MS = 30 * 60 * 1000; // 30 minutes
+
+    const resetInactivityTimer = () => {
+      clearTimeout(inactivityTimer);
+      const token = localStorage.getItem("hrms_token");
+      if (!token) return;
+
+      inactivityTimer = setTimeout(() => {
+        localStorage.removeItem("hrms_token");
+        localStorage.removeItem("user_role");
+        localStorage.removeItem("user_email");
+        localStorage.removeItem("user_id");
+        localStorage.removeItem("hrms_permissions");
+        localStorage.removeItem("hrms_profile");
+        window.location.href = "/login?reason=inactivity";
+      }, INACTIVITY_LIMIT_MS);
+    };
+
+    const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+    events.forEach((event) => window.addEventListener(event, resetInactivityTimer));
+
+    resetInactivityTimer();
+
+    return () => {
+      clearTimeout(inactivityTimer);
+      events.forEach((event) => window.removeEventListener(event, resetInactivityTimer));
+    };
+  }, []);
+
   const hasPermission = (moduleCode: string, actionCode: string) => {
     if (isAdmin) return true;
     return permissions.includes(`${moduleCode}:${actionCode}`) || permissions.includes("*:*");

@@ -61,9 +61,9 @@ def upload_public_file_to_supabase(file_bytes: bytes, filename: str, bucket_name
         except Exception:
             raise e
 
-def get_signed_file_url(file_url_or_path: str, bucket_name: str = "hrms-documents", expires_in: int = 3600) -> str:
+def get_signed_file_url(file_url_or_path: str, bucket_name: str = "hrms-documents", expires_in: int = 900) -> str:
     """
-    Generates a temporary signed URL (valid for `expires_in` seconds, default 1 hr)
+    Generates a temporary signed URL (valid for `expires_in` seconds, default 15 min / 900s)
     for private bucket files.
     """
     if not supabase or not file_url_or_path:

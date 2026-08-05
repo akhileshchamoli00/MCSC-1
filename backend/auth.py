@@ -120,6 +120,13 @@ def get_cached_user(db: Session, email: str):
     _user_cache[email] = (user_dict, now + CACHE_TTL_SECONDS)
     return db_user
 
+def clear_user_cache(email: str):
+    """
+    Clears cached user data to force immediate re-authentication.
+    """
+    if email in _user_cache:
+        del _user_cache[email]
+
 def get_user_by_email(db: Session, email: str):
     return get_cached_user(db, email)
 
