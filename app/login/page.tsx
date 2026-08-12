@@ -50,10 +50,48 @@ export default function LoginPage() {
         router.push("/client/dashboard");
       } else {
         const pref = localStorage.getItem("preferred_system");
-        if (pref === "hrms" || pref === "business") {
-          router.push(`/${pref}/dashboard`);
+        const email = localStorage.getItem("user_email") || "";
+        const uRole = (role || "").trim().toUpperCase();
+        const isSuperAdmin = email === "admin@mcs-consulting.com" || uRole === "ADMIN" || uRole === "SUPER ADMIN" || uRole === "SUPERADMIN" || uRole === "SYSTEM ADMIN";
+        
+        if (isSuperAdmin) {
+          if (pref === "hrms" || pref === "business") {
+            router.push(`/${pref}/dashboard`);
+          } else {
+            router.push("/select-system");
+          }
         } else {
-          router.push("/select-system");
+          // Check cached permissions
+          let freshPermissions: string[] = [];
+          try {
+            const cachedPerms = localStorage.getItem("hrms_permissions");
+            if (cachedPerms) freshPermissions = JSON.parse(cachedPerms);
+          } catch (e) {}
+
+          const list: ("hrms" | "business")[] = [];
+          const hasHRMS = freshPermissions.includes("platform_hrms:view") || freshPermissions.includes("platform_hrms:*") || freshPermissions.includes("*:*");
+          if (hasHRMS) {
+            list.push("hrms");
+          }
+          
+          const hasBusiness = freshPermissions.includes("platform_business:view") || freshPermissions.includes("platform_business:*") || freshPermissions.includes("*:*");
+          if (hasBusiness) {
+            list.push("business");
+          }
+
+          if (list.length === 0) {
+            list.push("hrms");
+          }
+
+          if (list.length === 1) {
+            router.push(`/${list[0]}/dashboard`);
+          } else {
+            if (pref && list.includes(pref as any)) {
+              router.push(`/${pref}/dashboard`);
+            } else {
+              router.push("/select-system");
+            }
+          }
         }
       }
     }
@@ -124,15 +162,50 @@ export default function LoginPage() {
         localStorage.setItem("user_role", roleName);
         localStorage.setItem("user_email", user.email);
         localStorage.setItem("user_id", user.id.toString());
+        
+        const freshPermissions = user.permissions || [];
+        localStorage.setItem("hrms_permissions", JSON.stringify(freshPermissions));
 
         if (roleName === "CLIENT") {
           window.location.href = "/client/dashboard";
         } else {
-          const pref = localStorage.getItem("preferred_system");
-          if (pref === "hrms" || pref === "business") {
-            window.location.href = `/${pref}/dashboard`;
+          const email = user.email || "";
+          const uRole = roleName.trim().toUpperCase();
+          const isSuperAdmin = email === "admin@mcs-consulting.com" || user.role_id === 1 || uRole === "ADMIN" || uRole === "SUPER ADMIN" || uRole === "SUPERADMIN" || uRole === "SYSTEM ADMIN";
+          
+          if (isSuperAdmin) {
+            const pref = localStorage.getItem("preferred_system");
+            if (pref === "hrms" || pref === "business") {
+              window.location.href = `/${pref}/dashboard`;
+            } else {
+              window.location.href = "/select-system";
+            }
           } else {
-            window.location.href = "/select-system";
+            const list: ("hrms" | "business")[] = [];
+            const hasHRMS = freshPermissions.includes("platform_hrms:view") || freshPermissions.includes("platform_hrms:*") || freshPermissions.includes("*:*");
+            if (hasHRMS) {
+              list.push("hrms");
+            }
+            
+            const hasBusiness = freshPermissions.includes("platform_business:view") || freshPermissions.includes("platform_business:*") || freshPermissions.includes("*:*");
+            if (hasBusiness) {
+              list.push("business");
+            }
+
+            if (list.length === 0) {
+              list.push("hrms");
+            }
+
+            if (list.length === 1) {
+              window.location.href = `/${list[0]}/dashboard`;
+            } else {
+              const pref = localStorage.getItem("preferred_system");
+              if (pref && list.includes(pref as any)) {
+                window.location.href = `/${pref}/dashboard`;
+              } else {
+                window.location.href = "/select-system";
+              }
+            }
           }
         }
       } else {

@@ -234,18 +234,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (uRole === "CLIENT") {
         list.push("business");
       } else {
-        // If employee, check explicit platform access permission or their permission prefixes:
-        const hasExplicitHRMS = permissions.includes("platform_hrms:view") || permissions.includes("platform_hrms:*");
-        const hrmsCodes = ["calendar", "employees", "roles", "access_control", "attendance", "leave", "holiday", "payroll", "timesheet", "assets", "performance"];
-        const hasHRMS = hasExplicitHRMS || permissions.some(p => hrmsCodes.some(code => p.startsWith(code)));
-        if (hasHRMS || permissions.includes("*:*")) {
+        // If employee, check explicit platform access permission:
+        const hasHRMS = permissions.includes("platform_hrms:view") || permissions.includes("platform_hrms:*") || permissions.includes("*:*");
+        if (hasHRMS) {
           list.push("hrms");
         }
         
-        const hasExplicitBusiness = permissions.includes("platform_business:view") || permissions.includes("platform_business:*");
-        const businessCodes = ["clients", "chat", "work_items"];
-        const hasBusiness = hasExplicitBusiness || permissions.some(p => businessCodes.some(code => p.startsWith(code)));
-        if (hasBusiness || permissions.includes("*:*")) {
+        const hasBusiness = permissions.includes("platform_business:view") || permissions.includes("platform_business:*") || permissions.includes("*:*");
+        if (hasBusiness) {
           list.push("business");
         }
 
@@ -257,6 +253,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
     return list;
   }, [profile, isAdmin, roleName, email, permissions]);
+
+  // If only one mode is allowed, force it as currentMode automatically
+  useEffect(() => {
+    if (!loading && allowedModes.length === 1) {
+      const singleMode = allowedModes[0];
+      if (currentMode !== singleMode) {
+        setCurrentModeState(singleMode);
+        localStorage.setItem("current_mode", singleMode);
+      }
+    }
+  }, [loading, allowedModes, currentMode]);
 
   return (
     <UserContext.Provider value={{ 
