@@ -565,3 +565,164 @@ def get_admin_dashboard_summary(db: Session = Depends(get_db), current_user: mod
         "upcoming_holidays": upcoming_holidays,
         "performance_stats": performance_stats
     }
+
+from pydantic import BaseModel
+
+class DashboardSettingsUpdate(BaseModel):
+    notify_team_birthdays: bool
+
+@router.get("/birthday")
+def get_my_birthday_status(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
+    employee = current_user.employee
+    if not employee or not employee.date_of_birth:
+        return {"is_birthday": False}
+        
+    today = datetime.date.today()
+    dob = employee.date_of_birth
+    
+    if dob.day == today.day and dob.month == today.month:
+        # 1. Trigger birthday notification for the employee
+        emp_notif_exists = db.query(models.Notification).filter(
+            models.Notification.user_id == current_user.id,
+            models.Notification.type == "BIRTHDAY",
+            func.date(models.Notification.created_at) == today
+        ).first()
+        
+        if not emp_notif_exists:
+            from notification_manager import manager
+            manager.notify_user_sync(
+                db=db,
+                user_id=current_user.id,
+                title="Happy Birthday! 🎉",
+                message=f"Happy Birthday, {employee.first_name}! 🎂 We hope you have a wonderful day!",
+                type="BIRTHDAY",
+                module="dashboard"
+            )
+            
+        # 2. Trigger team birthday notification if enabled
+        notify_setting = db.query(models.SystemSetting).filter(
+            models.SystemSetting.key == "notify_team_birthdays"
+        ).first()
+        notify_team_enabled = (notify_setting.value.lower() == "true") if notify_setting else True
+        
+        if notify_team_enabled:
+            # Check if team notifications already sent today for this employee
+            team_notif_exists = db.query(models.Notification).filter(
+                models.Notification.type == "TEAM_BIRTHDAY",
+                models.Notification.reference_id == employee.id,
+                func.date(models.Notification.created_at) == today
+            ).first()
+            
+            if not team_notif_exists:
+                from notification_manager import manager
+                colleagues = db.query(models.User).filter(
+                    models.User.id != current_user.id,
+                    models.User.is_active == True
+                ).all()
+                
+                month_name = today.strftime("%B")
+                bday_str = f"{today.day} {month_name}"
+                
+                for colleague in colleagues:
+                    manager.notify_user_sync(
+                        db=db,
+                        user_id=colleague.id,
+                        title="Colleague Birthday 🎉",
+                        message=f"Today is {employee.first_name}'s birthday ({bday_str})! Don't forget to wish them a great day!",
+                        type="TEAM_BIRTHDAY",
+                        module="dashboard",
+                        reference_id=employee.id
+                    )
+                    
+        # 3. Dynamic professional messages
+        greetings = [
+            "Wishing you a wonderful year filled with happiness, success, and great achievements.",
+            "Wishing you a fantastic birthday and another amazing year ahead. Thank you for being part of the team!",
+            "May this special day bring you joy, happiness, and continued success in everything you do.",
+            "Happy Birthday! We appreciate all your hard work and dedication. Have a wonderful celebration!",
+            "Wishing you a memorable day and a fantastic year of growth and achievements ahead."
+        ]
+        
+        years_of_service_msg = ""
+        if employee.hire_date:
+            service_years = today.year - employee.hire_date.year
+            if (today.month, today.day) < (employee.hire_date.month, employee.hire_date.day):
+                service_years -= 1
+            if service_years > 0:
+                years_of_service_msg = f" Thank you for {service_years} {'year' if service_years == 1 else 'years'} of service with us!"
+
+        import random
+        selected_message = random.choice(greetings) + years_of_service_msg
+        
+        return {
+            "is_birthday": True,
+            "employee_name": employee.first_name,
+            "message": selected_message
+        }
+        
+    return {"is_birthday": False}
+
+@router.get("/birthdays/upcoming")
+def get_upcoming_birthdays(
+    days: int = Query(30, ge=1, le=365),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    today = datetime.date.today()
+    employees = db.query(models.Employee).filter(
+        models.Employee.status == "ACTIVE",
+        models.Employee.date_of_birth.isnot(None)
+    ).options(joinedload(models.Employee.department)).all()
+    
+    upcoming = []
+    for emp in employees:
+        dob = emp.date_of_birth
+        try:
+            bday_this_year = datetime.date(today.year, dob.month, dob.day)
+        except ValueError:
+            bday_this_year = datetime.date(today.year, 2, 28)
+            
+        if bday_this_year >= today:
+            next_bday = bday_this_year
+        else:
+            try:
+                next_bday = datetime.date(today.year + 1, dob.month, dob.day)
+            except ValueError:
+                next_bday = datetime.date(today.year + 1, 2, 28)
+                
+        days_away = (next_bday - today).days
+        if days_away <= days:
+            upcoming.append({
+                "id": emp.id,
+                "first_name": emp.first_name,
+                "last_name": emp.last_name,
+                "profile_photo": emp.profile_photo,
+                "department": emp.department.name if emp.department else "MCS Consulting",
+                "birthday_date": next_bday.strftime("%d %b"),
+                "days_away": days_away
+            })
+            
+    upcoming.sort(key=lambda x: x["days_away"])
+    return upcoming
+
+@router.get("/settings")
+def get_dashboard_settings(db: Session = Depends(get_db), current_user: models.User = Depends(auth.get_current_user)):
+    notify_setting = db.query(models.SystemSetting).filter(models.SystemSetting.key == "notify_team_birthdays").first()
+    notify_team_enabled = (notify_setting.value.lower() == "true") if notify_setting else True
+    return {"notify_team_birthdays": notify_team_enabled}
+
+@router.put("/settings")
+def update_dashboard_settings(
+    settings_data: DashboardSettingsUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    setting = db.query(models.SystemSetting).filter(models.SystemSetting.key == "notify_team_birthdays").first()
+    val_str = "true" if settings_data.notify_team_birthdays else "false"
+    if not setting:
+        setting = models.SystemSetting(key="notify_team_birthdays", value=val_str)
+        db.add(setting)
+    else:
+        setting.value = val_str
+    db.commit()
+    return {"message": "Settings updated successfully", "notify_team_birthdays": settings_data.notify_team_birthdays}

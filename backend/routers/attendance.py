@@ -14,13 +14,13 @@ router = APIRouter(
     dependencies=[Depends(auth.get_current_user)]
 )
 
-kl_tz = pytz.timezone('Asia/Kuala_Lumpur')
+local_tz = pytz.timezone('Asia/Jakarta')
 
-def get_kl_now():
-    return datetime.now(kl_tz)
+def get_local_now():
+    return datetime.now(local_tz)
 
-def get_kl_today():
-    return get_kl_now().date()
+def get_local_today():
+    return get_local_now().date()
 
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371000  # radius of Earth in meters
@@ -43,10 +43,10 @@ def get_settings(db: Session):
 
 def recalculate_attendance(attendance: models.Attendance):
     if attendance.clock_in_time:
-        start_time = kl_tz.localize(datetime.combine(attendance.attendance_date, time(9, 0)))
-        clock_in_kl = attendance.clock_in_time.astimezone(kl_tz) if attendance.clock_in_time.tzinfo else kl_tz.localize(attendance.clock_in_time)
-        if clock_in_kl > start_time:
-            late_diff = clock_in_kl - start_time
+        start_time = local_tz.localize(datetime.combine(attendance.attendance_date, time(9, 0)))
+        clock_in_local = attendance.clock_in_time.astimezone(local_tz) if attendance.clock_in_time.tzinfo else local_tz.localize(attendance.clock_in_time)
+        if clock_in_local > start_time:
+            late_diff = clock_in_local - start_time
             late_minutes = int(late_diff.total_seconds() / 60)
             attendance.late_minutes = late_minutes
             attendance.status = "Late"
@@ -114,8 +114,8 @@ def clock_in(request: Request, req: schemas.AttendanceClockInRequest, db: Sessio
         
     validate_ip(request, settings)
         
-    today = get_kl_today()
-    now = get_kl_now()
+    today = get_local_today()
+    now = get_local_now()
     
     from routers.leave import is_public_holiday
     if is_public_holiday(db, today):
@@ -131,7 +131,7 @@ def clock_in(request: Request, req: schemas.AttendanceClockInRequest, db: Sessio
         
     # Calculate Late
     late_minutes = 0
-    start_time = kl_tz.localize(datetime.combine(today, time(9, 0)))
+    start_time = local_tz.localize(datetime.combine(today, time(9, 0)))
     if now > start_time:
         diff = now - start_time
         late_minutes = int(diff.total_seconds() / 60)
@@ -165,8 +165,8 @@ def clock_out(request: Request, req: schemas.AttendanceClockOutRequest, db: Sess
         
     validate_ip(request, settings)
         
-    today = get_kl_today()
-    now = get_kl_now()
+    today = get_local_today()
+    now = get_local_now()
     
     attendance = db.query(models.Attendance).filter(
         models.Attendance.employee_id == current_user.employee.id,
@@ -267,7 +267,7 @@ def get_today_summary(db: Session = Depends(database.get_db), current_user: mode
     if not is_admin_or_hr(current_user, db):
         raise HTTPException(status_code=403, detail="Admin access required")
         
-    today = get_kl_today()
+    today = get_local_today()
     total_employees = db.query(models.Employee).count()
     
     attendances = db.query(models.Attendance).filter(models.Attendance.attendance_date == today).all()
@@ -350,7 +350,7 @@ def approve_correction(correction_id: int, db: Session = Depends(database.get_db
         
     correction.status = "APPROVED"
     correction.approved_by = current_user.id
-    correction.approved_at = get_kl_now()
+    correction.approved_at = get_local_now()
     
     attendance = correction.attendance
     if correction.requested_clock_in:
@@ -374,6 +374,6 @@ def reject_correction(correction_id: int, db: Session = Depends(database.get_db)
         
     correction.status = "REJECTED"
     correction.approved_by = current_user.id
-    correction.approved_at = get_kl_now()
+    correction.approved_at = get_local_now()
     db.commit()
     return {"message": "Correction rejected"}

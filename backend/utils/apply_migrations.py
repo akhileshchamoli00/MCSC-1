@@ -84,13 +84,14 @@ def run_migrations():
                 handle_migration_error(col, "employees", e)
 
         # Columns to add to client_documents
-        try:
-            conn.execute(text("ALTER TABLE client_documents ADD COLUMN document_date DATE"))
-            conn.commit()
-            print("Added column 'document_date' to 'client_documents' table.")
-        except Exception as e:
-            conn.rollback()
-            handle_migration_error("document_date", "client_documents", e)
+        for col, col_type in [("document_date", "DATE"), ("document_path", "VARCHAR(500)")]:
+            try:
+                conn.execute(text(f"ALTER TABLE client_documents ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                print(f"Added column '{col}' to 'client_documents' table.")
+            except Exception as e:
+                conn.rollback()
+                handle_migration_error(col, "client_documents", e)
 
         # Columns to add to leave_requests
         try:
@@ -100,6 +101,16 @@ def run_migrations():
         except Exception as e:
             conn.rollback()
             handle_migration_error("allocation_date", "leave_requests", e)
+
+        # Columns to add to client_companies
+        for col, col_type in [("director_name", "VARCHAR(255)"), ("director_email", "VARCHAR(255)"), ("director_contact", "VARCHAR(255)"), ("notes", "TEXT")]:
+            try:
+                conn.execute(text(f"ALTER TABLE client_companies ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                print(f"Added column '{col}' to 'client_companies' table.")
+            except Exception as e:
+                conn.rollback()
+                handle_migration_error(col, "client_companies", e)
 
         # Indexes for attendance and attendance_corrections tables
         for idx_sql, idx_name in [
@@ -113,6 +124,80 @@ def run_migrations():
                 print(f"Created/verified index '{idx_name}'.")
             except Exception as e:
                 conn.rollback()
+
+        # Add client_code to clients table
+        try:
+            conn.execute(text("ALTER TABLE clients ADD COLUMN client_code VARCHAR(255) UNIQUE"))
+            conn.commit()
+            print("Added column 'client_code' to 'clients' table.")
+        except Exception as e:
+            conn.rollback()
+
+        # Columns to add to company_stakeholders
+        for col, col_type in [("phone", "VARCHAR(255)"), ("email", "VARCHAR(255)"), ("is_key_contact", "BOOLEAN DEFAULT FALSE")]:
+            try:
+                conn.execute(text(f"ALTER TABLE company_stakeholders ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                print(f"Added column '{col}' to 'company_stakeholders' table.")
+            except Exception as e:
+                conn.rollback()
+
+        # Add order_number to client_documents table
+        try:
+            conn.execute(text("ALTER TABLE client_documents ADD COLUMN order_number VARCHAR(255)"))
+            conn.commit()
+            print("Added column 'order_number' to 'client_documents' table.")
+        except Exception as e:
+            conn.rollback()
+
+        # Add is_proforma_finalized to client_orders table
+        try:
+            conn.execute(text("ALTER TABLE client_orders ADD COLUMN is_proforma_finalized BOOLEAN DEFAULT FALSE"))
+            conn.commit()
+            print("Added column 'is_proforma_finalized' to 'client_orders' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("is_proforma_finalized", "client_orders", e)
+
+        # Add proforma_stage_percent to client_orders table
+        try:
+            conn.execute(text("ALTER TABLE client_orders ADD COLUMN proforma_stage_percent INTEGER DEFAULT 50"))
+            conn.commit()
+            print("Added column 'proforma_stage_percent' to 'client_orders' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("proforma_stage_percent", "client_orders", e)
+
+        # Add is_final_invoice_finalized to client_orders table
+        try:
+            conn.execute(text("ALTER TABLE client_orders ADD COLUMN is_final_invoice_finalized BOOLEAN DEFAULT FALSE"))
+            conn.commit()
+            print("Added column 'is_final_invoice_finalized' to 'client_orders' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("is_final_invoice_finalized", "client_orders", e)
+
+        # Seed existing clients without client_code
+        try:
+            res = conn.execute(text("SELECT id, created_at FROM clients WHERE client_code IS NULL ORDER BY id ASC")).fetchall()
+            import datetime
+            for row in res:
+                cid = row[0]
+                created_dt = row[1] or datetime.datetime.now()
+                year_str = created_dt.strftime("%y")
+                seq_num = 1
+                while True:
+                    test_code = f"X{year_str}{seq_num:04d}"
+                    exists = conn.execute(text("SELECT 1 FROM clients WHERE client_code = :code"), {"code": test_code}).first()
+                    if not exists:
+                        conn.execute(text("UPDATE clients SET client_code = :code WHERE id = :id"), {"code": test_code, "id": cid})
+                        conn.commit()
+                        print(f"Migrated client ID {cid} to code {test_code}")
+                        break
+                    seq_num += 1
+        except Exception as e:
+            conn.rollback()
+            print(f"Error migrating client codes: {e}")
 
     print("Migration check complete.")
 

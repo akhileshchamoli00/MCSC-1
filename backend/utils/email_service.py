@@ -170,3 +170,45 @@ MCS Consulting HRMS
         print(f"Successfully sent password reset email to {employee_email}")
     except Exception as e:
         print(f"Failed to send email to {employee_email}: {str(e)}")
+
+
+def send_invoice_attachment_email(recipient_email: str, recipient_name: str, invoice_type: str, pdf_content: bytes, pdf_filename: str):
+    """
+    Send finalized proforma or final invoice attachment to a client.
+    """
+    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
+        print("WARNING: GMAIL_USER or GMAIL_APP_PASSWORD not set in .env. Email won't be sent.")
+        return
+
+    subject = f"PT Mandiri Cipta Solusi - {invoice_type.title()} Invoice"
+    
+    body = f"""Dear {recipient_name},
+
+Please find attached our official {invoice_type} invoice for your review and payment process.
+
+If you have any questions or require further assistance, please feel free to reach out to us.
+
+Regards,
+PT Mandiri Cipta Solusi (MCS Consulting)
+"""
+
+    msg = MIMEMultipart()
+    msg['From'] = GMAIL_USER
+    msg['To'] = recipient_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+
+    if pdf_content:
+        from email.mime.application import MIMEApplication
+        part = MIMEApplication(pdf_content, Name=pdf_filename)
+        part['Content-Disposition'] = f'attachment; filename="{pdf_filename}"'
+        msg.attach(part)
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+            server.send_message(msg)
+        print(f"Successfully sent {invoice_type} invoice email to {recipient_email}")
+    except Exception as e:
+        print(f"Failed to send {invoice_type} invoice email to {recipient_email}: {str(e)}")
+

@@ -26,6 +26,11 @@ interface UserContextType {
   permissions: string[];
   hasPermission: (moduleCode: string, actionCode: string) => boolean;
   refreshProfile: () => Promise<void>;
+  currentMode: "hrms" | "business";
+  setMode: (mode: "hrms" | "business") => void;
+  allowedModes: ("hrms" | "business")[];
+  preferredMode: "hrms" | "business" | null;
+  setPreferredMode: (mode: "hrms" | "business" | null) => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -42,6 +47,38 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const [currentMode, setCurrentModeState] = useState<"hrms" | "business">("hrms");
+  const [preferredMode, setPreferredModeState] = useState<"hrms" | "business" | null>(null);
+
+  // Sync mode with localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedMode = localStorage.getItem("current_mode") as "hrms" | "business";
+      if (savedMode === "hrms" || savedMode === "business") {
+        setCurrentModeState(savedMode);
+      }
+      
+      const savedPref = localStorage.getItem("preferred_system") as "hrms" | "business";
+      if (savedPref === "hrms" || savedPref === "business") {
+        setPreferredModeState(savedPref);
+      }
+    }
+  }, []);
+
+  const setMode = (mode: "hrms" | "business") => {
+    setCurrentModeState(mode);
+    localStorage.setItem("current_mode", mode);
+  };
+
+  const setPreferredMode = (mode: "hrms" | "business" | null) => {
+    setPreferredModeState(mode);
+    if (mode) {
+      localStorage.setItem("preferred_system", mode);
+    } else {
+      localStorage.removeItem("preferred_system");
+    }
+  };
 
   const fetchProfile = async (isBackground = false) => {
     const token = localStorage.getItem("hrms_token");
@@ -184,8 +221,57 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return permissions.includes(`${moduleCode}:${actionCode}`) || permissions.includes("*:*");
   };
 
+  // Determine allowed modes based on role and permissions
+  const roleName = profile?.user?.role?.name || (typeof window !== "undefined" ? localStorage.getItem("user_role") : "") || "";
+  const email = profile?.user?.email || (typeof window !== "undefined" ? localStorage.getItem("user_email") : "") || "";
+  
+  const allowedModes = React.useMemo<("hrms" | "business")[]>(() => {
+    const list: ("hrms" | "business")[] = [];
+    if (isAdmin || isSuperAdminRole(roleName, undefined, email)) {
+      list.push("hrms", "business");
+    } else {
+      const uRole = roleName.trim().toUpperCase();
+      if (uRole === "CLIENT") {
+        list.push("business");
+      } else {
+        // If employee, check explicit platform access permission or their permission prefixes:
+        const hasExplicitHRMS = permissions.includes("platform_hrms:view") || permissions.includes("platform_hrms:*");
+        const hrmsCodes = ["calendar", "employees", "roles", "access_control", "attendance", "leave", "holiday", "payroll", "timesheet", "assets", "performance"];
+        const hasHRMS = hasExplicitHRMS || permissions.some(p => hrmsCodes.some(code => p.startsWith(code)));
+        if (hasHRMS || permissions.includes("*:*")) {
+          list.push("hrms");
+        }
+        
+        const hasExplicitBusiness = permissions.includes("platform_business:view") || permissions.includes("platform_business:*");
+        const businessCodes = ["clients", "chat", "work_items"];
+        const hasBusiness = hasExplicitBusiness || permissions.some(p => businessCodes.some(code => p.startsWith(code)));
+        if (hasBusiness || permissions.includes("*:*")) {
+          list.push("business");
+        }
+
+        // Default fallback if no specific permission but employee
+        if (list.length === 0) {
+          list.push("hrms");
+        }
+      }
+    }
+    return list;
+  }, [profile, isAdmin, roleName, email, permissions]);
+
   return (
-    <UserContext.Provider value={{ profile, isAdmin, loading, permissions, hasPermission, refreshProfile: fetchProfile }}>
+    <UserContext.Provider value={{ 
+      profile, 
+      isAdmin, 
+      loading, 
+      permissions, 
+      hasPermission, 
+      refreshProfile: fetchProfile,
+      currentMode,
+      setMode,
+      allowedModes,
+      preferredMode,
+      setPreferredMode
+    }}>
       {children}
     </UserContext.Provider>
   );

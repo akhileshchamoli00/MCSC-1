@@ -24,19 +24,19 @@ async def add_security_headers(request: Request, call_next):
         "img-src 'self' data: blob: https://*.supabase.co https://*.google.com; "
         "frame-src 'self' https://calendar.google.com https://*.google.com https://*.google.co.id; "
         "connect-src 'self' https://*.supabase.co wss://*.supabase.co http://127.0.0.1:8000 http://localhost:8000 https://*; "
-        "frame-ancestors 'none'; "
+        "frame-ancestors 'self'; "
         "object-src 'none'; "
         "base-uri 'self';"
     )
     response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["X-XSS-Protection"] = "0"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
-from routers import departments, employees, attendance, leave, payroll, assets, timesheets, performance, roles, profile, dashboard, notifications, holidays, calendar as calendar_router, clients, chat, announcements, access_control, companies
+from routers import departments, employees, attendance, leave, payroll, assets, timesheets, performance, roles, profile, dashboard, notifications, holidays, calendar as calendar_router, clients, chat, announcements, access_control, companies, dropbox, notaries, teams
 app.include_router(departments.router)
 app.include_router(employees.router)
 app.include_router(attendance.router)
@@ -51,11 +51,14 @@ app.include_router(dashboard.router)
 app.include_router(notifications.router)
 app.include_router(holidays.router)
 app.include_router(calendar_router.router)
+app.include_router(notaries.router, prefix="/api/clients/notaries", tags=["notaries"])
 app.include_router(clients.router)
 app.include_router(chat.router)
 app.include_router(announcements.router)
 app.include_router(access_control.router)
 app.include_router(companies.router)
+app.include_router(dropbox.router)
+app.include_router(teams.router)
 
 # Mount uploads directory
 import os
@@ -97,7 +100,7 @@ async def run_daily_accrual_middleware(request: Request, call_next):
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
-    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"

@@ -38,6 +38,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
+      sessionStorage.clear();
       const params = new URLSearchParams(window.location.search);
       if (params.get("reason") === "inactivity") {
         setError("Session expired: You were automatically logged out due to 30 minutes of inactivity.");
@@ -48,7 +49,12 @@ export default function LoginPage() {
       if (role === "CLIENT") {
         router.push("/client/dashboard");
       } else {
-        router.push("/dashboard");
+        const pref = localStorage.getItem("preferred_system");
+        if (pref === "hrms" || pref === "business") {
+          router.push(`/${pref}/dashboard`);
+        } else {
+          router.push("/select-system");
+        }
       }
     }
   }, [router]);
@@ -122,10 +128,20 @@ export default function LoginPage() {
         if (roleName === "CLIENT") {
           window.location.href = "/client/dashboard";
         } else {
-          window.location.href = "/dashboard";
+          const pref = localStorage.getItem("preferred_system");
+          if (pref === "hrms" || pref === "business") {
+            window.location.href = `/${pref}/dashboard`;
+          } else {
+            window.location.href = "/select-system";
+          }
         }
       } else {
-        window.location.href = "/dashboard";
+        const pref = localStorage.getItem("preferred_system");
+        if (pref === "hrms" || pref === "business") {
+          window.location.href = `/${pref}/dashboard`;
+        } else {
+          window.location.href = "/select-system";
+        }
       }
     } catch (err: any) {
       setError(err.message || "An error occurred during login.");

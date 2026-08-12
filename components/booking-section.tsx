@@ -14,8 +14,12 @@ export function BookingSection({ isEmbedded = false }: { isEmbedded?: boolean } 
   useEffect(() => {
     // Only load the URL on the client to avoid hydration mismatch
     // and access the environment variable safely.
-    const url = process.env.NEXT_PUBLIC_GOOGLE_BOOKING_URL;
+    let url = process.env.NEXT_PUBLIC_GOOGLE_BOOKING_URL;
     if (url) {
+      if (!url.includes("ctz=")) {
+        const separator = url.includes("?") ? "&" : "?";
+        url = `${url}${separator}ctz=Asia/Jakarta`;
+      }
       setBookingUrl(url);
     } else {
       setIsLoading(false);

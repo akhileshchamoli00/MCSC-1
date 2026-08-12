@@ -23,14 +23,17 @@ import {
   Zap,
   PlayCircle,
   FileCheck,
-  Layers,
   Sparkles,
   Shield,
   MessageSquare,
   FileText,
   Megaphone,
   User,
-  Award
+  Award,
+  Building2,
+  Briefcase,
+  ShoppingBag,
+  Scale
 } from "lucide-react";
 import {
   Tooltip,
@@ -56,6 +59,7 @@ interface NavModule {
   adminOnly?: boolean;
   employeeOnly?: boolean;
   moduleCode?: string;
+  systemArea?: "hrms" | "business" | "shared";
 }
 
 const clientNavModules: NavModule[] = [
@@ -95,106 +99,171 @@ const navModules: NavModule[] = [
   {
     title: "Dashboard",
     icon: LayoutDashboard,
-    href: "/dashboard",
-    moduleCode: "dashboard"
+    href: "/hrms/dashboard",
+    moduleCode: "dashboard",
+    systemArea: "shared"
+  },
+  {
+    title: "Teams",
+    icon: Users,
+    href: "/business/teams",
+    moduleCode: "clients_teams",
+    systemArea: "business"
   },
   {
     title: "Calendar",
     icon: Calendar,
-    href: "/calendar",
+    href: "/hrms/calendar",
     adminOnly: true,
-    moduleCode: "calendar"
+    moduleCode: "calendar",
+    systemArea: "hrms"
   },
   {
     title: "Employee",
     icon: Users,
+    systemArea: "hrms",
     items: [
-      { name: "All Employees", href: "/employees", adminOnly: true, moduleCode: "employees_all" },
-      { name: "My Profile", href: "/profile", adminOnly: false, moduleCode: "employees_profile" },
+      { name: "All Employees", href: "/hrms/employees", adminOnly: true, moduleCode: "employees_all" },
+      { name: "My Profile", href: "/hrms/profile", adminOnly: false, moduleCode: "employees_profile" },
     ]
   },
   {
     title: "Access Control",
     icon: Shield,
+    systemArea: "hrms",
     items: [
-      { name: "Roles List", href: "/roles", adminOnly: true, moduleCode: "roles_list" },
-      { name: "Permission Matrix", href: "/access-control", adminOnly: true, moduleCode: "access_control_matrix" },
+      { name: "Roles List", href: "/hrms/roles", adminOnly: true, moduleCode: "roles_list" },
+      { name: "Permission Matrix", href: "/hrms/access-control", adminOnly: true, moduleCode: "access_control_matrix" },
     ]
   },
   {
     title: "Attendance",
     icon: Calendar,
+    systemArea: "hrms",
     items: [
-      { name: "Management", href: "/attendance-management", adminOnly: true, moduleCode: "attendance_management" },
-      { name: "My Attendance", href: "/attendance", adminOnly: false, moduleCode: "attendance_my" },
+      { name: "Management", href: "/hrms/attendance-management", adminOnly: true, moduleCode: "attendance_management" },
+      { name: "My Attendance", href: "/hrms/attendance", adminOnly: false, moduleCode: "attendance_my" },
     ]
   },
   {
     title: "Leave",
     icon: Coffee,
+    systemArea: "hrms",
     items: [
-      { name: "Overview", href: "/leave", adminOnly: true, moduleCode: "leave_overview" },
-      { name: "Management", href: "/leave-approval", adminOnly: true, moduleCode: "leave_management" },
-      { name: "My Leave", href: "/apply-leave", adminOnly: false, moduleCode: "leave_my" },
+      { name: "Overview", href: "/hrms/leave", adminOnly: true, moduleCode: "leave_overview" },
+      { name: "Management", href: "/hrms/leave-approval", adminOnly: true, moduleCode: "leave_management" },
+      { name: "My Leave", href: "/hrms/apply-leave", adminOnly: false, moduleCode: "leave_my" },
     ]
   },
   {
     title: "Public Holidays",
     icon: Calendar,
-    href: "/public-holidays",
+    href: "/hrms/public-holidays",
     adminOnly: true,
-    moduleCode: "public_holidays"
+    moduleCode: "public_holidays",
+    systemArea: "hrms"
   },
   {
     title: "Payroll",
     icon: Wallet,
+    systemArea: "hrms",
     items: [
-      { name: "Management", href: "/payroll", adminOnly: true, moduleCode: "payroll_management" },
-      { name: "My Payroll", href: "/my-payroll", adminOnly: false, moduleCode: "payroll_my" },
+      { name: "Management", href: "/hrms/payroll", adminOnly: true, moduleCode: "payroll_management" },
+      { name: "My Payroll", href: "/hrms/my-payroll", adminOnly: false, moduleCode: "payroll_my" },
     ]
   },
   {
     title: "Timesheets",
     icon: Clock,
+    systemArea: "hrms",
     items: [
-      { name: "Management", href: "/timesheet-management", adminOnly: true, moduleCode: "timesheets_management" },
-      { name: "My Timesheets", href: "/timesheets", adminOnly: false, moduleCode: "timesheets_my" },
+      { name: "Management", href: "/hrms/timesheet-management", adminOnly: true, moduleCode: "timesheets_management" },
+      { name: "My Timesheets", href: "/hrms/timesheets", adminOnly: false, moduleCode: "timesheets_my" },
     ]
   },
   {
     title: "Assets",
     icon: Monitor,
+    systemArea: "hrms",
     items: [
-      { name: "Management", href: "/assets", adminOnly: true, moduleCode: "assets_management" },
-      { name: "My Assets", href: "/my-assets", adminOnly: false, moduleCode: "assets_my" },
+      { name: "Management", href: "/hrms/assets", adminOnly: true, moduleCode: "assets_management" },
+      { name: "My Assets", href: "/hrms/my-assets", adminOnly: false, moduleCode: "assets_my" },
     ]
   },
   {
     title: "Performance",
     icon: Award,
+    systemArea: "hrms",
     items: [
-      { name: "Overview", href: "/performance", adminOnly: false },
+      { name: "Overview", href: "/hrms/performance", adminOnly: false },
     ]
   },
   {
-    title: "Clients",
+    title: "Partners",
     icon: Users,
+    href: "/business/clients",
     adminOnly: true,
+    moduleCode: "clients_all",
+    systemArea: "business"
+  },
+  {
+    title: "Companies",
+    icon: Building2,
+    href: "/business/clients/companies",
+    adminOnly: true,
+    moduleCode: "clients_company",
+    systemArea: "business"
+  },
+  {
+    title: "Services",
+    icon: Briefcase,
+    href: "/business/clients/services",
+    adminOnly: true,
+    moduleCode: "clients_services",
+    systemArea: "business"
+  },
+  {
+    title: "Notaries",
+    icon: Scale,
+    href: "/business/clients/notaries",
+    adminOnly: true,
+    moduleCode: "clients_notaries",
+    systemArea: "business"
+  },
+  {
+    title: "Orders",
+    icon: ShoppingBag,
+    systemArea: "business",
     items: [
-      { name: "All Clients", href: "/clients", adminOnly: true, moduleCode: "clients_all" },
-      { name: "Add Company", href: "/clients/companies", adminOnly: true, moduleCode: "clients_company" },
-      { name: "Company Documents", href: "/clients/documents", adminOnly: true, moduleCode: "clients_documents" },
-      { name: "Assign Consultant", href: "/clients/assign", adminOnly: true, moduleCode: "clients_assign" },
-      { name: "My Clients", href: "/my-clients", adminOnly: false, employeeOnly: true, moduleCode: "clients_my" },
+      { name: "Active Orders", href: "/business/clients/orders", adminOnly: true, moduleCode: "clients_orders_active" },
+      { name: "Completed Orders", href: "/business/clients/orders/completed", adminOnly: true, moduleCode: "clients_orders_completed" }
     ]
+  },
+  {
+    title: "Documents",
+    icon: FileText,
+    href: "/business/clients/documents",
+    adminOnly: true,
+    moduleCode: "clients_documents",
+    systemArea: "business"
+  },
+  {
+    title: "Assigned Orders",
+    icon: FileCheck,
+    href: "/business/assigned-orders",
+    adminOnly: false,
+    employeeOnly: true,
+    moduleCode: "clients_my",
+    systemArea: "business"
   },
   {
     title: "Chat",
     icon: MessageSquare,
+    systemArea: "business",
     items: [
-      { name: "Chat Center", href: "/chat-center", adminOnly: true, moduleCode: "chat_center" },
-      { name: "Client Chat", href: "/chat", adminOnly: false, employeeOnly: true, moduleCode: "chat_client" },
-      { name: "Assigned Company", href: "/chat/assigned-companies", adminOnly: false, moduleCode: "chat_assigned_companies" },
+      { name: "Chat Center", href: "/business/chat-center", adminOnly: true, moduleCode: "chat_center" },
+      { name: "Client Chat", href: "/business/chat", adminOnly: false, employeeOnly: true, moduleCode: "chat_client" },
+      { name: "Assigned Company", href: "/business/chat/assigned-companies", adminOnly: false, moduleCode: "chat_assigned_companies" },
     ]
   }
 ];
@@ -210,9 +279,10 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
   const pathname = usePathname();
   const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
   const [role, setRole] = useState("");
-  const { hasPermission } = useUser();
+  const { hasPermission, currentMode, setMode, allowedModes } = useUser();
 
   // Persist state
   useEffect(() => {
@@ -251,8 +321,24 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
 
   // Determine if a module is active based on current path
   const isModuleActive = (module: NavModule) => {
-    if (module.href) {
-      return pathname === module.href || pathname.startsWith(module.href + '/');
+    let href = module.href;
+    if (module.title === "Dashboard" && role !== "CLIENT") {
+      href = currentMode === "business" ? "/business/dashboard" : "/hrms/dashboard";
+    }
+    if (href) {
+      if (href === "/business/clients") {
+        const exclusions = [
+          "/business/clients/companies",
+          "/business/clients/services",
+          "/business/clients/orders",
+          "/business/clients/documents",
+          "/business/clients/notaries"
+        ];
+        if (exclusions.some(ex => pathname === ex || pathname.startsWith(ex + '/'))) {
+          return false;
+        }
+      }
+      return pathname === href || pathname.startsWith(href + '/');
     }
     return module.items?.some(item => pathname === item.href || pathname.startsWith(item.href + '/')) ?? false;
   };
@@ -269,6 +355,7 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
     localStorage.removeItem("hrms_employees_data");
     localStorage.removeItem("hrms_departments_data");
     localStorage.removeItem("hrms_roles_data");
+    sessionStorage.clear();
     window.location.href = "/login";
   };
 
@@ -301,7 +388,10 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
           }`}
       >
         {/* Header / Logo Area */}
-        <div className="h-[104px] flex items-center px-4 shrink-0 border-b border-slate-100 dark:border-zinc-900 relative">
+        <div 
+          className="h-[104px] flex items-center px-4 shrink-0 border-b border-slate-100 dark:border-zinc-900 relative"
+          onMouseLeave={() => setIsSwitcherOpen(false)}
+        >
           <AnimatePresence mode="wait">
             {!isCollapsed && (
               <motion.div 
@@ -310,7 +400,7 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
                 animate={{ opacity: 1, width: "auto" }}
                 exit={{ opacity: 0, width: 0 }}
                 transition={{ duration: 0.3 }}
-                className="flex items-center gap-3 w-full p-2 mt-2 overflow-hidden"
+                className="flex items-center gap-3 w-full p-2 mt-2 overflow-visible"
               >
                 <div 
                   className="bg-gradient-to-tr from-primary/20 via-primary/10 to-primary/30 p-[1.5px] rounded-xl transition-all shrink-0 hover:scale-105 cursor-pointer flex items-center justify-center shadow-sm"
@@ -320,14 +410,77 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
                     <img src="/icon.png" alt="MCS Logo" className="w-6 h-6 object-contain" />
                   </div>
                 </div>
-                <div className="flex flex-col whitespace-nowrap">
-                  <span className="font-black text-base tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 dark:from-white dark:via-slate-100 dark:to-slate-200 leading-tight">
-                    MCS
-                  </span>
-                  <span className="text-[9px] text-muted-foreground/60 tracking-widest uppercase font-bold mt-0.5">
-                    Workspace
-                  </span>
-                </div>
+                
+                {allowedModes && allowedModes.length > 1 && role !== "CLIENT" ? (
+                  <div className="flex flex-col whitespace-nowrap justify-start items-start relative">
+                    <span className="text-[10px] text-muted-foreground/60 tracking-wider uppercase font-bold">
+                      MCS Platform
+                    </span>
+                    <button
+                      onClick={() => setIsSwitcherOpen(!isSwitcherOpen)}
+                      className="flex items-center gap-1 text-sm font-bold text-slate-800 dark:text-slate-100 hover:opacity-85 transition-opacity"
+                    >
+                      {currentMode === "business" ? "Business" : "HRMS"}
+                      <ChevronDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
+                    </button>
+                    
+                    {/* Switcher Dropdown */}
+                    <AnimatePresence>
+                      {isSwitcherOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 5 }}
+                          className="absolute left-0 top-[38px] w-[180px] rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-1.5 shadow-xl z-50 text-[11px]"
+                        >
+                          <button
+                            onClick={() => {
+                              setIsSwitcherOpen(false);
+                              if (currentMode !== "hrms") {
+                                setMode("hrms");
+                                router.push("/hrms/dashboard");
+                              }
+                            }}
+                            className={`flex items-center justify-between w-full p-2 rounded-lg font-bold text-left transition-colors ${currentMode === "hrms" ? "bg-primary/10 text-primary" : "hover:bg-slate-100 dark:hover:bg-zinc-900 text-slate-700 dark:text-slate-300"}`}
+                          >
+                            <span>MCS HRMS Platform</span>
+                            {currentMode === "hrms" && <div className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setIsSwitcherOpen(false);
+                              if (currentMode !== "business") {
+                                setMode("business");
+                                router.push("/business/dashboard");
+                              }
+                            }}
+                            className={`flex items-center justify-between w-full p-2 rounded-lg font-bold text-left transition-colors ${currentMode === "business" ? "bg-primary/10 text-primary" : "hover:bg-slate-100 dark:hover:bg-zinc-900 text-slate-700 dark:text-slate-300"}`}
+                          >
+                            <span>MCS Business Platform</span>
+                            {currentMode === "business" && <div className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                          </button>
+                          <div className="border-t border-slate-100 dark:border-zinc-900 my-1" />
+                          <Link
+                            href="/select-system"
+                            onClick={() => setIsSwitcherOpen(false)}
+                            className="flex items-center gap-1.5 w-full p-2 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900 text-[10px] font-semibold"
+                          >
+                            Change Workspace
+                          </Link>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                ) : (
+                  <div className="flex flex-col whitespace-nowrap">
+                    <span className="font-black text-base tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 dark:from-white dark:via-slate-100 dark:to-slate-200 leading-tight">
+                      MCS
+                    </span>
+                    <span className="text-[9px] text-muted-foreground/60 tracking-widest uppercase font-bold mt-0.5">
+                      {role === "CLIENT" ? "Client Portal" : currentMode === "business" ? "Business" : "HRMS"}
+                    </span>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -346,11 +499,17 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
         {/* Navigation List */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-3 space-y-1 scrollbar-hide">
           {(role === "CLIENT" ? clientNavModules : navModules).map((module) => {
+            // Filter by active system area (hrms vs business)
+            const moduleArea = module.systemArea || "shared";
+            if (role !== "CLIENT" && moduleArea !== "shared" && moduleArea !== currentMode) {
+              return null;
+            }
+
             let isVisible = false;
             let visibleItems: NavItem[] = [];
 
             if (module.href) {
-              if (module.href === "/calendar") {
+              if (module.href === "/calendar" || module.href === "/hrms/calendar") {
                 isVisible = isAdmin || userProfile?.has_calendar_access;
               } else if (module.moduleCode) {
                 isVisible = hasPermission(module.moduleCode, "view");
@@ -372,14 +531,20 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
 
             const active = isModuleActive(module);
 
+            // Dynamically override dashboard href
+            let href = module.href;
+            if (module.title === "Dashboard" && role !== "CLIENT") {
+              href = currentMode === "business" ? "/business/dashboard" : "/hrms/dashboard";
+            }
+
             // Direct link rendering (no dropdown)
-            if (module.href) {
+            if (href) {
               return (
                 <div key={module.title} className="flex flex-col mb-1">
                   <Tooltip delayDuration={300}>
                     <TooltipTrigger asChild>
                       <Link
-                        href={module.href}
+                        href={href}
                         className={`flex items-center justify-between w-full p-2.5 text-sm font-semibold rounded-xl transition-all duration-300 group ${active
                              ? "bg-primary/10 text-primary dark:bg-zinc-900 dark:text-white shadow-[inset_3px_0_0_0_hsl(var(--primary))]"
                              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 dark:text-white/60 dark:hover:text-white dark:hover:bg-zinc-900"
@@ -448,10 +613,12 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
                     >
                       <div className="ml-[18px] pl-4 border-l border-slate-100 dark:border-zinc-900 py-1 mt-1 space-y-1">
                         {visibleItems.map((item) => {
-                          const isSubActive = item.href === "/clients"
-                            ? (pathname === "/clients" || pathname === "/clients/new")
-                            : item.href === "/chat"
-                            ? (pathname === "/chat")
+                          const isSubActive = item.href === "/clients" || item.href === "/business/clients"
+                            ? (pathname === "/business/clients" || pathname === "/business/clients/new")
+                            : item.href === "/chat" || item.href === "/business/chat"
+                            ? (pathname === "/business/chat")
+                            : item.href === "/business/clients/orders"
+                            ? (pathname === "/business/clients/orders" || pathname === "/business/clients/orders/new")
                             : (pathname === item.href || pathname.startsWith(item.href + '/'));
                           return (
                             <Link
@@ -484,19 +651,19 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
           })}
 
           {/* Settings / System at bottom of list */}
-          {(isAdmin || hasPermission("settings", "view")) && (
+          {currentMode === "hrms" && (isAdmin || hasPermission("settings", "view")) && (
             <div className="pt-4 mt-4 border-t border-slate-100 dark:border-zinc-900">
               <Tooltip delayDuration={300}>
                 <TooltipTrigger asChild>
                   <Link
-                    href="/settings"
-                    className={`flex items-center gap-3 w-full p-2.5 text-sm font-semibold rounded-xl transition-all duration-300 group ${pathname.startsWith("/settings")
+                    href="/hrms/settings"
+                    className={`flex items-center gap-3 w-full p-2.5 text-sm font-semibold rounded-xl transition-all duration-300 group ${pathname.startsWith("/hrms/settings")
                         ? "bg-primary/10 text-primary dark:bg-zinc-900 dark:text-white shadow-[inset_3px_0_0_0_hsl(var(--primary))]"
                         : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 dark:text-white/60 dark:hover:text-white dark:hover:bg-zinc-900"
                       }`}
                   >
                     <motion.div whileHover={{ scale: 1.1 }}>
-                      <Settings className={`h-[18px] w-[18px] transition-colors ${pathname.startsWith("/settings") ? "text-primary dark:text-white" : "text-slate-400 dark:text-white/40 group-hover:text-slate-800 dark:group-hover:text-white"}`} />
+                      <Settings className={`h-[18px] w-[18px] transition-colors ${pathname.startsWith("/hrms/settings") ? "text-primary dark:text-white" : "text-slate-400 dark:text-white/40 group-hover:text-slate-800 dark:group-hover:text-white"}`} />
                     </motion.div>
                     {!isCollapsed && <span className="tracking-tight group-hover:translate-x-[2px] transition-transform duration-200">Settings</span>}
                   </Link>

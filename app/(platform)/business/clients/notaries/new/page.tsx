@@ -1,0 +1,271 @@
+"use client";
+
+import React, { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { 
+  Scale, 
+  Loader2, 
+  ArrowLeft, 
+  DollarSign, 
+  Check, 
+  Building2,
+  MapPin,
+  FileText
+} from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import { toast } from "sonner";
+
+export default function NewNotaryPage() {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    service_fee: "",
+    status: "ACTIVE",
+    notes: ""
+  });
+
+  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    setSaving(true);
+    try {
+      const payload = {
+        name: formData.name,
+        email: formData.email || null,
+        phone: formData.phone || null,
+        address: formData.address || null,
+        city: formData.city,
+        service_fee: formData.service_fee ? parseFloat(formData.service_fee) : 0.0,
+        status: formData.status,
+        notes: formData.notes || null
+      };
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        toast.success("Notary public registered successfully!");
+        router.push("/business/clients/notaries");
+      } else {
+        const err = await res.json();
+        toast.error(err.detail || "Failed to register notary");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error registering notary");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const formatCurrency = (val: number) => {
+    return "IDR " + new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(val);
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-6xl mx-auto pb-10">
+      
+      {/* Title Header */}
+      <div className="flex items-start gap-4">
+        <Link href="/business/clients/notaries" className="mt-1">
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </Link>
+        <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm shrink-0 flex items-center justify-center">
+          <Scale className="h-6 w-6" />
+        </div>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Add Notary</h1>
+          <p className="text-muted-foreground mt-1">Register a new licensed notary public to your legal contractor panel list.</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <Card className="border-border/50 shadow-sm bg-card/60 backdrop-blur-md">
+          <CardHeader className="pb-4 border-b border-border/30">
+            <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <Scale className="h-5 w-5 text-primary" />
+              <span>Notary Public Profile</span>
+            </CardTitle>
+          </CardHeader>
+          
+          <CardContent className="space-y-6 pt-6">
+            <div className="space-y-6">
+              
+              {/* Primary Identity Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Notary Name *</label>
+                  <Input
+                    required
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="e.g. Maria Elizabeth, S.H., M.Kn."
+                    className="h-10 text-sm font-medium bg-background border-border/60 focus:border-primary/50 focus:ring-primary/25 rounded-xl transition-all"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">City / Jurisdiction *</label>
+                  <Input
+                    required
+                    name="city"
+                    value={formData.city}
+                    onChange={handleInputChange}
+                    placeholder="e.g. Jakarta Selatan"
+                    className="h-10 text-sm font-medium bg-background border-border/60 focus:border-primary/50 focus:ring-primary/25 rounded-xl transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Contact Information Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Contact Email</label>
+                  <Input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="e.g. notary@example.com"
+                    className="h-10 text-sm font-medium bg-background border-border/60 focus:border-primary/50 focus:ring-primary/25 rounded-xl transition-all"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Contact Phone</label>
+                  <Input
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    placeholder="e.g. +62 812 3456 789"
+                    className="h-10 text-sm font-medium bg-background border-border/60 focus:border-primary/50 focus:ring-primary/25 rounded-xl transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Fee and Status Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Service Fee (IDR) *</label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      required
+                      name="service_fee"
+                      value={formData.service_fee}
+                      onChange={handleInputChange}
+                      placeholder="e.g. 5000000"
+                      className="h-10 font-mono font-bold text-sm bg-background border-border/60 focus:border-primary/50 focus:ring-primary/25 rounded-xl transition-all pl-7"
+                    />
+                    <span className="absolute left-2.5 top-3.5 text-[10.5px] font-mono font-semibold text-muted-foreground leading-none">Rp</span>
+                  </div>
+                  {formData.service_fee && !isNaN(parseFloat(formData.service_fee)) && (
+                    <div className="bg-amber-500/5 border border-amber-500/15 text-amber-600 dark:text-amber-400 py-1.5 px-2.5 rounded-xl font-bold font-mono text-[10.5px] text-center mt-1 truncate">
+                      {formatCurrency(parseFloat(formData.service_fee))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Panel Status</label>
+                  <Select 
+                    value={formData.status} 
+                    onValueChange={(val) => setFormData(prev => ({ ...prev, status: val }))}
+                  >
+                    <SelectTrigger className="h-10 rounded-xl">
+                      <SelectValue placeholder="Select Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ACTIVE">ACTIVE</SelectItem>
+                      <SelectItem value="INACTIVE">INACTIVE</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Physical Office Address */}
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90 flex items-center justify-between">
+                  <span>Office Address</span>
+                  <span className="text-[10px] font-normal text-muted-foreground lowercase normal-case">Full legal registered office address</span>
+                </label>
+                <textarea
+                  name="address"
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  rows={3}
+                  className="flex w-full rounded-xl border border-border/60 bg-background p-3.5 text-sm placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary leading-relaxed font-medium transition-all"
+                  placeholder="Street name, Building block, suite info..."
+                />
+              </div>
+
+              {/* Specialties / Notes */}
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Notes / Scope Specialties</label>
+                <textarea
+                  name="notes"
+                  value={formData.notes}
+                  onChange={handleInputChange}
+                  rows={3}
+                  className="flex w-full rounded-xl border border-border/60 bg-background p-3.5 text-sm placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary leading-relaxed font-medium transition-all"
+                  placeholder="Enter details on specific skills, land deed authorizations, speed covenants, or other key notary remarks..."
+                />
+              </div>
+
+            </div>
+
+            {/* Actions Bar */}
+            <div className="flex justify-between pt-6 border-t border-border/30 mt-6">
+              <Link href="/business/clients/notaries">
+                <Button type="button" variant="outline" className="rounded-xl h-10 px-4 font-bold border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-foreground transition-colors bg-transparent">
+                  Cancel
+                </Button>
+              </Link>
+              <Button 
+                type="submit" 
+                disabled={saving} 
+                className="px-6 font-bold shadow-md gap-2 rounded-xl h-10 bg-zinc-900 hover:bg-zinc-100 text-zinc-50 hover:text-zinc-900 border border-zinc-900 dark:bg-zinc-100 dark:hover:bg-zinc-900 dark:text-zinc-950 dark:hover:text-zinc-100 dark:border-zinc-100 transition-all duration-200"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                Save Notary & Finish
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </form>
+    </div>
+  );
+}

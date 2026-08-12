@@ -763,7 +763,7 @@ class TimesheetResponse(TimesheetBase):
 
 class ClientCompanyBase(BaseModel):
     company_name: str
-    company_code: str
+    company_code: Optional[str] = None
     address: Optional[str] = None
     tax_number: Optional[str] = None
     industry: Optional[str] = None
@@ -771,6 +771,10 @@ class ClientCompanyBase(BaseModel):
     key_contact_person: Optional[str] = None
     key_contact_email: Optional[str] = None
     key_contact_phone: Optional[str] = None
+    director_name: Optional[str] = None
+    director_email: Optional[str] = None
+    director_contact: Optional[str] = None
+    notes: Optional[str] = None
     client_id: Optional[int] = None
 
 class ClientCompanyCreate(ClientCompanyBase):
@@ -799,6 +803,7 @@ class ClientBase(BaseModel):
     contact_person: str
     email: str
     phone: Optional[str] = None
+    client_code: Optional[str] = None
     status: Optional[str] = "ACTIVE"
     notes: Optional[str] = None
     date_of_birth: Optional[date] = None
@@ -807,8 +812,69 @@ class ClientBase(BaseModel):
     identification_number: Optional[str] = None
     personal_address: Optional[str] = None
 
+class ClientOrderItemCreate(BaseModel):
+    service_id: Optional[int] = None
+    job_id: Optional[str] = None
+    job_title: str
+    description: Optional[str] = None
+    pricing_tier: str = "BASE"
+    unit_price: float = 0.0
+    custom_price_text: Optional[str] = None
+
+class ClientOrderCreateRequest(BaseModel):
+    client_id: Optional[int] = None
+    company_id: Optional[int] = None
+    items: List[ClientOrderItemCreate]
+    consultant_ids: Optional[List[int]] = []
+    notes: Optional[str] = None
+    order_number: Optional[str] = None
+
+class ClientOrderItemResponse(BaseModel):
+    id: int
+    order_id: int
+    service_id: Optional[int] = None
+    job_id: Optional[str] = None
+    job_title: str
+    description: Optional[str] = None
+    pricing_tier: str
+    unit_price: float
+    custom_price_text: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class ClientOrderResponse(BaseModel):
+    id: int
+    order_number: Optional[str] = None
+    client_id: int
+    company_id: Optional[int] = None
+    service_id: Optional[int] = None
+    job_id: Optional[str] = None
+    job_title: Optional[str] = "Service Package"
+    description: Optional[str] = None
+    pricing_tier: Optional[str] = "BASE"
+    unit_price: Optional[float] = 0.0
+    total_amount: Optional[float] = 0.0
+    custom_price_text: Optional[str] = None
+    status: Optional[str] = "CONFIRMED"
+    payment_status: Optional[str] = "UNPAID"
+    invoice_number: Optional[str] = None
+    is_proforma_finalized: Optional[bool] = False
+    proforma_stage_percent: Optional[int] = 50
+    is_final_invoice_finalized: Optional[bool] = False
+    consultant_ids: Optional[List[int]] = []
+    consultants: Optional[List[dict]] = []
+    notes: Optional[str] = None
+    created_at: Optional[datetime] = None
+    client_name: Optional[str] = None
+    company_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
 class ClientCreate(ClientBase):
-    password: str
+    create_portal_account: Optional[bool] = False
+    password: Optional[str] = None
     company_name: Optional[str] = None
     company_code: Optional[str] = None
     address: Optional[str] = None
@@ -817,10 +883,15 @@ class ClientCreate(ClientBase):
     key_contact_person: Optional[str] = None
     key_contact_email: Optional[str] = None
     key_contact_phone: Optional[str] = None
+    director_name: Optional[str] = None
+    director_email: Optional[str] = None
+    director_contact: Optional[str] = None
+    company_notes: Optional[str] = None
+    order_items: Optional[List[ClientOrderItemCreate]] = []
 
 class ClientResponse(ClientBase):
     id: int
-    user_id: int
+    user_id: Optional[int] = None
     companies: List[ClientCompanyResponse] = []
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -888,10 +959,67 @@ class AnnouncementResponse(AnnouncementBase):
     class Config:
         from_attributes = True
 
+class ClientOrderUpdate(BaseModel):
+    status: Optional[str] = None
+    payment_status: Optional[str] = None
+    invoice_number: Optional[str] = None
+    consultant_ids: Optional[List[int]] = None
+    notes: Optional[str] = None
+    service_id: Optional[int] = None
+    job_id: Optional[str] = None
+    job_title: Optional[str] = None
+    description: Optional[str] = None
+    pricing_tier: Optional[str] = None
+    unit_price: Optional[float] = None
+    custom_price_text: Optional[str] = None
+    is_proforma_finalized: Optional[bool] = None
+    proforma_stage_percent: Optional[int] = None
+    is_final_invoice_finalized: Optional[bool] = None
+
+class CompanyStakeholderCreate(BaseModel):
+    name: str
+    role: str
+    share_percentage: Optional[float] = 0.0
+    identification_number: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    is_key_contact: Optional[bool] = False
+
+class CompanyStakeholderResponse(BaseModel):
+    id: int
+    company_id: int
+    name: str
+    role: str
+    share_percentage: float
+    identification_number: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    is_key_contact: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ClientActivityLogResponse(BaseModel):
+    id: int
+    client_id: Optional[int] = None
+    company_id: Optional[int] = None
+    user_id: Optional[int] = None
+    action_type: str
+    description: str
+    performed_by: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 class ClientDocumentUpdate(BaseModel):
     document_type: Optional[str] = None
     description: Optional[str] = None
+    document_path: Optional[str] = None
+    order_number: Optional[str] = None
     document_date: Optional[date] = None
+    expiry_date: Optional[date] = None
 
 class ClientDocumentResponse(BaseModel):
     id: int
@@ -900,7 +1028,10 @@ class ClientDocumentResponse(BaseModel):
     file_url: str
     document_type: Optional[str] = None
     description: Optional[str] = None
+    document_path: Optional[str] = None
+    order_number: Optional[str] = None
     document_date: Optional[date] = None
+    expiry_date: Optional[date] = None
     uploaded_at: datetime
     uploaded_by: int
 
@@ -911,9 +1042,64 @@ class ClientDocumentResponse(BaseModel):
     @classmethod
     def convert_client_doc_url(cls, v: Optional[str]) -> Optional[str]:
         if v:
+            if v.startswith("/Clients/"):
+                # Optimize: return raw Dropbox path to avoid slow synchronous HTTP queries in document list retrieval
+                # Check first if it is actually stored locally (local fallback)
+                local_rel = v.replace("/Clients/", "", 1)
+                import os
+                local_path = os.path.join("uploads", local_rel)
+                if os.path.exists(local_path):
+                    return f"/uploads/{local_rel}".replace("\\", "/")
+                
+                # Check old local path fallback
+                parts = local_rel.split("/")
+                if len(parts) >= 4:
+                    old_rel = f"{parts[0]}/{parts[2]}/{parts[3]}"
+                    old_path = os.path.join("uploads", old_rel)
+                    if os.path.exists(old_path):
+                        return f"/uploads/{old_rel}".replace("\\", "/")
+                
+                return v
+            if v.startswith("/uploads/") or v.startswith("http://") or v.startswith("https://") or v == "#":
+                return v
             from storage import get_signed_file_url
             return get_signed_file_url(v, bucket_name="client-documents")
         return v
+
+
+class ClientServiceBase(BaseModel):
+    job_id: Optional[str] = None
+    job_title: str
+    description: Optional[str] = None
+    base_price: float = 0.0
+    partner_a_discount: Optional[float] = 20.0
+    partner_a1_discount: Optional[float] = 40.0
+    partner_a2_discount: Optional[float] = 50.0
+    partner_a3_price: Optional[str] = None
+
+class ClientServiceCreate(ClientServiceBase):
+    pass
+
+class ClientServiceUpdate(BaseModel):
+    job_id: Optional[str] = None
+    job_title: Optional[str] = None
+    description: Optional[str] = None
+    base_price: Optional[float] = None
+    partner_a_discount: Optional[float] = None
+    partner_a1_discount: Optional[float] = None
+    partner_a2_discount: Optional[float] = None
+    partner_a3_price: Optional[str] = None
+
+class ClientServiceResponse(ClientServiceBase):
+    id: int
+    partner_a_price: Optional[float] = None
+    partner_a1_price: Optional[float] = None
+    partner_a2_price: Optional[float] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
 
 
 class PermissionBase(BaseModel):
@@ -969,5 +1155,88 @@ class CompanyResponse(CompanyBase):
 
     class Config:
         from_attributes = True
+
+
+class ClientOrderProgressCreate(BaseModel):
+    message: str
+
+
+class ClientOrderProgressResponse(BaseModel):
+    id: int
+    order_number: str
+    user_id: Optional[int] = None
+    message: str
+    created_at: datetime
+    sender_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class NotaryBase(BaseModel):
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    city: str
+    service_fee: float = 0.0
+    status: str = "ACTIVE"
+    notes: Optional[str] = None
+
+
+class NotaryCreate(NotaryBase):
+    pass
+
+
+class NotaryResponse(NotaryBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TeamBase(BaseModel):
+    name: str
+    code: str
+    description: Optional[str] = None
+    leader_id: Optional[int] = None
+    color: Optional[str] = "#10b981"
+    is_active: Optional[bool] = True
+
+
+class TeamCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    leader_id: Optional[int] = None
+    color: Optional[str] = "#10b981"
+    is_active: Optional[bool] = True
+
+
+class TeamUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    leader_id: Optional[int] = None
+    color: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class TeamMemberAssign(BaseModel):
+    employee_ids: List[int]
+
+
+class TeamResponse(TeamBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    leader: Optional[EmployeeSummary] = None
+    members: List[EmployeeSummary] = []
+
+    class Config:
+        from_attributes = True
+
+
+
 
 

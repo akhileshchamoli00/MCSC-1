@@ -260,6 +260,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                         localStorage.removeItem("user_id");
                         localStorage.removeItem("hrms_permissions");
                         localStorage.removeItem("hrms_profile");
+                        sessionStorage.clear();
                         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/logout`, { method: "POST" }).catch(() => {});
                       }}>
                         <LogOut className="mr-2 h-4 w-4" />

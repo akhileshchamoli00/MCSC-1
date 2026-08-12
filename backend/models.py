@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Date, Enum, Float
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Date, Enum, Float, JSON, Table
 import enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -496,6 +496,10 @@ class ClientCompany(Base):
     key_contact_person = Column(String, nullable=True)
     key_contact_email = Column(String, nullable=True)
     key_contact_phone = Column(String, nullable=True)
+    director_name = Column(String, nullable=True)
+    director_email = Column(String, nullable=True)
+    director_contact = Column(String, nullable=True)
+    notes = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
@@ -512,6 +516,7 @@ class Client(Base):
     contact_person = Column(String)
     email = Column(String)
     phone = Column(String, nullable=True)
+    client_code = Column(String, unique=True, index=True, nullable=True)
     status = Column(String, default="ACTIVE") # ACTIVE, DISABLED
     notes = Column(String, nullable=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True)
@@ -536,11 +541,54 @@ class ClientConsultant(Base):
     company_id = Column(Integer, ForeignKey("client_companies.id", ondelete="CASCADE"), index=True)
     employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), index=True)
     is_primary = Column(Boolean, default=False)
+    consultant_role = Column(String, default="Consultant")
     assigned_at = Column(DateTime(timezone=True), server_default=func.now())
     
     company = relationship("ClientCompany", back_populates="consultants")
     employee = relationship("Employee", back_populates="client_assignments")
 
+
+class CompanyStakeholder(Base):
+    __tablename__ = "company_stakeholders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("client_companies.id", ondelete="CASCADE"), index=True)
+    name = Column(String, nullable=False)
+    role = Column(String, nullable=False) # Director, Commissioner, Shareholder, Authorized Signer
+    share_percentage = Column(Float, default=0.0)
+    identification_number = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    is_key_contact = Column(Boolean, default=False, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    company = relationship("ClientCompany", backref="stakeholders")
+
+
+class ClientActivityLog(Base):
+    __tablename__ = "client_activity_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), index=True, nullable=True)
+    company_id = Column(Integer, ForeignKey("client_companies.id", ondelete="CASCADE"), index=True, nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    action_type = Column(String, nullable=False) # ORDER_CREATED, DOCUMENT_UPLOADED, CONSULTANT_ASSIGNED, STAKEHOLDER_ADDED
+    description = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    client = relationship("Client", backref="activities")
+    company = relationship("ClientCompany")
+    user = relationship("User")
+
+    @property
+    def performed_by(self) -> str:
+        if not self.user:
+            return "System"
+        if self.user.employee:
+            return f"{self.user.employee.first_name} {self.user.employee.last_name}"
+        if self.user.client:
+            return self.user.client.contact_person
+        return self.user.email
 
 class Conversation(Base):
     __tablename__ = "conversations"
@@ -589,12 +637,75 @@ class ClientDocument(Base):
     file_url = Column(String)
     document_type = Column(String, nullable=True)
     description = Column(String, nullable=True)
+    document_path = Column(String, nullable=True)
+    order_number = Column(String, nullable=True)
     document_date = Column(Date, nullable=True)
+    expiry_date = Column(Date, nullable=True)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
     uploaded_by = Column(Integer, ForeignKey("users.id"))
     
     company = relationship("ClientCompany", back_populates="documents")
     uploader = relationship("User")
+
+
+class ClientService(Base):
+    __tablename__ = "client_services"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(String, unique=True, index=True)
+    job_title = Column(String, index=True)
+    description = Column(String, nullable=True)
+    base_price = Column(Float, default=0.0)
+    partner_a_discount = Column(Float, default=20.0)
+    partner_a1_discount = Column(Float, default=40.0)
+    partner_a2_discount = Column(Float, default=50.0)
+    partner_a3_price = Column(String, nullable=True) # Free text pricing for Partner A3
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class ClientOrder(Base):
+    __tablename__ = "client_orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_number = Column(String, index=True) # e.g. MCSX-260001
+    client_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    company_id = Column(Integer, ForeignKey("client_companies.id", ondelete="SET NULL"), nullable=True)
+    service_id = Column(Integer, ForeignKey("client_services.id", ondelete="SET NULL"), nullable=True)
+    job_id = Column(String, nullable=True) # e.g. OA-001
+    job_title = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    pricing_tier = Column(String, default="BASE") # BASE, PARTNER_A, PARTNER_A1, PARTNER_A2, PARTNER_A3
+    unit_price = Column(Float, default=0.0)
+    total_amount = Column(Float, default=0.0)
+    custom_price_text = Column(String, nullable=True)
+    status = Column(String, default="CONFIRMED") # DRAFT, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED
+    payment_status = Column(String, default="UNPAID") # UNPAID, PARTIALLY_PAID, PAID
+    invoice_number = Column(String, nullable=True) # e.g. INV-260001
+    is_proforma_finalized = Column(Boolean, default=False)
+    proforma_stage_percent = Column(Integer, default=50)
+    is_final_invoice_finalized = Column(Boolean, default=False)
+    consultant_ids = Column(JSON, nullable=True, default=list) # List of assigned employee/consultant IDs
+    notes = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    client = relationship("Client", backref="orders")
+    company = relationship("ClientCompany")
+    service = relationship("ClientService")
+
+
+class ClientOrderProgress(Base):
+    __tablename__ = "client_order_progress"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_number = Column(String, index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True)
+    message = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User")
 
 
 class Module(Base):
@@ -604,6 +715,7 @@ class Module(Base):
     name = Column(String, unique=True, index=True)
     code = Column(String, unique=True, index=True)
     parent_id = Column(Integer, ForeignKey("modules.id", ondelete="CASCADE"), nullable=True)
+    system_area = Column(String, default="shared", nullable=True)
     
     parent = relationship("Module", remote_side=[id], backref="sub_modules")
 
@@ -739,5 +851,51 @@ class ReviewTemplate(Base):
     fields_schema = Column(String, nullable=True) # Storing JSON string representation
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Notary(Base):
+    __tablename__ = "notaries"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True, nullable=False)
+    email = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    address = Column(String, nullable=True)
+    city = Column(String, index=True, nullable=False)
+    service_fee = Column(Float, default=0.0)
+    status = Column(String, default="ACTIVE")
+    notes = Column(String, nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+# Association Table for Team Members (Junction)
+team_members = Table(
+    "team_members",
+    Base.metadata,
+    Column("team_id", Integer, ForeignKey("teams.id", ondelete="CASCADE"), primary_key=True),
+    Column("employee_id", Integer, ForeignKey("employees.id", ondelete="CASCADE"), primary_key=True)
+)
+
+
+class Team(Base):
+    __tablename__ = "teams"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True, nullable=False)
+    code = Column(String, unique=True, index=True, nullable=False)
+    description = Column(String, nullable=True)
+    leader_id = Column(Integer, ForeignKey("employees.id", ondelete="SET NULL"), nullable=True)
+    color = Column(String, nullable=True, default="#10b981")
+    is_active = Column(Boolean, default=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    leader = relationship("Employee", foreign_keys=[leader_id])
+    members = relationship("Employee", secondary=team_members, backref="teams")
+
+
 
 

@@ -128,9 +128,10 @@ def reset_role_permissions(
                 db.add(rp)
                 
     elif role_name_upper == "EMPLOYEE":
-        # Seed 18 default employee permissions
+        # Seed default employee permissions
         employee_defaults = [
             ("dashboard", "view"),
+            ("calendar", "view"),
             ("employees_profile", "view"),
             ("employees_profile", "edit"),
             ("attendance_my", "view"),
@@ -144,6 +145,13 @@ def reset_role_permissions(
             ("payroll_my", "view"),
             ("payroll_my", "download"),
             ("assets_my", "view"),
+            ("chat_client", "view"),
+            ("chat_client", "create"),
+            ("chat_assigned_companies", "view"),
+            ("notifications", "view"),
+            ("platform_hrms", "view"),
+            ("platform_business", "view"),
+            ("clients_my", "view"),
         ]
         
         all_modules = db.query(models.Module).all()

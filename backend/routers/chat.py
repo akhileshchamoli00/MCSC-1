@@ -23,6 +23,17 @@ def is_admin_or_hr(user: models.User) -> bool:
         return True
     return user.role.name.upper() == "HR"
 
+def is_employee_role(user: models.User) -> bool:
+    if not user:
+        return False
+    if hasattr(user, "employee") and user.employee is not None:
+        return True
+    if user.role:
+        name = user.role.name.upper()
+        if "EMPLOYEE" in name or name in ["TEAM LEAD", "LICENSE CONSULTANT", "PROJECT MANAGER", "HR EXECUTIVE"]:
+            return True
+    return False
+
 # WebSocket Connection Manager
 class ConnectionManager:
     def __init__(self):
@@ -140,7 +151,7 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
                     is_authorized = False
                     if is_admin_or_hr(current_user):
                         is_authorized = True
-                    elif role_name == "EMPLOYEE" and employee_id and conversation.employee_id == employee_id:
+                    elif is_employee_role(current_user) and employee_id and conversation.employee_id == employee_id:
                         is_authorized = True
                     elif role_name == "CLIENT" and client_id and conversation.company and conversation.company.client_id == client_id:
                         is_authorized = True
@@ -194,7 +205,7 @@ def get_conversations(db: Session = Depends(database.get_db), current_user: mode
     if is_admin_or_hr(current_user):
         return db.query(models.Conversation).all()
         
-    elif role_name == "EMPLOYEE":
+    elif is_employee_role(current_user):
         if not current_user.employee:
             return []
         return db.query(models.Conversation).filter(
@@ -225,7 +236,7 @@ def get_conversation_messages(id: int, db: Session = Depends(database.get_db), c
     
     if is_admin_or_hr(current_user):
         is_authorized = True
-    elif role_name == "EMPLOYEE" and current_user.employee and conversation.employee_id == current_user.employee.id:
+    elif is_employee_role(current_user) and current_user.employee and conversation.employee_id == current_user.employee.id:
         is_authorized = True
     elif role_name == "CLIENT" and current_user.client and conversation.company and conversation.company.client_id == current_user.client.id:
         is_authorized = True
@@ -262,7 +273,7 @@ def get_or_create_conversation(payload: dict, db: Session = Depends(database.get
     
     if is_admin_or_hr(current_user):
         is_authorized = True
-    elif role_name == "EMPLOYEE" and current_user.employee and current_user.employee.id == employee_id:
+    elif is_employee_role(current_user) and current_user.employee and current_user.employee.id == employee_id:
         is_authorized = True
     elif role_name == "CLIENT" and current_user.client:
         company = db.query(models.ClientCompany).filter(models.ClientCompany.id == company_id).first()
