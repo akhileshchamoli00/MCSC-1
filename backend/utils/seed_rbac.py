@@ -119,60 +119,63 @@ def seed_rbac_data(db: Session):
     db.commit()
     
     # 3. Seed default permissions for ADMIN and EMPLOYEE
-    # Always ensure Admin has full access to all modules (including any new ones added).
-    admin_role = db.query(models.Role).filter(models.Role.name.ilike("admin")).first()
-    if admin_role:
-        for mod in modules_by_code.values():
-            for perm in perm_map.values():
-                exists = db.query(models.RolePermission).filter(
-                    models.RolePermission.role_id == admin_role.id,
-                    models.RolePermission.module_id == mod.id,
-                    models.RolePermission.permission_id == perm.id
-                ).first()
-                if not exists:
+    # To prevent overwriting custom changes made by administrators in the UI,
+    # we use a system setting flag "rbac_seeded" to record that initial seeding has run.
+    rbac_seeded_setting = db.query(models.SystemSetting).filter(models.SystemSetting.key == "rbac_seeded").first()
+    
+    if not rbac_seeded_setting:
+        total_existing_rules = db.query(models.RolePermission).count()
+        if total_existing_rules > 0:
+            print("Database already contains custom permission rules. Skipping default seeding and marking rbac_seeded=true...")
+            db.add(models.SystemSetting(key="rbac_seeded", value="true"))
+            db.commit()
+            rbac_seeded_setting = True
+
+    if not rbac_seeded_setting:
+        print("Performing initial role permissions seeding...")
+        admin_role = db.query(models.Role).filter(models.Role.name.ilike("admin")).first()
+        if admin_role:
+            for mod in modules_by_code.values():
+                for perm in perm_map.values():
                     rp = models.RolePermission(role_id=admin_role.id, module_id=mod.id, permission_id=perm.id)
                     db.add(rp)
                     
-    emp_role = db.query(models.Role).filter(models.Role.name.ilike("employee")).first()
-    if emp_role:
-        employee_defaults = [
-            ("dashboard", "view"),
-            ("calendar", "view"),
-            ("employees_profile", "view"),
-            ("employees_profile", "edit"),
-            ("attendance_my", "view"),
-            ("attendance_my", "create"),
-            ("timesheets_my", "view"),
-            ("timesheets_my", "create"),
-            ("timesheets_my", "edit"),
-            ("leave_my", "view"),
-            ("leave_my", "create"),
-            ("leave_my", "edit"),
-            ("payroll_my", "view"),
-            ("payroll_my", "download"),
-            ("assets_my", "view"),
-            ("chat_client", "view"),
-            ("chat_client", "create"),
-            ("chat_assigned_companies", "view"),
-            ("notifications", "view"),
-            ("platform_hrms", "view"),
-            ("platform_business", "view"),
-            ("clients_my", "view"),
-        ]
-        for m_code, p_code in employee_defaults:
-            mod = modules_by_code.get(m_code)
-            perm = perm_map.get(p_code)
-            if mod and perm:
-                exists = db.query(models.RolePermission).filter(
-                    models.RolePermission.role_id == emp_role.id,
-                    models.RolePermission.module_id == mod.id,
-                    models.RolePermission.permission_id == perm.id
-                ).first()
-                if not exists:
+        emp_role = db.query(models.Role).filter(models.Role.name.ilike("employee")).first()
+        if emp_role:
+            employee_defaults = [
+                ("dashboard", "view"),
+                ("calendar", "view"),
+                ("employees_profile", "view"),
+                ("employees_profile", "edit"),
+                ("attendance_my", "view"),
+                ("attendance_my", "create"),
+                ("timesheets_my", "view"),
+                ("timesheets_my", "create"),
+                ("timesheets_my", "edit"),
+                ("leave_my", "view"),
+                ("leave_my", "create"),
+                ("leave_my", "edit"),
+                ("payroll_my", "view"),
+                ("payroll_my", "download"),
+                ("assets_my", "view"),
+                ("chat_client", "view"),
+                ("chat_client", "create"),
+                ("chat_assigned_companies", "view"),
+                ("notifications", "view"),
+                ("platform_hrms", "view"),
+                ("platform_business", "view"),
+                ("clients_my", "view"),
+            ]
+            for m_code, p_code in employee_defaults:
+                mod = modules_by_code.get(m_code)
+                perm = perm_map.get(p_code)
+                if mod and perm:
                     rp = models.RolePermission(role_id=emp_role.id, module_id=mod.id, permission_id=perm.id)
                     db.add(rp)
                     
-    db.commit()
+        # Mark as seeded
+        db.add(models.SystemSetting(key="rbac_seeded", value="true"))
+        db.commit()
 
     # 4. Seed Internal/Employing Companies
     companies_to_seed = [

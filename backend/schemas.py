@@ -865,6 +865,9 @@ class ClientOrderResponse(BaseModel):
     consultant_ids: Optional[List[int]] = []
     consultants: Optional[List[dict]] = []
     notes: Optional[str] = None
+    payment_link: Optional[str] = None
+    xendit_invoice_id: Optional[str] = None
+    payment_link_created_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     client_name: Optional[str] = None
     company_name: Optional[str] = None
@@ -975,6 +978,8 @@ class ClientOrderUpdate(BaseModel):
     is_proforma_finalized: Optional[bool] = None
     proforma_stage_percent: Optional[int] = None
     is_final_invoice_finalized: Optional[bool] = None
+    payment_link: Optional[str] = None
+    xendit_invoice_id: Optional[str] = None
 
 class CompanyStakeholderCreate(BaseModel):
     name: str

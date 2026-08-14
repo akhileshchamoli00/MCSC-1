@@ -177,6 +177,16 @@ def run_migrations():
             conn.rollback()
             handle_migration_error("is_final_invoice_finalized", "client_orders", e)
 
+        # Add payment_link, xendit_invoice_id, and payment_link_created_at to client_orders table
+        for col, col_type in [("payment_link", "VARCHAR(500)"), ("xendit_invoice_id", "VARCHAR(255)"), ("payment_link_created_at", "TIMESTAMP")]:
+            try:
+                conn.execute(text(f"ALTER TABLE client_orders ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                print(f"Added column '{col}' to 'client_orders' table.")
+            except Exception as e:
+                conn.rollback()
+                handle_migration_error(col, "client_orders", e)
+
         # Seed existing clients without client_code
         try:
             res = conn.execute(text("SELECT id, created_at FROM clients WHERE client_code IS NULL ORDER BY id ASC")).fetchall()

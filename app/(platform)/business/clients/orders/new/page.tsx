@@ -501,57 +501,47 @@ export default function NewClientOrderPage() {
         {/* Right Column: Roster, Notes, & Save actions (1/3 width) */}
         <div className="lg:col-span-1 space-y-3">
           
-          {/* Roster Assignment Grid */}
+          {/* Unified Roster Allocation & Execution Notes Box */}
           <Card className="border-border/50 shadow-sm bg-card/60 backdrop-blur-md">
-            <CardHeader className="p-3 pb-2 border-b border-border/30">
-              <CardTitle className="text-xs font-bold flex items-center gap-2">
-                <Users className="h-4 w-4 text-primary" /> Roster Allocation
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 pt-1.5">
-              <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto p-2 bg-background rounded-lg border border-border/40">
-                {(() => {
-                  const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
-                  const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
-                  const licensingEmployees = employees.filter((emp) => licensingMemberIds.includes(emp.id));
+            <CardContent className="space-y-4 p-4 pt-4">
+              {/* Roster Allocation */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Roster Allocation</label>
+                <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto p-2 bg-background rounded-lg border border-border/40">
+                  {(() => {
+                    const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
+                    const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
+                    const licensingEmployees = employees.filter((emp) => licensingMemberIds.includes(emp.id));
 
-                  if (licensingEmployees.length === 0) {
-                    return <span className="text-xs text-muted-foreground italic py-2 text-center col-span-3">No licensing consultants</span>;
-                  }
+                    if (licensingEmployees.length === 0) {
+                      return <span className="text-xs text-muted-foreground italic py-2 text-center col-span-3">No licensing consultants</span>;
+                    }
 
-                  return licensingEmployees.map((emp) => {
-                    const isSelected = selectedConsultantIds.includes(emp.id);
-                    return (
-                      <label
-                        key={emp.id}
-                        className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer select-none text-[11px] transition-colors ${isSelected ? "border-primary bg-primary/10 text-primary font-bold shadow-xs" : "border-border/60 hover:bg-muted/40"}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleConsultantSelect(emp.id)}
-                          className="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary accent-primary"
-                        />
-                        <div className="truncate">
-                          <div className="font-semibold text-foreground truncate">{emp.first_name} {emp.last_name}</div>
-                          <div className="text-[9px] text-muted-foreground truncate">{emp.job_title || "Consultant"}</div>
-                        </div>
-                      </label>
-                    );
-                  });
-                })()}
+                    return licensingEmployees.map((emp) => {
+                      const isSelected = selectedConsultantIds.includes(emp.id);
+                      return (
+                        <label
+                          key={emp.id}
+                          className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer select-none text-[11px] transition-colors ${isSelected ? "border-primary bg-primary/10 text-primary font-bold shadow-xs" : "border-border/60 hover:bg-muted/40"}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleConsultantSelect(emp.id)}
+                            className="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary accent-primary"
+                          />
+                          <div className="truncate">
+                            <div className="font-semibold text-foreground truncate">{emp.first_name} {emp.last_name}</div>
+                            <div className="text-[9px] text-muted-foreground truncate">{emp.job_title || "Consultant"}</div>
+                          </div>
+                        </label>
+                      );
+                    });
+                  })()}
+                </div>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Notes & Instructions */}
-          <Card className="border-border/50 shadow-sm bg-card/60 backdrop-blur-md">
-            <CardHeader className="p-3 pb-2 border-b border-border/30">
-              <CardTitle className="text-xs font-bold flex items-center gap-2">
-                <Building className="h-4 w-4 text-primary" /> Execution Notes
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 pt-1.5 space-y-3">
+              {/* Notes & Instructions */}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">General Notes / Instructions</label>
                 <textarea

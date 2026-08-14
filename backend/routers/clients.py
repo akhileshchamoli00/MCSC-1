@@ -60,6 +60,27 @@ def generate_client_code(db: Session) -> str:
         
     return code
 
+def update_order_group_status(db: Session, orders: List[models.ClientOrder], new_status: str, user_id: Optional[int] = None):
+    if not orders:
+        return
+        
+    first_order = orders[0]
+    old_status = first_order.status
+    
+    # Update status for all orders in group
+    for order in orders:
+        order.status = new_status
+        
+    # If the status actually changed, log a single progress message in the order chat
+    if old_status != new_status:
+        status_label = new_status.replace("_", " ").title()
+        progress = models.ClientOrderProgress(
+            order_number=first_order.order_number,
+            message=f"Order execution status has been updated to {status_label}.",
+            user_id=user_id
+        )
+        db.add(progress)
+
 def replicate_key_contact_to_stakeholder(db: Session, db_company: models.ClientCompany):
     if db_company and db_company.key_contact_person:
         # Check if they are already in the stakeholders table for this company
@@ -520,14 +541,17 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
         raise HTTPException(status_code=403, detail="You do not have permission to update this order")
         
     if order_update.status:
-        db_order.status = order_update.status
+        update_order_group_status(db, [db_order], order_update.status, current_user.id)
         
     if is_admin_hr:
         if order_update.payment_status:
             db_order.payment_status = order_update.payment_status
             if order_update.payment_status in ["PARTIALLY_PAID", "PAID"]:
                 if db_order.status in ["DRAFT", "PROFORMA_GENERATED", "WAITING_ON_CLIENT"]:
-                    db_order.status = "CONFIRMED"
+                    target_status = "CONFIRMED"
+                    if db_order.consultant_ids and len(db_order.consultant_ids) > 0:
+                        target_status = "ORDER_ASSIGNED"
+                    update_order_group_status(db, [db_order], target_status, current_user.id)
         if order_update.invoice_number is not None:
             db_order.invoice_number = order_update.invoice_number
         if order_update.consultant_ids is not None:
@@ -551,7 +575,7 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
             db_order.is_proforma_finalized = order_update.is_proforma_finalized
             if not order_update.is_proforma_finalized:
                 db_order.is_final_invoice_finalized = False
-                db_order.status = "DRAFT"
+                update_order_group_status(db, [db_order], "DRAFT", current_user.id)
         if order_update.proforma_stage_percent is not None:
             db_order.proforma_stage_percent = order_update.proforma_stage_percent
         if order_update.is_final_invoice_finalized is not None:
@@ -1694,10 +1718,10 @@ def finalize_order_invoice(
         raise HTTPException(status_code=500, detail=f"Failed to save file to Dropbox: {str(e)}")
         
     # Update orders
+    update_order_group_status(db, orders_in_group, "PROFORMA_GENERATED", current_user.id)
     for order in orders_in_group:
         order.is_proforma_finalized = True
         order.proforma_stage_percent = proforma_stage_percent
-        order.status = "PROFORMA_GENERATED"
         
     # Register as ClientDocument so it is visible in the client workspace
     db_doc = models.ClientDocument(
@@ -1713,6 +1737,14 @@ def finalize_order_invoice(
         uploaded_by=current_user.id
     )
     db.add(db_doc)
+    
+    # Post progress update in the chat
+    db_progress = models.ClientOrderProgress(
+        order_number=order_number,
+        user_id=current_user.id,
+        message=f"Proforma invoice ({proforma_stage_percent}%) has been generated and saved."
+    )
+    db.add(db_progress)
     
     # Log activity
     log_activity(db, "INVOICE_FINALIZED", f"Finalized proforma invoice ({proforma_stage_percent}%) for order {order_number} and uploaded to Dropbox", client_id=company.client_id, company_id=company_id, user_id=current_user.id)
@@ -1778,9 +1810,9 @@ def finalize_order_final_invoice(
         raise HTTPException(status_code=500, detail=f"Failed to save file to Dropbox: {str(e)}")
         
     # Update orders
+    update_order_group_status(db, orders_in_group, "INVOICE_GENERATED", current_user.id)
     for order in orders_in_group:
         order.is_final_invoice_finalized = True
-        order.status = "INVOICE_GENERATED"
         
     # Register as ClientDocument so it is visible in the client workspace
     db_doc = models.ClientDocument(
@@ -1796,6 +1828,14 @@ def finalize_order_final_invoice(
         uploaded_by=current_user.id
     )
     db.add(db_doc)
+    
+    # Post progress update in the chat
+    db_progress = models.ClientOrderProgress(
+        order_number=order_number,
+        user_id=current_user.id,
+        message="Final invoice has been generated and saved."
+    )
+    db.add(db_progress)
     
     # Log activity
     log_activity(db, "INVOICE_FINALIZED", f"Finalized final tax invoice for order {order_number} and uploaded to Dropbox", client_id=company.client_id, company_id=company_id, user_id=current_user.id)
@@ -1910,20 +1950,46 @@ def send_order_invoice_email(
     recipient_email = company.key_contact_email if company.key_contact_email else first_order.client.email
     recipient_name = company.key_contact_person if company.key_contact_person else first_order.client.contact_person
 
+    # Transition order statuses in this group to WAITING_ON_CLIENT
+    orders_in_group = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
+    update_order_group_status(db, orders_in_group, "WAITING_ON_CLIENT", current_user.id)
+
+    # Automatically generate Xendit payment link if not already generated
+    total_amount = sum(item.unit_price for item in orders_in_group)
+    if invoice_type == "proforma" and first_order.proforma_stage_percent:
+        total_amount = round((total_amount * first_order.proforma_stage_percent) / 100)
+
+    payment_url = first_order.payment_link
+    if not payment_url:
+        from utils.xendit_client import XenditClient
+        xendit = XenditClient()
+        try:
+            res = xendit.create_invoice(
+                external_id=order_number,
+                amount=total_amount,
+                payer_email=recipient_email,
+                description=f"Payment for Service Order {order_number} ({invoice_type.capitalize()} Invoice)"
+            )
+            payment_url = res.get("invoice_url")
+            inv_id = res.get("id")
+            for item in orders_in_group:
+                item.payment_link = payment_url
+                item.xendit_invoice_id = inv_id
+                item.payment_link_created_at = datetime.now()
+        except Exception as e:
+            print("Failed to auto-generate Xendit link:", e)
+
+    db.commit()
+
     from utils.email_service import send_invoice_attachment_email
     send_invoice_attachment_email(
         recipient_email=recipient_email,
         recipient_name=recipient_name,
         invoice_type=invoice_type,
         pdf_content=pdf_content,
-        pdf_filename=doc.file_name
+        pdf_filename=doc.file_name,
+        payment_url=payment_url
     )
-
-    # Transition order statuses in this group to WAITING_ON_CLIENT
-    orders_in_group = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
-    for order in orders_in_group:
-        order.status = "WAITING_ON_CLIENT"
-    db.commit()
 
     # Log activity
     log_activity(
@@ -1946,6 +2012,131 @@ def send_order_invoice_email(
         res_list.append(res)
         
     return res_list
+
+
+@router.post("/orders/{order_number}/payment-link")
+def generate_order_payment_link(
+    order_number: str,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    orders = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
+    if not orders:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    first_order = orders[0]
+    
+    # Calculate amount
+    total_amount = sum(item.unit_price for item in orders)
+    if total_amount <= 0:
+        raise HTTPException(status_code=400, detail="Invalid order total amount")
+        
+    client = first_order.client
+    if not client:
+        raise HTTPException(status_code=400, detail="Client not attached to order")
+        
+    if first_order.payment_link:
+        return {"payment_link": first_order.payment_link}
+        
+    from utils.xendit_client import XenditClient
+    xendit = XenditClient()
+    
+    try:
+        res = xendit.create_invoice(
+            external_id=order_number,
+            amount=total_amount,
+            payer_email=client.email,
+            description=f"Payment for Service Order {order_number}"
+        )
+        pay_url = res.get("invoice_url")
+        inv_id = res.get("id")
+        
+        for item in orders:
+            item.payment_link = pay_url
+            item.xendit_invoice_id = inv_id
+            item.payment_link_created_at = datetime.now()
+            
+        db.commit()
+        return {"payment_link": pay_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+public_router = APIRouter(
+    prefix="/api/clients/payments",
+    tags=["payments"]
+)
+
+@public_router.post("/webhook")
+async def xendit_webhook(request: Request, db: Session = Depends(database.get_db)):
+    x_token = request.headers.get("x-callback-token")
+    env_token = os.getenv("XENDIT_CALLBACK_TOKEN", "")
+    if not env_token or x_token != env_token:
+        raise HTTPException(status_code=401, detail="Unauthorized webhook source")
+        
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+        
+    external_id = payload.get("external_id")
+    status = payload.get("status")
+    
+    if not external_id or not status:
+        return {"status": "ignored", "reason": "missing required fields"}
+        
+    # Check if order exists
+    orders = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == external_id).all()
+    if not orders:
+        return {"status": "ignored", "reason": "matching order not found"}
+        
+    if status == "PAID":
+        description = payload.get("description", "").lower()
+        is_proforma = "proforma" in description
+        is_final = "final" in description
+        paid_amount_val = payload.get("paid_amount") or payload.get("amount")
+        
+        # Calculate total amount of the order
+        total_order_amount = sum(item.unit_price for item in orders)
+        
+        # Parse paid_amount to float for formatting
+        try:
+            parsed_paid_amount = float(paid_amount_val) if paid_amount_val is not None else float(total_order_amount)
+        except ValueError:
+            parsed_paid_amount = 0.0
+            
+        formatted_paid = f"IDR {parsed_paid_amount:,.0f}"
+        
+        if is_proforma or (paid_amount_val and float(paid_amount_val) < total_order_amount and not is_final):
+            new_payment_status = "PARTIALLY_PAID"
+            message_text = f"Proforma payment of {formatted_paid} completed successfully via Xendit bank transfer."
+        else:
+            new_payment_status = "PAID"
+            message_text = f"Full payment of {formatted_paid} completed successfully via Xendit bank transfer."
+            
+        # Transition execution status conditionally and log to chat
+        transition_orders = [item for item in orders if item.status in ["DRAFT", "PROFORMA_GENERATED", "WAITING_ON_CLIENT"]]
+        if transition_orders:
+            target_status = "CONFIRMED"
+            first_trans = transition_orders[0]
+            if first_trans.consultant_ids and len(first_trans.consultant_ids) > 0:
+                target_status = "ORDER_ASSIGNED"
+            update_order_group_status(db, transition_orders, target_status, None)
+            
+        for item in orders:
+            item.payment_status = new_payment_status
+        
+        # Log to ClientOrderProgress
+        progress = models.ClientOrderProgress(
+            order_number=external_id,
+            message=message_text,
+            user_id=None
+        )
+        db.add(progress)
+        db.commit()
+        return {"status": "success", "message": f"Order {external_id} marked as {new_payment_status}"}
+        
+    return {"status": "received"}
 
 
 

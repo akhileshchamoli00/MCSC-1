@@ -688,6 +688,9 @@ class ClientOrder(Base):
     is_final_invoice_finalized = Column(Boolean, default=False)
     consultant_ids = Column(JSON, nullable=True, default=list) # List of assigned employee/consultant IDs
     notes = Column(String, nullable=True)
+    payment_link = Column(String, nullable=True)
+    xendit_invoice_id = Column(String, nullable=True)
+    payment_link_created_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

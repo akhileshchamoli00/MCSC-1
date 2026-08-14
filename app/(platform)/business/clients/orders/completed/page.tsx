@@ -39,7 +39,8 @@ import {
   X,
   Lock,
   Mail,
-  MessageSquare
+  MessageSquare,
+  Link2
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
@@ -75,6 +76,45 @@ export default function ClientOrdersPage() {
   const [filteredEmployees, setFilteredEmployees] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [viewingTeam, setViewingTeam] = useState<any | null>(null);
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+
+  const toggleItemExpansion = (key: string) => {
+    setExpandedItems(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const formatInvoiceDescription = (desc: string, isSmallText: boolean = false) => {
+    if (!desc) return null;
+
+    let processed = desc;
+    processed = processed.replace(/\s+([a-zA-Z]|\d+)\.\s+/g, '\n$1. ');
+    processed = processed.replace(/\s+([•\-\*])\s+/g, '\n$1 ');
+
+    const lines = processed.split('\n').map(line => line.trim()).filter(Boolean);
+
+    if (lines.length <= 1) {
+      return <div className="whitespace-pre-wrap">{desc}</div>;
+    }
+
+    return (
+      <div className={`space-y-1 mt-1 leading-relaxed ${isSmallText ? 'text-[10px]' : 'text-xs'} text-slate-550`}>
+        {lines.map((line, idx) => {
+          const isMarker = /^[a-zA-Z0-9]+\.\s+/.test(line) || /^[•\-\*]\s+/.test(line);
+          if (isMarker) {
+            return (
+              <div key={idx} className="pl-4 -indent-4">
+                {line}
+              </div>
+            );
+          }
+          return (
+            <div key={idx} className="font-semibold text-slate-800 mb-1">
+              {line}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   const handleTextChange = (val: string, selectionStart: number) => {
     setNewProgressMessage(val);
@@ -889,6 +929,28 @@ export default function ClientOrdersPage() {
         setSelectedOrderGroup((prev: any) => prev ? { ...prev, status: "WAITING_ON_CLIENT" } : null);
         // Refresh full list
         fetchData();
+
+        // Post automated update to order chat
+        try {
+          const chatMsg = emailConfirmType === 'proforma'
+            ? "Proforma invoice email has been sent to the client"
+            : "Final invoice email has been sent to the client";
+
+          const chatRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/progress`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${activeToken}`
+            },
+            body: JSON.stringify({ message: chatMsg })
+          });
+          if (chatRes.ok) {
+            const newUpdate = await chatRes.json();
+            setProgressUpdates(prev => [...prev, newUpdate]);
+          }
+        } catch (chatErr) {
+          console.error("Error posting automated email notification to chat:", chatErr);
+        }
       } else {
         const err = await res.json();
         toast.error(err.detail || `Failed to send ${emailConfirmType} invoice email`);
@@ -1199,6 +1261,9 @@ export default function ClientOrdersPage() {
         return matched ? matched : ord;
       }));
 
+      // Refresh chat progress to show automated message
+      fetchProgressUpdates(selectedOrderGroup.order_number);
+
     } catch (err: any) {
       console.error("Finalize Final Invoice Error:", err);
       toast.error(err.message || "Failed to finalize final invoice");
@@ -1336,11 +1401,11 @@ export default function ClientOrdersPage() {
                   </thead>
                   <tbody className="divide-y">
                     {paginatedOrders.map((ord, index) => (
-                      <tr key={ord.order_number || index} className="hover:bg-muted/30 transition-colors">
-                        <td className="p-4 text-center font-mono font-medium text-muted-foreground">
+                       <tr key={ord.order_number || index} className="hover:bg-muted/30 transition-colors border-b last:border-0">
+                        <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5">
                           #{startIndex + index + 1}
                         </td>
-                        <td className="p-4">
+                        <td className="p-4 align-top pt-5">
                           {ord.company_id ? (
                             <Link href={`/business/clients/documents/${ord.company_id}?from=orders`}>
                               <Badge
@@ -1357,32 +1422,30 @@ export default function ClientOrdersPage() {
                             </Badge>
                           )}
                         </td>
-                        <td className="p-4 font-bold text-foreground text-sm">
+                        <td className="p-4 font-bold text-foreground text-sm align-top pt-5">
                           <div>{ord.company_name || "Personal Client Account"}</div>
-                          <div className="text-xs font-normal text-muted-foreground flex items-center gap-1 mt-0.5">
+                          <div className="text-xs font-normal text-muted-foreground flex items-center gap-1 mt-1">
                             <Building className="h-3 w-3 text-muted-foreground" /> {ord.client_name || "Representative"}
                           </div>
                         </td>
-                        <td className="p-4">
+                        <td className="p-4 align-top pt-5">
                           {ord.items && ord.items.length > 0 ? (
-                            <div className="space-y-2 max-w-sm">
+                            <div className="space-y-1.5 max-w-sm">
                               {ord.items.map((item: any, idx: number) => (
-                                <div key={idx} className="flex flex-col gap-0.5 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
+                                <div key={idx} className="flex flex-wrap items-center gap-1.5 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
                                   <span className="font-semibold text-foreground text-xs leading-normal break-words">
                                     {item.job_title}
                                   </span>
-                                  <div className="flex items-center gap-1.5 mt-0.5">
-                                    {item.job_id && (
-                                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 bg-primary/5 text-primary border-primary/20 shrink-0">
-                                        {item.job_id}
-                                      </Badge>
-                                    )}
-                                    {item.pricing_tier && (
-                                      <Badge variant="secondary" className="text-[9px] py-0 px-1 font-medium capitalize">
-                                        {item.pricing_tier.toLowerCase().replace('_', ' ')}
-                                      </Badge>
-                                    )}
-                                  </div>
+                                  {item.job_id && (
+                                    <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                      {item.job_id}
+                                    </Badge>
+                                  )}
+                                  {item.pricing_tier && (
+                                    <Badge variant="secondary" className="text-[9px] py-0 px-1 font-medium capitalize shrink-0">
+                                      {item.pricing_tier.toLowerCase().replace('_', ' ')}
+                                    </Badge>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -1390,7 +1453,7 @@ export default function ClientOrdersPage() {
                             <span className="text-muted-foreground italic text-xs">-</span>
                           )}
                         </td>
-                        <td className="p-4">
+                        <td className="p-4 align-top pt-5">
                           {ord.consultants && ord.consultants.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
                               {ord.consultants.map((c: any) => (
@@ -1404,20 +1467,59 @@ export default function ClientOrdersPage() {
                             <span className="text-muted-foreground italic text-xs">No consultant assigned</span>
                           )}
                         </td>
-                        <td className="p-4 text-right font-mono font-bold text-sm text-foreground">
+                        <td className="p-4 text-right font-mono font-bold text-sm text-foreground align-top pt-5">
                           {formatCurrency(ord.total_amount)}
                         </td>
-                        <td className="p-4 text-center">
-                          <Badge className={`${getPaymentStatusColor(ord.payment_status)} font-bold font-mono border text-[11px]`}>
-                            {ord.payment_status || "UNPAID"}
-                          </Badge>
+                        <td className="p-4 text-center align-top pt-5">
+                          <div className="flex flex-col items-center gap-1.5 justify-center">
+                            <Badge className={`${getPaymentStatusColor(ord.payment_status)} font-bold font-mono border text-[11px]`}>
+                              {ord.payment_status || "UNPAID"}
+                            </Badge>
+                            {ord.payment_status !== "PAID" && ord.is_proforma_finalized && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-2 text-[10px] gap-1 font-bold border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30 shadow-sm"
+                                onClick={async () => {
+                                  if (ord.payment_link) {
+                                    navigator.clipboard.writeText(ord.payment_link);
+                                    toast.success("Payment link copied to clipboard!");
+                                    return;
+                                  }
+                                  const activeToken = localStorage.getItem("hrms_token");
+                                  const toastId = toast.loading("Generating secure payment link...");
+                                  try {
+                                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${ord.order_number}/payment-link`, {
+                                      method: "POST",
+                                      headers: {
+                                        "Authorization": `Bearer ${activeToken}`
+                                      }
+                                    });
+                                    if (res.ok) {
+                                      const data = await res.json();
+                                      toast.success("Payment link generated and copied to clipboard!", { id: toastId });
+                                      setOrders(prev => prev.map(o => o.order_number === ord.order_number ? { ...o, payment_link: data.payment_link } : o));
+                                      navigator.clipboard.writeText(data.payment_link);
+                                    } else {
+                                      toast.error("Failed to generate payment link", { id: toastId });
+                                    }
+                                  } catch (err) {
+                                    console.error(err);
+                                    toast.error("Error generating payment link", { id: toastId });
+                                  }
+                                }}
+                              >
+                                <Link2 className="h-3 w-3" /> Copy Link
+                              </Button>
+                            )}
+                          </div>
                         </td>
-                        <td className="p-4 text-center">
+                        <td className="p-4 text-center align-top pt-5">
                           <Badge className={`${getOrderStatusColor(ord.status)} font-bold border text-[11px]`}>
                             {ord.status || "CONFIRMED"}
                           </Badge>
                         </td>
-                        <td className="p-4 text-right space-x-1">
+                        <td className="p-4 text-right space-x-1 align-top pt-5">
                           <Button
                             size="icon"
                             variant="ghost"
@@ -1825,9 +1927,49 @@ export default function ClientOrdersPage() {
                         <span className="text-muted-foreground block font-medium uppercase text-[10px]">Target Company Entity</span>
                         <span className="font-bold text-base text-foreground block mt-0.5">{selectedOrderGroup.company_name || "Individual Account"}</span>
                       </div>
-                      <Badge className={`${getPaymentStatusColor(selectedOrderGroup.payment_status)} font-mono font-bold text-[10px] uppercase`}>
-                        {selectedOrderGroup.payment_status}
-                      </Badge>
+                      <div className="flex flex-col items-end gap-1.5">
+                        <Badge className={`${getPaymentStatusColor(selectedOrderGroup.payment_status)} font-mono font-bold text-[10px] uppercase`}>
+                          {selectedOrderGroup.payment_status}
+                        </Badge>
+                        {selectedOrderGroup.payment_status !== "PAID" && selectedOrderGroup.is_proforma_finalized && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[10px] gap-1 font-bold border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30"
+                            onClick={async () => {
+                              if (selectedOrderGroup.payment_link) {
+                                navigator.clipboard.writeText(selectedOrderGroup.payment_link);
+                                toast.success("Payment link copied to clipboard!");
+                                return;
+                              }
+                              const activeToken = localStorage.getItem("hrms_token");
+                              const toastId = toast.loading("Generating secure payment link...");
+                              try {
+                                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/payment-link`, {
+                                  method: "POST",
+                                  headers: {
+                                    "Authorization": `Bearer ${activeToken}`
+                                  }
+                                });
+                                if (res.ok) {
+                                  const data = await res.json();
+                                  toast.success("Payment link generated and copied to clipboard!", { id: toastId });
+                                  setSelectedOrderGroup((prev: any) => prev ? { ...prev, payment_link: data.payment_link } : null);
+                                  setOrders(prev => prev.map(o => o.order_number === selectedOrderGroup.order_number ? { ...o, payment_link: data.payment_link } : o));
+                                  navigator.clipboard.writeText(data.payment_link);
+                                } else {
+                                  toast.error("Failed to generate payment link", { id: toastId });
+                                }
+                              } catch (err) {
+                                console.error(err);
+                                  toast.error("Error generating payment link", { id: toastId });
+                                }
+                              }}
+                            >
+                              <Link2 className="h-3 w-3" /> Copy Link
+                            </Button>
+                          )}
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 pt-1">
@@ -1968,18 +2110,18 @@ export default function ClientOrdersPage() {
                       onClick={() => setIsProformaPreviewOpen(true)}
                       className="w-full gap-2 font-bold py-5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md text-sm disabled:opacity-50"
                     >
-                      <FileText className="h-4 w-4" /> Generate Proforma Invoice ({proformaPercent || 0}%)
+                      <FileText className="h-4 w-4" /> {selectedOrderGroup.is_proforma_finalized ? "View" : "Generate"} Proforma Invoice ({proformaPercent || 0}%)
                     </Button>
 
                     <Button
                       type="button"
-                      disabled={!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "COMPLETED"}
+                      disabled={(!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "COMPLETED") && !selectedOrderGroup?.is_final_invoice_finalized}
                       onClick={() => setIsFinalInvoicePreviewOpen(true)}
                       className="w-full gap-2 font-bold py-5 bg-blue-600 hover:bg-blue-700 text-white shadow-md text-sm disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed"
                     >
-                      <FileText className="h-4 w-4" /> Generate Final Invoice
+                      <FileText className="h-4 w-4" /> {selectedOrderGroup?.is_final_invoice_finalized ? "View" : "Generate"} Final Invoice
                     </Button>
-                    {(!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "COMPLETED") && (
+                    {(!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "COMPLETED") && !selectedOrderGroup?.is_final_invoice_finalized && (
                       <p className="text-[10px] text-muted-foreground text-center italic mt-0.5">
                         Requires finalized proforma invoice & completed order lifecycle status.
                       </p>
@@ -1997,44 +2139,65 @@ export default function ClientOrdersPage() {
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-muted/60 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                          <th className="p-3">Job Code</th>
                           <th className="p-3">Service Package</th>
-                          <th className="p-3">Tier</th>
-                          <th className="p-3 text-right">Price</th>
+                          <th className="p-3 text-right w-32">Price</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {(selectedOrderGroup.items || []).map((item: any) => (
-                          <tr key={item.id} className="hover:bg-muted/20 transition-colors">
-                            <td className="p-3 font-mono font-bold text-primary">
-                              {item.job_id || "-"}
-                            </td>
-                            <td className="p-3 max-w-[280px]">
-                              <div className="font-bold text-foreground break-words">{item.job_title}</div>
-                              {(() => {
-                                const matchedService = services.find((s) => s.id === item.service_id);
-                                const desc = item.description || matchedService?.description;
-                                if (!desc) return null;
-                                return (
-                                  <div className="text-[10px] text-muted-foreground/90 mt-1 whitespace-normal break-words leading-normal">
-                                    {desc}
+                        {(selectedOrderGroup.items || []).map((item: any, idx: number) => {
+                          const itemKey = `order-completed-${selectedOrderGroup.order_number}-${idx}`;
+                          const isExpanded = !!expandedItems[itemKey];
+                          return (
+                            <tr key={item.id || idx} className="hover:bg-muted/20 transition-colors">
+                              <td className="p-3 align-top">
+                                <div className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-950/20 shadow-none space-y-1.5 transition-all duration-200 max-w-xl">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="font-bold text-foreground text-xs leading-normal break-words">
+                                      {item.job_title}
+                                    </span>
+                                    {item.job_id && (
+                                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                        {item.job_id}
+                                      </Badge>
+                                    )}
+                                    {item.pricing_tier && (
+                                      <Badge variant="secondary" className="text-[9px] py-0 px-1.5 font-medium capitalize shrink-0">
+                                        {item.pricing_tier.toLowerCase().replace('_', ' ')}
+                                      </Badge>
+                                    )}
                                   </div>
-                                );
-                              })()}
-                            </td>
-                            <td className="p-3">
-                              <Badge variant="outline" className="text-[10px] font-mono font-bold uppercase">
-                                {item.pricing_tier}
-                              </Badge>
-                            </td>
-                            <td className="p-3 text-right font-mono font-bold text-foreground">
-                              {item.pricing_tier === "PARTNER_A3"
-                                ? item.custom_price_text || "Custom"
-                                : formatCurrency(item.unit_price)
-                              }
-                            </td>
-                          </tr>
-                        ))}
+                                  {(() => {
+                                    const matchedService = services.find((s) => s.id === item.service_id);
+                                    const desc = item.description || matchedService?.description;
+                                    if (!desc) return null;
+                                    return (
+                                      <div className="space-y-1">
+                                        {isExpanded && (
+                                          <div className="mt-1 border-l-2 border-zinc-300 dark:border-zinc-700 pl-2 py-0.5">
+                                            {formatInvoiceDescription(desc, true)}
+                                          </div>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleItemExpansion(itemKey)}
+                                          className="text-[9.5px] text-primary hover:text-primary/80 font-bold hover:underline block"
+                                        >
+                                          {isExpanded ? "Hide details" : "Show details"}
+                                        </button>
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              </td>
+                              <td className="p-3 text-right font-mono font-bold text-foreground align-top pt-5">
+                                {item.pricing_tier === "PARTNER_A3"
+                                  ? item.custom_price_text || "Custom"
+                                  : formatCurrency(item.unit_price)
+                                }
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -2370,18 +2533,19 @@ export default function ClientOrdersPage() {
                                 <td className="p-2 text-center font-mono font-bold text-slate-400">{idx + 1}</td>
                                 <td className="p-2 font-mono font-semibold text-slate-600 w-28">{item.pricing_tier}</td>
                                 <td className="p-2">
-                                  <div className="font-bold text-slate-900 text-sm">{item.job_title}</div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="font-bold text-slate-900 text-sm leading-tight">{item.job_title}</span>
+                                    {item.job_id && (
+                                      <span className="text-[9px] font-mono font-bold text-slate-550 border border-slate-200 bg-slate-50/50 px-1.5 py-0.5 rounded shrink-0">
+                                        {item.job_id}
+                                      </span>
+                                    )}
+                                  </div>
                                   {(() => {
                                     const matchedService = services.find((s) => s.id === item.service_id);
                                     const desc = item.description || matchedService?.description;
-                                    if (!desc) return null;
-                                    return (
-                                      <div className="text-[11px] text-slate-500 mt-1 whitespace-normal break-words leading-relaxed max-w-lg">
-                                        {desc}
-                                      </div>
-                                    );
+                                    return formatInvoiceDescription(desc);
                                   })()}
-                                  {item.job_id && <div className="text-[10px] font-mono text-slate-400 mt-1">Job Code: {item.job_id}</div>}
                                 </td>
                                 <td className="p-2 text-right font-mono font-bold text-slate-700">{formatCurrency(lineFullPrice)}</td>
                                 <td className="p-2 text-right font-mono font-bold text-emerald-700 bg-emerald-50/50">
@@ -2625,18 +2789,19 @@ export default function ClientOrdersPage() {
                                 <td className="p-2.5 text-center font-mono font-bold text-slate-400">{idx + 1}</td>
                                 <td className="p-2.5 font-mono font-semibold text-slate-600 w-28">{item.pricing_tier}</td>
                                 <td className="p-2.5">
-                                  <div className="font-bold text-slate-900 text-sm">{item.job_title}</div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="font-bold text-slate-900 text-sm leading-tight">{item.job_title}</span>
+                                    {item.job_id && (
+                                      <span className="text-[9px] font-mono font-bold text-slate-550 border border-slate-200 bg-slate-50/50 px-1.5 py-0.5 rounded shrink-0">
+                                        {item.job_id}
+                                      </span>
+                                    )}
+                                  </div>
                                   {(() => {
                                     const matchedService = services.find((s) => s.id === item.service_id);
                                     const desc = item.description || matchedService?.description;
-                                    if (!desc) return null;
-                                    return (
-                                      <div className="text-[11px] text-slate-500 mt-1 whitespace-normal break-words leading-relaxed max-w-lg">
-                                        {desc}
-                                      </div>
-                                    );
+                                    return formatInvoiceDescription(desc);
                                   })()}
-                                  {item.job_id && <div className="text-[10px] font-mono text-slate-400 mt-1">Job Code: {item.job_id}</div>}
                                 </td>
                                 <td className="p-2.5 text-right font-mono font-bold text-slate-700">{formatCurrency(lineFullPrice)}</td>
                               </tr>

@@ -48,6 +48,11 @@ export default function AssignedOrdersPage() {
   const [loadingProgress, setLoadingProgress] = useState(false);
   const [newProgressMessage, setNewProgressMessage] = useState("");
   const [postingProgress, setPostingProgress] = useState(false);
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+
+  const toggleItemExpansion = (key: string) => {
+    setExpandedItems(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   // Real-time Chat & Tagging States
   const [employees, setEmployees] = useState<any[]>([]);
@@ -531,11 +536,11 @@ export default function AssignedOrdersPage() {
               </thead>
               <tbody className="divide-y">
                 {paginatedOrders.map((ord, idx) => (
-                  <tr key={ord.order_number} className="hover:bg-muted/30 transition-colors">
-                    <td className="p-4 text-center font-mono font-medium text-muted-foreground">
+                  <tr key={ord.order_number} className="hover:bg-muted/30 transition-colors border-b last:border-0">
+                    <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5">
                       #{startIndex + idx + 1}
                     </td>
-                    <td className="p-4">
+                    <td className="p-4 align-top pt-5">
                       {ord.company_id ? (
                         <Link href={`/business/clients/documents/${ord.company_id}?from=assigned-orders`}>
                           <Badge 
@@ -552,43 +557,66 @@ export default function AssignedOrdersPage() {
                         </Badge>
                       )}
                     </td>
-                    <td className="p-4 text-muted-foreground space-y-1">
+                    <td className="p-4 text-muted-foreground space-y-1 align-top pt-5">
                       <div className="text-foreground font-semibold text-sm">
                         {ord.company_name || "Personal Client"}
                       </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
                         <Building className="h-3.5 w-3.5 shrink-0" />
                         <span>{ord.client_name || "Representative"}</span>
                       </div>
                     </td>
-                    <td className="p-4 text-muted-foreground">
+                    <td className="p-4 text-muted-foreground align-top">
                       {ord.items && ord.items.length > 0 ? (
-                        <div className="space-y-2 max-w-sm">
-                          {ord.items.map((item: any, idx: number) => (
-                            <div key={idx} className="flex flex-col gap-0.5 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
-                              <span className="font-semibold text-foreground text-xs leading-normal break-words">
-                                {item.job_title}
-                              </span>
-                              <div className="flex items-center gap-1.5 mt-0.5">
-                                {item.job_id && (
-                                  <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 bg-primary/5 text-primary border-primary/20 shrink-0">
-                                    {item.job_id}
-                                  </Badge>
-                                )}
-                                {item.pricing_tier && (
-                                  <Badge variant="secondary" className="text-[9px] py-0 px-1 font-medium capitalize">
-                                    {item.pricing_tier.toLowerCase().replace('_', ' ')}
-                                  </Badge>
+                        <div className="space-y-2.5 max-w-md my-1">
+                          {ord.items.map((item: any, idx: number) => {
+                            const itemKey = `${ord.order_number}-${idx}`;
+                            const isExpanded = !!expandedItems[itemKey];
+                            return (
+                              <div 
+                                key={idx} 
+                                className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-950/20 shadow-none space-y-1.5 transition-all duration-200"
+                              >
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="font-bold text-foreground text-xs leading-normal break-words">
+                                    {item.job_title}
+                                  </span>
+                                  {item.job_id && (
+                                    <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                      {item.job_id}
+                                    </Badge>
+                                  )}
+                                  {item.pricing_tier && (
+                                    <Badge variant="secondary" className="text-[9px] py-0 px-1.5 font-medium capitalize shrink-0">
+                                      {item.pricing_tier.toLowerCase().replace('_', ' ')}
+                                    </Badge>
+                                  )}
+                                </div>
+                                {item.description && (
+                                  <div className="space-y-1">
+                                    {isExpanded && (
+                                      <div className="text-[10px] text-muted-foreground leading-relaxed whitespace-pre-wrap transition-all duration-200 mt-1 border-l-2 border-zinc-300 dark:border-zinc-700 pl-2 py-0.5">
+                                        {item.description}
+                                      </div>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleItemExpansion(itemKey)}
+                                      className="text-[9.5px] text-primary hover:text-primary/80 font-bold hover:underline block"
+                                    >
+                                      {isExpanded ? "Hide details" : "Show details"}
+                                    </button>
+                                  </div>
                                 )}
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       ) : (
                         <span className="text-muted-foreground italic text-xs">-</span>
                       )}
                     </td>
-                    <td className="p-4">
+                    <td className="p-4 align-top pt-5">
                       {ord.consultants && ord.consultants.length > 0 ? (
                         <div className="flex flex-wrap gap-1 max-w-[200px]">
                           {ord.consultants.map((c: any) => (
@@ -602,10 +630,10 @@ export default function AssignedOrdersPage() {
                         <span className="text-muted-foreground italic text-xs">No team assigned</span>
                       )}
                     </td>
-                    <td className="p-4 font-mono font-medium text-muted-foreground">
+                    <td className="p-4 font-mono font-medium text-muted-foreground align-top pt-5">
                       {formatDate(ord.created_at)}
                     </td>
-                    <td className="p-4 text-center">
+                    <td className="p-4 text-center align-top pt-5">
                       <select
                         value={ord.status}
                         disabled={savingStatus}
@@ -628,30 +656,18 @@ export default function AssignedOrdersPage() {
                         <option value="CANCELLED">CANCELLED</option>
                       </select>
                     </td>
-                    <td className="p-4 text-right flex items-center justify-end gap-1">
-                      <Button 
-                        size="icon"
-                        variant="ghost"
-                        title="View Scope"
-                        onClick={() => {
-                          setSelectedGroup(ord);
-                          setIsViewOpen(true);
-                          fetchProgressUpdates(ord.order_number);
-                        }}
-                      >
-                        <Eye className="h-4 w-4 text-slate-500 hover:text-foreground" />
-                      </Button>
+                    <td className="p-4 text-right align-top pt-5">
                       <Button
-                        size="icon"
-                        variant="ghost"
-                        title="Order Chat"
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 font-bold border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30 shadow-sm"
                         onClick={() => {
                           setSelectedGroup(ord);
                           setIsChatOpen(true);
                           fetchProgressUpdates(ord.order_number);
                         }}
                       >
-                        <MessageSquare className="h-4 w-4 text-emerald-600 hover:text-emerald-700" />
+                        <MessageSquare className="h-3.5 w-3.5" /> Chat
                       </Button>
                     </td>
                   </tr>
