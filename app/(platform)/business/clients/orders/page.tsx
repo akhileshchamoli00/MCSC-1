@@ -699,8 +699,16 @@ export default function ClientOrdersPage() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || "Failed to finalize invoice");
+        let errMsg = "Failed to finalize invoice";
+        try {
+          const err = await res.json();
+          errMsg = err.detail 
+            ? (typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail)) 
+            : JSON.stringify(err);
+        } catch (e) {
+          errMsg = `Error ${res.status}: ${res.statusText}`;
+        }
+        throw new Error(errMsg);
       }
 
       const updatedOrders = await res.json();
@@ -1080,8 +1088,16 @@ export default function ClientOrdersPage() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || "Failed to finalize final invoice");
+        let errMsg = "Failed to finalize final invoice";
+        try {
+          const err = await res.json();
+          errMsg = err.detail 
+            ? (typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail)) 
+            : JSON.stringify(err);
+        } catch (e) {
+          errMsg = `Error ${res.status}: ${res.statusText}`;
+        }
+        throw new Error(errMsg);
       }
 
       const updatedOrders = await res.json();

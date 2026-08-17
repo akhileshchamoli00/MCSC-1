@@ -45,7 +45,7 @@ const nextConfig = {
       { source: '/leave/:path*', destination: '/hrms/leave/:path*', permanent: true },
       { source: '/my-assets/:path*', destination: '/hrms/my-assets/:path*', permanent: true },
       { source: '/my-payroll/:path*', destination: '/hrms/my-payroll/:path*', permanent: true },
-      { source: '/notifications/:path*', destination: '/hrms/notifications/:path*', permanent: true },
+      { source: '/notifications/:path*', destination: '/shared/notifications/:path*', permanent: true },
       { source: '/payroll/:path*', destination: '/hrms/payroll/:path*', permanent: true },
       { source: '/performance/:path*', destination: '/hrms/performance/:path*', permanent: true },
       { source: '/profile/:path*', destination: '/hrms/profile/:path*', permanent: true },

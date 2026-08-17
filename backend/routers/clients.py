@@ -365,7 +365,16 @@ def delete_client_order(id: int, db: Session = Depends(database.get_db), current
     if not db_order:
         raise HTTPException(status_code=404, detail="Order not found")
         
+    order_number = db_order.order_number
     db.delete(db_order)
+    db.flush()
+    
+    # Check if there are any remaining items in this order group
+    remaining = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).count()
+    if remaining == 0:
+        # Delete progress logs (this includes both system and user messages in the order chat)
+        db.query(models.ClientOrderProgress).filter(models.ClientOrderProgress.order_number == order_number).delete()
+        
     db.commit()
     return {"message": "Order deleted successfully"}
 
