@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { KpiCard } from "@/components/kpi-card";
 import { FileText, Wallet, Loader2, Eye, PlusCircle, Users, CheckCircle, Clock, Download, Send, AlertCircle, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
@@ -95,6 +96,7 @@ export default function AdminPayrollPage() {
 
   const getMonthName = (month: number) => {
     const date = new Date();
+    date.setDate(1); // Set day to 1 to prevent monthly overflow rollovers (e.g., Feb 31st -> March)
     date.setMonth(month - 1);
     return date.toLocaleString('default', { month: 'long' });
   };
@@ -319,52 +321,12 @@ export default function AdminPayrollPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
-        <Card className="border border-border/50 bg-card shadow-sm">
-          <div className="py-0.5 px-3 flex items-center justify-between w-full">
-            <div>
-              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Total Employees</p>
-              <p className="text-lg md:text-xl font-bold text-foreground tracking-tight">{totalEmployees}</p>
-            </div>
-            <Users className="w-5 h-5 text-muted-foreground/30" />
-          </div>
-        </Card>
-        <Card className="border border-border/50 bg-card shadow-sm">
-          <div className="py-0.5 px-3 flex items-center justify-between w-full">
-            <div>
-              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Payslips Generated</p>
-              <p className="text-lg md:text-xl font-bold text-foreground tracking-tight">{generatedCount}</p>
-            </div>
-            <CheckCircle className="w-5 h-5 text-muted-foreground/30" />
-          </div>
-        </Card>
-        <Card className="border border-border/50 bg-card shadow-sm">
-          <div className="py-0.5 px-3 flex items-center justify-between w-full">
-            <div>
-              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Pending Payroll</p>
-              <p className="text-lg md:text-xl font-bold text-foreground tracking-tight">{pendingCount}</p>
-            </div>
-            <Clock className="w-5 h-5 text-muted-foreground/30" />
-          </div>
-        </Card>
-        <Card className="border border-border/50 bg-card shadow-sm">
-          <div className="py-0.5 px-3 flex items-center justify-between w-full">
-            <div>
-              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Current Month Payroll</p>
-              <p className="text-lg md:text-xl font-bold text-foreground tracking-tight">IDR {currentMonthCost.toLocaleString()}</p>
-            </div>
-            <Wallet className="w-5 h-5 text-muted-foreground/30" />
-          </div>
-        </Card>
-        <Card className="border border-border/50 bg-card shadow-sm">
-          <div className="py-0.5 px-3 flex items-center justify-between w-full">
-            <div>
-              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Previous Month Payroll</p>
-              <p className="text-lg md:text-xl font-bold text-foreground tracking-tight">IDR {prevMonthCost.toLocaleString()}</p>
-            </div>
-            <Wallet className="w-5 h-5 text-muted-foreground/30" />
-          </div>
-        </Card>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <KpiCard title="Total Employees" value={totalEmployees} icon={Users} colorTheme="sky" />
+        <KpiCard title="Payslips Generated" value={generatedCount} icon={CheckCircle} colorTheme="emerald" />
+        <KpiCard title="Pending Payroll" value={pendingCount} icon={Clock} colorTheme="amber" />
+        <KpiCard title="Current Month Cost" value={`IDR ${currentMonthCost.toLocaleString()}`} icon={Wallet} colorTheme="indigo" />
+        <KpiCard title="Previous Month Cost" value={`IDR ${prevMonthCost.toLocaleString()}`} icon={Wallet} colorTheme="purple" />
       </div>
 
       <Card className="border-border/50 shadow-sm">

@@ -377,3 +377,179 @@ def reject_correction(correction_id: int, db: Session = Depends(database.get_db)
     correction.approved_at = get_local_now()
     db.commit()
     return {"message": "Correction rejected"}
+
+@router.get("/monthly-report")
+def get_monthly_report(
+    year: int,
+    month: int,
+    department_id: Optional[int] = None,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    import calendar
+    from datetime import date, timedelta
+    from sqlalchemy.orm import joinedload
+    
+    if not is_admin_or_hr(current_user, db):
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    try:
+        first_day = date(year, month, 1)
+        num_days = calendar.monthrange(year, month)[1]
+        last_day = date(year, month, num_days)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid year or month")
+        
+    # Get active/on_leave employees
+    emp_query = db.query(models.Employee).options(
+        joinedload(models.Employee.department)
+    ).filter(
+        models.Employee.status != models.EmploymentStatus.TERMINATED
+    )
+    if department_id:
+        emp_query = emp_query.filter(models.Employee.department_id == department_id)
+        
+    employees = emp_query.all()
+    
+    # Filter out System Admin, Akhi Dev, and John Wick from the report
+    exclude_names = {
+        ("System", "Admin"),
+        ("Akhi", "Dev"),
+        ("John", "Wick")
+    }
+    employees = [
+        emp for emp in employees 
+        if (emp.first_name, emp.last_name) not in exclude_names
+    ]
+    
+    # Get attendance records for this month
+    attendance_records = db.query(models.Attendance).filter(
+        models.Attendance.attendance_date.between(first_day, last_day)
+    ).all()
+    
+    # Group attendance by employee and date
+    attendance_map = {}
+    for att in attendance_records:
+        if att.employee_id not in attendance_map:
+            attendance_map[att.employee_id] = {}
+        attendance_map[att.employee_id][att.attendance_date] = att
+        
+    # Get approved leaves for this month
+    leave_requests = db.query(models.LeaveRequest).filter(
+        models.LeaveRequest.status == "APPROVED",
+        models.LeaveRequest.start_date <= last_day,
+        models.LeaveRequest.end_date >= first_day
+    ).all()
+    
+    # Group leaves by employee and date
+    leave_map = {}
+    for req in leave_requests:
+        if req.employee_id not in leave_map:
+            leave_map[req.employee_id] = {}
+        
+        curr = max(req.start_date, first_day)
+        end = min(req.end_date, last_day)
+        while curr <= end:
+            leave_map[req.employee_id][curr] = req.leave_type or "Leave"
+            curr += timedelta(days=1)
+            
+    # Get public holidays
+    holidays = db.query(models.PublicHoliday).filter(
+        models.PublicHoliday.holiday_date.between(first_day, last_day)
+    ).all()
+    holiday_map = {h.holiday_date: h.holiday_name for h in holidays}
+    
+    today_local = get_local_today()
+    
+    employee_reports = []
+    for emp in employees:
+        days_data = []
+        summary = {
+            "present": 0,
+            "late": 0,
+            "half_day": 0,
+            "absent": 0,
+            "leave": 0,
+            "holiday": 0,
+            "weekend": 0
+        }
+        
+        for day_num in range(1, num_days + 1):
+            curr_date = date(year, month, day_num)
+            day_status = None
+            clock_in = None
+            clock_out = None
+            working_hours = 0.0
+            late_minutes = 0
+            leave_type = None
+            
+            # Check attendance first
+            att = attendance_map.get(emp.id, {}).get(curr_date)
+            if att:
+                day_status = att.status # Present, Late, Half Day
+                clock_in = att.clock_in_time.isoformat() if att.clock_in_time else None
+                clock_out = att.clock_out_time.isoformat() if att.clock_out_time else None
+                working_hours = att.working_hours or 0.0
+                late_minutes = att.late_minutes or 0
+                
+                # Update summary
+                if day_status == "Present":
+                    summary["present"] += 1
+                elif day_status == "Late":
+                    summary["late"] += 1
+                elif day_status == "Half Day":
+                    summary["half_day"] += 1
+            else:
+                # No attendance record
+                # Check leave
+                leave_type = leave_map.get(emp.id, {}).get(curr_date)
+                if leave_type:
+                    day_status = "Leave"
+                    summary["leave"] += 1
+                # Check holiday
+                elif curr_date in holiday_map:
+                    day_status = "Holiday"
+                    summary["holiday"] += 1
+                # Check weekend
+                elif curr_date.weekday() >= 5:
+                    day_status = "Weekend"
+                    summary["weekend"] += 1
+                # Check absent (past days)
+                elif curr_date < today_local:
+                    day_status = "Absent"
+                    summary["absent"] += 1
+                else:
+                    # Today or future day where they haven't clocked in yet
+                    day_status = None
+                    
+            days_data.append({
+                "day": day_num,
+                "date": curr_date.isoformat(),
+                "status": day_status,
+                "clock_in": clock_in,
+                "clock_out": clock_out,
+                "working_hours": working_hours,
+                "late_minutes": late_minutes,
+                "holiday_name": holiday_map.get(curr_date) if curr_date in holiday_map else None,
+                "leave_type": leave_type
+            })
+            
+        employee_reports.append({
+            "id": emp.id,
+            "employee_id_custom": emp.employee_id_custom,
+            "first_name": emp.first_name,
+            "last_name": emp.last_name,
+            "job_title": emp.job_title,
+            "department": emp.department.name if emp.department else "Unassigned",
+            "summary": summary,
+            "days": days_data
+        })
+        
+    return {
+        "year": year,
+        "month": month,
+        "days_in_month": num_days,
+        "holidays": {d.isoformat(): name for d, name in holiday_map.items()},
+        "employees": employee_reports
+    }
+

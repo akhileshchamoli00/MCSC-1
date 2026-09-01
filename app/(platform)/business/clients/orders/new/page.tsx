@@ -33,6 +33,7 @@ export default function NewClientOrderPage() {
   const [services, setServices] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
+  const [notaries, setNotaries] = useState<any[]>([]);
 
   // Form Fields State
   const [filterClientId, setFilterClientId] = useState<string>("");
@@ -48,6 +49,7 @@ export default function NewClientOrderPage() {
       pricing_tier: "BASE",
       unit_price: 0,
       custom_price_text: "",
+      notary_id: "",
       _raw_service: null
     }
   ]);
@@ -61,12 +63,13 @@ export default function NewClientOrderPage() {
     }
     try {
       setLoading(true);
-      const [cliRes, compRes, serRes, empRes, teamRes] = await Promise.all([
+      const [cliRes, compRes, serRes, empRes, teamRes, notariesRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, { headers: { "Authorization": `Bearer ${token}` } }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, { headers: { "Authorization": `Bearer ${token}` } }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, { headers: { "Authorization": `Bearer ${token}` } }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, { headers: { "Authorization": `Bearer ${token}` } })
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, { headers: { "Authorization": `Bearer ${token}` } }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries`, { headers: { "Authorization": `Bearer ${token}` } })
       ]);
 
       if (cliRes.ok) setClients(await cliRes.json());
@@ -74,6 +77,7 @@ export default function NewClientOrderPage() {
       if (serRes.ok) setServices(await serRes.json());
       if (empRes.ok) setEmployees(await empRes.json());
       if (teamRes.ok) setTeams(await teamRes.json());
+      if (notariesRes.ok) setNotaries(await notariesRes.json());
     } catch (err) {
       console.error("Error loading master records:", err);
       toast.error("Failed to load dependency catalog data");
@@ -102,6 +106,7 @@ export default function NewClientOrderPage() {
         pricing_tier: "BASE",
         unit_price: 0,
         custom_price_text: "",
+        notary_id: "",
         _raw_service: null
       },
       ...prev
@@ -157,6 +162,7 @@ export default function NewClientOrderPage() {
         description: selectedService.description || "",
         unit_price: price,
         custom_price_text: customText,
+        notary_id: "",
         _raw_service: selectedService
       };
       return copy;
@@ -214,7 +220,8 @@ export default function NewClientOrderPage() {
         description: i.description,
         pricing_tier: i.pricing_tier,
         unit_price: i.unit_price || 0,
-        custom_price_text: i.custom_price_text || null
+        custom_price_text: i.custom_price_text || null,
+        notary_id: i.notary_id ? parseInt(i.notary_id) : null
       }));
 
     if (validItems.length === 0) {
@@ -478,6 +485,43 @@ export default function NewClientOrderPage() {
                           placeholder="e.g. Free or Custom Contract Price"
                           className="h-8.5 text-xs font-semibold rounded-lg border-border/60 bg-background"
                         />
+                      </div>
+                    )}
+
+                    {/* Notary Selection (Conditional) */}
+                    {item._raw_service?.needs_notary && (
+                      <div className="space-y-1 pt-1 animate-in slide-in-from-top-2 duration-200">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Select Notary *</label>
+                        <select
+                          required
+                          value={item.notary_id || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setOrderItems((prev) => {
+                              const copy = [...prev];
+                              copy[idx].notary_id = val ? parseInt(val) : "";
+                              return copy;
+                            });
+                          }}
+                          className="flex h-8.5 w-full rounded-lg border border-border/60 bg-background px-2.5 py-1 text-xs font-medium shadow-xs focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                          <option value="">Choose Notary...</option>
+                          {(() => {
+                            const serviceId = Number(item.service_id);
+                            const filtered = notaries.filter((n) => 
+                              n.service_fees && n.service_fees.some((sf: any) => sf.service_id === serviceId)
+                            );
+                            return filtered.map((n) => {
+                              const serviceFeeObj = n.service_fees.find((sf: any) => sf.service_id === serviceId);
+                              const specificFee = serviceFeeObj ? serviceFeeObj.fee : 0;
+                              return (
+                                <option key={n.id} value={n.id}>
+                                  {n.name} ({n.city} - {formatCurrency(specificFee)})
+                                </option>
+                              );
+                            });
+                          })()}
+                        </select>
                       </div>
                     )}
 

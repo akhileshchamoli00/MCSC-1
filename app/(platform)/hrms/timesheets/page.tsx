@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { KpiCard } from "@/components/kpi-card";
 import {
   Dialog,
   DialogContent,
@@ -243,64 +244,41 @@ export default function MyTimesheets() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm">
-          <div className="py-1 px-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Total Hours</p>
-                <p className="text-lg font-bold text-foreground mt-0">{totalHours.toFixed(1)}h</p>
-              </div>
-              <div className="p-1.5 bg-blue-500/10 rounded-lg">
-                <Clock className="w-4 h-4 text-blue-500" />
-              </div>
+        <KpiCard title="Total Hours" value={`${totalHours.toFixed(1)}h`} icon={Clock} colorTheme="sky" />
+        <KpiCard title="Overtime" value={`${overtimeHours.toFixed(1)}h`} icon={Clock4} colorTheme="amber" />
+        <KpiCard
+          title="Current Status"
+          borderClass={
+            currentTimesheet?.status === "APPROVED" ? "bg-emerald-500/80" : 
+            currentTimesheet?.status === "SUBMITTED" ? "bg-indigo-500/80" : 
+            currentTimesheet?.status === "REJECTED" ? "bg-rose-500/80" : "bg-amber-500/80"
+          }
+          className="md:col-span-2"
+        >
+          <div className="flex items-center justify-between gap-4 mt-0.5">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className={`font-semibold px-2 py-0 text-[10px] ${getStatusColor(currentTimesheet?.status || "DRAFT")}`}>
+                {currentTimesheet?.status || "NO TIMESHEET"}
+              </Badge>
+              {currentTimesheet?.status === "REJECTED" && (
+                <span className="text-[10px] text-red-500 flex items-center gap-1 bg-red-500/10 px-1.5 py-0.5 rounded-md">
+                  <AlertCircle className="w-3 h-3" />
+                  {currentTimesheet.comments}
+                </span>
+              )}
             </div>
+            <Button 
+              onClick={handleSubmitTimesheet}
+              disabled={!currentTimesheet || isReadOnly || totalHours === 0}
+              variant={isReadOnly ? "secondary" : "default"}
+              size="sm"
+              className="h-7 text-xs px-3 shadow-sm active-scale"
+            >
+              {currentTimesheet?.status === "SUBMITTED" ? "Awaiting Approval" : 
+               currentTimesheet?.status === "APPROVED" ? "Approved" : "Submit Timesheet"}
+            </Button>
           </div>
-        </Card>
-        
-        <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm">
-          <div className="py-1 px-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Overtime</p>
-                <p className="text-lg font-bold text-foreground mt-0">{overtimeHours.toFixed(1)}h</p>
-              </div>
-              <div className="p-1.5 bg-orange-500/10 rounded-lg">
-                <Clock4 className="w-4 h-4 text-orange-500" />
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm md:col-span-2">
-          <div className="py-1 px-3 h-full flex flex-col justify-center">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Current Status</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <Badge variant="outline" className={`font-semibold px-2 py-0 text-[10px] ${getStatusColor(currentTimesheet?.status || "DRAFT")}`}>
-                    {currentTimesheet?.status || "NO TIMESHEET"}
-                  </Badge>
-                  {currentTimesheet?.status === "REJECTED" && (
-                    <span className="text-[10px] text-red-500 flex items-center gap-1 bg-red-500/10 px-1.5 py-0.5 rounded-md">
-                      <AlertCircle className="w-3 h-3" />
-                      {currentTimesheet.comments}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <Button 
-                onClick={handleSubmitTimesheet}
-                disabled={!currentTimesheet || isReadOnly || totalHours === 0}
-                variant={isReadOnly ? "secondary" : "default"}
-                size="sm"
-                className="h-7 text-xs px-3"
-              >
-                {currentTimesheet?.status === "SUBMITTED" ? "Awaiting Approval" : 
-                 currentTimesheet?.status === "APPROVED" ? "Approved" : "Submit Timesheet"}
-              </Button>
-            </div>
-          </div>
-        </Card>
+        </KpiCard>
       </div>
 
       <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm overflow-hidden">

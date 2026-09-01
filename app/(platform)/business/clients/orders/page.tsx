@@ -43,6 +43,7 @@ import {
   Link2
 } from "lucide-react";
 import Link from "next/link";
+import { KpiCard } from "@/components/kpi-card";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -578,6 +579,8 @@ export default function ClientOrdersPage() {
       case "FINAL_DOCUMENT_PREPARATION": return "bg-orange-500/15 text-orange-600 border-orange-500/30";
       case "FINAL_DOC_READY": return "bg-lime-500/15 text-lime-600 border-lime-500/30";
       case "INVOICE_GENERATED": return "bg-pink-500/15 text-pink-600 border-pink-500/30";
+      case "WAITING_FOR_FINAL_PAYMENT": return "bg-pink-500/15 text-pink-600 border-pink-500/30";
+      case "FINAL_PAYMENT_COMPLETED": return "bg-emerald-500/15 text-emerald-600 border-emerald-500/30";
       case "SOFT_COPY_DELIVERED": return "bg-sky-500/15 text-sky-600 border-sky-500/30";
       case "HARD_COPY_DELIVERED": return "bg-violet-500/15 text-violet-600 border-violet-500/30";
       default: return "bg-primary/10 text-primary border-primary/20";
@@ -1171,85 +1174,40 @@ export default function ClientOrdersPage() {
       </div>
 
       {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
-        {/* Total Orders */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-500 border border-purple-500/20 shrink-0">
-              <ShoppingCart className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Total Orders</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{totalOrdersCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Confirmed Value */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0">
-              <DollarSign className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Confirmed Value</p>
-              <h3 className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 leading-none mt-0.5">{formatCurrency(totalRevenue)}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Pending Collection */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0">
-              <Receipt className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Pending Collection</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{pendingCollectionCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Staff Allocated */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 shrink-0">
-              <Users className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Staff Allocated</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{allocatedStaffCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search Order ID, Company..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
+        <KpiCard title="Total Orders" value={totalOrdersCount} icon={ShoppingCart} colorTheme="purple" />
+        <KpiCard title="Confirmed Value" value={formatCurrency(totalRevenue)} icon={DollarSign} colorTheme="emerald" />
+        <KpiCard title="Pending Collection" value={pendingCollectionCount} icon={Receipt} colorTheme="amber" />
+        <KpiCard title="Staff Allocated" value={allocatedStaffCount} icon={Users} colorTheme="blue" />
       </div>
 
       {/* Main Orders Table */}
-      <Card className="border-border/50 shadow-sm overflow-hidden">
+      <Card className="border-border/50 shadow-sm overflow-hidden bg-card/60 backdrop-blur-md">
+        <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search Order ID, Company..."
+              className="pl-8 h-9 text-xs rounded-lg"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold">
+            Showing {paginatedOrders.length} of {filteredOrders.length} entries
+          </span>
+        </div>
+
         <CardContent className="p-0">
           {filteredOrders.length === 0 ? (
-            <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2 border-t">
+            <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
               <ShoppingCart className="h-10 w-10 text-muted-foreground/35" />
               <span className="text-sm font-semibold">No Client Orders Found</span>
               <p className="text-xs max-w-sm">Click "Create New Order" above to issue your first service order.</p>
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto border-t">
+              <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
@@ -1306,9 +1264,9 @@ export default function ClientOrdersPage() {
                                       {item.job_id}
                                     </Badge>
                                   )}
-                                  {item.pricing_tier && (
-                                    <Badge variant="secondary" className="text-[9px] py-0 px-1 font-medium capitalize shrink-0">
-                                      {item.pricing_tier.toLowerCase().replace('_', ' ')}
+                                  {item.notary && (
+                                    <Badge variant="outline" className="text-[9px] font-bold py-0 px-1.5 bg-indigo-500/5 text-indigo-600 border-indigo-500/20 shrink-0">
+                                      Notary: {item.notary.name}
                                     </Badge>
                                   )}
                                 </div>
@@ -1527,8 +1485,8 @@ export default function ClientOrdersPage() {
                 {/* 2-Column Responsive Layout Utilizing Horizontal Whitespace */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                  {/* Left Column (Metadata & Consultants) - 5 cols */}
-                  <div className="lg:col-span-5 space-y-5">
+                  {/* Left Column (Metadata & Consultants) - 4 cols */}
+                  <div className="lg:col-span-4 space-y-4">
 
                     {/* Entity & Rep Details */}
                     <div className="p-5 rounded-2xl border border-border bg-card shadow-sm space-y-4">
@@ -1595,26 +1553,26 @@ export default function ClientOrdersPage() {
                     </div>
 
                     {/* Assigned Consultants */}
-                    <div className="p-5 rounded-2xl border border-border bg-card shadow-sm space-y-3">
-                      <span className="text-muted-foreground font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5 pb-2 border-b border-border/60">
-                        <Users className="h-4 w-4 text-primary" /> Assigned Consulting Team
+                    <div className="p-4 rounded-xl border border-border bg-card shadow-sm space-y-2">
+                      <span className="text-muted-foreground font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5 pb-1.5 border-b border-border/60">
+                        <Users className="h-3.5 w-3.5 text-primary" /> Assigned Consulting Team
                       </span>
                       {selectedOrderGroup.consultants && selectedOrderGroup.consultants.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-2 pt-1">
+                        <div className="grid grid-cols-2 gap-1.5 pt-0.5">
                           {selectedOrderGroup.consultants.map((c: any) => (
-                            <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl border border-border/60 bg-muted/10 hover:bg-muted/20 transition-all duration-200">
-                              <div className="h-9 w-9 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center text-sm shrink-0 border border-emerald-500/20">
+                            <div key={c.id} className="flex items-center gap-2 py-1.5 px-2.5 rounded-lg border border-border/40 bg-muted/5 hover:bg-muted/10 transition-all duration-200">
+                              <div className="h-7 w-7 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center text-xs shrink-0 border border-emerald-500/20">
                                 {c.name.substring(0, 2).toUpperCase()}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <span className="font-bold text-foreground block truncate text-sm">{c.name}</span>
-                                <span className="text-xs text-muted-foreground block truncate">{c.job_title || "Consultant"}</span>
+                                <span className="font-bold text-foreground block truncate text-xs">{c.name}</span>
+                                <span className="text-[10px] text-muted-foreground block truncate">{c.job_title || "Consultant"}</span>
                               </div>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <span className="text-muted-foreground italic text-sm block py-1">No consultants assigned to this order</span>
+                        <span className="text-muted-foreground italic text-xs block py-0.5">No consultants assigned to this order</span>
                       )}
                     </div>
 
@@ -1730,23 +1688,23 @@ export default function ClientOrdersPage() {
 
                       <Button
                         type="button"
-                        disabled={(!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "COMPLETED") && !selectedOrderGroup?.is_final_invoice_finalized}
+                        disabled={(!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "FINAL_DOC_READY") && !selectedOrderGroup?.is_final_invoice_finalized}
                         onClick={() => setIsFinalInvoicePreviewOpen(true)}
                         className="w-full gap-2 font-bold py-6 bg-blue-600 hover:bg-blue-700 text-white shadow-md text-sm disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed transition-all duration-200"
                       >
                         <FileText className="h-4 w-4" /> {selectedOrderGroup?.is_final_invoice_finalized ? "View" : "Generate"} Final Invoice
                       </Button>
-                      {(!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "COMPLETED") && !selectedOrderGroup?.is_final_invoice_finalized && (
+                      {(!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "FINAL_DOC_READY") && !selectedOrderGroup?.is_final_invoice_finalized && (
                         <p className="text-xs text-muted-foreground text-center italic mt-1">
-                          Requires finalized proforma invoice & completed order lifecycle status.
+                          Requires finalized proforma invoice & final doc ready lifecycle status.
                         </p>
                       )}
                     </div>
 
                   </div>
 
-                  {/* Right Column (Line Items & Totals) - 7 cols */}
-                  <div className="lg:col-span-7 space-y-5">
+                  {/* Right Column (Line Items & Totals) - 8 cols */}
+                  <div className="lg:col-span-8 space-y-5">
 
                     {/* Service Items Table */}
                     <div className="border rounded-2xl overflow-hidden shadow-sm bg-card">
@@ -1777,6 +1735,11 @@ export default function ClientOrdersPage() {
                                       {item.pricing_tier && (
                                         <Badge variant="secondary" className="text-[9px] py-0 px-1.5 font-medium capitalize shrink-0">
                                           {item.pricing_tier.toLowerCase().replace('_', ' ')}
+                                        </Badge>
+                                      )}
+                                      {item.notary && (
+                                        <Badge variant="outline" className="text-[9px] font-bold py-0 px-1.5 bg-indigo-500/5 text-indigo-600 border-indigo-500/20 shrink-0">
+                                          Notary: {item.notary.name}
                                         </Badge>
                                       )}
                                     </div>
@@ -2446,9 +2409,21 @@ export default function ClientOrdersPage() {
                           <span>Less: Proforma Paid ({selectedOrderGroup.proforma_stage_percent || proformaPercent}%):</span>
                           <span className="font-bold text-amber-600">-{formatCurrency((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100)}</span>
                         </div>
+                        {isPph21 && (
+                          <div className="flex justify-between py-1 border-b border-slate-200 text-red-650 font-bold">
+                            <span>WHT PPh 21 (2% Deduction):</span>
+                            <span>-{formatCurrency((selectedOrderGroup.total_amount - ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100)) * 0.02)}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between py-3 px-4 rounded-lg bg-blue-600 text-white text-base font-extrabold shadow-sm">
                           <span>Total Amount Due:</span>
-                          <span>{formatCurrency(selectedOrderGroup.total_amount - ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100))}</span>
+                          <span>
+                            {formatCurrency(
+                              isPph21
+                                ? (selectedOrderGroup.total_amount - ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100)) * 0.98
+                                : selectedOrderGroup.total_amount - ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100)
+                            )}
+                          </span>
                         </div>
                       </div>
                     </div>

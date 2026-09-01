@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { KpiCard } from "@/components/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -110,75 +111,29 @@ export default function CompanyDocumentsDirectory() {
       </div>
 
       {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
-        {/* Active Directories */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 shrink-0">
-              <Building2 className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Active Vaults</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{totalFoldersCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Compliance Profiles */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0">
-              <CheckCircle className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Tax Compliance</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{compliantFoldersCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Parent Partners */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-500 border border-purple-500/20 shrink-0">
-              <Building className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Parent Partners</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{parentPartnersCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Cloud Repository */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0">
-              <FileText className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Cloud Repository</p>
-              <h3 className="text-base font-bold text-foreground leading-none mt-0.5">Dropbox Panel</h3>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search & Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search name, code, contact or industry..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
+        <KpiCard title="Active Vaults" value={totalFoldersCount} icon={Building2} colorTheme="blue" />
+        <KpiCard title="Tax Compliance" value={compliantFoldersCount} icon={CheckCircle} colorTheme="emerald" />
+        <KpiCard title="Parent Partners" value={parentPartnersCount} icon={Building} colorTheme="purple" />
+        <KpiCard title="Cloud Repository" value="Dropbox Panel" icon={FileText} colorTheme="amber" />
       </div>
 
       {/* Companies Display Card */}
-      <Card>
+      <Card className="border-border/50 shadow-sm overflow-hidden bg-card/60 backdrop-blur-md">
+        <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search name, code, contact or industry..."
+              className="pl-8 h-9 text-xs rounded-lg"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold">
+            Showing {paginatedCompanies.length} of {filteredCompanies.length} entries
+          </span>
+        </div>
 
         <CardContent className="p-0">
           {filteredCompanies.length === 0 ? (

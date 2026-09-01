@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { KpiCard } from "@/components/kpi-card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -159,19 +160,7 @@ export default function TimesheetManagement() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm">
-          <div className="py-1 px-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Pending Reviews</p>
-                <p className="text-lg md:text-xl font-bold text-foreground mt-0">{pendingCount}</p>
-              </div>
-              <div className="p-1.5 bg-blue-500/10 rounded-lg">
-                <Clock className="w-4 h-4 text-blue-500" />
-              </div>
-            </div>
-          </div>
-        </Card>
+        <KpiCard title="Pending Reviews" value={pendingCount} icon={Clock} colorTheme="amber" />
       </div>
 
       <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm overflow-hidden">

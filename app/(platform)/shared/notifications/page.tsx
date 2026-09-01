@@ -37,7 +37,10 @@ export default function NotificationsPage() {
 
   const fetchNotifications = async () => {
     const token = localStorage.getItem("hrms_token");
-    if (!token) return;
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications?limit=200`, {

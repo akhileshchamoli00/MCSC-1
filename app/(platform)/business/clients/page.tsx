@@ -22,6 +22,7 @@ import {
   LockOpen
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { KpiCard } from "@/components/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -239,60 +240,11 @@ export default function ClientList() {
       </div>
 
       {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
-        {/* Total Partners */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-500 border border-purple-500/20 shrink-0">
-              <Users className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Total Partners</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{clients.length}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Active Panels */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0">
-              <CheckCircle className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Active Panels</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{clients.filter(c => c.status === "ACTIVE").length}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Corporate Entities */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 shrink-0">
-              <Building className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Corporate Entities</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">
-                {clients.reduce((acc, curr) => acc + (curr.companies?.length || 0), 0)}
-              </h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Portal Accounts */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0">
-              <LockOpen className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Portal Credentials</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{clients.filter(c => c.user_id).length}</h3>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
+        <KpiCard title="Total Partners" value={clients.length} icon={Users} colorTheme="purple" />
+        <KpiCard title="Active Panels" value={clients.filter(c => c.status === "ACTIVE").length} icon={CheckCircle} colorTheme="emerald" />
+        <KpiCard title="Corporate Entities" value={clients.reduce((acc, curr) => acc + (curr.companies?.length || 0), 0)} icon={Building} colorTheme="blue" />
+        <KpiCard title="Portal Credentials" value={clients.filter(c => c.user_id).length} icon={LockOpen} colorTheme="amber" />
       </div>
 
       {/* Notifications */}
@@ -307,45 +259,49 @@ export default function ClientList() {
         </div>
       )}
 
-      {/* Search & Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search company or contact person..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-1 bg-muted p-1 rounded-lg self-end sm:self-auto">
-          {["ALL", "ACTIVE", "DISABLED"].map((statusOpt) => (
-            <button
-              key={statusOpt}
-              onClick={() => setStatusFilter(statusOpt)}
-              className={`px-3 py-1 rounded text-xs font-semibold transition-all
-                ${statusFilter === statusOpt
-                  ? "bg-background shadow text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-                }
-              `}
-            >
-              {statusOpt}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Clients Display Card */}
-      <Card>
+      <Card className="border-border/50 shadow-sm overflow-hidden bg-card/60 backdrop-blur-md">
+        <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search company or contact person..."
+              className="pl-8 h-9 text-xs rounded-lg"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
+              {["ALL", "ACTIVE", "DISABLED"].map((statusOpt) => (
+                <button
+                  key={statusOpt}
+                  onClick={() => setStatusFilter(statusOpt)}
+                  className={`px-3 py-1 rounded text-xs font-semibold transition-all
+                    ${statusFilter === statusOpt
+                      ? "bg-background shadow text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                    }
+                  `}
+                >
+                  {statusOpt}
+                </button>
+              ))}
+            </div>
+            <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold hidden md:inline-block">
+              Showing {paginatedClients.length} of {filteredClients.length} entries
+            </span>
+          </div>
+        </div>
+
         <CardContent className="p-0">
           {filteredClients.length === 0 ? (
-            <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2 border-t">
+            <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
               <Building className="h-10 w-10 text-muted-foreground/35" />
               <span className="text-sm font-semibold">No Clients Found</span>
             </div>
           ) : (
-            <div className="overflow-x-auto border-t">
+            <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">

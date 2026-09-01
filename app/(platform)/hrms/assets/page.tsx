@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Monitor, Plus, Trash2, Edit, AlertCircle, History } from "lucide-react";
+import { Loader2, Monitor, Plus, Trash2, Edit, AlertCircle, History, UserCheck, CheckCircle2 } from "lucide-react";
+import { KpiCard } from "@/components/kpi-card";
 
 export default function AssetsAdminPage() {
   const [assets, setAssets] = useState<any[]>([]);
@@ -226,30 +227,10 @@ export default function AssetsAdminPage() {
 
       {/* Dashboard Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="border border-border/50 bg-card shadow-sm">
-          <div className="py-1 px-3">
-            <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Total Assets</p>
-            <p className="text-lg md:text-xl font-bold text-foreground mt-0">{totalAssets}</p>
-          </div>
-        </Card>
-        <Card className="border border-border/50 bg-card shadow-sm">
-          <div className="py-1 px-3">
-            <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Assigned Assets</p>
-            <p className="text-lg md:text-xl font-bold text-foreground mt-0">{assignedAssets}</p>
-          </div>
-        </Card>
-        <Card className="border border-border/50 bg-card shadow-sm">
-          <div className="py-1 px-3">
-            <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Available</p>
-            <p className="text-lg md:text-xl font-bold text-foreground mt-0">{availableAssets}</p>
-          </div>
-        </Card>
-        <Card className="border border-border/50 bg-card shadow-sm">
-          <div className="py-1 px-3">
-            <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Damaged</p>
-            <p className="text-lg md:text-xl font-bold text-foreground mt-0">{damagedAssets}</p>
-          </div>
-        </Card>
+        <KpiCard title="Total Assets" value={totalAssets} icon={Monitor} colorTheme="sky" />
+        <KpiCard title="Assigned Assets" value={assignedAssets} icon={UserCheck} colorTheme="indigo" />
+        <KpiCard title="Available" value={availableAssets} icon={CheckCircle2} colorTheme="emerald" />
+        <KpiCard title="Damaged" value={damagedAssets} icon={AlertCircle} colorTheme="rose" />
       </div>
 
       <div className="flex gap-4 mb-2">

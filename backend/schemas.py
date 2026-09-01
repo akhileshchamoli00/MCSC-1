@@ -820,6 +820,8 @@ class ClientOrderItemCreate(BaseModel):
     pricing_tier: str = "BASE"
     unit_price: float = 0.0
     custom_price_text: Optional[str] = None
+    notary_id: Optional[int] = None
+    notary_fee: Optional[float] = None
 
 class ClientOrderCreateRequest(BaseModel):
     client_id: Optional[int] = None
@@ -839,6 +841,11 @@ class ClientOrderItemResponse(BaseModel):
     pricing_tier: str
     unit_price: float
     custom_price_text: Optional[str] = None
+    notary_id: Optional[int] = None
+    notary_fee: Optional[float] = 0.0
+    notary_payment_status: Optional[str] = "UNPAID"
+    notary_payment_date: Optional[date] = None
+    notary_payment_ref: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -871,9 +878,19 @@ class ClientOrderResponse(BaseModel):
     created_at: Optional[datetime] = None
     client_name: Optional[str] = None
     company_name: Optional[str] = None
+    notary_id: Optional[int] = None
+    notary: Optional['NotaryResponse'] = None
+    notary_fee: Optional[float] = 0.0
+    notary_payment_status: Optional[str] = "UNPAID"
+    notary_payment_date: Optional[date] = None
+    notary_payment_ref: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+class NotaryPaymentRequest(BaseModel):
+    payment_date: Optional[str] = None # YYYY-MM-DD
+    payment_ref: Optional[str] = None
 
 class ClientCreate(ClientBase):
     create_portal_account: Optional[bool] = False
@@ -980,6 +997,7 @@ class ClientOrderUpdate(BaseModel):
     is_final_invoice_finalized: Optional[bool] = None
     payment_link: Optional[str] = None
     xendit_invoice_id: Optional[str] = None
+    notary_id: Optional[int] = None
 
 class CompanyStakeholderCreate(BaseModel):
     name: str
@@ -1081,6 +1099,7 @@ class ClientServiceBase(BaseModel):
     partner_a1_discount: Optional[float] = 40.0
     partner_a2_discount: Optional[float] = 50.0
     partner_a3_price: Optional[str] = None
+    needs_notary: Optional[bool] = False
 
 class ClientServiceCreate(ClientServiceBase):
     pass
@@ -1094,6 +1113,7 @@ class ClientServiceUpdate(BaseModel):
     partner_a1_discount: Optional[float] = None
     partner_a2_discount: Optional[float] = None
     partner_a3_price: Optional[str] = None
+    needs_notary: Optional[bool] = None
 
 class ClientServiceResponse(ClientServiceBase):
     id: int
@@ -1178,25 +1198,39 @@ class ClientOrderProgressResponse(BaseModel):
         from_attributes = True
 
 
+class NotaryServiceFeeCreate(BaseModel):
+    service_id: int
+    fee: float
+
+class NotaryServiceFeeResponse(BaseModel):
+    id: int
+    notary_id: int
+    service_id: int
+    fee: float
+    service_title: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
 class NotaryBase(BaseModel):
     name: str
     email: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
     city: str
-    service_fee: float = 0.0
     status: str = "ACTIVE"
     notes: Optional[str] = None
 
 
 class NotaryCreate(NotaryBase):
-    pass
+    service_fees: Optional[List[NotaryServiceFeeCreate]] = None
 
 
 class NotaryResponse(NotaryBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    service_fees: List[NotaryServiceFeeResponse] = []
 
     class Config:
         from_attributes = True

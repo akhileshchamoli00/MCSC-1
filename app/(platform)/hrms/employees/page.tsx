@@ -4,10 +4,11 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, User, Mail, Phone, Briefcase, Loader2, Eye, Edit, Download, Filter, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Search, User, Mail, Phone, Briefcase, Loader2, Eye, Edit, Download, Filter, ChevronUp, ChevronDown, Users, UserCheck, Clock, Building2 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { resolveImageUrl } from "@/lib/utils";
+import { KpiCard } from "@/components/kpi-card";
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<any[]>([]);
@@ -198,62 +199,67 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      <div className="glass-card rounded-xl p-5 space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-medium">Filter & Search</h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, ID, email..."
-              className="pl-9"
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-            />
-          </div>
-
-          <Select value={deptFilter} onValueChange={(v) => { setDeptFilter(v); setCurrentPage(1); }}>
-            <SelectTrigger>
-              <SelectValue placeholder="Department" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Departments</SelectItem>
-              {departments.map(d => (
-                <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v); setCurrentPage(1); }}>
-            <SelectTrigger>
-              <SelectValue placeholder="Designation (Role)" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Designations</SelectItem>
-              {roles.map(r => (
-                <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}>
-            <SelectTrigger>
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Statuses</SelectItem>
-              <SelectItem value="ACTIVE">Active</SelectItem>
-              <SelectItem value="PROBATION">Probation</SelectItem>
-              <SelectItem value="RESIGNED">Resigned</SelectItem>
-              <SelectItem value="TERMINATED">Terminated</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      {/* KPI Cards Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard title="Total Employees" value={employees.length} icon={Users} colorTheme="sky" />
+        <KpiCard title="Active Staff" value={employees.filter(e => e.status === "ACTIVE").length} icon={UserCheck} colorTheme="emerald" />
+        <KpiCard title="On Probation" value={employees.filter(e => e.status === "PROBATION").length} icon={Clock} colorTheme="amber" />
+        <KpiCard title="Departments" value={departments.length} icon={Building2} colorTheme="indigo" />
       </div>
 
       <div className="glass-card rounded-xl overflow-hidden">
+        {/* Integrated Filter & Search Bar */}
+        <div className="p-4 border-b border-border/50 bg-muted/20">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, ID, email..."
+                className="pl-9 bg-background"
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+              />
+            </div>
+
+            <Select value={deptFilter} onValueChange={(v) => { setDeptFilter(v); setCurrentPage(1); }}>
+              <SelectTrigger className="bg-background">
+                <SelectValue placeholder="Department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Departments</SelectItem>
+                {departments.map(d => (
+                  <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v); setCurrentPage(1); }}>
+              <SelectTrigger className="bg-background">
+                <SelectValue placeholder="Designation (Role)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Designations</SelectItem>
+                {roles.map(r => (
+                  <SelectItem key={r.id} value={r.id.toString()}>{r.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}>
+              <SelectTrigger className="bg-background">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Statuses</SelectItem>
+                <SelectItem value="ACTIVE">Active</SelectItem>
+                <SelectItem value="PROBATION">Probation</SelectItem>
+                <SelectItem value="RESIGNED">Resigned</SelectItem>
+                <SelectItem value="TERMINATED">Terminated</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50">

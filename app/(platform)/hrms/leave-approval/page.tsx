@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { format } from "date-fns";
+import { KpiCard } from "@/components/kpi-card";
 
 export default function LeaveApprovalPage() {
   const [requests, setRequests] = useState<any[]>([]);
@@ -278,54 +280,11 @@ export default function LeaveApprovalPage() {
       </div>
 
       {/* COMPACT METRICS CARDS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border border-border/50 bg-card shadow-sm">
-          <div className="p-3.5 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-zinc-500/10 dark:bg-zinc-400/10 text-zinc-600 dark:text-zinc-400">
-              <FileText className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Requests</p>
-              <h3 className="text-xl font-bold text-foreground mt-0.5">{total}</h3>
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="border border-border/50 bg-card shadow-sm">
-          <div className="p-3.5 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/10 dark:bg-amber-400/10 text-amber-600 dark:text-amber-400 animate-pulse">
-              <Clock className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Pending</p>
-              <h3 className="text-xl font-bold text-foreground mt-0.5">{pending}</h3>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="border border-border/50 bg-card shadow-sm">
-          <div className="p-3.5 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/10 dark:bg-emerald-400/10 text-emerald-600 dark:text-emerald-400">
-              <CheckCircle className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Approved</p>
-              <h3 className="text-xl font-bold text-foreground mt-0.5">{approved}</h3>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="border border-border/50 bg-card shadow-sm">
-          <div className="p-3.5 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-rose-500/10 dark:bg-rose-400/10 text-rose-600 dark:text-rose-400">
-              <XCircle className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Rejected</p>
-              <h3 className="text-xl font-bold text-foreground mt-0.5">{rejected}</h3>
-            </div>
-          </div>
-        </Card>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard title="Total Requests" value={total} icon={FileText} colorTheme="sky" />
+        <KpiCard title="Pending" value={pending} icon={Clock} colorTheme="amber" pulseIcon={true} />
+        <KpiCard title="Approved" value={approved} icon={CheckCircle} colorTheme="emerald" />
+        <KpiCard title="Rejected" value={rejected} icon={XCircle} colorTheme="rose" />
       </div>
 
       {/* TEXT FILTER */}
@@ -389,7 +348,7 @@ export default function LeaveApprovalPage() {
                         {req.days_requested}
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">
-                        {new Date(req.created_at).toLocaleDateString()}
+                        {format(new Date(req.created_at), "dd MMM yyyy, HH:mm")}
                       </td>
                       <td className="px-4 py-3">
                         {req.status === "PENDING" && <Badge variant="outline" className="text-orange-600 bg-orange-50 border-orange-200">Pending</Badge>}

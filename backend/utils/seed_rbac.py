@@ -70,6 +70,7 @@ def seed_rbac_data(db: Session):
         {"name": "Orders", "code": "clients_orders", "system_area": "business", "submodules": [
             {"name": "Active Orders", "code": "clients_orders_active"},
             {"name": "Completed Orders", "code": "clients_orders_completed"},
+            {"name": "Notary Payments", "code": "clients_orders_notary_payments"},
         ]},
         {"name": "Documents", "code": "clients_documents", "system_area": "business", "submodules": []},
         {"name": "Teams", "code": "clients_teams", "system_area": "business", "submodules": []},
@@ -188,6 +189,22 @@ def seed_rbac_data(db: Session):
         if not exists:
             db.add(models.Company(name=c_name, description=f"Internal company: {c_name}"))
     db.commit()
+
+    # Force grant all permissions for the new clients_orders_notary_payments module to ADMIN role
+    admin_role = db.query(models.Role).filter(models.Role.name.ilike("admin")).first()
+    if admin_role:
+        new_module = modules_by_code.get("clients_orders_notary_payments")
+        if new_module:
+            for perm in perm_map.values():
+                exists = db.query(models.RolePermission).filter(
+                    models.RolePermission.role_id == admin_role.id,
+                    models.RolePermission.module_id == new_module.id,
+                    models.RolePermission.permission_id == perm.id
+                ).first()
+                if not exists:
+                    rp = models.RolePermission(role_id=admin_role.id, module_id=new_module.id, permission_id=perm.id)
+                    db.add(rp)
+            db.commit()
 
     print("RBAC Database seeding completed successfully.")
 

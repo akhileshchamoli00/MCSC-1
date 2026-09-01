@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
@@ -28,6 +28,8 @@ import { toast } from "sonner";
 export default function NewNotaryPage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [services, setServices] = useState<any[]>([]);
+  const [serviceFees, setServiceFees] = useState<Record<number, string>>({});
 
   const [formData, setFormData] = useState({
     name: "",
@@ -35,12 +37,22 @@ export default function NewNotaryPage() {
     phone: "",
     address: "",
     city: "",
-    service_fee: "",
     status: "ACTIVE",
     notes: ""
   });
 
   const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
+
+  // Fetch catalog services
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(data => setServices(Array.isArray(data) ? data : []))
+      .catch(err => console.error("Error loading services:", err));
+  }, [token]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -52,15 +64,22 @@ export default function NewNotaryPage() {
     if (!token) return;
     setSaving(true);
     try {
+      const feesPayload = Object.entries(serviceFees)
+        .map(([sid, val]) => ({
+          service_id: parseInt(sid),
+          fee: parseFloat(val) || 0.0
+        }))
+        .filter(x => x.fee > 0);
+
       const payload = {
         name: formData.name,
         email: formData.email || null,
         phone: formData.phone || null,
         address: formData.address || null,
         city: formData.city,
-        service_fee: formData.service_fee ? parseFloat(formData.service_fee) : 0.0,
         status: formData.status,
-        notes: formData.notes || null
+        notes: formData.notes || null,
+        service_fees: feesPayload
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/`, {
@@ -73,7 +92,7 @@ export default function NewNotaryPage() {
       });
 
       if (res.ok) {
-        toast.success("Notary public registered successfully!");
+        toast.success("Notary registered with service fees successfully!");
         router.push("/business/clients/notaries");
       } else {
         const err = await res.json();
@@ -175,30 +194,8 @@ export default function NewNotaryPage() {
                 </div>
               </div>
 
-              {/* Fee and Status Row */}
+              {/* Panel Status Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Service Fee (IDR) *</label>
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      required
-                      name="service_fee"
-                      value={formData.service_fee}
-                      onChange={handleInputChange}
-                      placeholder="e.g. 5000000"
-                      className="h-10 font-mono font-bold text-sm bg-background border-border/60 focus:border-primary/50 focus:ring-primary/25 rounded-xl transition-all pl-7"
-                    />
-                    <span className="absolute left-2.5 top-3.5 text-[10.5px] font-mono font-semibold text-muted-foreground leading-none">Rp</span>
-                  </div>
-                  {formData.service_fee && !isNaN(parseFloat(formData.service_fee)) && (
-                    <div className="bg-amber-500/5 border border-amber-500/15 text-amber-600 dark:text-amber-400 py-1.5 px-2.5 rounded-xl font-bold font-mono text-[10.5px] text-center mt-1 truncate">
-                      {formatCurrency(parseFloat(formData.service_fee))}
-                    </div>
-                  )}
-                </div>
-
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Panel Status</label>
                   <Select 
@@ -226,10 +223,60 @@ export default function NewNotaryPage() {
                   name="address"
                   value={formData.address}
                   onChange={handleInputChange}
-                  rows={3}
+                  rows={2}
                   className="flex w-full rounded-xl border border-border/60 bg-background p-3.5 text-sm placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary leading-relaxed font-medium transition-all"
                   placeholder="Street name, Building block, suite info..."
                 />
+              </div>
+
+              {/* Service-Specific Fees Catalog Listing */}
+              <div className="space-y-2 pt-2">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">
+                  Configure Service-Specific Fees (Owed to Notary)
+                </label>
+                <div className="border border-border/50 rounded-xl overflow-hidden bg-background/50">
+                  <div className="max-h-96 overflow-y-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-muted/50 text-muted-foreground uppercase font-bold text-[10px] border-b border-border/50 select-none">
+                        <tr>
+                          <th className="p-3">Service Name</th>
+                          <th className="p-3">Service Code</th>
+                          <th className="p-3 w-44 text-right">Notary Fee (IDR)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/30">
+                        {services.filter((s) => s.needs_notary).map((s) => (
+                          <tr key={s.id} className="hover:bg-muted/10 transition-colors">
+                            <td className="p-3 font-semibold text-foreground">
+                              {s.job_title}
+                              {s.description && (
+                                <div className="text-[10px] text-muted-foreground font-normal mt-0.5 whitespace-pre-wrap break-words max-w-lg leading-relaxed">
+                                  {s.description}
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-3 font-mono text-muted-foreground">{s.job_id}</td>
+                            <td className="p-3 text-right">
+                              <div className="relative inline-block w-40">
+                                <span className="absolute left-2.5 top-2.5 text-[10px] font-mono text-muted-foreground leading-none">Rp</span>
+                                <Input
+                                  type="number"
+                                  placeholder="0"
+                                  className="h-8 pl-7 text-right font-mono font-bold text-xs rounded-lg"
+                                  value={serviceFees[s.id] || ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setServiceFees(prev => ({ ...prev, [s.id]: val }));
+                                  }}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
 
               {/* Specialties / Notes */}
@@ -239,7 +286,7 @@ export default function NewNotaryPage() {
                   name="notes"
                   value={formData.notes}
                   onChange={handleInputChange}
-                  rows={3}
+                  rows={2}
                   className="flex w-full rounded-xl border border-border/60 bg-background p-3.5 text-sm placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary leading-relaxed font-medium transition-all"
                   placeholder="Enter details on specific skills, land deed authorizations, speed covenants, or other key notary remarks..."
                 />

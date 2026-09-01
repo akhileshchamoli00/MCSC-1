@@ -42,6 +42,7 @@ export default function MyPayrollPage() {
 
   const getMonthName = (month: number) => {
     const date = new Date();
+    date.setDate(1); // Set day to 1 to prevent monthly overflow rollovers (e.g., Feb 31st -> March)
     date.setMonth(month - 1);
     return date.toLocaleString('default', { month: 'long' });
   };

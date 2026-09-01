@@ -142,6 +142,7 @@ const navModules: NavModule[] = [
     systemArea: "hrms",
     items: [
       { name: "Management", href: "/hrms/attendance-management", adminOnly: true, moduleCode: "attendance_management" },
+      { name: "Consolidated Report", href: "/hrms/attendance-report", adminOnly: true, moduleCode: "attendance_management" },
       { name: "My Attendance", href: "/hrms/attendance", adminOnly: false, moduleCode: "attendance_my" },
     ]
   },
@@ -236,7 +237,8 @@ const navModules: NavModule[] = [
     systemArea: "business",
     items: [
       { name: "Active Orders", href: "/business/clients/orders", adminOnly: true, moduleCode: "clients_orders_active" },
-      { name: "Completed Orders", href: "/business/clients/orders/completed", adminOnly: true, moduleCode: "clients_orders_completed" }
+      { name: "Completed Orders", href: "/business/clients/orders/completed", adminOnly: true, moduleCode: "clients_orders_completed" },
+      { name: "Notary Payment", href: "/business/clients/orders/notary-payments", adminOnly: true, moduleCode: "clients_orders_notary_payments" }
     ]
   },
   {

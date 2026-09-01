@@ -185,8 +185,8 @@ def login_for_access_token(request: Request, response: Response, form_data: OAut
         max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
     
-    # Return a client-accessible dummy token to satisfy frontend routing
-    return {"access_token": "cookie_based_session_active", "token_type": "bearer"}
+    # Return the real JWT token in the JSON response to support WebSocket authentication
+    return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/api/auth/logout")
 def logout_user(response: Response):

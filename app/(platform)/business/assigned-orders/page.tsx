@@ -495,33 +495,36 @@ export default function AssignedOrdersPage() {
         </Card>
       </div>
 
-      {/* Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search assigned orders..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-      </div>
-
       {/* Orders List Card */}
-      {filteredOrders.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed rounded-2xl bg-muted/30">
-          <ShoppingCart className="h-12 w-12 text-muted-foreground/35 mb-3" />
-          <h3 className="font-bold text-lg">No Assigned Orders</h3>
-          <p className="text-sm text-muted-foreground max-w-sm mt-1">
-            {searchTerm ? "No results match your search query." : "You do not have any orders assigned to you currently."}
-          </p>
+      <Card className="border-border/50 shadow-sm overflow-hidden bg-card/60 backdrop-blur-md">
+        <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search assigned orders..."
+              className="pl-8 h-9 text-xs rounded-lg"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold">
+            Showing {paginatedOrders.length} of {filteredOrders.length} entries
+          </span>
         </div>
-      ) : (
-        <Card className="border-border/50 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+
+        <CardContent className="p-0">
+          {filteredOrders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <ShoppingCart className="h-12 w-12 text-muted-foreground/35 mb-3" />
+              <h3 className="font-bold text-lg">No Assigned Orders</h3>
+              <p className="text-sm text-muted-foreground max-w-sm mt-1">
+                {searchTerm ? "No results match your search query." : "You do not have any orders assigned to you currently."}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
                   <th className="p-4 w-12 text-center">No.</th>
@@ -709,8 +712,10 @@ export default function AssignedOrdersPage() {
               </div>
             </div>
           )}
-        </Card>
-      )}
+            </>
+          )}
+        </CardContent>
+      </Card>
       </div>
 
       {/* VIEW SCOPE DIALOG */}

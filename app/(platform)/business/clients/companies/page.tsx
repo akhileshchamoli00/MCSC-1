@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { KpiCard } from "@/components/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -194,58 +195,11 @@ export default function CompaniesDirectory() {
       </div>
 
       {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
-        {/* Total Companies */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 shrink-0">
-              <Building2 className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Total Companies</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{totalCompaniesCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Active Accounts */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0">
-              <CheckCircle className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Active Accounts</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{activeCompaniesCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Distinct Verticals */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shrink-0">
-              <Globe className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Distinct Verticals</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{distinctVerticalsCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Tax Compliance */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0">
-              <FileSpreadsheet className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Tax Compliance</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{taxRegisteredCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
+        <KpiCard title="Total Companies" value={totalCompaniesCount} icon={Building2} colorTheme="blue" />
+        <KpiCard title="Active Accounts" value={activeCompaniesCount} icon={CheckCircle} colorTheme="emerald" />
+        <KpiCard title="Distinct Verticals" value={distinctVerticalsCount} icon={Globe} colorTheme="indigo" />
+        <KpiCard title="Tax Compliance" value={taxRegisteredCount} icon={FileSpreadsheet} colorTheme="amber" />
       </div>
 
       {/* Notifications */}
@@ -260,45 +214,49 @@ export default function CompaniesDirectory() {
         </div>
       )}
 
-      {/* Search & Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search name, code, contact or industry..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-1 bg-muted p-1 rounded-lg self-end sm:self-auto">
-          {["ALL", "ACTIVE", "DISABLED"].map((statusOpt) => (
-            <button
-              key={statusOpt}
-              onClick={() => setStatusFilter(statusOpt)}
-              className={`px-3 py-1 rounded text-xs font-semibold transition-all
-                ${statusFilter === statusOpt 
-                  ? "bg-background shadow text-foreground" 
-                  : "text-muted-foreground hover:text-foreground"
-                }
-              `}
-            >
-              {statusOpt}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Companies Display Card */}
-      <Card>
+      <Card className="border-border/50 shadow-sm overflow-hidden bg-card/60 backdrop-blur-md">
+        <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search name, code, contact or industry..."
+              className="pl-8 h-9 text-xs rounded-lg"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
+              {["ALL", "ACTIVE", "DISABLED"].map((statusOpt) => (
+                <button
+                  key={statusOpt}
+                  onClick={() => setStatusFilter(statusOpt)}
+                  className={`px-3 py-1 rounded text-xs font-semibold transition-all
+                    ${statusFilter === statusOpt 
+                      ? "bg-background shadow text-foreground" 
+                      : "text-muted-foreground hover:text-foreground"
+                    }
+                  `}
+                >
+                  {statusOpt}
+                </button>
+              ))}
+            </div>
+            <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold hidden md:inline-block">
+              Showing {paginatedCompanies.length} of {filteredCompanies.length} entries
+            </span>
+          </div>
+        </div>
+
         <CardContent className="p-0">
           {filteredCompanies.length === 0 ? (
-            <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2 border-t">
+            <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
               <Building2 className="h-10 w-10 text-muted-foreground/35" />
               <span className="text-sm font-semibold">No Companies Found</span>
             </div>
           ) : (
-            <div className="overflow-x-auto border-t">
+            <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">

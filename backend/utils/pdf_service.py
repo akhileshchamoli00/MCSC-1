@@ -187,10 +187,25 @@ def generate_payslip_pdf_buffer(payroll) -> BytesIO:
     # Left Column (Earnings Items)
     c.setFont("Helvetica", 8.5)
     y_earn = y_salary_start + 175
+    
+    # Calculate rates dynamically for label details
+    meal_rate = 40000.0
+    work_support_rate = 30000.0
+    if payroll.employee:
+        if getattr(payroll.employee, "meal_allowance_per_day", None) is not None:
+            meal_rate = payroll.employee.meal_allowance_per_day
+        if getattr(payroll.employee, "work_support_allowance_per_day", None) is not None:
+            work_support_rate = payroll.employee.work_support_allowance_per_day
+
+    days = payroll.days_worked or 0.0
+    days_str = f"{int(days)}" if days.is_integer() else f"{days}"
+    meal_calc_str = f" ({days_str} X {int(meal_rate):,})"
+    work_support_calc_str = f" ({days_str} X {int(work_support_rate):,})"
+
     earnings_items = [
         ("Basic Salary", payroll.basic_salary),
-        ("Meal Allowance", payroll.meal_allowance),
-        ("Work Support Allowance", payroll.work_support_allowance),
+        (f"Meal Allowance{meal_calc_str}", payroll.meal_allowance),
+        (f"Work Support Allowance{work_support_calc_str}", payroll.work_support_allowance),
         ("Attendance Allowance (Hardship)", payroll.attendance_allowance),
         ("New Year Allowance - THR", payroll.thr_allowance),
         ("Functional Allowance", payroll.functional_allowance),

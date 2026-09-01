@@ -34,6 +34,7 @@ export default function EditClientOrderPage() {
   const [services, setServices] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
+  const [notaries, setNotaries] = useState<any[]>([]);
 
   // Edit Form States
   const [deletedItemIds, setDeletedItemIds] = useState<number[]>([]);
@@ -57,11 +58,12 @@ export default function EditClientOrderPage() {
     }
     try {
       setLoading(true);
-      const [ordRes, serRes, empRes, teamRes] = await Promise.all([
+      const [ordRes, serRes, empRes, teamRes, notariesRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, { headers: { "Authorization": `Bearer ${token}` } }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, { headers: { "Authorization": `Bearer ${token}` } }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, { headers: { "Authorization": `Bearer ${token}` } })
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, { headers: { "Authorization": `Bearer ${token}` } }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries`, { headers: { "Authorization": `Bearer ${token}` } })
       ]);
 
       let fetchedOrders: any[] = [];
@@ -70,6 +72,7 @@ export default function EditClientOrderPage() {
       if (serRes.ok) fetchedServices = await serRes.json();
       if (empRes.ok) setEmployees(await empRes.json());
       if (teamRes.ok) setTeams(await teamRes.json());
+      if (notariesRes.ok) setNotaries(await notariesRes.json());
       
       setServices(fetchedServices);
 
@@ -143,6 +146,7 @@ export default function EditClientOrderPage() {
           pricing_tier: item.pricing_tier || "BASE",
           unit_price: item.unit_price || 0,
           custom_price_text: item.custom_price_text || "",
+          notary_id: item.notary_id ? String(item.notary_id) : "",
           _raw_service: matchedService || null
         };
       });
@@ -210,6 +214,7 @@ export default function EditClientOrderPage() {
         description: selectedService.description || "",
         unit_price: price,
         custom_price_text: customText,
+        notary_id: "",
         _raw_service: selectedService
       };
       return { ...prev, items: itemsCopy };
@@ -262,6 +267,7 @@ export default function EditClientOrderPage() {
           pricing_tier: "BASE",
           unit_price: 0,
           custom_price_text: "",
+          notary_id: "",
           _raw_service: null
         },
         ...prev.items
@@ -332,7 +338,8 @@ export default function EditClientOrderPage() {
                 unit_price: item.unit_price || 0,
                 custom_price_text: item.custom_price_text || null,
                 is_proforma_finalized: editForm.is_proforma_finalized,
-                is_final_invoice_finalized: editForm.is_final_invoice_finalized
+                is_final_invoice_finalized: editForm.is_final_invoice_finalized,
+                notary_id: item.notary_id ? Number(item.notary_id) : null
               })
             })
           )
@@ -351,7 +358,8 @@ export default function EditClientOrderPage() {
             description: item.description,
             pricing_tier: item.pricing_tier,
             unit_price: item.unit_price || 0,
-            custom_price_text: item.custom_price_text || null
+            custom_price_text: item.custom_price_text || null,
+            notary_id: item.notary_id ? Number(item.notary_id) : null
           })),
           consultant_ids: editForm.consultant_ids,
           notes: editForm.notes || null
@@ -589,6 +597,44 @@ export default function EditClientOrderPage() {
                         </div>
                       )}
 
+                      {/* Notary Selection (Conditional) */}
+                      {item._raw_service?.needs_notary && (
+                        <div className="space-y-1 pt-1 animate-in slide-in-from-top-2 duration-200">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Select Notary *</label>
+                          <select
+                            required
+                            disabled={!canEditItems}
+                            value={item.notary_id || ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEditForm((prev) => {
+                                const itemsCopy = [...prev.items];
+                                itemsCopy[idx] = { ...itemsCopy[idx], notary_id: val ? Number(val) : "" };
+                                return { ...prev, items: itemsCopy };
+                              });
+                            }}
+                            className="flex h-8.5 w-full rounded-lg border border-border/60 bg-background px-2.5 py-1 text-xs font-medium shadow-xs disabled:opacity-80 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+                          >
+                            <option value="">Choose Notary...</option>
+                            {(() => {
+                              const serviceId = Number(item.service_id);
+                              const filtered = notaries.filter((n) => 
+                                n.service_fees && n.service_fees.some((sf: any) => sf.service_id === serviceId)
+                              );
+                              return filtered.map((n) => {
+                                const serviceFeeObj = n.service_fees.find((sf: any) => sf.service_id === serviceId);
+                                const specificFee = serviceFeeObj ? serviceFeeObj.fee : 0;
+                                return (
+                                  <option key={n.id} value={n.id}>
+                                    {n.name} ({n.city} - {formatCurrency(specificFee)})
+                                  </option>
+                                );
+                              });
+                            })()}
+                          </select>
+                        </div>
+                      )}
+
                       {/* Reflected Price Bar */}
                       <div className="flex items-center justify-between p-2 rounded-lg bg-muted/40 border border-border/30 font-mono text-[10px]">
                         <span className="font-bold text-muted-foreground">Price Calculation:</span>
@@ -672,8 +718,10 @@ export default function EditClientOrderPage() {
                   <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
                   <option value="FINAL_DOC_READY">FINAL DOC READY</option>
                   <option value="INVOICE_GENERATED">INVOICE GENERATED</option>
+                  <option value="WAITING_FOR_FINAL_PAYMENT">WAITING FOR FINAL PAYMENT</option>
+                  <option value="FINAL_PAYMENT_COMPLETED">FINAL PAYMENT COMPLETED</option>
                   <option value="SOFT_COPY_DELIVERED">SOFT COPY DELIVERED</option>
-                  <option value="HARD_COPY_DELIVERED">HARD copy DELIVERED</option>
+                  <option value="HARD_COPY_DELIVERED">HARD COPY DELIVERED</option>
                   <option value="COMPLETED">COMPLETED</option>
                   <option value="CANCELLED">CANCELLED</option>
                 </select>

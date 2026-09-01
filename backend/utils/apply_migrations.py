@@ -209,6 +209,40 @@ def run_migrations():
             conn.rollback()
             print(f"Error migrating client codes: {e}")
 
+        # Add needs_notary to client_services
+        try:
+            conn.execute(text("ALTER TABLE client_services ADD COLUMN needs_notary BOOLEAN DEFAULT FALSE"))
+            conn.commit()
+            print("Added column 'needs_notary' to 'client_services' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("needs_notary", "client_services", e)
+
+        # Add notary_id to client_orders
+        try:
+            conn.execute(text("ALTER TABLE client_orders ADD COLUMN notary_id INTEGER"))
+            conn.commit()
+            print("Added column 'notary_id' to 'client_orders' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("notary_id", "client_orders", e)
+
+        # Add notary payment tracking columns to client_orders
+        notary_pay_cols = [
+            ("notary_fee", "FLOAT DEFAULT 0.0"),
+            ("notary_payment_status", "VARCHAR(50) DEFAULT 'UNPAID'"),
+            ("notary_payment_date", "DATE"),
+            ("notary_payment_ref", "VARCHAR(255)")
+        ]
+        for col, col_type in notary_pay_cols:
+            try:
+                conn.execute(text(f"ALTER TABLE client_orders ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                print(f"Added column '{col}' to 'client_orders' table.")
+            except Exception as e:
+                conn.rollback()
+                handle_migration_error(col, "client_orders", e)
+
     print("Migration check complete.")
 
 if __name__ == "__main__":

@@ -69,7 +69,10 @@ def get_signed_file_url(file_url_or_path: str, bucket_name: str = "hrms-document
     if not supabase or not file_url_or_path:
         return file_url_or_path or ""
 
-    if file_url_or_path.startswith("/uploads/") or "/profile-photos/" in file_url_or_path or bucket_name == "profile-photos":
+    if (file_url_or_path.startswith("/uploads/") or 
+        "/profile-photos/" in file_url_or_path or 
+        "/object/public/" in file_url_or_path or 
+        bucket_name == "profile-photos"):
         return file_url_or_path
 
     try:
@@ -89,7 +92,9 @@ def get_signed_file_url(file_url_or_path: str, bucket_name: str = "hrms-document
             return res.get("signedUrl") or res.get("signed_url") or file_url_or_path
         return file_url_or_path
     except Exception as e:
-        print(f"Error generating signed URL: {e}")
+        err_str = str(e)
+        if "Object not found" not in err_str and "404" not in err_str:
+            print(f"Error generating signed URL: {e}")
         return file_url_or_path
 
 def delete_file_from_supabase(file_url: str, bucket_name: str = "hrms-documents") -> bool:

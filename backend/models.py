@@ -661,6 +661,8 @@ class ClientService(Base):
     partner_a2_discount = Column(Float, default=50.0)
     partner_a3_price = Column(String, nullable=True) # Free text pricing for Partner A3
     
+    needs_notary = Column(Boolean, default=False)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -691,12 +693,19 @@ class ClientOrder(Base):
     payment_link = Column(String, nullable=True)
     xendit_invoice_id = Column(String, nullable=True)
     payment_link_created_at = Column(DateTime(timezone=True), nullable=True)
+    notary_id = Column(Integer, ForeignKey("notaries.id", ondelete="SET NULL"), nullable=True)
+    notary_fee = Column(Float, default=0.0)
+    notary_payment_status = Column(String, default="UNPAID") # UNPAID, PAID
+    notary_payment_date = Column(Date, nullable=True)
+    notary_payment_ref = Column(String, nullable=True)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     client = relationship("Client", backref="orders")
     company = relationship("ClientCompany")
     service = relationship("ClientService")
+    notary = relationship("Notary")
 
 
 class ClientOrderProgress(Base):
@@ -865,12 +874,25 @@ class Notary(Base):
     phone = Column(String, nullable=True)
     address = Column(String, nullable=True)
     city = Column(String, index=True, nullable=False)
-    service_fee = Column(Float, default=0.0)
     status = Column(String, default="ACTIVE")
     notes = Column(String, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    service_fees = relationship("NotaryServiceFee", back_populates="notary", cascade="all, delete-orphan")
+
+
+class NotaryServiceFee(Base):
+    __tablename__ = "notary_service_fees"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    notary_id = Column(Integer, ForeignKey("notaries.id", ondelete="CASCADE"), nullable=False)
+    service_id = Column(Integer, ForeignKey("client_services.id", ondelete="CASCADE"), nullable=False)
+    fee = Column(Float, default=0.0)
+    
+    notary = relationship("Notary", back_populates="service_fees")
+    service = relationship("ClientService")
 
 
 # Association Table for Team Members (Junction)

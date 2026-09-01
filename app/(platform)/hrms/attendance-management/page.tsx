@@ -4,10 +4,11 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Pencil, Save, X, Search } from "lucide-react";
+import { AlertTriangle, Pencil, Save, X, Search, Users, CheckCircle2, XCircle, Clock, TrendingUp } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { KpiCard } from "@/components/kpi-card";
 
 export default function AttendanceManagementPage() {
   const [summary, setSummary] = useState<any>(null);
@@ -138,36 +139,11 @@ export default function AttendanceManagementPage() {
 
       {summary && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <Card className="border border-border/50 bg-card shadow-sm">
-            <div className="py-1 px-3">
-              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Total Staff</p>
-              <p className="text-lg md:text-xl font-bold text-foreground mt-0">{summary.total_employees}</p>
-            </div>
-          </Card>
-          <Card className="border border-border/50 bg-card shadow-sm">
-            <div className="py-1 px-3">
-              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Present</p>
-              <p className="text-lg md:text-xl font-bold text-foreground mt-0">{summary.present}</p>
-            </div>
-          </Card>
-          <Card className="border border-border/50 bg-card shadow-sm">
-            <div className="py-1 px-3">
-              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Absent</p>
-              <p className="text-lg md:text-xl font-bold text-foreground mt-0">{summary.absent}</p>
-            </div>
-          </Card>
-          <Card className="border border-border/50 bg-card shadow-sm">
-            <div className="py-1 px-3">
-              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Late</p>
-              <p className="text-lg md:text-xl font-bold text-foreground mt-0">{summary.late}</p>
-            </div>
-          </Card>
-          <Card className="border border-border/50 bg-card shadow-sm">
-            <div className="py-1 px-3">
-              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Attendance %</p>
-              <p className="text-lg md:text-xl font-bold text-foreground mt-0">{summary.percentage}%</p>
-            </div>
-          </Card>
+          <KpiCard title="Total Staff" value={summary.total_employees} icon={Users} colorTheme="sky" />
+          <KpiCard title="Present" value={summary.present} icon={CheckCircle2} colorTheme="emerald" />
+          <KpiCard title="Absent" value={summary.absent} icon={XCircle} colorTheme="rose" />
+          <KpiCard title="Late" value={summary.late} icon={Clock} colorTheme="amber" />
+          <KpiCard title="Attendance %" value={`${summary.percentage}%`} icon={TrendingUp} colorTheme="indigo" />
         </div>
       )}
 

@@ -74,9 +74,29 @@ function SelectSystemContent() {
     return (
       <div className="dark">
         <div className="flex h-screen w-full items-center justify-center bg-background text-foreground relative overflow-hidden">
+          
+          {/* Animated Lines Background */}
+          <div className="absolute inset-0 bg-grid-slate-200/20 [mask-image:linear-gradient(0deg,transparent,black)] dark:bg-grid-slate-800/10 opacity-30 z-0 pointer-events-none" />
           <div className="absolute inset-0 w-full h-full z-0">
-            <FloatingLines enabledWaves={ENABLED_WAVES} lineCount={3} gradientStart="#065eee" gradientMid="#10B981" gradientEnd="#EAB308" />
+            <FloatingLines
+              enabledWaves={ENABLED_WAVES}
+              lineCount={3}
+              lineDistance={34}
+              bendRadius={24}
+              bendStrength={0}
+              interactive
+              parallax={true}
+              animationSpeed={1.5}
+              gradientStart="#059669"
+              gradientMid="#065eee"
+              gradientEnd="#4f46e5"
+            />
           </div>
+
+          {/* Floating Glowing blobs */}
+          <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-emerald-500/10 blur-[120px] pointer-events-none -z-10" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] rounded-full bg-primary/10 blur-[130px] pointer-events-none -z-10" />
+
           <div className="flex flex-col items-center gap-4 relative z-10">
             <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
             <p className="text-sm text-muted-foreground font-semibold">Configuring your workspaces...</p>

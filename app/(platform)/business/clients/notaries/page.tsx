@@ -18,6 +18,7 @@ import {
   Building
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { KpiCard } from "@/components/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +46,8 @@ export default function NotariesPage() {
   const [cityFilter, setCityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [services, setServices] = useState<any[]>([]);
+  const [serviceFees, setServiceFees] = useState<Record<number, string>>({});
 
   useEffect(() => {
     setCurrentPage(1);
@@ -63,7 +66,6 @@ export default function NotariesPage() {
     phone: "",
     address: "",
     city: "",
-    service_fee: "",
     status: "ACTIVE",
     notes: ""
   });
@@ -93,7 +95,15 @@ export default function NotariesPage() {
 
   useEffect(() => {
     fetchNotaries();
-  }, []);
+    if (token) {
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      })
+        .then(res => res.json())
+        .then(data => setServices(Array.isArray(data) ? data : []))
+        .catch(err => console.error("Error loading services:", err));
+    }
+  }, [token]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -108,10 +118,17 @@ export default function NotariesPage() {
       phone: notary.phone || "",
       address: notary.address || "",
       city: notary.city || "",
-      service_fee: notary.service_fee !== undefined ? String(notary.service_fee) : "0",
       status: notary.status || "ACTIVE",
       notes: notary.notes || ""
     });
+
+    const feesMap: Record<number, string> = {};
+    if (notary.service_fees) {
+      notary.service_fees.forEach((sf: any) => {
+        feesMap[sf.service_id] = String(sf.fee);
+      });
+    }
+    setServiceFees(feesMap);
     setIsEditOpen(true);
   };
 
@@ -120,15 +137,22 @@ export default function NotariesPage() {
     if (!token || !selectedNotary) return;
     setSaving(true);
     try {
+      const feesPayload = Object.entries(serviceFees)
+        .map(([sid, val]) => ({
+          service_id: parseInt(sid),
+          fee: parseFloat(val) || 0.0
+        }))
+        .filter(x => x.fee > 0);
+
       const payload = {
         name: formData.name,
         email: formData.email || null,
         phone: formData.phone || null,
         address: formData.address || null,
         city: formData.city,
-        service_fee: formData.service_fee ? parseFloat(formData.service_fee) : 0.0,
         status: formData.status,
-        notes: formData.notes || null
+        notes: formData.notes || null,
+        service_fees: feesPayload
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/${selectedNotary.id}`, {
@@ -193,9 +217,7 @@ export default function NotariesPage() {
   // Metrics calculations
   const totalNotariesCount = notaries.length;
   const activeNotariesCount = notaries.filter(n => n.status === "ACTIVE").length;
-  const avgServiceFee = totalNotariesCount > 0 
-    ? notaries.reduce((acc, curr) => acc + (curr.service_fee || 0), 0) / totalNotariesCount 
-    : 0;
+  const totalConfiguredFees = notaries.reduce((acc, curr) => acc + (curr.service_fees?.length || 0), 0);
   
   // Calculate top city
   const cityCounts = notaries.reduce((acc: any, curr) => {
@@ -265,127 +287,81 @@ export default function NotariesPage() {
       </div>
 
       {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
-        
-        {/* Total Notaries */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 shrink-0">
-              <Scale className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Total Notaries</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{totalNotariesCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Active Notaries */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0">
-              <ShieldCheck className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Active Panel</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{activeNotariesCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Average Service Fee */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-pink-500/10 text-pink-500 border border-pink-500/20 shrink-0">
-              <DollarSign className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Avg Job Fee</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5 truncate">{formatCurrency(avgServiceFee)}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Top City */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0">
-              <MapPin className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Top Location</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5 truncate">{topCity}</h3>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search and Filters Bar */}
-      <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
-        
-        {/* Search input */}
-        <div className="relative w-full md:w-80">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search Notary name or email..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-        {/* Dropdown Filters */}
-        <div className="flex flex-wrap items-center gap-3.5 w-full md:w-auto">
-          {/* City Filter */}
-          <div className="w-full sm:w-40">
-            <Select value={cityFilter} onValueChange={setCityFilter}>
-              <SelectTrigger className="h-9 rounded-xl">
-                <SelectValue placeholder="Filter City" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Cities</SelectItem>
-                {uniqueCities.map((city, i) => (
-                  <SelectItem key={i} value={city}>{city}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Status Filter */}
-          <div className="w-full sm:w-36">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-9 rounded-xl">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="ACTIVE">ACTIVE</SelectItem>
-                <SelectItem value="INACTIVE">INACTIVE</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full">
+        <KpiCard title="Total Notaries" value={totalNotariesCount} icon={Scale} colorTheme="indigo" />
+        <KpiCard title="Active Panel" value={activeNotariesCount} icon={ShieldCheck} colorTheme="emerald" />
+        <KpiCard title="Pricing Rules" value={totalConfiguredFees} icon={Scale} colorTheme="pink" />
+        <KpiCard title="Top Location" value={topCity} icon={MapPin} colorTheme="amber" />
       </div>
 
       {/* Main Notary Table Card */}
-      <Card>
+      <Card className="border-border/50 shadow-sm overflow-hidden bg-card/60 backdrop-blur-md">
+        <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col md:flex-row gap-3 items-center justify-between">
+          {/* Search input */}
+          <div className="relative w-full md:w-80">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search Notary name or email..."
+              className="pl-8 h-9 text-xs rounded-lg"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {/* Dropdown Filters */}
+          <div className="flex flex-wrap items-center gap-3.5 w-full md:w-auto">
+            {/* City Filter */}
+            <div className="w-full sm:w-40">
+              <Select value={cityFilter} onValueChange={setCityFilter}>
+                <SelectTrigger className="h-9 rounded-xl">
+                  <SelectValue placeholder="Filter City" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Cities</SelectItem>
+                  {uniqueCities.map((city, i) => (
+                    <SelectItem key={i} value={city}>{city}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Status Filter */}
+            <div className="w-full sm:w-36">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-9 rounded-xl">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="ACTIVE">ACTIVE</SelectItem>
+                  <SelectItem value="INACTIVE">INACTIVE</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold hidden lg:inline-block">
+              Showing {paginatedNotaries.length} of {filteredNotaries.length} entries
+            </span>
+          </div>
+        </div>
+
         <CardContent className="p-0">
           {filteredNotaries.length === 0 ? (
-            <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2 border-t">
+            <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
               <Scale className="h-10 w-10 text-muted-foreground/35" />
               <span className="text-sm font-semibold">No Notaries Found</span>
               <p className="text-xs max-w-sm">Click "Add New Notary" above to register your first legal notary public.</p>
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto border-t">
+              <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-muted/40 text-muted-foreground/90 font-extrabold uppercase border-b border-border/40 select-none">
                     <th className="py-3 px-4 w-1/4">Notary Name</th>
                     <th className="py-3 px-4">Contact Detail</th>
                     <th className="py-3 px-4">Jurisdiction (City)</th>
-                    <th className="py-3 px-4 text-right">Job Fee</th>
+                    <th className="py-3 px-4 text-right">Configured Services</th>
                     <th className="py-3 px-4 text-center">Status</th>
                     <th className="py-3 px-4 w-20 text-center">Actions</th>
                   </tr>
@@ -426,7 +402,7 @@ export default function NotariesPage() {
                       </td>
 
                       <td className="py-3.5 px-4 align-top font-mono font-bold text-right text-foreground">
-                        {formatCurrency(notary.service_fee || 0)}
+                        {notary.service_fees?.length || 0} services
                       </td>
 
                       <td className="py-3.5 px-4 align-top text-center">
@@ -574,26 +550,8 @@ export default function NotariesPage() {
                 </div>
               </div>
 
+              {/* Panel Status Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Service Fee (IDR) *</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    required
-                    name="service_fee"
-                    value={formData.service_fee}
-                    onChange={handleInputChange}
-                    placeholder="e.g. 5000000"
-                    className="h-10 font-mono font-bold text-sm bg-background border-border/60 focus:border-primary/50 focus:ring-primary/25 rounded-xl transition-all"
-                  />
-                  {formData.service_fee && !isNaN(parseFloat(formData.service_fee)) && (
-                    <div className="bg-amber-500/5 border border-amber-500/15 text-amber-600 dark:text-amber-400 py-1.5 px-2.5 rounded-xl font-bold font-mono text-[10.5px] text-center mt-1 truncate">
-                      {formatCurrency(parseFloat(formData.service_fee))}
-                    </div>
-                  )}
-                </div>
-
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Panel Status</label>
                   <Select 
@@ -621,6 +579,56 @@ export default function NotariesPage() {
                   className="flex w-full rounded-xl border border-border/60 bg-background p-3.5 text-sm placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary leading-relaxed font-medium transition-all"
                   placeholder="Complete office physical address..."
                 />
+              </div>
+
+              {/* Service-Specific Fees Catalog Listing */}
+              <div className="space-y-2 pt-2 col-span-1 sm:col-span-2">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">
+                  Configure Service-Specific Fees (Owed to Notary)
+                </label>
+                <div className="border border-border/50 rounded-xl overflow-hidden bg-background/50">
+                  <div className="max-h-64 overflow-y-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-muted/50 text-muted-foreground uppercase font-bold text-[10px] border-b border-border/50 select-none">
+                        <tr>
+                          <th className="p-3">Service Name</th>
+                          <th className="p-3">Service Code</th>
+                          <th className="p-3 w-44 text-right">Notary Fee (IDR)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/30">
+                        {services.filter((s) => s.needs_notary).map((s) => (
+                          <tr key={s.id} className="hover:bg-muted/10 transition-colors">
+                            <td className="p-3 font-semibold text-foreground">
+                              {s.job_title}
+                              {s.description && (
+                                <div className="text-[10px] text-muted-foreground font-normal mt-0.5 whitespace-pre-wrap break-words max-w-lg leading-relaxed">
+                                  {s.description}
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-3 font-mono text-muted-foreground">{s.job_id}</td>
+                            <td className="p-3 text-right">
+                              <div className="relative inline-block w-40">
+                                <span className="absolute left-2.5 top-2.5 text-[10px] font-mono text-muted-foreground leading-none">Rp</span>
+                                <Input
+                                  type="number"
+                                  placeholder="0"
+                                  className="h-8 pl-7 text-right font-mono font-bold text-xs rounded-lg"
+                                  value={serviceFees[s.id] || ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setServiceFees(prev => ({ ...prev, [s.id]: val }));
+                                  }}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-2">

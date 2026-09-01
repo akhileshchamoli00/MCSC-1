@@ -33,7 +33,8 @@ export default function AddClientServicesPage() {
       partner_a_discount: "",
       partner_a1_discount: "",
       partner_a2_discount: "",
-      partner_a3_price: ""
+      partner_a3_price: "",
+      needs_notary: false
     }
   ]);
   const [initialCount, setInitialCount] = useState(0);
@@ -65,7 +66,8 @@ export default function AddClientServicesPage() {
             partner_a_discount: "",
             partner_a1_discount: "",
             partner_a2_discount: "",
-            partner_a3_price: ""
+            partner_a3_price: "",
+            needs_notary: false
           }
         ]);
       }
@@ -93,7 +95,8 @@ export default function AddClientServicesPage() {
         partner_a_discount: "",
         partner_a1_discount: "",
         partner_a2_discount: "",
-        partner_a3_price: ""
+        partner_a3_price: "",
+        needs_notary: false
       }
     ]);
   };
@@ -103,7 +106,7 @@ export default function AddClientServicesPage() {
     setCreateItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleCreateItemChange = (index: number, field: string, value: string) => {
+  const handleCreateItemChange = (index: number, field: string, value: any) => {
     setCreateItems((prev) => {
       const copy = [...prev];
       const currentItem = copy[index];
@@ -147,7 +150,8 @@ export default function AddClientServicesPage() {
         partner_a_discount: item.partner_a_discount !== "" ? parseFloat(item.partner_a_discount) : 20,
         partner_a1_discount: item.partner_a1_discount !== "" ? parseFloat(item.partner_a1_discount) : 40,
         partner_a2_discount: item.partner_a2_discount !== "" ? parseFloat(item.partner_a2_discount) : 50,
-        partner_a3_price: item.partner_a3_price || null
+        partner_a3_price: item.partner_a3_price || null,
+        needs_notary: item.needs_notary || false
       }));
 
       const isBulk = payload.length > 1;
@@ -263,8 +267,8 @@ export default function AddClientServicesPage() {
                   </div>
 
                   {/* Identification Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="sm:col-span-2 space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                    <div className="sm:col-span-7 space-y-2">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Job Title *</label>
                       <Input
                         required
@@ -275,10 +279,28 @@ export default function AddClientServicesPage() {
                       />
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="sm:col-span-2 space-y-2">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Job ID</label>
                       <div className="h-10 flex items-center font-mono font-extrabold text-sm text-primary select-none pointer-events-none">
                         {item.job_id}
+                      </div>
+                    </div>
+
+                    <div className="sm:col-span-3 space-y-2 flex flex-col justify-end pb-2">
+                      <div className="flex items-center gap-2 h-10">
+                        <input
+                          type="checkbox"
+                          id={`needs-notary-${idx}`}
+                          checked={item.needs_notary || false}
+                          onChange={(e) => handleCreateItemChange(idx, "needs_notary", e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-emerald-600 cursor-pointer"
+                        />
+                        <label 
+                          htmlFor={`needs-notary-${idx}`}
+                          className="text-xs font-bold text-muted-foreground/90 cursor-pointer select-none"
+                        >
+                          Notary Required
+                        </label>
                       </div>
                     </div>
                   </div>

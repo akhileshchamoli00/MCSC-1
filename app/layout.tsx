@@ -67,7 +67,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
         />
       </head>
-      <body className="font-sans antialiased min-h-screen bg-transparent text-foreground selection:bg-primary/30 relative">
+      <body className="font-sans antialiased min-h-screen bg-transparent text-foreground selection:bg-primary/30 relative" suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

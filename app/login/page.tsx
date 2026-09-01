@@ -267,12 +267,16 @@ export default function LoginPage() {
             bendStrength={0}
             interactive
             parallax={true}
-            animationSpeed={2}
-            gradientStart="#065eee"
-            gradientMid="#84CC16"
-            gradientEnd="#EAB308"
+            animationSpeed={1.5}
+            gradientStart="#059669"
+            gradientMid="#065eee"
+            gradientEnd="#4f46e5"
           />
         </div>
+
+        {/* Floating Glowing blobs */}
+        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-emerald-500/10 blur-[120px] pointer-events-none -z-10" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] rounded-full bg-primary/10 blur-[130px] pointer-events-none -z-10" />
 
         <div className="relative z-10 w-full max-w-md">
           <Link

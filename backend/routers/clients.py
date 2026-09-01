@@ -4,6 +4,7 @@ from typing import List, Optional, Any
 import os
 import shutil
 import uuid
+import threading
 from datetime import datetime
 
 import models, schemas, auth, database
@@ -16,6 +17,8 @@ router = APIRouter(
     tags=["clients"],
     dependencies=[Depends(auth.get_current_user)]
 )
+
+status_lock = threading.Lock()
 
 def generate_company_code(db: Session, company_name: str) -> str:
     """
@@ -64,22 +67,43 @@ def update_order_group_status(db: Session, orders: List[models.ClientOrder], new
     if not orders:
         return
         
-    first_order = orders[0]
-    old_status = first_order.status
-    
-    # Update status for all orders in group
-    for order in orders:
-        order.status = new_status
+    with status_lock:
+        first_order = orders[0]
         
-    # If the status actually changed, log a single progress message in the order chat
-    if old_status != new_status:
-        status_label = new_status.replace("_", " ").title()
-        progress = models.ClientOrderProgress(
-            order_number=first_order.order_number,
-            message=f"Order execution status has been updated to {status_label}.",
-            user_id=user_id
-        )
-        db.add(progress)
+        # Ensure we have fresh status from database
+        try:
+            db.refresh(first_order)
+        except Exception:
+            pass
+            
+        old_status = first_order.status
+        
+        # Update status for all orders in group
+        for order in orders:
+            order.status = new_status
+            
+        # If the status actually changed, log a single progress message in the order chat
+        if old_status != new_status:
+            status_label = new_status.replace("_", " ").upper()
+            msg = f"Order execution status has been updated to {status_label}."
+            
+            # Prevent duplicate status change entries in concurrent requests
+            existing = db.query(models.ClientOrderProgress).filter(
+                models.ClientOrderProgress.order_number == first_order.order_number,
+                models.ClientOrderProgress.message == msg
+            ).first()
+            
+            if not existing:
+                progress = models.ClientOrderProgress(
+                    order_number=first_order.order_number,
+                    message=msg,
+                    user_id=user_id
+                )
+                db.add(progress)
+                try:
+                    db.commit()  # Commit immediately to serialize writes and make it visible to other threads
+                except Exception:
+                    db.rollback()
 
 def replicate_key_contact_to_stakeholder(db: Session, db_company: models.ClientCompany):
     if db_company and db_company.key_contact_person:
@@ -321,6 +345,19 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
     created_rows = []
     
     for item in order_req.items:
+        # Determine notary fee if notary is selected
+        fee = 0.0
+        if item.notary_id:
+            if getattr(item, "notary_fee", None) is not None:
+                fee = item.notary_fee
+            else:
+                notary_fee_rec = db.query(models.NotaryServiceFee).filter(
+                    models.NotaryServiceFee.notary_id == item.notary_id,
+                    models.NotaryServiceFee.service_id == item.service_id
+                ).first()
+                if notary_fee_rec:
+                    fee = notary_fee_rec.fee or 0.0
+
         db_order = models.ClientOrder(
             order_number=order_num,
             client_id=target_client_id,
@@ -336,7 +373,9 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
             status=order_status,
             payment_status=payment_status,
             consultant_ids=order_req.consultant_ids or [],
-            notes=order_req.notes
+            notes=order_req.notes,
+            notary_id=item.notary_id,
+            notary_fee=fee
         )
         db.add(db_order)
         db.commit()
@@ -535,6 +574,9 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
 
     is_admin_hr = is_admin_or_hr(current_user)
     
+    # Query the entire order group to update them together and prevent duplicate progress entries
+    orders_in_group = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == db_order.order_number).all()
+    
     c_ids = db_order.consultant_ids or []
     if isinstance(c_ids, str):
         try:
@@ -550,7 +592,7 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
         raise HTTPException(status_code=403, detail="You do not have permission to update this order")
         
     if order_update.status:
-        update_order_group_status(db, [db_order], order_update.status, current_user.id)
+        update_order_group_status(db, orders_in_group, order_update.status, current_user.id)
         
     if is_admin_hr:
         if order_update.payment_status:
@@ -560,7 +602,7 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
                     target_status = "CONFIRMED"
                     if db_order.consultant_ids and len(db_order.consultant_ids) > 0:
                         target_status = "ORDER_ASSIGNED"
-                    update_order_group_status(db, [db_order], target_status, current_user.id)
+                    update_order_group_status(db, orders_in_group, target_status, current_user.id)
         if order_update.invoice_number is not None:
             db_order.invoice_number = order_update.invoice_number
         if order_update.consultant_ids is not None:
@@ -580,11 +622,24 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
             db_order.total_amount = order_update.unit_price
         if order_update.custom_price_text is not None:
             db_order.custom_price_text = order_update.custom_price_text
+        if order_update.notary_id is not None:
+            db_order.notary_id = order_update.notary_id
+            if order_update.notary_id:
+                notary_fee_rec = db.query(models.NotaryServiceFee).filter(
+                    models.NotaryServiceFee.notary_id == order_update.notary_id,
+                    models.NotaryServiceFee.service_id == db_order.service_id
+                ).first()
+                if notary_fee_rec:
+                    db_order.notary_fee = notary_fee_rec.fee or 0.0
+                else:
+                    db_order.notary_fee = 0.0
+            else:
+                db_order.notary_fee = 0.0
         if order_update.is_proforma_finalized is not None:
             db_order.is_proforma_finalized = order_update.is_proforma_finalized
             if not order_update.is_proforma_finalized:
                 db_order.is_final_invoice_finalized = False
-                update_order_group_status(db, [db_order], "DRAFT", current_user.id)
+                update_order_group_status(db, orders_in_group, "DRAFT", current_user.id)
         if order_update.proforma_stage_percent is not None:
             db_order.proforma_stage_percent = order_update.proforma_stage_percent
         if order_update.is_final_invoice_finalized is not None:
@@ -1414,6 +1469,19 @@ def create_bulk_client_services(services_data: List[schemas.ClientServiceCreate]
         
     return created_services
 
+@router.get("/services/catalog/{id}", response_model=schemas.ClientServiceResponse)
+def get_client_service(id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    db_service = db.query(models.ClientService).filter(models.ClientService.id == id).first()
+    if not db_service:
+        raise HTTPException(status_code=404, detail="Service entry not found")
+        
+    p_base = db_service.base_price or 0.0
+    res = schemas.ClientServiceResponse.model_validate(db_service) if hasattr(schemas.ClientServiceResponse, "model_validate") else schemas.ClientServiceResponse.from_orm(db_service)
+    res.partner_a_price = round(p_base * (1 - ((db_service.partner_a_discount or 20.0) / 100.0)), 2)
+    res.partner_a1_price = round(p_base * (1 - ((db_service.partner_a1_discount or 40.0) / 100.0)), 2)
+    res.partner_a2_price = round(p_base * (1 - ((db_service.partner_a2_discount or 50.0) / 100.0)), 2)
+    return res
+
 @router.put("/services/catalog/{id}", response_model=schemas.ClientServiceResponse)
 def update_client_service(id: int, service_update: schemas.ClientServiceUpdate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     if not is_admin_or_hr(current_user):
@@ -1819,7 +1887,7 @@ def finalize_order_final_invoice(
         raise HTTPException(status_code=500, detail=f"Failed to save file to Dropbox: {str(e)}")
         
     # Update orders
-    update_order_group_status(db, orders_in_group, "INVOICE_GENERATED", current_user.id)
+    update_order_group_status(db, orders_in_group, "WAITING_FOR_FINAL_PAYMENT", current_user.id)
     for order in orders_in_group:
         order.is_final_invoice_finalized = True
         
@@ -1880,7 +1948,7 @@ def get_expiring_documents(
     
     res = []
     for doc in docs:
-        if is_employee_role(current_user):
+        if is_employee_role(current_user) and not is_admin_or_hr(current_user):
             if not is_assigned_employee_to_company(current_user, doc.company_id, db):
                 continue
                 
@@ -2116,21 +2184,37 @@ async def xendit_webhook(request: Request, db: Session = Depends(database.get_db
             
         formatted_paid = f"IDR {parsed_paid_amount:,.0f}"
         
-        if is_proforma or (paid_amount_val and float(paid_amount_val) < total_order_amount and not is_final):
+        # Determine if this is a partial (proforma) or full (final) payment
+        is_partial = False
+        if is_proforma:
+            is_partial = True
+        elif is_final:
+            is_partial = False
+        elif orders[0].payment_status == "PARTIALLY_PAID":
+            is_partial = False
+        elif paid_amount_val and float(paid_amount_val) < total_order_amount:
+            is_partial = True
+            
+        if is_partial:
             new_payment_status = "PARTIALLY_PAID"
-            message_text = f"Proforma payment of {formatted_paid} completed successfully via Xendit bank transfer."
+            message_text = "Proforma payment completed successfully."
         else:
             new_payment_status = "PAID"
-            message_text = f"Full payment of {formatted_paid} completed successfully via Xendit bank transfer."
+            message_text = "Final Invoice payment completed successfully."
             
         # Transition execution status conditionally and log to chat
-        transition_orders = [item for item in orders if item.status in ["DRAFT", "PROFORMA_GENERATED", "WAITING_ON_CLIENT"]]
-        if transition_orders:
-            target_status = "CONFIRMED"
-            first_trans = transition_orders[0]
-            if first_trans.consultant_ids and len(first_trans.consultant_ids) > 0:
-                target_status = "ORDER_ASSIGNED"
-            update_order_group_status(db, transition_orders, target_status, None)
+        if not is_partial:
+            # Transition execution status to FINAL_PAYMENT_COMPLETED when final invoice is paid
+            update_order_group_status(db, orders, "FINAL_PAYMENT_COMPLETED", None)
+        else:
+            # Transition execution status conditionally for the proforma payment stage
+            transition_orders = [item for item in orders if item.status in ["DRAFT", "PROFORMA_GENERATED", "WAITING_ON_CLIENT"]]
+            if transition_orders:
+                target_status = "CONFIRMED"
+                first_trans = transition_orders[0]
+                if first_trans.consultant_ids and len(first_trans.consultant_ids) > 0:
+                    target_status = "ORDER_ASSIGNED"
+                update_order_group_status(db, transition_orders, target_status, None)
             
         for item in orders:
             item.payment_status = new_payment_status

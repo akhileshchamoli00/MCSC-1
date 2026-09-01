@@ -106,16 +106,21 @@ export default function MyClients() {
         </p>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative w-full sm:w-80">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search assigned clients..."
-          className="pl-8"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
+      {/* Search Panel Card */}
+      <Card className="border-border/50 shadow-sm overflow-hidden bg-card/60 backdrop-blur-md p-4 flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search assigned clients..."
+            className="pl-8 h-9 text-xs rounded-lg"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold">
+          Showing {filteredCompanies.length} clients
+        </span>
+      </Card>
 
       {filteredCompanies.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed rounded-2xl bg-muted/30">

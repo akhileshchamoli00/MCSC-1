@@ -22,6 +22,7 @@ import {
   ArrowLeft,
   Building,
   DollarSign,
+  Scale,
   Check,
   Tag,
   Receipt,
@@ -43,6 +44,7 @@ import {
   Link2
 } from "lucide-react";
 import Link from "next/link";
+import { KpiCard } from "@/components/kpi-card";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import domToImage from "dom-to-image";
@@ -443,6 +445,7 @@ export default function ClientOrdersPage() {
         consultants: ord.consultants || [],
         notes: ord.notes || "",
         total_amount: 0,
+        total_notary_fee: 0,
         items: [],
         is_proforma_finalized: ord.is_proforma_finalized || false,
         proforma_stage_percent: ord.proforma_stage_percent || 50,
@@ -452,6 +455,7 @@ export default function ClientOrdersPage() {
     const group = groupedOrdersMap.get(key);
     group.items.push(ord);
     group.total_amount += ord.unit_price || ord.total_amount || 0;
+    group.total_notary_fee += ord.notary_fee || 0;
 
     if (ord.is_proforma_finalized) {
       group.is_proforma_finalized = true;
@@ -712,12 +716,17 @@ export default function ClientOrdersPage() {
   const endIndex = startIndex + 10;
   const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
 
-  const totalOrdersCount = groupedOrders.length;
-  const totalRevenue = groupedOrders.reduce((acc, curr) => acc + (curr.total_amount || 0), 0);
-  const pendingCollectionCount = groupedOrders.filter(o => o.payment_status !== "PAID").length;
+  // Filter completed and paid orders for independent top metrics calculation
+  const allCompletedOrders = groupedOrders.filter((ord) => ord.status === "COMPLETED" && ord.payment_status === "PAID");
+
+  const totalOrdersCount = allCompletedOrders.length;
+  const totalRevenue = allCompletedOrders.reduce((acc, curr) => acc + (curr.total_amount || 0), 0);
+  const totalNotaryFees = allCompletedOrders.reduce((acc, curr) => acc + (curr.total_notary_fee || 0), 0);
+  const totalActualEarnings = totalRevenue - totalNotaryFees;
+  const pendingCollectionCount = allCompletedOrders.filter(o => o.payment_status !== "PAID").length;
 
   const allocatedStaffSet = new Set<number>();
-  groupedOrders.forEach(o => {
+  allCompletedOrders.forEach(o => {
     if (Array.isArray(o.consultant_ids)) {
       o.consultant_ids.forEach((id: any) => {
         if (typeof id === 'number') allocatedStaffSet.add(id);
@@ -740,6 +749,8 @@ export default function ClientOrdersPage() {
       case "FINAL_DOCUMENT_PREPARATION": return "bg-orange-500/15 text-orange-600 border-orange-500/30";
       case "FINAL_DOC_READY": return "bg-lime-500/15 text-lime-600 border-lime-500/30";
       case "INVOICE_GENERATED": return "bg-pink-500/15 text-pink-600 border-pink-500/30";
+      case "WAITING_FOR_FINAL_PAYMENT": return "bg-pink-500/15 text-pink-600 border-pink-500/30";
+      case "FINAL_PAYMENT_COMPLETED": return "bg-emerald-500/15 text-emerald-600 border-emerald-500/30";
       case "SOFT_COPY_DELIVERED": return "bg-sky-500/15 text-sky-600 border-sky-500/30";
       case "HARD_COPY_DELIVERED": return "bg-violet-500/15 text-violet-600 border-violet-500/30";
       default: return "bg-primary/10 text-primary border-primary/20";
@@ -1322,85 +1333,41 @@ export default function ClientOrdersPage() {
       </div>
 
       {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
-        {/* Total Orders */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-500 border border-purple-500/20 shrink-0">
-              <ShoppingCart className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Total Orders</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{totalOrdersCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Confirmed Value */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0">
-              <DollarSign className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Confirmed Value</p>
-              <h3 className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 leading-none mt-0.5">{formatCurrency(totalRevenue)}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Pending Collection */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0">
-              <Receipt className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Pending Collection</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{pendingCollectionCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Staff Allocated */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 shrink-0">
-              <Users className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Staff Allocated</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{allocatedStaffCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search Order ID, Company..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 w-full">
+        <KpiCard title="Total Orders" value={totalOrdersCount} icon={ShoppingCart} colorTheme="purple" />
+        <KpiCard title="Confirmed Value" value={formatCurrency(totalRevenue)} icon={DollarSign} colorTheme="sky" />
+        <KpiCard title="Actual Earnings" value={formatCurrency(totalActualEarnings)} icon={CheckCircle2} colorTheme="emerald" />
+        <KpiCard title="Notary Owed" value={formatCurrency(totalNotaryFees)} icon={Scale} colorTheme="amber" />
+        <KpiCard title="Staff Allocated" value={allocatedStaffCount} icon={Users} colorTheme="blue" />
       </div>
 
       {/* Main Orders Table */}
-      <Card className="border-border/50 shadow-sm overflow-hidden">
+      <Card className="border-border/50 shadow-sm overflow-hidden bg-card/60 backdrop-blur-md">
+        <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search Order ID, Company..."
+              className="pl-8 h-9 text-xs rounded-lg"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold">
+            Showing {paginatedOrders.length} of {filteredOrders.length} entries
+          </span>
+        </div>
+
         <CardContent className="p-0">
           {filteredOrders.length === 0 ? (
-            <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2 border-t">
+            <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
               <ShoppingCart className="h-10 w-10 text-muted-foreground/35" />
               <span className="text-sm font-semibold">No Client Orders Found</span>
               <p className="text-xs max-w-sm">Click "Create New Order" above to issue your first service order.</p>
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto border-t">
+              <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
@@ -1410,6 +1377,8 @@ export default function ClientOrdersPage() {
                       <th className="p-4">Service Package</th>
                       <th className="p-4">Assigned Consultants</th>
                       <th className="p-4 text-right">Total Amount</th>
+                      <th className="p-4 text-right">Notary Fee</th>
+                      <th className="p-4 text-right">Actual Earnings</th>
                       <th className="p-4 text-center">Payment</th>
                       <th className="p-4 text-center">Lifecycle Status</th>
                       <th className="p-4 text-right">Actions</th>
@@ -1457,9 +1426,9 @@ export default function ClientOrdersPage() {
                                       {item.job_id}
                                     </Badge>
                                   )}
-                                  {item.pricing_tier && (
-                                    <Badge variant="secondary" className="text-[9px] py-0 px-1 font-medium capitalize shrink-0">
-                                      {item.pricing_tier.toLowerCase().replace('_', ' ')}
+                                  {item.notary && (
+                                    <Badge variant="outline" className="text-[9px] font-bold py-0 px-1.5 bg-indigo-500/5 text-indigo-600 border-indigo-500/20 shrink-0">
+                                      Notary: {item.notary.name}
                                     </Badge>
                                   )}
                                 </div>
@@ -1485,6 +1454,12 @@ export default function ClientOrdersPage() {
                         </td>
                         <td className="p-4 text-right font-mono font-bold text-sm text-foreground align-top pt-5">
                           {formatCurrency(ord.total_amount)}
+                        </td>
+                        <td className="p-4 text-right font-mono font-bold text-sm text-amber-600 dark:text-amber-400 align-top pt-5">
+                          {formatCurrency(ord.total_notary_fee || 0)}
+                        </td>
+                        <td className="p-4 text-right font-mono font-bold text-sm text-emerald-600 dark:text-emerald-400 align-top pt-5">
+                          {formatCurrency((ord.total_amount || 0) - (ord.total_notary_fee || 0))}
                         </td>
                         <td className="p-4 text-center align-top pt-5">
                           <div className="flex flex-col items-center gap-1.5 justify-center">
@@ -1855,8 +1830,10 @@ export default function ClientOrdersPage() {
                   <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
                   <option value="FINAL_DOC_READY">FINAL DOC READY</option>
                   <option value="INVOICE_GENERATED">INVOICE GENERATED</option>
+                  <option value="WAITING_FOR_FINAL_PAYMENT">WAITING FOR FINAL PAYMENT</option>
+                  <option value="FINAL_PAYMENT_COMPLETED">FINAL PAYMENT COMPLETED</option>
                   <option value="SOFT_COPY_DELIVERED">SOFT COPY DELIVERED</option>
-                  <option value="HARD_COPY_DELIVERED">HARD copy DELIVERED</option>
+                  <option value="HARD_COPY_DELIVERED">HARD COPY DELIVERED</option>
                   <option value="COMPLETED">COMPLETED</option>
                   <option value="CANCELLED">CANCELLED</option>
                 </select>
@@ -1933,8 +1910,8 @@ export default function ClientOrdersPage() {
               {/* 2-Column Responsive Layout Utilizing Horizontal Whitespace */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
-                {/* Left Column (Metadata & Consultants) - 5 cols */}
-                <div className="lg:col-span-5 space-y-4">
+                {/* Left Column (Metadata & Consultants) - 4 cols */}
+                <div className="lg:col-span-4 space-y-4">
 
                   {/* Entity & Rep Details */}
                   <div className="p-4 rounded-xl border border-border/60 bg-muted/20 text-xs space-y-3">
@@ -2131,15 +2108,15 @@ export default function ClientOrdersPage() {
 
                     <Button
                       type="button"
-                      disabled={(!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "COMPLETED") && !selectedOrderGroup?.is_final_invoice_finalized}
+                      disabled={(!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "FINAL_DOC_READY") && !selectedOrderGroup?.is_final_invoice_finalized}
                       onClick={() => setIsFinalInvoicePreviewOpen(true)}
                       className="w-full gap-2 font-bold py-5 bg-blue-600 hover:bg-blue-700 text-white shadow-md text-sm disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed"
                     >
                       <FileText className="h-4 w-4" /> {selectedOrderGroup?.is_final_invoice_finalized ? "View" : "Generate"} Final Invoice
                     </Button>
-                    {(!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "COMPLETED") && !selectedOrderGroup?.is_final_invoice_finalized && (
+                    {(!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "FINAL_DOC_READY") && !selectedOrderGroup?.is_final_invoice_finalized && (
                       <p className="text-[10px] text-muted-foreground text-center italic mt-0.5">
-                        Requires finalized proforma invoice & completed order lifecycle status.
+                        Requires finalized proforma invoice & final doc ready lifecycle status.
                       </p>
                     )}
 
@@ -2147,8 +2124,8 @@ export default function ClientOrdersPage() {
 
                  </div>
 
-                {/* Right Column (Line Items & Totals) - 7 cols */}
-                <div className="lg:col-span-7 space-y-4">
+                {/* Right Column (Line Items & Totals) - 8 cols */}
+                <div className="lg:col-span-8 space-y-4">
 
                   {/* Service Items Table */}
                   <div className="border rounded-xl overflow-hidden text-xs shadow-xs bg-background">
@@ -2179,6 +2156,11 @@ export default function ClientOrdersPage() {
                                     {item.pricing_tier && (
                                       <Badge variant="secondary" className="text-[9px] py-0 px-1.5 font-medium capitalize shrink-0">
                                         {item.pricing_tier.toLowerCase().replace('_', ' ')}
+                                      </Badge>
+                                    )}
+                                    {item.notary && (
+                                      <Badge variant="outline" className="text-[9px] font-bold py-0 px-1.5 bg-indigo-500/5 text-indigo-600 border-indigo-500/20 shrink-0">
+                                        Notary: {item.notary.name}
                                       </Badge>
                                     )}
                                   </div>
@@ -2850,9 +2832,21 @@ export default function ClientOrdersPage() {
                           <span>Less: Proforma Paid ({selectedOrderGroup.proforma_stage_percent || proformaPercent}%):</span>
                           <span className="font-bold text-amber-600">-{formatCurrency((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100)}</span>
                         </div>
+                        {isPph21 && (
+                          <div className="flex justify-between py-1 border-b border-slate-200 text-red-600 font-bold">
+                            <span>WHT PPh 21 (2% Deduction):</span>
+                            <span>-{formatCurrency((selectedOrderGroup.total_amount - ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100)) * 0.02)}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between py-2.5 px-3 rounded-lg bg-blue-600 text-white text-sm font-bold shadow-sm">
                           <span>Total Amount Due:</span>
-                          <span>{formatCurrency(selectedOrderGroup.total_amount - ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100))}</span>
+                          <span>
+                            {formatCurrency(
+                              isPph21
+                                ? (selectedOrderGroup.total_amount - ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100)) * 0.98
+                                : selectedOrderGroup.total_amount - ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100)
+                            )}
+                          </span>
                         </div>
                       </div>
                     </div>
