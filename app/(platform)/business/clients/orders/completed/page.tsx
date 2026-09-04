@@ -45,6 +45,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { KpiCard } from "@/components/kpi-card";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -53,6 +54,7 @@ import { jsPDF } from "jspdf";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function ClientOrdersPage() {
+  const router = useRouter();
   const [orders, setOrders] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
