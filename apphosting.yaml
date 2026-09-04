@@ -1,9 +1,21 @@
 # Firebase App Hosting configuration file
 # Reference: https://firebase.google.com/docs/app-hosting/configure
 
+runConfig:
+  cpu: 1
+  memoryMiB: 1024
+  minInstances: 0
+  maxInstances: 10
+  concurrency: 80
+
 env:
+  - variable: NODE_OPTIONS
+    value: "--max-old-space-size=4096"
+    availability:
+      - BUILD
   # Map GMAIL_USER and GMAIL_APP_PASSWORD to Firebase/Google Cloud Secrets
   - variable: GMAIL_USER
     secret: GMAIL_USER
   - variable: GMAIL_APP_PASSWORD
     secret: GMAIL_APP_PASSWORD
+
