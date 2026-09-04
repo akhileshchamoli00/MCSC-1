@@ -40,7 +40,8 @@ import {
   Lock,
   Mail,
   MessageSquare,
-  Link2
+  Link2,
+  RefreshCw
 } from "lucide-react";
 import Link from "next/link";
 import { KpiCard } from "@/components/kpi-card";
@@ -72,7 +73,7 @@ export default function ClientOrdersPage() {
   const [progressUpdates, setProgressUpdates] = useState<any[]>([]);
   const [loadingProgress, setLoadingProgress] = useState(false);
   const [newProgressMessage, setNewProgressMessage] = useState("");
-  
+
   // Mentions / Tagging States
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionSearch, setSuggestionSearch] = useState("");
@@ -138,16 +139,16 @@ export default function ClientOrdersPage() {
       const filteredEmps = (employees || []).filter((emp: any) => {
         const isLicensingMember = licensingMemberIds.includes(emp.id);
         if (!isLicensingMember) return false;
-        
+
         const fullName = `${emp.first_name} ${emp.last_name}`.toLowerCase();
         return fullName.includes(query);
       }).map(emp => ({ ...emp, type: "employee" }));
 
       // Also filter active teams (include Licensing Team in suggestions)
-      const filteredTeams = (teams || []).filter((t: any) => 
+      const filteredTeams = (teams || []).filter((t: any) =>
         t.is_active && t.name.toLowerCase() === "licensing team" && t.name.toLowerCase().includes(query)
       ).map(t => ({ ...t, type: "team" }));
-      
+
       const merged = [...filteredEmps, ...filteredTeams];
       setFilteredEmployees(merged);
       setShowSuggestions(merged.length > 0);
@@ -170,7 +171,7 @@ export default function ClientOrdersPage() {
       const afterMention = val.slice(start);
       const displayName = item.type === "team" ? item.name : `${item.first_name} ${item.last_name}`;
       const insertText = `@${displayName} `;
-      
+
       const newText = beforeMention + insertText + afterMention;
       setNewProgressMessage(newText);
       setShowSuggestions(false);
@@ -186,7 +187,7 @@ export default function ClientOrdersPage() {
 
   const renderMessageContent = (msg: string) => {
     if (!msg) return null;
-    
+
     // Create mapping of name/team -> color/type
     const teamMap = new Map();
     (teams || []).forEach((t: any) => {
@@ -203,7 +204,7 @@ export default function ClientOrdersPage() {
 
     const allPatterns = [...namePatterns, ...teamPatterns]
       .map((name: string) => name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
-      
+
     if (allPatterns.length === 0) {
       const parts = msg.split(/(@[^\s,.:;!?]+)/g);
       return parts.map((part, index) => {
@@ -217,17 +218,17 @@ export default function ClientOrdersPage() {
         return part;
       });
     }
-    
+
     const escapedNamesPattern = allPatterns.join('|');
     const emailPattern = '[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+';
     const pattern = new RegExp(`(@(?:${escapedNamesPattern}|${emailPattern}))`, 'g');
-    
+
     const parts = msg.split(pattern);
     return parts.map((part, index) => {
       if (part.startsWith("@")) {
         const entityName = part.slice(1);
         const matchedTeam = teamMap.get(entityName.toLowerCase());
-        
+
         if (matchedTeam) {
           const tColor = matchedTeam.color || "#10b981";
           return (
@@ -246,7 +247,7 @@ export default function ClientOrdersPage() {
             </button>
           );
         }
-        
+
         return (
           <span key={index} className="bg-emerald-500/10 text-emerald-600 font-bold px-1.5 py-0.5 rounded-md border border-emerald-500/25 text-[10px] inline-block">
             {part}
@@ -387,7 +388,7 @@ export default function ClientOrdersPage() {
   // Auto-open chat from URL query parameter (for notifications)
   useEffect(() => {
     if (orders.length === 0) return;
-    
+
     const checkParams = () => {
       if (typeof window === "undefined") return;
       const params = new URLSearchParams(window.location.search);
@@ -431,6 +432,10 @@ export default function ClientOrdersPage() {
         client_id: ord.client_id,
         company_name: ord.company_name,
         company_id: ord.company_id,
+        billing_company_name: ord.billing_company_name || ord.company_name,
+        billing_company_id: ord.billing_company_id || ord.company_id,
+        company: ord.company,
+        billing_company: ord.billing_company,
         created_at: ord.created_at,
         status: ord.status || "CONFIRMED",
         payment_status: ord.payment_status || "UNPAID",
@@ -442,6 +447,7 @@ export default function ClientOrdersPage() {
         items: [],
         is_proforma_finalized: ord.is_proforma_finalized || false,
         proforma_stage_percent: ord.proforma_stage_percent || 50,
+        proforma_paid_amount: ord.proforma_paid_amount != null ? ord.proforma_paid_amount : null,
         is_final_invoice_finalized: ord.is_final_invoice_finalized || false
       });
     }
@@ -454,6 +460,9 @@ export default function ClientOrdersPage() {
     }
     if (ord.proforma_stage_percent) {
       group.proforma_stage_percent = ord.proforma_stage_percent;
+    }
+    if (ord.proforma_paid_amount != null) {
+      group.proforma_paid_amount = ord.proforma_paid_amount;
     }
     if (ord.is_final_invoice_finalized) {
       group.is_final_invoice_finalized = true;
@@ -509,17 +518,23 @@ export default function ClientOrdersPage() {
 
   const handleDeleteSubmit = async () => {
     const activeToken = localStorage.getItem("hrms_token");
-    if (!activeToken || !selectedOrderGroup || !selectedOrderGroup.items) return;
+    if (!activeToken || !selectedOrderGroup) return;
     setSaving(true);
     try {
-      await Promise.all(
-        selectedOrderGroup.items.map((itemRow: any) =>
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${itemRow.id}`, {
-            method: "DELETE",
-            headers: { "Authorization": `Bearer ${activeToken}` }
-          })
-        )
-      );
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/group/${selectedOrderGroup.order_number}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${activeToken}` }
+      });
+      if (!res.ok && selectedOrderGroup.items) {
+        await Promise.all(
+          selectedOrderGroup.items.map((itemRow: any) =>
+            fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${itemRow.id}`, {
+              method: "DELETE",
+              headers: { "Authorization": `Bearer ${activeToken}` }
+            })
+          )
+        );
+      }
       toast.success("Order deleted successfully");
       setIsDeleteOpen(false);
       fetchData();
@@ -531,11 +546,13 @@ export default function ClientOrdersPage() {
     }
   };
 
-  const filteredOrders = groupedOrders.filter((ord) => {
-    // Exclude completed & paid orders from Order Management
+  // Active Orders: Exclude completed & paid orders from Active Orders Management
+  const activeOrders = groupedOrders.filter((ord) => {
     const isCompletedAndPaid = ord.status === "COMPLETED" && ord.payment_status === "PAID";
-    if (isCompletedAndPaid) return false;
+    return !isCompletedAndPaid;
+  });
 
+  const filteredOrders = activeOrders.filter((ord) => {
     const term = searchTerm.toLowerCase();
     const orderNum = (ord.order_number || "").toLowerCase();
     const clientName = (ord.client_name || "").toLowerCase();
@@ -550,12 +567,12 @@ export default function ClientOrdersPage() {
   const endIndex = startIndex + 10;
   const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
 
-  const totalOrdersCount = groupedOrders.length;
-  const totalRevenue = groupedOrders.reduce((acc, curr) => acc + (curr.total_amount || 0), 0);
-  const pendingCollectionCount = groupedOrders.filter(o => o.payment_status !== "PAID").length;
+  const totalOrdersCount = activeOrders.length;
+  const totalRevenue = activeOrders.reduce((acc, curr) => acc + (curr.total_amount || 0), 0);
+  const pendingCollectionCount = activeOrders.filter(o => o.payment_status !== "PAID").length;
 
   const allocatedStaffSet = new Set<number>();
-  groupedOrders.forEach(o => {
+  activeOrders.forEach(o => {
     if (Array.isArray(o.consultant_ids)) {
       o.consultant_ids.forEach((id: any) => {
         if (typeof id === 'number') allocatedStaffSet.add(id);
@@ -593,6 +610,12 @@ export default function ClientOrdersPage() {
       case "PARTIALLY_PAID": return "bg-amber-500/15 text-amber-600 border-amber-500/30";
       default: return "bg-red-500/15 text-red-600 border-red-500/30";
     }
+  };
+
+  const isPaymentActionVisible = (ord: any) => {
+    if (!ord || ord.payment_status === "PAID") return false;
+    const st = (ord.status || "").toUpperCase();
+    return st === "WAITING_ON_CLIENT" || st === "WAITING_FOR_FINAL_PAYMENT" || st === "WAITING_ON_FINAL_PAYMENT";
   };
 
   const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -705,8 +728,8 @@ export default function ClientOrdersPage() {
         let errMsg = "Failed to finalize invoice";
         try {
           const err = await res.json();
-          errMsg = err.detail 
-            ? (typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail)) 
+          errMsg = err.detail
+            ? (typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail))
             : JSON.stringify(err);
         } catch (e) {
           errMsg = `Error ${res.status}: ${res.statusText}`;
@@ -747,13 +770,15 @@ export default function ClientOrdersPage() {
   const handleSendInvoiceEmail = (invoiceType: 'proforma' | 'final') => {
     if (!selectedOrderGroup) return;
 
-    // Find company & client email
-    const companyObj = companies.find((c: any) => c.id === selectedOrderGroup.company_id);
-    const clientObj = clients.find((c: any) => c.id === selectedOrderGroup.client_id || c.contact_person === selectedOrderGroup.client_name);
-    const targetEmail = companyObj?.key_contact_email || clientObj?.email || "";
+    // Find billing company & client email (prioritizing the billing company if different from target company)
+    const billingCompanyId = selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id;
+    const companyObj = companies.find((c: any) => c.id === billingCompanyId);
+    const targetCompanyObj = companies.find((c: any) => c.id === selectedOrderGroup.company_id);
+    const clientObj = clients.find((c: any) => c.id === (companyObj?.client_id || selectedOrderGroup.client_id) || c.contact_person === selectedOrderGroup.client_name);
+    const targetEmail = companyObj?.key_contact_email || targetCompanyObj?.key_contact_email || clientObj?.email || "";
 
     if (!targetEmail) {
-      toast.error("No recipient email found for this company/client.");
+      toast.error("No recipient email found for this billing company/client.");
       return;
     }
 
@@ -777,8 +802,9 @@ export default function ClientOrdersPage() {
       });
       if (res.ok) {
         toast.success(`Successfully sent ${emailConfirmType} invoice email to ${emailConfirmAddress}!`);
+        const targetStatus = emailConfirmType === 'final' ? "WAITING_FOR_FINAL_PAYMENT" : "WAITING_ON_CLIENT";
         // Update selectedOrderGroup status in UI
-        setSelectedOrderGroup((prev: any) => prev ? { ...prev, status: "WAITING_ON_CLIENT" } : null);
+        setSelectedOrderGroup((prev: any) => prev ? { ...prev, status: targetStatus } : null);
         // Refresh full list
         fetchData();
 
@@ -803,6 +829,7 @@ export default function ClientOrdersPage() {
         } catch (chatErr) {
           console.error("Error posting automated email notification to chat:", chatErr);
         }
+        fetchProgressUpdates(selectedOrderGroup.order_number);
       } else {
         const err = await res.json();
         toast.error(err.detail || `Failed to send ${emailConfirmType} invoice email`);
@@ -1094,8 +1121,8 @@ export default function ClientOrdersPage() {
         let errMsg = "Failed to finalize final invoice";
         try {
           const err = await res.json();
-          errMsg = err.detail 
-            ? (typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail)) 
+          errMsg = err.detail
+            ? (typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail))
             : JSON.stringify(err);
         } catch (e) {
           errMsg = `Error ${res.status}: ${res.statusText}`;
@@ -1111,6 +1138,7 @@ export default function ClientOrdersPage() {
         if (!prev) return prev;
         return {
           ...prev,
+          status: "INVOICE_GENERATED",
           is_final_invoice_finalized: true
         };
       });
@@ -1147,294 +1175,334 @@ export default function ClientOrdersPage() {
     <>
       <div className="space-y-6 animate-in fade-in duration-500 w-full max-w-none pb-12">
 
-      {/* Title Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <Link href="/business/clients" className="mt-1">
-            <Button variant="ghost" size="icon" title="Back to Clients">
-              <ArrowLeft className="h-4 w-4" />
+        {/* Title Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <Link href="/business/clients" className="mt-1">
+              <Button variant="ghost" size="icon" title="Back to Clients">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm shrink-0 flex items-center justify-center">
+              <ShoppingCart className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Active Orders</h1>
+              <p className="text-muted-foreground text-sm">
+                Manage client service orders in progress, assign multiple consultants per order, and track billing & lifecycle progress.
+              </p>
+            </div>
+          </div>
+
+          <Link href="/business/clients/orders/new">
+            <Button className="gap-2 font-semibold shadow">
+              <Plus className="h-4 w-4" /> Create New Order
             </Button>
           </Link>
-          <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm shrink-0 flex items-center justify-center">
-            <ShoppingCart className="h-6 w-6" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Active Orders</h1>
-            <p className="text-muted-foreground text-sm">
-              Manage client service orders in progress, assign multiple consultants per order, and track billing & lifecycle progress.
-            </p>
-          </div>
         </div>
 
-        <Link href="/business/clients/orders/new">
-          <Button className="gap-2 font-semibold shadow">
-            <Plus className="h-4 w-4" /> Create New Order
-          </Button>
-        </Link>
-      </div>
-
-      {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
-        <KpiCard title="Total Orders" value={totalOrdersCount} icon={ShoppingCart} colorTheme="purple" />
-        <KpiCard title="Confirmed Value" value={formatCurrency(totalRevenue)} icon={DollarSign} colorTheme="emerald" />
-        <KpiCard title="Pending Collection" value={pendingCollectionCount} icon={Receipt} colorTheme="amber" />
-        <KpiCard title="Staff Allocated" value={allocatedStaffCount} icon={Users} colorTheme="blue" />
-      </div>
-
-      {/* Main Orders Table */}
-      <Card className="border-border/50 shadow-sm overflow-hidden bg-card/60 backdrop-blur-md">
-        <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
-          <div className="relative w-full sm:w-80">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search Order ID, Company..."
-              className="pl-8 h-9 text-xs rounded-lg"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold">
-            Showing {paginatedOrders.length} of {filteredOrders.length} entries
-          </span>
+        {/* Metrics Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
+          <KpiCard title="Total Orders" value={totalOrdersCount} icon={ShoppingCart} colorTheme="purple" />
+          <KpiCard title="Confirmed Value" value={formatCurrency(totalRevenue)} icon={DollarSign} colorTheme="emerald" />
+          <KpiCard title="Pending Collection" value={pendingCollectionCount} icon={Receipt} colorTheme="amber" />
+          <KpiCard title="Staff Allocated" value={allocatedStaffCount} icon={Users} colorTheme="blue" />
         </div>
 
-        <CardContent className="p-0">
-          {filteredOrders.length === 0 ? (
-            <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
-              <ShoppingCart className="h-10 w-10 text-muted-foreground/35" />
-              <span className="text-sm font-semibold">No Client Orders Found</span>
-              <p className="text-xs max-w-sm">Click "Create New Order" above to issue your first service order.</p>
+        {/* Main Orders Table */}
+        <Card className="border-border/50 shadow-sm overflow-hidden bg-card/60 backdrop-blur-md">
+          <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search Order ID, Company..."
+                className="pl-8 h-9 text-xs rounded-lg"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                      <th className="p-4 w-12 text-center">No.</th>
-                      <th className="p-4">Order ID</th>
-                      <th className="p-4">Company Entity</th>
-                      <th className="p-4">Service Package</th>
-                      <th className="p-4">Assigned Consultants</th>
-                      <th className="p-4 text-right">Total Amount</th>
-                      <th className="p-4 text-center">Payment</th>
-                      <th className="p-4 text-center">Lifecycle Status</th>
-                      <th className="p-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {paginatedOrders.map((ord, index) => (
-                      <tr key={ord.order_number || index} className="hover:bg-muted/30 transition-colors border-b last:border-0">
-                        <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5">
-                          #{startIndex + index + 1}
-                        </td>
-                        <td className="p-4 align-top pt-5">
-                          {ord.company_id ? (
-                            <Link href={`/business/clients/documents/${ord.company_id}?from=orders`}>
-                              <Badge
-                                variant="outline"
-                                className="font-mono font-bold text-xs bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary cursor-pointer transition-colors"
-                                title="Go to Company Documents Folder"
-                              >
+            <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold">
+              Showing {paginatedOrders.length} of {filteredOrders.length} entries
+            </span>
+          </div>
+
+          <CardContent className="p-0">
+            {filteredOrders.length === 0 ? (
+              <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
+                <ShoppingCart className="h-10 w-10 text-muted-foreground/35" />
+                <span className="text-sm font-semibold">No Client Orders Found</span>
+                <p className="text-xs max-w-sm">Click "Create New Order" above to issue your first service order.</p>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
+                        <th className="p-4 w-12 text-center">No.</th>
+                        <th className="p-4">Order ID</th>
+                        <th className="p-4">Company Entity</th>
+                        <th className="p-4">Service Package</th>
+                        <th className="p-4">Assigned Consultants</th>
+                        <th className="p-4 text-right">Total Amount</th>
+                        <th className="p-4 text-center">Payment</th>
+                        <th className="p-4 text-center">Lifecycle Status</th>
+                        <th className="p-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {paginatedOrders.map((ord, index) => (
+                        <tr key={ord.order_number || index} className="hover:bg-muted/30 transition-colors border-b last:border-0">
+                          <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5">
+                            #{startIndex + index + 1}
+                          </td>
+                          <td className="p-4 align-top pt-5">
+                            {ord.company_id ? (
+                              <Link href={`/business/clients/documents/${ord.company_id}?from=orders`}>
+                                <Badge
+                                  variant="outline"
+                                  className="font-mono font-bold text-xs bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary cursor-pointer transition-colors"
+                                  title="Go to Company Documents Folder"
+                                >
+                                  {ord.order_number}
+                                </Badge>
+                              </Link>
+                            ) : (
+                              <Badge variant="outline" className="font-mono font-bold text-xs bg-primary/10 border-primary/30 text-primary">
                                 {ord.order_number}
                               </Badge>
-                            </Link>
-                          ) : (
-                            <Badge variant="outline" className="font-mono font-bold text-xs bg-primary/10 border-primary/30 text-primary">
-                              {ord.order_number}
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="p-4 font-bold text-foreground text-sm align-top pt-5">
-                          <div>{ord.company_name || "Personal Client Account"}</div>
-                          <div className="text-xs font-normal text-muted-foreground flex items-center gap-1 mt-1">
-                            <Building className="h-3 w-3 text-muted-foreground" /> {ord.client_name || "Representative"}
-                          </div>
-                        </td>
-                        <td className="p-4 align-top pt-5">
-                          {ord.items && ord.items.length > 0 ? (
-                            <div className="space-y-1.5 max-w-sm">
-                              {ord.items.map((item: any, idx: number) => (
-                                <div key={idx} className="flex flex-wrap items-center gap-1.5 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
-                                  <span className="font-semibold text-foreground text-xs leading-normal break-words">
-                                    {item.job_title}
-                                  </span>
-                                  {item.job_id && (
-                                    <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 bg-primary/5 text-primary border-primary/20 shrink-0">
-                                      {item.job_id}
-                                    </Badge>
-                                  )}
-                                  {item.notary && (
-                                    <Badge variant="outline" className="text-[9px] font-bold py-0 px-1.5 bg-indigo-500/5 text-indigo-600 border-indigo-500/20 shrink-0">
-                                      Notary: {item.notary.name}
-                                    </Badge>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground italic text-xs">-</span>
-                          )}
-                        </td>
-                        <td className="p-4 align-top pt-5">
-                          {ord.consultants && ord.consultants.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {ord.consultants.map((c: any) => (
-                                <Badge key={c.id} variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-medium flex items-center gap-1">
-                                  <UserCheck className="h-3 w-3 text-emerald-600" />
-                                  {c.name}
-                                </Badge>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground italic text-xs">No consultant assigned</span>
-                          )}
-                        </td>
-                        <td className="p-4 text-right font-mono font-bold text-sm text-foreground align-top pt-5">
-                          {formatCurrency(ord.total_amount)}
-                        </td>
-                        <td className="p-4 text-center align-top pt-5">
-                          <div className="flex flex-col items-center gap-1.5 justify-center">
-                            <Badge className={`${getPaymentStatusColor(ord.payment_status)} font-bold font-mono border text-[11px]`}>
-                              {ord.payment_status || "UNPAID"}
-                            </Badge>
-                            {ord.payment_status !== "PAID" && ord.is_proforma_finalized && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-6 px-2 text-[10px] gap-1 font-bold border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30 shadow-sm"
-                                onClick={async () => {
-                                  if (ord.payment_link) {
-                                    navigator.clipboard.writeText(ord.payment_link);
-                                    toast.success("Payment link copied to clipboard!");
-                                    return;
-                                  }
-                                  const activeToken = localStorage.getItem("hrms_token");
-                                  const toastId = toast.loading("Generating secure payment link...");
-                                  try {
-                                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${ord.order_number}/payment-link`, {
-                                      method: "POST",
-                                      headers: {
-                                        "Authorization": `Bearer ${activeToken}`
-                                      }
-                                    });
-                                    if (res.ok) {
-                                      const data = await res.json();
-                                      toast.success("Payment link generated and copied to clipboard!", { id: toastId });
-                                      setOrders(prev => prev.map(o => o.order_number === ord.order_number ? { ...o, payment_link: data.payment_link } : o));
-                                      navigator.clipboard.writeText(data.payment_link);
-                                    } else {
-                                      toast.error("Failed to generate payment link", { id: toastId });
-                                    }
-                                  } catch (err) {
-                                    console.error(err);
-                                    toast.error("Error generating payment link", { id: toastId });
-                                  }
-                                }}
-                              >
-                                <Link2 className="h-3 w-3" /> Copy Link
-                              </Button>
                             )}
-                          </div>
-                        </td>
-                        <td className="p-4 text-center align-top pt-5">
-                          <Badge className={`${getOrderStatusColor(ord.status)} font-bold border text-[11px]`}>
-                            {ord.status || "CONFIRMED"}
-                          </Badge>
-                        </td>
-                        <td className="p-4 text-right space-x-1 align-top pt-5">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            title="Edit Order & Consultants"
-                            onClick={() => router.push(`/business/clients/orders/${ord.order_number}/edit`)}
-                          >
-                            <Edit className="h-4 w-4 text-blue-600 hover:text-blue-700" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            title="View Order Details"
-                            onClick={() => {
-                              setSelectedOrderGroup(ord);
-                              const pct = ord.proforma_stage_percent || 70;
-                              setProformaPercent(pct);
-                              setTempPercent(String(pct));
-                              setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
-                              setIsPph21(false);
-                              setIsViewOpen(true);
-                              fetchProgressUpdates(ord.order_number);
-                            }}
-                          >
-                            <Eye className="h-4 w-4 text-slate-500 hover:text-foreground" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            title="Order Chat"
-                            onClick={() => {
-                              setSelectedOrderGroup(ord);
-                              setIsChatOpen(true);
-                              fetchProgressUpdates(ord.order_number);
-                            }}
-                          >
-                            <MessageSquare className="h-4 w-4 text-emerald-600 hover:text-emerald-700" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            title="Delete Order"
-                            onClick={() => {
-                              setSelectedOrderGroup(ord);
-                              setIsDeleteOpen(true);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive/70 hover:text-destructive" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination Controls */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
-                  <div className="text-xs text-muted-foreground">
-                    Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
-                    <span className="font-medium text-foreground">{Math.min(filteredOrders.length, endIndex)}</span> of{" "}
-                    <span className="font-medium text-foreground">{filteredOrders.length}</span> entries
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                      className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
-                    >
-                      Previous
-                    </Button>
-                    <span className="text-xs text-muted-foreground px-2">
-                      Page {currentPage} of {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                      className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
-                    >
-                      Next
-                    </Button>
-                  </div>
+                          </td>
+                          <td className="p-4 font-bold text-foreground text-sm align-top pt-5">
+                            <div>{ord.company_name || "Personal Client Account"}</div>
+                            <div className="text-xs font-normal text-muted-foreground flex items-center gap-1 mt-1">
+                              <Building className="h-3 w-3 text-muted-foreground" /> {ord.client_name || "Representative"}
+                            </div>
+                          </td>
+                          <td className="p-4 align-top pt-5">
+                            {ord.items && ord.items.length > 0 ? (
+                              <div className="space-y-1.5 max-w-sm">
+                                {ord.items.map((item: any, idx: number) => (
+                                  <div key={idx} className="flex flex-wrap items-center gap-1.5 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
+                                    <span className="font-semibold text-foreground text-xs leading-normal break-words">
+                                      {item.job_title}
+                                    </span>
+                                    {item.job_id && (
+                                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                        {item.job_id}
+                                      </Badge>
+                                    )}
+                                    {item.branch_name && (
+                                      <Badge variant="outline" className="text-[9px] font-medium py-0 px-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 shrink-0">
+                                        {item.branch_name}
+                                      </Badge>
+                                    )}
+                                    {item.notary && (
+                                      <Badge variant="outline" className="text-[9px] font-bold py-0 px-1.5 bg-indigo-500/5 text-indigo-600 border-indigo-500/20 shrink-0">
+                                        Notary: {item.notary.name}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground italic text-xs">-</span>
+                            )}
+                          </td>
+                          <td className="p-4 align-top pt-5">
+                            {ord.consultants && ord.consultants.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {ord.consultants.map((c: any) => (
+                                  <Badge key={c.id} variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-medium flex items-center gap-1">
+                                    <UserCheck className="h-3 w-3 text-emerald-600" />
+                                    {c.name}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground italic text-xs">No consultant assigned</span>
+                            )}
+                          </td>
+                          <td className="p-4 text-right font-mono font-bold text-sm text-foreground align-top pt-5">
+                            {formatCurrency(ord.total_amount)}
+                          </td>
+                          <td className="p-4 text-center align-top pt-5">
+                            <div className="flex flex-col items-center gap-1.5 justify-center">
+                              <Badge className={`${getPaymentStatusColor(ord.payment_status)} font-bold font-mono border text-[11px]`}>
+                                {ord.payment_status || "UNPAID"}
+                              </Badge>
+                              {isPaymentActionVisible(ord) && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-6 px-2 text-[10px] gap-1 font-bold border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30 shadow-sm"
+                                    onClick={async () => {
+                                      if (ord.payment_link) {
+                                        navigator.clipboard.writeText(ord.payment_link);
+                                        toast.success("Payment link copied to clipboard!");
+                                        return;
+                                      }
+                                      const activeToken = localStorage.getItem("hrms_token");
+                                      const toastId = toast.loading("Generating secure payment link...");
+                                      try {
+                                        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${ord.order_number}/payment-link`, {
+                                          method: "POST",
+                                          headers: {
+                                            "Authorization": `Bearer ${activeToken}`
+                                          }
+                                        });
+                                        if (res.ok) {
+                                          const data = await res.json();
+                                          toast.success("Payment link generated and copied to clipboard!", { id: toastId });
+                                          setOrders(prev => prev.map(o => o.order_number === ord.order_number ? { ...o, payment_link: data.payment_link } : o));
+                                          navigator.clipboard.writeText(data.payment_link);
+                                        } else {
+                                          toast.error("Failed to generate payment link", { id: toastId });
+                                        }
+                                      } catch (err) {
+                                        console.error(err);
+                                        toast.error("Error generating payment link", { id: toastId });
+                                      }
+                                    }}
+                                  >
+                                    <Link2 className="h-3 w-3" /> Copy Link
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-6 px-2 text-[10px] gap-1 font-bold border-indigo-500/20 bg-indigo-500/5 text-indigo-600 hover:bg-indigo-500/10 hover:text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/30 shadow-sm"
+                                    onClick={async () => {
+                                      const activeToken = localStorage.getItem("hrms_token");
+                                      const toastId = toast.loading("Verifying payment with Xendit...");
+                                      try {
+                                        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${ord.order_number}/sync-payment`, {
+                                          method: "POST",
+                                          headers: { "Authorization": `Bearer ${activeToken}` }
+                                        });
+                                        const data = await res.json();
+                                        if (res.ok && data.status === "success") {
+                                          toast.success(data.message || "Payment verified and updated!", { id: toastId });
+                                          fetchData();
+                                        } else if (res.ok && data.status === "received") {
+                                          toast.info(`Payment status on Xendit: ${data.xendit_status || "PENDING"}`, { id: toastId });
+                                        } else {
+                                          toast.info(data.detail || data.message || "No payment detected yet", { id: toastId });
+                                        }
+                                      } catch (err) {
+                                        console.error(err);
+                                        toast.error("Error verifying payment", { id: toastId });
+                                      }
+                                    }}
+                                  >
+                                    <RefreshCw className="h-3 w-3" /> Check Payment
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-4 text-center align-top pt-5">
+                            <Badge className={`${getOrderStatusColor(ord.status)} font-bold border text-[11px]`}>
+                              {ord.status || "CONFIRMED"}
+                            </Badge>
+                          </td>
+                          <td className="p-4 text-right space-x-1 align-top pt-5">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="Edit Order & Consultants"
+                              onClick={() => router.push(`/business/clients/orders/${ord.order_number}/edit`)}
+                            >
+                              <Edit className="h-4 w-4 text-blue-600 hover:text-blue-700" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="View Order Details"
+                              onClick={() => {
+                                setSelectedOrderGroup(ord);
+                                const pct = ord.proforma_stage_percent || 70;
+                                setProformaPercent(pct);
+                                setTempPercent(String(pct));
+                                if (ord.proforma_paid_amount != null && ord.proforma_paid_amount > 0) {
+                                  setTempAmount(String(Math.round(ord.proforma_paid_amount)));
+                                } else {
+                                  setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
+                                }
+                                setIsPph21(false);
+                                setIsViewOpen(true);
+                                fetchProgressUpdates(ord.order_number);
+                              }}
+                            >
+                              <Eye className="h-4 w-4 text-slate-500 hover:text-foreground" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="Order Chat"
+                              onClick={() => {
+                                setSelectedOrderGroup(ord);
+                                setIsChatOpen(true);
+                                fetchProgressUpdates(ord.order_number);
+                              }}
+                            >
+                              <MessageSquare className="h-4 w-4 text-emerald-600 hover:text-emerald-700" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="Delete Order"
+                              onClick={() => {
+                                setSelectedOrderGroup(ord);
+                                setIsDeleteOpen(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive/70 hover:text-destructive" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+                    <div className="text-xs text-muted-foreground">
+                      Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
+                      <span className="font-medium text-foreground">{Math.min(filteredOrders.length, endIndex)}</span> of{" "}
+                      <span className="font-medium text-foreground">{filteredOrders.length}</span> entries
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-xs text-muted-foreground px-2">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
 
 
 
@@ -1469,7 +1537,7 @@ export default function ClientOrdersPage() {
                   </h2>
                 </div>
 
-                 <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3">
                   <Badge variant="outline" className="font-mono text-sm font-bold px-3 py-1 bg-primary/10 border-primary/30 text-primary">
                     {selectedOrderGroup.order_number}
                   </Badge>
@@ -1491,51 +1559,90 @@ export default function ClientOrdersPage() {
                     {/* Entity & Rep Details */}
                     <div className="p-5 rounded-2xl border border-border bg-card shadow-sm space-y-4">
                       <div className="flex justify-between items-start pb-3 border-b border-border/60">
-                        <div>
+                        <div className="space-y-1">
                           <span className="text-muted-foreground block font-bold uppercase text-[10px] tracking-wider">Target Company Entity</span>
                           <span className="font-extrabold text-lg text-foreground block mt-1">{selectedOrderGroup.company_name || "Individual Account"}</span>
+                          {selectedOrderGroup.billing_company_id && selectedOrderGroup.billing_company_id !== selectedOrderGroup.company_id && (
+                            <div className="pt-1 mt-1 border-t border-border/30">
+                              <span className="text-primary block font-bold uppercase text-[9px] tracking-wider">Billed To (Invoice Recipient)</span>
+                              <span className="font-bold text-xs text-primary block">{selectedOrderGroup.billing_company_name || selectedOrderGroup.company_name}</span>
+                            </div>
+                          )}
                         </div>
                         <div className="flex flex-col items-end gap-1.5">
                           <Badge className={`${getPaymentStatusColor(selectedOrderGroup.payment_status)} font-mono font-bold text-xs uppercase px-2.5 py-1`}>
                             {selectedOrderGroup.payment_status}
                           </Badge>
-                          {selectedOrderGroup.payment_status !== "PAID" && selectedOrderGroup.is_proforma_finalized && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-6 px-2 text-[10px] gap-1 font-bold border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30"
-                              onClick={async () => {
-                                if (selectedOrderGroup.payment_link) {
-                                  navigator.clipboard.writeText(selectedOrderGroup.payment_link);
-                                  toast.success("Payment link copied to clipboard!");
-                                  return;
-                                }
-                                const activeToken = localStorage.getItem("hrms_token");
-                                const toastId = toast.loading("Generating secure payment link...");
-                                try {
-                                  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/payment-link`, {
-                                    method: "POST",
-                                    headers: {
-                                      "Authorization": `Bearer ${activeToken}`
-                                    }
-                                  });
-                                  if (res.ok) {
-                                    const data = await res.json();
-                                    toast.success("Payment link generated and copied to clipboard!", { id: toastId });
-                                    setSelectedOrderGroup((prev: any) => prev ? { ...prev, payment_link: data.payment_link } : null);
-                                    setOrders(prev => prev.map(o => o.order_number === selectedOrderGroup.order_number ? { ...o, payment_link: data.payment_link } : o));
-                                    navigator.clipboard.writeText(data.payment_link);
-                                  } else {
-                                    toast.error("Failed to generate payment link", { id: toastId });
+                          {isPaymentActionVisible(selectedOrderGroup) && (
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-2 text-[10px] gap-1 font-bold border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30"
+                                onClick={async () => {
+                                  if (selectedOrderGroup.payment_link) {
+                                    navigator.clipboard.writeText(selectedOrderGroup.payment_link);
+                                    toast.success("Payment link copied to clipboard!");
+                                    return;
                                   }
-                                } catch (err) {
-                                  console.error(err);
-                                  toast.error("Error generating payment link", { id: toastId });
-                                }
-                              }}
-                            >
-                              <Link2 className="h-3 w-3" /> Copy Link
-                            </Button>
+                                  const activeToken = localStorage.getItem("hrms_token");
+                                  const toastId = toast.loading("Generating secure payment link...");
+                                  try {
+                                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/payment-link`, {
+                                      method: "POST",
+                                      headers: {
+                                        "Authorization": `Bearer ${activeToken}`
+                                      }
+                                    });
+                                    if (res.ok) {
+                                      const data = await res.json();
+                                      toast.success("Payment link generated and copied to clipboard!", { id: toastId });
+                                      setSelectedOrderGroup((prev: any) => prev ? { ...prev, payment_link: data.payment_link } : null);
+                                      setOrders(prev => prev.map(o => o.order_number === selectedOrderGroup.order_number ? { ...o, payment_link: data.payment_link } : o));
+                                      navigator.clipboard.writeText(data.payment_link);
+                                    } else {
+                                      toast.error("Failed to generate payment link", { id: toastId });
+                                    }
+                                  } catch (err) {
+                                    console.error(err);
+                                    toast.error("Error generating payment link", { id: toastId });
+                                  }
+                                }}
+                              >
+                                <Link2 className="h-3 w-3" /> Copy Link
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-2 text-[10px] gap-1 font-bold border-indigo-500/20 bg-indigo-500/5 text-indigo-600 hover:bg-indigo-500/10 hover:text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/30"
+                                onClick={async () => {
+                                  const activeToken = localStorage.getItem("hrms_token");
+                                  const toastId = toast.loading("Verifying payment with Xendit...");
+                                  try {
+                                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/sync-payment`, {
+                                      method: "POST",
+                                      headers: { "Authorization": `Bearer ${activeToken}` }
+                                    });
+                                    const data = await res.json();
+                                    if (res.ok && data.status === "success") {
+                                      toast.success(data.message || "Payment verified and updated!", { id: toastId });
+                                      setSelectedOrderGroup((prev: any) => prev ? { ...prev, payment_status: data.payment_status || "PARTIALLY_PAID" } : null);
+                                      fetchData();
+                                      fetchProgressUpdates(selectedOrderGroup.order_number);
+                                    } else if (res.ok && data.status === "received") {
+                                      toast.info(`Payment status on Xendit: ${data.xendit_status || "PENDING"}`, { id: toastId });
+                                    } else {
+                                      toast.info(data.detail || data.message || "No payment detected yet", { id: toastId });
+                                    }
+                                  } catch (err) {
+                                    console.error(err);
+                                    toast.error("Error verifying payment", { id: toastId });
+                                  }
+                                }}
+                              >
+                                <RefreshCw className="h-3 w-3" /> Check Payment
+                              </Button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -1673,6 +1780,26 @@ export default function ClientOrdersPage() {
                           </div>
                         </div>
                       )}
+
+                      {/* Recorded Manual Proforma Paid Amount Notice */}
+                      {selectedOrderGroup.proforma_paid_amount != null && selectedOrderGroup.proforma_paid_amount > 0 && (
+                        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                              <DollarSign className="h-4 w-4 text-amber-600" /> Recorded Proforma Paid:
+                            </span>
+                            <Badge variant="outline" className="font-mono font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40">
+                              {formatCurrency(selectedOrderGroup.proforma_paid_amount)}
+                            </Badge>
+                          </div>
+                          <div className="text-[11px] text-muted-foreground flex justify-between pt-1 border-t border-amber-500/20 font-mono">
+                            <span>Remaining Final Balance:</span>
+                            <span className="font-bold text-foreground">
+                              {formatCurrency(Math.max(0, selectedOrderGroup.total_amount - selectedOrderGroup.proforma_paid_amount))}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Action Bar */}
@@ -1728,8 +1855,13 @@ export default function ClientOrdersPage() {
                                         {item.job_title}
                                       </span>
                                       {item.job_id && (
-                                        <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                        <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 bg-primary/5 text-primary border-primary/20 shrink-0">
                                           {item.job_id}
+                                        </Badge>
+                                      )}
+                                      {item.branch_name && (
+                                        <Badge variant="outline" className="text-[9px] font-medium py-0 px-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 shrink-0">
+                                          {item.branch_name}
                                         </Badge>
                                       )}
                                       {item.pricing_tier && (
@@ -1779,23 +1911,67 @@ export default function ClientOrdersPage() {
                       </table>
                     </div>
 
-                    {/* Grand Total Bar */}
-                    <div className="flex justify-between items-center p-5 rounded-2xl border border-primary/20 bg-primary/5 dark:bg-primary/10 shadow-sm">
-                      <span className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
-                        <DollarSign className="h-5 w-5 text-primary" /> Total Agreed Contract Value:
-                      </span>
-                      <span className="text-xl sm:text-2xl font-extrabold font-mono text-primary">{formatCurrency(selectedOrderGroup.total_amount)}</span>
-                    </div>
+                    {/* Financial Summary Breakdown Cards */}
+                    {(() => {
+                      const isFinalized = !!selectedOrderGroup.is_proforma_finalized;
+                      const isRecorded = selectedOrderGroup.proforma_paid_amount != null && selectedOrderGroup.proforma_paid_amount > 0;
+                      const hasProformaStage = isFinalized || isRecorded;
+
+                      const actualPaid = isRecorded
+                        ? selectedOrderGroup.proforma_paid_amount
+                        : isFinalized
+                          ? (selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100
+                          : 0;
+
+                      const remainingDue = hasProformaStage
+                        ? Math.max(0, selectedOrderGroup.total_amount - actualPaid)
+                        : null;
+
+                      return (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="p-4 rounded-xl border border-border/60 bg-card shadow-xs space-y-1">
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">Agreed Contract Value</span>
+                            <span className="text-lg font-extrabold font-mono text-foreground block">{formatCurrency(selectedOrderGroup.total_amount)}</span>
+                          </div>
+                          <div className="p-4 rounded-xl border border-amber-500/25 bg-amber-500/5 dark:bg-amber-500/10 shadow-xs space-y-1">
+                            <span className="text-[10px] uppercase font-bold text-amber-700 dark:text-amber-400 block">
+                              {isRecorded
+                                ? "Proforma Paid (Recorded)"
+                                : isFinalized
+                                  ? `Proforma Due (${selectedOrderGroup.proforma_stage_percent}%)`
+                                  : "Proforma Due"}
+                            </span>
+                            <span className="text-lg font-extrabold font-mono text-amber-600 block">
+                              {hasProformaStage ? (
+                                formatCurrency(actualPaid)
+                              ) : (
+                                <span className="text-muted-foreground/60 text-base font-normal font-sans">—</span>
+                              )}
+                            </span>
+                          </div>
+                          <div className="p-4 rounded-xl border border-blue-500/25 bg-blue-500/5 dark:bg-blue-500/10 shadow-xs space-y-1">
+                            <span className="text-[10px] uppercase font-bold text-blue-700 dark:text-blue-400 block">Remaining Final Balance</span>
+                            <span className="text-lg font-extrabold font-mono text-blue-600 block">
+                              {remainingDue != null ? (
+                                formatCurrency(remainingDue)
+                              ) : (
+                                <span className="text-muted-foreground/60 text-base font-normal font-sans">—</span>
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                   </div>
 
                 </div>
 
-              </div> 
-            {/* End of Scrollable Content Body */}
+              </div>
+              {/* End of Scrollable Content Body */}
 
-          </div>
-        </motion.div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -1882,9 +2058,9 @@ export default function ClientOrdersPage() {
                           className="w-full text-left px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground flex items-center gap-2 transition-colors"
                         >
                           {item.type === "team" ? (
-                            <div 
+                            <div
                               className="h-6 w-6 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 border"
-                              style={{ 
+                              style={{
                                 backgroundColor: `${item.color || "#10b981"}15`,
                                 color: item.color || "#10b981",
                                 borderColor: `${item.color || "#10b981"}40`
@@ -2074,11 +2250,13 @@ export default function ClientOrdersPage() {
                     <div className="grid grid-cols-2 gap-6 p-5 rounded-xl bg-slate-50 border border-slate-200 text-sm">
                       <div className="space-y-1">
                         <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider block mb-1">BILLED TO (CLIENT ENTITY)</span>
-                        <h4 className="text-lg font-bold text-slate-900">{selectedOrderGroup.company_name || "Client Entity"}</h4>
-                        <p className="text-slate-700 font-medium">
-                          Attention: <span className="font-bold text-slate-900">{selectedOrderGroup.client_name || "Key Representative"}</span>
-                        </p>
-                        <p className="text-slate-500 text-xs">Reference Contract #: <span className="font-mono font-bold text-slate-800">{selectedOrderGroup.order_number}</span></p>
+                        <h4 className="text-lg font-bold text-slate-900">{selectedOrderGroup.billing_company_name || selectedOrderGroup.company_name || "Client Entity"}</h4>
+                        {selectedOrderGroup.billing_company_id && selectedOrderGroup.billing_company_id !== selectedOrderGroup.company_id && (
+                          <p className="text-xs text-slate-500 font-semibold">
+                            Target Company Entity: <span className="font-bold text-slate-700">{selectedOrderGroup.company_name}</span>
+                          </p>
+                        )}
+                        <p className="text-slate-500 text-xs mt-1">Reference Contract #: <span className="font-mono font-bold text-slate-800">{selectedOrderGroup.order_number}</span></p>
                       </div>
 
                       <div className="text-right border-l border-slate-200 pl-6 space-y-1">
@@ -2094,8 +2272,9 @@ export default function ClientOrdersPage() {
                         <thead>
                           <tr className="bg-slate-100 border-b border-slate-200 text-slate-600 font-bold uppercase text-xs tracking-wider">
                             <th className="p-3 w-12 text-center">#</th>
-                            <th className="p-3 w-28">Pricing Tier</th>
                             <th className="p-3">Service Line Item</th>
+                            <th className="p-3 w-36">Branch / Reference</th>
+                            <th className="p-3 w-28">Pricing Tier</th>
                             <th className="p-3 text-right">Contract Price</th>
                             <th className="p-3 text-right text-emerald-700 font-extrabold">Proforma Amount ({proformaPercent}%)</th>
                           </tr>
@@ -2107,7 +2286,6 @@ export default function ClientOrdersPage() {
                             return (
                               <tr key={item.id || idx} className="hover:bg-slate-50/60">
                                 <td className="p-3 text-center font-mono font-bold text-slate-450">{idx + 1}</td>
-                                <td className="p-3 font-mono font-semibold text-slate-600 w-28">{item.pricing_tier}</td>
                                 <td className="p-3">
                                   <div className="flex flex-wrap items-center gap-2">
                                     <span className="font-extrabold text-slate-900 text-base leading-tight">{item.job_title}</span>
@@ -2123,6 +2301,16 @@ export default function ClientOrdersPage() {
                                     return formatInvoiceDescription(desc);
                                   })()}
                                 </td>
+                                <td className="p-3 text-xs font-semibold text-slate-700 w-36">
+                                  {item.branch_name ? (
+                                    <span className="inline-block px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800 font-mono text-[11px] font-bold">
+                                      {item.branch_name}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 font-mono text-xs">-</span>
+                                  )}
+                                </td>
+                                <td className="p-3 font-mono font-semibold text-slate-600 w-28">{item.pricing_tier}</td>
                                 <td className="p-3 text-right font-mono font-bold text-slate-700">{formatCurrency(lineFullPrice)}</td>
                                 <td className="p-3 text-right font-mono font-bold text-emerald-700 bg-emerald-50/50">
                                   {formatCurrency(lineProformaPrice)}
@@ -2143,8 +2331,9 @@ export default function ClientOrdersPage() {
                           <ShieldCheck className="h-4 w-4 text-emerald-600" /> Official Bank Transfer Account
                         </span>
                         <p className="text-slate-700 font-semibold">Bank Name: <span className="font-bold text-slate-900">Bank Central Asia (BCA)</span></p>
-                        <p className="text-slate-700 font-semibold">Account Name: <span className="font-bold text-slate-900">PT Mandiri Cipta Solusi</span></p>
-                        <p className="text-slate-700 font-semibold">Account Number: <span className="font-mono font-bold text-slate-900">884-0192-3841</span></p>
+                        <p className="text-slate-700 font-semibold">Account Name: <span className="font-bold text-slate-900">PT MANDIRI CIPTA SOLUSI</span></p>
+                        <p className="text-slate-700 font-semibold">Account Number: <span className="font-mono font-bold text-slate-900">591-011-2998</span></p>
+                        <p className="text-slate-700 font-semibold">SWIFT Code: <span className="font-mono font-bold text-slate-900">CENAIDJA</span></p>
                       </div>
 
                       {/* Total Calculations */}
@@ -2331,11 +2520,13 @@ export default function ClientOrdersPage() {
                     <div className="grid grid-cols-2 gap-6 p-5 rounded-xl bg-slate-50 border border-slate-200 text-sm">
                       <div className="space-y-1">
                         <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider block mb-1">BILLED TO (CLIENT ENTITY)</span>
-                        <h4 className="text-lg font-bold text-slate-900">{selectedOrderGroup.company_name || "Client Entity"}</h4>
-                        <p className="text-slate-700 font-medium">
-                          Attention: <span className="font-bold text-slate-900">{selectedOrderGroup.client_name || "Key Representative"}</span>
-                        </p>
-                        <p className="text-slate-500 text-xs">Reference Contract #: <span className="font-mono font-bold text-slate-800">{selectedOrderGroup.order_number}</span></p>
+                        <h4 className="text-lg font-bold text-slate-900">{selectedOrderGroup.billing_company_name || selectedOrderGroup.company_name || "Client Entity"}</h4>
+                        {selectedOrderGroup.billing_company_id && selectedOrderGroup.billing_company_id !== selectedOrderGroup.company_id && (
+                          <p className="text-xs text-slate-500 font-semibold">
+                            Target Company Entity: <span className="font-bold text-slate-700">{selectedOrderGroup.company_name}</span>
+                          </p>
+                        )}
+                        <p className="text-slate-500 text-xs mt-1">Reference Contract #: <span className="font-mono font-bold text-slate-800">{selectedOrderGroup.order_number}</span></p>
                       </div>
 
                       <div className="text-right border-l border-slate-200 pl-6 space-y-1">
@@ -2351,8 +2542,9 @@ export default function ClientOrdersPage() {
                         <thead>
                           <tr className="bg-slate-100 border-b border-slate-200 text-slate-600 font-bold uppercase text-xs tracking-wider">
                             <th className="p-3 w-12 text-center">#</th>
-                            <th className="p-3 w-28">Pricing Tier</th>
                             <th className="p-3">Service Line Item</th>
+                            <th className="p-3 w-36">Branch / Reference</th>
+                            <th className="p-3 w-28">Pricing Tier</th>
                             <th className="p-3 text-right">Contract Price</th>
                           </tr>
                         </thead>
@@ -2362,7 +2554,6 @@ export default function ClientOrdersPage() {
                             return (
                               <tr key={item.id || idx} className="hover:bg-slate-50/60">
                                 <td className="p-3 text-center font-mono font-bold text-slate-450">{idx + 1}</td>
-                                <td className="p-3 font-mono font-semibold text-slate-600 w-28">{item.pricing_tier}</td>
                                 <td className="p-3">
                                   <div className="flex flex-wrap items-center gap-2">
                                     <span className="font-extrabold text-slate-900 text-base leading-tight">{item.job_title}</span>
@@ -2378,6 +2569,16 @@ export default function ClientOrdersPage() {
                                     return formatInvoiceDescription(desc);
                                   })()}
                                 </td>
+                                <td className="p-3 text-xs font-semibold text-slate-700 w-36">
+                                  {item.branch_name ? (
+                                    <span className="inline-block px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800 font-mono text-[11px] font-bold">
+                                      {item.branch_name}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 font-mono text-xs">-</span>
+                                  )}
+                                </td>
+                                <td className="p-3 font-mono font-semibold text-slate-600 w-28">{item.pricing_tier}</td>
                                 <td className="p-3 text-right font-mono font-bold text-slate-700">{formatCurrency(lineFullPrice)}</td>
                               </tr>
                             );
@@ -2395,37 +2596,44 @@ export default function ClientOrdersPage() {
                           <ShieldCheck className="h-4 w-4 text-emerald-600" /> Official Bank Transfer Account
                         </span>
                         <p className="text-slate-700 font-semibold">Bank Name: <span className="font-bold text-slate-900">Bank Central Asia (BCA)</span></p>
-                        <p className="text-slate-700 font-semibold">Account Name: <span className="font-bold text-slate-900">PT Mandiri Cipta Solusi</span></p>
-                        <p className="text-slate-700 font-semibold">Account Number: <span className="font-mono font-bold text-slate-900">884-0192-3841</span></p>
+                        <p className="text-slate-700 font-semibold">Account Name: <span className="font-bold text-slate-900">PT MANDIRI CIPTA SOLUSI</span></p>
+                        <p className="text-slate-700 font-semibold">Account Number: <span className="font-mono font-bold text-slate-900">591-011-2998</span></p>
+                        <p className="text-slate-700 font-semibold">SWIFT Code: <span className="font-mono font-bold text-slate-900">CENAIDJA</span></p>
                       </div>
 
                       {/* Total Calculations */}
-                      <div className="w-full sm:w-96 space-y-2 text-sm font-mono">
-                        <div className="flex justify-between py-1 border-b border-slate-200 text-slate-650">
-                          <span>Total Contract Value:</span>
-                          <span className="font-bold text-slate-900">{formatCurrency(selectedOrderGroup.total_amount)}</span>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-slate-200 text-slate-650">
-                          <span>Less: Proforma Paid ({selectedOrderGroup.proforma_stage_percent || proformaPercent}%):</span>
-                          <span className="font-bold text-amber-600">-{formatCurrency((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100)}</span>
-                        </div>
-                        {isPph21 && (
-                          <div className="flex justify-between py-1 border-b border-slate-200 text-red-650 font-bold">
-                            <span>WHT PPh 21 (2% Deduction):</span>
-                            <span>-{formatCurrency((selectedOrderGroup.total_amount - ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100)) * 0.02)}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between py-3 px-4 rounded-lg bg-blue-600 text-white text-base font-extrabold shadow-sm">
-                          <span>Total Amount Due:</span>
-                          <span>
-                            {formatCurrency(
-                              isPph21
-                                ? (selectedOrderGroup.total_amount - ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100)) * 0.98
-                                : selectedOrderGroup.total_amount - ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100)
+                      {(() => {
+                        const proformaDeduction = (selectedOrderGroup.proforma_paid_amount !== undefined && selectedOrderGroup.proforma_paid_amount !== null && selectedOrderGroup.proforma_paid_amount > 0)
+                          ? selectedOrderGroup.proforma_paid_amount
+                          : ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100);
+                        const isCustomProforma = (selectedOrderGroup.proforma_paid_amount !== undefined && selectedOrderGroup.proforma_paid_amount !== null && selectedOrderGroup.proforma_paid_amount > 0);
+                        const subtotalAfterDeduction = Math.max(0, selectedOrderGroup.total_amount - proformaDeduction);
+                        const pph21Val = isPph21 ? subtotalAfterDeduction * 0.02 : 0;
+                        const finalDue = subtotalAfterDeduction - pph21Val;
+
+                        return (
+                          <div className="w-full sm:w-96 space-y-2 text-sm font-mono">
+                            <div className="flex justify-between py-1 border-b border-slate-200 text-slate-650">
+                              <span>Total Contract Value:</span>
+                              <span className="font-bold text-slate-900">{formatCurrency(selectedOrderGroup.total_amount)}</span>
+                            </div>
+                            <div className="flex justify-between py-1 border-b border-slate-200 text-slate-650">
+                              <span>Less: Proforma Paid {isCustomProforma ? "(Custom Received)" : `(${selectedOrderGroup.proforma_stage_percent || proformaPercent}%)`}:</span>
+                              <span className="font-bold text-amber-600">-{formatCurrency(proformaDeduction)}</span>
+                            </div>
+                            {isPph21 && (
+                              <div className="flex justify-between py-1 border-b border-slate-200 text-red-650 font-bold">
+                                <span>WHT PPh 21 (2% Deduction):</span>
+                                <span>-{formatCurrency(pph21Val)}</span>
+                              </div>
                             )}
-                          </span>
-                        </div>
-                      </div>
+                            <div className="flex justify-between py-3 px-4 rounded-lg bg-blue-600 text-white text-base font-extrabold shadow-sm">
+                              <span>Total Amount Due:</span>
+                              <span>{formatCurrency(finalDue)}</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                   </div>
@@ -2531,7 +2739,7 @@ export default function ClientOrdersPage() {
               {viewingTeam?.description || "No description provided for this team."}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
             {/* Team Leader */}
             <div className="flex items-center gap-2.5 bg-muted/40 p-3 rounded-xl border border-border/30">
@@ -2570,7 +2778,7 @@ export default function ClientOrdersPage() {
               )}
             </div>
           </div>
-          
+
           <DialogFooter className="p-4 border-t border-border/60 bg-muted/5 shrink-0">
             <Button variant="outline" size="sm" onClick={() => setViewingTeam(null)} className="w-full sm:w-auto font-semibold">
               Close

@@ -243,6 +243,59 @@ def run_migrations():
                 conn.rollback()
                 handle_migration_error(col, "client_orders", e)
 
+        # Add proforma_paid_amount to client_orders
+        try:
+            conn.execute(text("ALTER TABLE client_orders ADD COLUMN proforma_paid_amount FLOAT DEFAULT NULL"))
+            conn.commit()
+            print("Added column 'proforma_paid_amount' to 'client_orders' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("proforma_paid_amount", "client_orders", e)
+
+        # Add billing_company_id to client_orders
+        try:
+            conn.execute(text("ALTER TABLE client_orders ADD COLUMN billing_company_id INTEGER REFERENCES client_companies(id) ON DELETE SET NULL"))
+            conn.commit()
+            print("Added column 'billing_company_id' to 'client_orders' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("billing_company_id", "client_orders", e)
+
+        # Add branch_name to client_orders
+        try:
+            conn.execute(text("ALTER TABLE client_orders ADD COLUMN branch_name VARCHAR(255) DEFAULT NULL"))
+            conn.commit()
+            print("Added column 'branch_name' to 'client_orders' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("branch_name", "client_orders", e)
+
+        # Add notary_payout_id to client_orders
+        try:
+            conn.execute(text("ALTER TABLE client_orders ADD COLUMN notary_payout_id VARCHAR(255) DEFAULT NULL"))
+            conn.commit()
+            print("Added column 'notary_payout_id' to 'client_orders' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("notary_payout_id", "client_orders", e)
+
+        # Add bank details columns to notaries
+        notary_bank_cols = [
+            ("bank_name", "VARCHAR(255) DEFAULT NULL"),
+            ("bank_account_number", "VARCHAR(255) DEFAULT NULL"),
+            ("bank_account_holder_name", "VARCHAR(255) DEFAULT NULL"),
+            ("bank_branch", "VARCHAR(255) DEFAULT NULL"),
+            ("bank_swift_code", "VARCHAR(255) DEFAULT NULL")
+        ]
+        for col, col_type in notary_bank_cols:
+            try:
+                conn.execute(text(f"ALTER TABLE notaries ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                print(f"Added column '{col}' to 'notaries' table.")
+            except Exception as e:
+                conn.rollback()
+                handle_migration_error(col, "notaries", e)
+
     print("Migration check complete.")
 
 if __name__ == "__main__":

@@ -816,6 +816,7 @@ class ClientOrderItemCreate(BaseModel):
     service_id: Optional[int] = None
     job_id: Optional[str] = None
     job_title: str
+    branch_name: Optional[str] = None
     description: Optional[str] = None
     pricing_tier: str = "BASE"
     unit_price: float = 0.0
@@ -826,6 +827,7 @@ class ClientOrderItemCreate(BaseModel):
 class ClientOrderCreateRequest(BaseModel):
     client_id: Optional[int] = None
     company_id: Optional[int] = None
+    billing_company_id: Optional[int] = None
     items: List[ClientOrderItemCreate]
     consultant_ids: Optional[List[int]] = []
     notes: Optional[str] = None
@@ -837,6 +839,7 @@ class ClientOrderItemResponse(BaseModel):
     service_id: Optional[int] = None
     job_id: Optional[str] = None
     job_title: str
+    branch_name: Optional[str] = None
     description: Optional[str] = None
     pricing_tier: str
     unit_price: float
@@ -855,9 +858,11 @@ class ClientOrderResponse(BaseModel):
     order_number: Optional[str] = None
     client_id: int
     company_id: Optional[int] = None
+    billing_company_id: Optional[int] = None
     service_id: Optional[int] = None
     job_id: Optional[str] = None
     job_title: Optional[str] = "Service Package"
+    branch_name: Optional[str] = None
     description: Optional[str] = None
     pricing_tier: Optional[str] = "BASE"
     unit_price: Optional[float] = 0.0
@@ -868,6 +873,7 @@ class ClientOrderResponse(BaseModel):
     invoice_number: Optional[str] = None
     is_proforma_finalized: Optional[bool] = False
     proforma_stage_percent: Optional[int] = 50
+    proforma_paid_amount: Optional[float] = None
     is_final_invoice_finalized: Optional[bool] = False
     consultant_ids: Optional[List[int]] = []
     consultants: Optional[List[dict]] = []
@@ -878,6 +884,9 @@ class ClientOrderResponse(BaseModel):
     created_at: Optional[datetime] = None
     client_name: Optional[str] = None
     company_name: Optional[str] = None
+    billing_company_name: Optional[str] = None
+    company: Optional['ClientCompanyResponse'] = None
+    billing_company: Optional['ClientCompanyResponse'] = None
     notary_id: Optional[int] = None
     notary: Optional['NotaryResponse'] = None
     notary_fee: Optional[float] = 0.0
@@ -982,18 +991,21 @@ class AnnouncementResponse(AnnouncementBase):
 class ClientOrderUpdate(BaseModel):
     status: Optional[str] = None
     payment_status: Optional[str] = None
+    billing_company_id: Optional[int] = None
     invoice_number: Optional[str] = None
     consultant_ids: Optional[List[int]] = None
     notes: Optional[str] = None
     service_id: Optional[int] = None
     job_id: Optional[str] = None
     job_title: Optional[str] = None
+    branch_name: Optional[str] = None
     description: Optional[str] = None
     pricing_tier: Optional[str] = None
     unit_price: Optional[float] = None
     custom_price_text: Optional[str] = None
     is_proforma_finalized: Optional[bool] = None
     proforma_stage_percent: Optional[int] = None
+    proforma_paid_amount: Optional[float] = None
     is_final_invoice_finalized: Optional[bool] = None
     payment_link: Optional[str] = None
     xendit_invoice_id: Optional[str] = None
@@ -1220,6 +1232,13 @@ class NotaryBase(BaseModel):
     city: str
     status: str = "ACTIVE"
     notes: Optional[str] = None
+    
+    # Bank & Payout Information
+    bank_name: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    bank_account_holder_name: Optional[str] = None
+    bank_branch: Optional[str] = None
+    bank_swift_code: Optional[str] = None
 
 
 class NotaryCreate(NotaryBase):
@@ -1231,9 +1250,14 @@ class NotaryResponse(NotaryBase):
     created_at: datetime
     updated_at: datetime
     service_fees: List[NotaryServiceFeeResponse] = []
+    is_bank_configured: bool = False
 
     class Config:
         from_attributes = True
+
+
+class NotaryDisbursementRequest(BaseModel):
+    description: Optional[str] = None
 
 
 class TeamBase(BaseModel):

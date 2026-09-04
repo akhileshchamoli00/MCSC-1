@@ -41,7 +41,8 @@ import {
   Lock,
   Mail,
   MessageSquare,
-  Link2
+  Link2,
+  RefreshCw
 } from "lucide-react";
 import Link from "next/link";
 import { KpiCard } from "@/components/kpi-card";
@@ -71,7 +72,7 @@ export default function ClientOrdersPage() {
   const [progressUpdates, setProgressUpdates] = useState<any[]>([]);
   const [loadingProgress, setLoadingProgress] = useState(false);
   const [newProgressMessage, setNewProgressMessage] = useState("");
-  
+
   // Mentions / Tagging States
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionSearch, setSuggestionSearch] = useState("");
@@ -134,18 +135,18 @@ export default function ClientOrdersPage() {
       const filteredEmps = (employees || []).filter((emp: any) => {
         const isConsultant = consultantIds.includes(emp.id);
         const isFinance = emp.department?.name?.toLowerCase().includes("finance");
-        
+
         if (!isConsultant && !isFinance) return false;
-        
+
         const fullName = `${emp.first_name} ${emp.last_name}`.toLowerCase();
         return fullName.includes(query);
       }).map(emp => ({ ...emp, type: "employee" }));
 
       // Filter active teams
-      const filteredTeams = (teams || []).filter((t: any) => 
+      const filteredTeams = (teams || []).filter((t: any) =>
         t.is_active && t.name.toLowerCase().includes(query)
       ).map(t => ({ ...t, type: "team" }));
-      
+
       const merged = [...filteredEmps, ...filteredTeams];
       setFilteredEmployees(merged);
       setShowSuggestions(merged.length > 0);
@@ -168,7 +169,7 @@ export default function ClientOrdersPage() {
       const afterMention = val.slice(start);
       const displayName = item.type === "team" ? item.name : `${item.first_name} ${item.last_name}`;
       const insertText = `@${displayName} `;
-      
+
       const newText = beforeMention + insertText + afterMention;
       setNewProgressMessage(newText);
       setShowSuggestions(false);
@@ -184,7 +185,7 @@ export default function ClientOrdersPage() {
 
   const renderMessageContent = (msg: string) => {
     if (!msg) return null;
-    
+
     // Create mapping of name/team -> color/type
     const teamMap = new Map();
     (teams || []).forEach((t: any) => {
@@ -201,7 +202,7 @@ export default function ClientOrdersPage() {
 
     const allPatterns = [...namePatterns, ...teamPatterns]
       .map((name: string) => name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
-      
+
     if (allPatterns.length === 0) {
       const parts = msg.split(/(@[^\s,.:;!?]+)/g);
       return parts.map((part, index) => {
@@ -215,17 +216,17 @@ export default function ClientOrdersPage() {
         return part;
       });
     }
-    
+
     const escapedNamesPattern = allPatterns.join('|');
     const emailPattern = '[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+';
     const pattern = new RegExp(`(@(?:${escapedNamesPattern}|${emailPattern}))`, 'g');
-    
+
     const parts = msg.split(pattern);
     return parts.map((part, index) => {
       if (part.startsWith("@")) {
         const entityName = part.slice(1);
         const matchedTeam = teamMap.get(entityName.toLowerCase());
-        
+
         if (matchedTeam) {
           const tColor = matchedTeam.color || "#10b981";
           return (
@@ -244,7 +245,7 @@ export default function ClientOrdersPage() {
             </button>
           );
         }
-        
+
         return (
           <span key={index} className="bg-emerald-500/10 text-emerald-600 font-bold px-1.5 py-0.5 rounded-md border border-emerald-500/25 text-[10px] inline-block">
             {part}
@@ -396,7 +397,7 @@ export default function ClientOrdersPage() {
   // Auto-open chat from URL query parameter (for notifications)
   useEffect(() => {
     if (orders.length === 0) return;
-    
+
     const checkParams = () => {
       if (typeof window === "undefined") return;
       const params = new URLSearchParams(window.location.search);
@@ -437,6 +438,10 @@ export default function ClientOrdersPage() {
         client_name: ord.client_name,
         company_name: ord.company_name,
         company_id: ord.company_id,
+        billing_company_name: ord.billing_company_name || ord.company_name,
+        billing_company_id: ord.billing_company_id || ord.company_id,
+        company: ord.company,
+        billing_company: ord.billing_company,
         created_at: ord.created_at,
         status: ord.status || "CONFIRMED",
         payment_status: ord.payment_status || "UNPAID",
@@ -449,6 +454,7 @@ export default function ClientOrdersPage() {
         items: [],
         is_proforma_finalized: ord.is_proforma_finalized || false,
         proforma_stage_percent: ord.proforma_stage_percent || 50,
+        proforma_paid_amount: ord.proforma_paid_amount != null ? ord.proforma_paid_amount : null,
         is_final_invoice_finalized: ord.is_final_invoice_finalized || false
       });
     }
@@ -462,6 +468,9 @@ export default function ClientOrdersPage() {
     }
     if (ord.proforma_stage_percent) {
       group.proforma_stage_percent = ord.proforma_stage_percent;
+    }
+    if (ord.proforma_paid_amount != null) {
+      group.proforma_paid_amount = ord.proforma_paid_amount;
     }
     if (ord.is_final_invoice_finalized) {
       group.is_final_invoice_finalized = true;
@@ -675,18 +684,24 @@ export default function ClientOrdersPage() {
 
   const handleDeleteSubmit = async () => {
     const activeToken = localStorage.getItem("hrms_token");
-    if (!activeToken || !selectedOrderGroup || !selectedOrderGroup.items) return;
+    if (!activeToken || !selectedOrderGroup) return;
     setSaving(true);
     try {
-      await Promise.all(
-        selectedOrderGroup.items.map((itemRow: any) =>
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${itemRow.id}`, {
-            method: "DELETE",
-            headers: { "Authorization": `Bearer ${activeToken}` }
-          })
-        )
-      );
-      toast.success("Order deleted successfully");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/group/${selectedOrderGroup.order_number}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${activeToken}` }
+      });
+      if (!res.ok && selectedOrderGroup.items) {
+        await Promise.all(
+          selectedOrderGroup.items.map((itemRow: any) =>
+            fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${itemRow.id}`, {
+              method: "DELETE",
+              headers: { "Authorization": `Bearer ${activeToken}` }
+            })
+          )
+        );
+      }
+      toast.success("Order and chat history deleted successfully");
       setIsDeleteOpen(false);
       fetchData();
     } catch (err) {
@@ -763,6 +778,12 @@ export default function ClientOrdersPage() {
       case "PARTIALLY_PAID": return "bg-amber-500/15 text-amber-600 border-amber-500/30";
       default: return "bg-red-500/15 text-red-600 border-red-500/30";
     }
+  };
+
+  const isPaymentActionVisible = (ord: any) => {
+    if (!ord || ord.payment_status === "PAID") return false;
+    const st = (ord.status || "").toUpperCase();
+    return st === "WAITING_ON_CLIENT" || st === "WAITING_FOR_FINAL_PAYMENT" || st === "WAITING_ON_FINAL_PAYMENT";
   };
 
   const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -875,8 +896,8 @@ export default function ClientOrdersPage() {
         let errMsg = "Failed to finalize invoice";
         try {
           const err = await res.json();
-          errMsg = err.detail 
-            ? (typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail)) 
+          errMsg = err.detail
+            ? (typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail))
             : JSON.stringify(err);
         } catch (e) {
           errMsg = `Error ${res.status}: ${res.statusText}`;
@@ -914,13 +935,15 @@ export default function ClientOrdersPage() {
   const handleSendInvoiceEmail = (invoiceType: 'proforma' | 'final') => {
     if (!selectedOrderGroup) return;
 
-    // Find company & client email
-    const companyObj = companies.find((c: any) => c.id === selectedOrderGroup.company_id);
-    const clientObj = clients.find((c: any) => c.id === selectedOrderGroup.client_id || c.contact_person === selectedOrderGroup.client_name);
-    const targetEmail = companyObj?.key_contact_email || clientObj?.email || "";
+    // Find billing company & client email (prioritizing the billing company if different from target company)
+    const billingCompanyId = selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id;
+    const companyObj = companies.find((c: any) => c.id === billingCompanyId);
+    const targetCompanyObj = companies.find((c: any) => c.id === selectedOrderGroup.company_id);
+    const clientObj = clients.find((c: any) => c.id === (companyObj?.client_id || selectedOrderGroup.client_id) || c.contact_person === selectedOrderGroup.client_name);
+    const targetEmail = companyObj?.key_contact_email || targetCompanyObj?.key_contact_email || clientObj?.email || "";
 
     if (!targetEmail) {
-      toast.error("No recipient email found for this company/client.");
+      toast.error("No recipient email found for this billing company/client.");
       return;
     }
 
@@ -944,8 +967,9 @@ export default function ClientOrdersPage() {
       });
       if (res.ok) {
         toast.success(`Successfully sent ${emailConfirmType} invoice email to ${emailConfirmAddress}!`);
+        const targetStatus = emailConfirmType === 'final' ? "WAITING_FOR_FINAL_PAYMENT" : "WAITING_ON_CLIENT";
         // Update selectedOrderGroup status in UI
-        setSelectedOrderGroup((prev: any) => prev ? { ...prev, status: "WAITING_ON_CLIENT" } : null);
+        setSelectedOrderGroup((prev: any) => prev ? { ...prev, status: targetStatus } : null);
         // Refresh full list
         fetchData();
 
@@ -970,6 +994,7 @@ export default function ClientOrdersPage() {
         } catch (chatErr) {
           console.error("Error posting automated email notification to chat:", chatErr);
         }
+        fetchProgressUpdates(selectedOrderGroup.order_number);
       } else {
         const err = await res.json();
         toast.error(err.detail || `Failed to send ${emailConfirmType} invoice email`);
@@ -1261,8 +1286,8 @@ export default function ClientOrdersPage() {
         let errMsg = "Failed to finalize final invoice";
         try {
           const err = await res.json();
-          errMsg = err.detail 
-            ? (typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail)) 
+          errMsg = err.detail
+            ? (typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail))
             : JSON.stringify(err);
         } catch (e) {
           errMsg = `Error ${res.status}: ${res.statusText}`;
@@ -1278,6 +1303,7 @@ export default function ClientOrdersPage() {
         if (!prev) return prev;
         return {
           ...prev,
+          status: "INVOICE_GENERATED",
           is_final_invoice_finalized: true
         };
       });
@@ -1312,558 +1338,593 @@ export default function ClientOrdersPage() {
     <>
       <div className="space-y-6 animate-in fade-in duration-500 w-full max-w-none pb-12">
 
-      {/* Title Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <Link href="/business/clients" className="mt-1">
-            <Button variant="ghost" size="icon" title="Back to Clients">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm shrink-0 flex items-center justify-center">
-            <ShoppingCart className="h-6 w-6" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Completed Orders</h1>
-            <p className="text-muted-foreground text-sm">
-              View historical record of all completed and paid client service orders.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 w-full">
-        <KpiCard title="Total Orders" value={totalOrdersCount} icon={ShoppingCart} colorTheme="purple" />
-        <KpiCard title="Confirmed Value" value={formatCurrency(totalRevenue)} icon={DollarSign} colorTheme="sky" />
-        <KpiCard title="Actual Earnings" value={formatCurrency(totalActualEarnings)} icon={CheckCircle2} colorTheme="emerald" />
-        <KpiCard title="Notary Owed" value={formatCurrency(totalNotaryFees)} icon={Scale} colorTheme="amber" />
-        <KpiCard title="Staff Allocated" value={allocatedStaffCount} icon={Users} colorTheme="blue" />
-      </div>
-
-      {/* Main Orders Table */}
-      <Card className="border-border/50 shadow-sm overflow-hidden bg-card/60 backdrop-blur-md">
-        <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
-          <div className="relative w-full sm:w-80">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search Order ID, Company..."
-              className="pl-8 h-9 text-xs rounded-lg"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold">
-            Showing {paginatedOrders.length} of {filteredOrders.length} entries
-          </span>
-        </div>
-
-        <CardContent className="p-0">
-          {filteredOrders.length === 0 ? (
-            <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
-              <ShoppingCart className="h-10 w-10 text-muted-foreground/35" />
-              <span className="text-sm font-semibold">No Client Orders Found</span>
-              <p className="text-xs max-w-sm">Click "Create New Order" above to issue your first service order.</p>
+        {/* Title Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <Link href="/business/clients" className="mt-1">
+              <Button variant="ghost" size="icon" title="Back to Clients">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm shrink-0 flex items-center justify-center">
+              <ShoppingCart className="h-6 w-6" />
             </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                      <th className="p-4 w-12 text-center">No.</th>
-                      <th className="p-4">Order ID</th>
-                      <th className="p-4">Company Entity</th>
-                      <th className="p-4">Service Package</th>
-                      <th className="p-4">Assigned Consultants</th>
-                      <th className="p-4 text-right">Total Amount</th>
-                      <th className="p-4 text-right">Notary Fee</th>
-                      <th className="p-4 text-right">Actual Earnings</th>
-                      <th className="p-4 text-center">Payment</th>
-                      <th className="p-4 text-center">Lifecycle Status</th>
-                      <th className="p-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {paginatedOrders.map((ord, index) => (
-                       <tr key={ord.order_number || index} className="hover:bg-muted/30 transition-colors border-b last:border-0">
-                        <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5">
-                          #{startIndex + index + 1}
-                        </td>
-                        <td className="p-4 align-top pt-5">
-                          {ord.company_id ? (
-                            <Link href={`/business/clients/documents/${ord.company_id}?from=orders`}>
-                              <Badge
-                                variant="outline"
-                                className="font-mono font-bold text-xs bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary cursor-pointer transition-colors"
-                                title="Go to Company Documents Folder"
-                              >
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Completed Orders</h1>
+              <p className="text-muted-foreground text-sm">
+                View historical record of all completed and paid client service orders.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Metrics Cards Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 w-full">
+          <KpiCard title="Total Orders" value={totalOrdersCount} icon={ShoppingCart} colorTheme="purple" />
+          <KpiCard title="Confirmed Value" value={formatCurrency(totalRevenue)} icon={DollarSign} colorTheme="sky" />
+          <KpiCard title="Actual Earnings" value={formatCurrency(totalActualEarnings)} icon={CheckCircle2} colorTheme="emerald" />
+          <KpiCard title="Notary Owed" value={formatCurrency(totalNotaryFees)} icon={Scale} colorTheme="amber" />
+          <KpiCard title="Staff Allocated" value={allocatedStaffCount} icon={Users} colorTheme="blue" />
+        </div>
+
+        {/* Main Orders Table */}
+        <Card className="border-border/50 shadow-sm overflow-hidden bg-card/60 backdrop-blur-md">
+          <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search Order ID, Company..."
+                className="pl-8 h-9 text-xs rounded-lg"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold">
+              Showing {paginatedOrders.length} of {filteredOrders.length} entries
+            </span>
+          </div>
+
+          <CardContent className="p-0">
+            {filteredOrders.length === 0 ? (
+              <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
+                <ShoppingCart className="h-10 w-10 text-muted-foreground/35" />
+                <span className="text-sm font-semibold">No Client Orders Found</span>
+                <p className="text-xs max-w-sm">Click "Create New Order" above to issue your first service order.</p>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
+                        <th className="p-4 w-12 text-center">No.</th>
+                        <th className="p-4">Order ID</th>
+                        <th className="p-4">Company Entity</th>
+                        <th className="p-4">Service Package</th>
+                        <th className="p-4">Assigned Consultants</th>
+                        <th className="p-4 text-right">Total Amount</th>
+                        <th className="p-4 text-right">Notary Fee</th>
+                        <th className="p-4 text-right">Actual Earnings</th>
+                        <th className="p-4 text-center">Payment</th>
+                        <th className="p-4 text-center">Lifecycle Status</th>
+                        <th className="p-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {paginatedOrders.map((ord, index) => (
+                        <tr key={ord.order_number || index} className="hover:bg-muted/30 transition-colors border-b last:border-0">
+                          <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5">
+                            #{startIndex + index + 1}
+                          </td>
+                          <td className="p-4 align-top pt-5">
+                            {ord.company_id ? (
+                              <Link href={`/business/clients/documents/${ord.company_id}?from=orders`}>
+                                <Badge
+                                  variant="outline"
+                                  className="font-mono font-bold text-xs bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary cursor-pointer transition-colors"
+                                  title="Go to Company Documents Folder"
+                                >
+                                  {ord.order_number}
+                                </Badge>
+                              </Link>
+                            ) : (
+                              <Badge variant="outline" className="font-mono font-bold text-xs bg-primary/10 border-primary/30 text-primary">
                                 {ord.order_number}
                               </Badge>
-                            </Link>
-                          ) : (
-                            <Badge variant="outline" className="font-mono font-bold text-xs bg-primary/10 border-primary/30 text-primary">
-                              {ord.order_number}
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="p-4 font-bold text-foreground text-sm align-top pt-5">
-                          <div>{ord.company_name || "Personal Client Account"}</div>
-                          <div className="text-xs font-normal text-muted-foreground flex items-center gap-1 mt-1">
-                            <Building className="h-3 w-3 text-muted-foreground" /> {ord.client_name || "Representative"}
-                          </div>
-                        </td>
-                        <td className="p-4 align-top pt-5">
-                          {ord.items && ord.items.length > 0 ? (
-                            <div className="space-y-1.5 max-w-sm">
-                              {ord.items.map((item: any, idx: number) => (
-                                <div key={idx} className="flex flex-wrap items-center gap-1.5 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
-                                  <span className="font-semibold text-foreground text-xs leading-normal break-words">
-                                    {item.job_title}
-                                  </span>
-                                  {item.job_id && (
-                                    <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 bg-primary/5 text-primary border-primary/20 shrink-0">
-                                      {item.job_id}
-                                    </Badge>
-                                  )}
-                                  {item.notary && (
-                                    <Badge variant="outline" className="text-[9px] font-bold py-0 px-1.5 bg-indigo-500/5 text-indigo-600 border-indigo-500/20 shrink-0">
-                                      Notary: {item.notary.name}
-                                    </Badge>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground italic text-xs">-</span>
-                          )}
-                        </td>
-                        <td className="p-4 align-top pt-5">
-                          {ord.consultants && ord.consultants.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {ord.consultants.map((c: any) => (
-                                <Badge key={c.id} variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-medium flex items-center gap-1">
-                                  <UserCheck className="h-3 w-3 text-emerald-600" />
-                                  {c.name}
-                                </Badge>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground italic text-xs">No consultant assigned</span>
-                          )}
-                        </td>
-                        <td className="p-4 text-right font-mono font-bold text-sm text-foreground align-top pt-5">
-                          {formatCurrency(ord.total_amount)}
-                        </td>
-                        <td className="p-4 text-right font-mono font-bold text-sm text-amber-600 dark:text-amber-400 align-top pt-5">
-                          {formatCurrency(ord.total_notary_fee || 0)}
-                        </td>
-                        <td className="p-4 text-right font-mono font-bold text-sm text-emerald-600 dark:text-emerald-400 align-top pt-5">
-                          {formatCurrency((ord.total_amount || 0) - (ord.total_notary_fee || 0))}
-                        </td>
-                        <td className="p-4 text-center align-top pt-5">
-                          <div className="flex flex-col items-center gap-1.5 justify-center">
-                            <Badge className={`${getPaymentStatusColor(ord.payment_status)} font-bold font-mono border text-[11px]`}>
-                              {ord.payment_status || "UNPAID"}
-                            </Badge>
-                            {ord.payment_status !== "PAID" && ord.is_proforma_finalized && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-6 px-2 text-[10px] gap-1 font-bold border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30 shadow-sm"
-                                onClick={async () => {
-                                  if (ord.payment_link) {
-                                    navigator.clipboard.writeText(ord.payment_link);
-                                    toast.success("Payment link copied to clipboard!");
-                                    return;
-                                  }
-                                  const activeToken = localStorage.getItem("hrms_token");
-                                  const toastId = toast.loading("Generating secure payment link...");
-                                  try {
-                                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${ord.order_number}/payment-link`, {
-                                      method: "POST",
-                                      headers: {
-                                        "Authorization": `Bearer ${activeToken}`
-                                      }
-                                    });
-                                    if (res.ok) {
-                                      const data = await res.json();
-                                      toast.success("Payment link generated and copied to clipboard!", { id: toastId });
-                                      setOrders(prev => prev.map(o => o.order_number === ord.order_number ? { ...o, payment_link: data.payment_link } : o));
-                                      navigator.clipboard.writeText(data.payment_link);
-                                    } else {
-                                      toast.error("Failed to generate payment link", { id: toastId });
-                                    }
-                                  } catch (err) {
-                                    console.error(err);
-                                    toast.error("Error generating payment link", { id: toastId });
-                                  }
-                                }}
-                              >
-                                <Link2 className="h-3 w-3" /> Copy Link
-                              </Button>
                             )}
-                          </div>
-                        </td>
-                        <td className="p-4 text-center align-top pt-5">
-                          <Badge className={`${getOrderStatusColor(ord.status)} font-bold border text-[11px]`}>
-                            {ord.status || "CONFIRMED"}
-                          </Badge>
-                        </td>
-                        <td className="p-4 text-right space-x-1 align-top pt-5">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            title="Edit Order & Consultants"
-                            onClick={() => handleOpenEditModal(ord)}
-                          >
-                            <Edit className="h-4 w-4 text-blue-600 hover:text-blue-700" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            title="View Order Details"
-                            onClick={() => {
-                              setSelectedOrderGroup(ord);
-                              const pct = ord.proforma_stage_percent || 70;
-                              setProformaPercent(pct);
-                              setTempPercent(String(pct));
-                              setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
-                              setIsPph21(false);
-                              setIsViewOpen(true);
-                              fetchProgressUpdates(ord.order_number);
-                            }}
-                          >
-                            <Eye className="h-4 w-4 text-slate-500 hover:text-foreground" />
-                          </Button>
-                           <Button
-                            size="icon"
-                            variant="ghost"
-                            title="Order Chat"
-                            onClick={() => {
-                              setSelectedOrderGroup(ord);
-                              setIsChatOpen(true);
-                              fetchProgressUpdates(ord.order_number);
-                            }}
-                          >
-                            <MessageSquare className="h-4 w-4 text-emerald-600 hover:text-emerald-700" />
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                          </td>
+                          <td className="p-4 font-bold text-foreground text-sm align-top pt-5">
+                            <div>{ord.company_name || "Personal Client Account"}</div>
+                            <div className="text-xs font-normal text-muted-foreground flex items-center gap-1 mt-1">
+                              <Building className="h-3 w-3 text-muted-foreground" /> {ord.client_name || "Representative"}
+                            </div>
+                          </td>
+                          <td className="p-4 align-top pt-5">
+                            {ord.items && ord.items.length > 0 ? (
+                              <div className="space-y-1.5 max-w-sm">
+                                {ord.items.map((item: any, idx: number) => (
+                                  <div key={idx} className="flex flex-wrap items-center gap-1.5 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
+                                    <span className="font-semibold text-foreground text-xs leading-normal break-words">
+                                      {item.job_title}
+                                    </span>
+                                    {item.job_id && (
+                                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                        {item.job_id}
+                                      </Badge>
+                                    )}
+                                    {item.notary && (
+                                      <Badge variant="outline" className="text-[9px] font-bold py-0 px-1.5 bg-indigo-500/5 text-indigo-600 border-indigo-500/20 shrink-0">
+                                        Notary: {item.notary.name}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground italic text-xs">-</span>
+                            )}
+                          </td>
+                          <td className="p-4 align-top pt-5">
+                            {ord.consultants && ord.consultants.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {ord.consultants.map((c: any) => (
+                                  <Badge key={c.id} variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-medium flex items-center gap-1">
+                                    <UserCheck className="h-3 w-3 text-emerald-600" />
+                                    {c.name}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground italic text-xs">No consultant assigned</span>
+                            )}
+                          </td>
+                          <td className="p-4 text-right font-mono font-bold text-sm text-foreground align-top pt-5">
+                            {formatCurrency(ord.total_amount)}
+                          </td>
+                          <td className="p-4 text-right font-mono font-bold text-sm text-amber-600 dark:text-amber-400 align-top pt-5">
+                            {formatCurrency(ord.total_notary_fee || 0)}
+                          </td>
+                          <td className="p-4 text-right font-mono font-bold text-sm text-emerald-600 dark:text-emerald-400 align-top pt-5">
+                            {formatCurrency((ord.total_amount || 0) - (ord.total_notary_fee || 0))}
+                          </td>
+                          <td className="p-4 text-center align-top pt-5">
+                            <div className="flex flex-col items-center gap-1.5 justify-center">
+                              <Badge className={`${getPaymentStatusColor(ord.payment_status)} font-bold font-mono border text-[11px]`}>
+                                {ord.payment_status || "UNPAID"}
+                              </Badge>
+                              {isPaymentActionVisible(ord) && (
+                                <div className="flex flex-col gap-1 w-full">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-6 px-2 text-[10px] gap-1 font-bold border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30 shadow-sm"
+                                    onClick={async () => {
+                                      if (ord.payment_link) {
+                                        navigator.clipboard.writeText(ord.payment_link);
+                                        toast.success("Payment link copied to clipboard!");
+                                        return;
+                                      }
+                                      const activeToken = localStorage.getItem("hrms_token");
+                                      const toastId = toast.loading("Generating secure payment link...");
+                                      try {
+                                        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${ord.order_number}/payment-link`, {
+                                          method: "POST",
+                                          headers: {
+                                            "Authorization": `Bearer ${activeToken}`
+                                          }
+                                        });
+                                        if (res.ok) {
+                                          const data = await res.json();
+                                          toast.success("Payment link generated and copied to clipboard!", { id: toastId });
+                                          setOrders(prev => prev.map(o => o.order_number === ord.order_number ? { ...o, payment_link: data.payment_link } : o));
+                                          navigator.clipboard.writeText(data.payment_link);
+                                        } else {
+                                          toast.error("Failed to generate payment link", { id: toastId });
+                                        }
+                                      } catch (err) {
+                                        console.error(err);
+                                        toast.error("Error generating payment link", { id: toastId });
+                                      }
+                                    }}
+                                  >
+                                    <Link2 className="h-3 w-3" /> Copy Link
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-6 px-2 text-[10px] gap-1 font-bold border-indigo-500/20 bg-indigo-500/5 text-indigo-600 hover:bg-indigo-500/10 hover:text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/30 shadow-sm"
+                                    onClick={async () => {
+                                      const activeToken = localStorage.getItem("hrms_token");
+                                      const toastId = toast.loading("Verifying payment with Xendit...");
+                                      try {
+                                        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${ord.order_number}/sync-payment`, {
+                                          method: "POST",
+                                          headers: { "Authorization": `Bearer ${activeToken}` }
+                                        });
+                                        const data = await res.json();
+                                        if (res.ok && data.status === "success") {
+                                          toast.success(data.message || "Payment verified and updated!", { id: toastId });
+                                          fetchData();
+                                        } else if (res.ok && data.status === "received") {
+                                          toast.info(`Payment status on Xendit: ${data.xendit_status || "PENDING"}`, { id: toastId });
+                                        } else {
+                                          toast.info(data.detail || data.message || "No payment detected yet", { id: toastId });
+                                        }
+                                      } catch (err) {
+                                        console.error(err);
+                                        toast.error("Error verifying payment", { id: toastId });
+                                      }
+                                    }}
+                                  >
+                                    <RefreshCw className="h-3 w-3" /> Check Payment
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-4 text-center align-top pt-5">
+                            <Badge className={`${getOrderStatusColor(ord.status)} font-bold border text-[11px]`}>
+                              {ord.status || "CONFIRMED"}
+                            </Badge>
+                          </td>
+                          <td className="p-4 text-right space-x-1 align-top pt-5">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="Edit Order & Consultants"
+                              onClick={() => router.push(`/business/clients/orders/${ord.order_number}/edit`)}
+                            >
+                              <Edit className="h-4 w-4 text-blue-600 hover:text-blue-700" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="View Order Details"
+                              onClick={() => {
+                                setSelectedOrderGroup(ord);
+                                const pct = ord.proforma_stage_percent || 70;
+                                setProformaPercent(pct);
+                                setTempPercent(String(pct));
+                                if (ord.proforma_paid_amount != null && ord.proforma_paid_amount > 0) {
+                                  setTempAmount(String(Math.round(ord.proforma_paid_amount)));
+                                } else {
+                                  setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
+                                }
+                                setIsPph21(false);
+                                setIsViewOpen(true);
+                                fetchProgressUpdates(ord.order_number);
+                              }}
+                            >
+                              <Eye className="h-4 w-4 text-slate-500 hover:text-foreground" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="Order Chat"
+                              onClick={() => {
+                                setSelectedOrderGroup(ord);
+                                setIsChatOpen(true);
+                                fetchProgressUpdates(ord.order_number);
+                              }}
+                            >
+                              <MessageSquare className="h-4 w-4 text-emerald-600 hover:text-emerald-700" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-              {/* Pagination Controls */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
-                  <div className="text-xs text-muted-foreground">
-                    Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
-                    <span className="font-medium text-foreground">{Math.min(filteredOrders.length, endIndex)}</span> of{" "}
-                    <span className="font-medium text-foreground">{filteredOrders.length}</span> entries
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+                    <div className="text-xs text-muted-foreground">
+                      Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
+                      <span className="font-medium text-foreground">{Math.min(filteredOrders.length, endIndex)}</span> of{" "}
+                      <span className="font-medium text-foreground">{filteredOrders.length}</span> entries
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-xs text-muted-foreground px-2">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                      >
+                        Next
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                      className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
-                    >
-                      Previous
-                    </Button>
-                    <span className="text-xs text-muted-foreground px-2">
-                      Page {currentPage} of {totalPages}
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+
+
+        {/* EDIT ORDER DIALOG (EDIT CONSULTANTS & LIFECYCLE) */}
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent className="max-w-4xl sm:max-w-5xl max-h-[92vh] overflow-y-auto p-6 sm:p-8 rounded-2xl shadow-2xl">
+            <DialogHeader className="pb-4 border-b border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <DialogTitle className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+                  <Edit className="h-6 w-6 text-blue-600" /> Edit Order Details & Consultants
+                </DialogTitle>
+                <DialogDescription className="text-sm mt-1">
+                  Update assigned consultants, order progress lifecycle stage, and payment status for <span className="font-mono font-bold text-foreground">{selectedOrderGroup?.order_number}</span>.
+                </DialogDescription>
+              </div>
+              {selectedOrderGroup && (
+                <Badge variant="outline" className="font-mono text-sm font-bold px-3 py-1 bg-primary/10 border-primary/30 text-primary self-start sm:self-auto">
+                  {selectedOrderGroup.order_number}
+                </Badge>
+              )}
+            </DialogHeader>
+
+            <form onSubmit={handleEditSubmit} className="space-y-6 pt-4">
+
+              {/* Summary Banner */}
+              {selectedOrderGroup && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-xl border border-border/60 bg-muted/20 text-xs">
+                  <div>
+                    <span className="text-muted-foreground block font-medium">Target Company Entity</span>
+                    <span className="font-bold text-sm text-foreground">{selectedOrderGroup.company_name || "Individual Account"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block font-medium">Client Representative</span>
+                    <span className="font-semibold text-foreground">{selectedOrderGroup.client_name || "-"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block font-medium">Total Contract Amount</span>
+                    <span className="font-mono font-bold text-sm text-emerald-600 dark:text-emerald-400">
+                      {formatCurrency(selectedOrderGroup.total_amount)}
                     </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                      className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
-                    >
-                      Next
-                    </Button>
                   </div>
                 </div>
               )}
-            </>
-          )}
-        </CardContent>
-      </Card>
 
-
-
-      {/* EDIT ORDER DIALOG (EDIT CONSULTANTS & LIFECYCLE) */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-4xl sm:max-w-5xl max-h-[92vh] overflow-y-auto p-6 sm:p-8 rounded-2xl shadow-2xl">
-          <DialogHeader className="pb-4 border-b border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <DialogTitle className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-                <Edit className="h-6 w-6 text-blue-600" /> Edit Order Details & Consultants
-              </DialogTitle>
-              <DialogDescription className="text-sm mt-1">
-                Update assigned consultants, order progress lifecycle stage, and payment status for <span className="font-mono font-bold text-foreground">{selectedOrderGroup?.order_number}</span>.
-              </DialogDescription>
-            </div>
-            {selectedOrderGroup && (
-              <Badge variant="outline" className="font-mono text-sm font-bold px-3 py-1 bg-primary/10 border-primary/30 text-primary self-start sm:self-auto">
-                {selectedOrderGroup.order_number}
-              </Badge>
-            )}
-          </DialogHeader>
-
-          <form onSubmit={handleEditSubmit} className="space-y-6 pt-4">
-
-            {/* Summary Banner */}
-            {selectedOrderGroup && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-xl border border-border/60 bg-muted/20 text-xs">
-                <div>
-                  <span className="text-muted-foreground block font-medium">Target Company Entity</span>
-                  <span className="font-bold text-sm text-foreground">{selectedOrderGroup.company_name || "Individual Account"}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block font-medium">Client Representative</span>
-                  <span className="font-semibold text-foreground">{selectedOrderGroup.client_name || "-"}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block font-medium">Total Contract Amount</span>
-                  <span className="font-mono font-bold text-sm text-emerald-600 dark:text-emerald-400">
-                    {formatCurrency(selectedOrderGroup.total_amount)}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Finalization / Unlock Status Control (Only shown if currently finalized to allow unlocking) */}
-            {selectedOrderGroup?.is_proforma_finalized && (
-              <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 flex items-center justify-between gap-4">
-                <div className="space-y-0.5">
-                  <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
-                    <Lock className="h-4 w-4 text-amber-500" /> Proforma Invoice Finalized
-                  </h4>
-                  <p className="text-xs text-muted-foreground">
-                    This order's proforma invoice is finalized. Uncheck to unlock and allow edits.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0 bg-background/50 p-2.5 rounded-lg border">
-                  <input
-                    type="checkbox"
-                    id="unlock-proforma-checkbox"
-                    checked={editForm.is_proforma_finalized}
-                    onChange={(e) => {
-                      const isChecked = e.target.checked;
-                      setEditForm(prev => {
-                        const nextForm = { ...prev, is_proforma_finalized: isChecked };
-                        if (!isChecked) {
-                          nextForm.is_final_invoice_finalized = false;
-                          nextForm.status = "DRAFT";
-                        }
-                        return nextForm;
-                      });
-                    }}
-                    className="h-5 w-5 rounded border-gray-300 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer"
-                  />
-                  <label htmlFor="unlock-proforma-checkbox" className="text-xs font-bold text-foreground cursor-pointer select-none">
-                    {editForm.is_proforma_finalized ? "Finalized (Locked)" : "Unlocked (Editable)"}
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {/* Consultant Multi-Select (Spacious Grid) */}
-            <div className="space-y-2 p-4 rounded-xl border border-border/70 bg-muted/20">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Users className="h-3.5 w-3.5 text-primary" /> Assign Consultants to Order (Multiple Consultants Allowed)
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-64 overflow-y-auto p-3 bg-background rounded-lg border">
-                {(() => {
-                  const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
-                  const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
-
-                  const licensingEmployees = employees.filter((emp) => licensingMemberIds.includes(emp.id));
-
-                  if (licensingEmployees.length === 0) {
-                    return <span className="text-xs text-muted-foreground col-span-3">No licensing team consultants available</span>;
-                  }
-
-                  return licensingEmployees.map((emp) => {
-                    const isChecked = (editForm.consultant_ids || []).includes(emp.id);
-                    return (
-                      <label
-                        key={emp.id}
-                        className={`flex items-center gap-2.5 p-3 rounded-lg border cursor-pointer select-none text-xs transition-colors ${isChecked ? "border-primary bg-primary/10 font-semibold text-primary" : "border-border/60 hover:bg-muted/40"}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleEditConsultantSelect(emp.id)}
-                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-primary"
-                        />
-                        <div className="truncate">
-                          <div className="font-medium text-foreground truncate">{emp.first_name} {emp.last_name}</div>
-                          <div className="text-[10px] text-muted-foreground truncate">{emp.job_title || "Consultant"}</div>
-                        </div>
-                      </label>
-                    );
-                  });
-                })()}
-              </div>
-            </div>
-
-            {/* Edit Order Items */}
-            <div className="space-y-4 p-4 rounded-xl border border-border/77 bg-muted/20">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Tag className="h-3.5 w-3.5 text-primary" /> Edit Order Job Items ({(editForm.items || []).length})
-              </label>
-
-              <div className="space-y-4 max-h-96 overflow-y-auto p-1">
-                {(editForm.items || []).map((item: any, idx: number) => (
-                  <div key={item.id || idx} className="p-4 rounded-xl border border-border/60 bg-background space-y-4">
-                    <div className="flex items-center justify-between pb-2 border-b border-border/40">
-                      <span className="text-xs font-bold text-primary font-mono">Service Item #{idx + 1}</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Service Selection */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-foreground">Select Service / Job Title *</label>
-                        <select
-                          value={item.service_id}
-                          onChange={(e) => handleEditServiceSelect(idx, e.target.value)}
-                          disabled={editForm.is_proforma_finalized}
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-80"
-                        >
-                          <option value="">Choose Service Package...</option>
-                          {services.map((s) => (
-                            <option key={s.id} value={String(s.id)}>
-                              {s.job_title} ({s.job_id})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Tier Selection */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-foreground">Select Pricing Tier *</label>
-                        <select
-                          value={item.pricing_tier}
-                          onChange={(e) => handleEditTierSelect(idx, e.target.value)}
-                          disabled={editForm.is_proforma_finalized}
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-80"
-                        >
-                          <option value="BASE">
-                            Base Price {item._raw_service ? `(${formatCurrency(item._raw_service.base_price)})` : ""}
-                          </option>
-                          <option value="PARTNER_A">
-                            Partner A (-{item._raw_service?.partner_a_discount || 20}% {item._raw_service ? `= ${formatCurrency(item._raw_service.partner_a_price ?? (item._raw_service.base_price * 0.8))}` : ""})
-                          </option>
-                          <option value="PARTNER_A1">
-                            Partner A1 (-{item._raw_service?.partner_a1_discount || 40}% {item._raw_service ? `= ${formatCurrency(item._raw_service.partner_a1_price ?? (item._raw_service.base_price * 0.6))}` : ""})
-                          </option>
-                          <option value="PARTNER_A2">
-                            Partner A2 (-{item._raw_service?.partner_a2_discount || 50}% {item._raw_service ? `= ${formatCurrency(item._raw_service.partner_a2_price ?? (item._raw_service.base_price * 0.5))}` : ""})
-                          </option>
-                          <option value="PARTNER_A3">
-                            Partner A3 (Free Text: {item._raw_service?.partner_a3_price || "Custom"})
-                          </option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Custom Price Text Input (only show if PARTNER_A3 tier is selected) */}
-                    {item.pricing_tier === "PARTNER_A3" && (
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-foreground">Custom Price Text (e.g. Free, Special Rate, Quote Needed) *</label>
-                        <Input
-                          placeholder="e.g. Special Corporate Waiver"
-                          value={item.custom_price_text || ""}
-                          disabled={editForm.is_proforma_finalized}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setEditForm(prev => {
-                              const itemsCopy = [...prev.items];
-                              itemsCopy[idx] = { ...itemsCopy[idx], custom_price_text: val };
-                              return { ...prev, items: itemsCopy };
-                            });
-                          }}
-                          className="h-10 text-xs"
-                          required
-                        />
-                      </div>
-                    )}
-
-                    {/* Reflected Price Bar */}
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50 font-mono text-xs">
-                      <span className="font-medium text-muted-foreground flex items-center gap-1.5">
-                        <Tag className="h-3.5 w-3.5 text-primary" /> Active Price:
-                      </span>
-                      <span className="font-bold text-sm text-foreground">
-                        {item.pricing_tier === "PARTNER_A3"
-                          ? `Free Text: ${item.custom_price_text || "Custom"}`
-                          : formatCurrency(item.unit_price)
-                        }
-                      </span>
-                    </div>
-
+              {/* Finalization / Unlock Status Control (Only shown if currently finalized to allow unlocking) */}
+              {selectedOrderGroup?.is_proforma_finalized && (
+                <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 flex items-center justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
+                      <Lock className="h-4 w-4 text-amber-500" /> Proforma Invoice Finalized
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      This order's proforma invoice is finalized. Uncheck to unlock and allow edits.
+                    </p>
                   </div>
-                ))}
+                  <div className="flex items-center gap-2 shrink-0 bg-background/50 p-2.5 rounded-lg border">
+                    <input
+                      type="checkbox"
+                      id="unlock-proforma-checkbox"
+                      checked={editForm.is_proforma_finalized}
+                      onChange={(e) => {
+                        const isChecked = e.target.checked;
+                        setEditForm(prev => {
+                          const nextForm = { ...prev, is_proforma_finalized: isChecked };
+                          if (!isChecked) {
+                            nextForm.is_final_invoice_finalized = false;
+                            nextForm.status = "DRAFT";
+                          }
+                          return nextForm;
+                        });
+                      }}
+                      className="h-5 w-5 rounded border-gray-300 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer"
+                    />
+                    <label htmlFor="unlock-proforma-checkbox" className="text-xs font-bold text-foreground cursor-pointer select-none">
+                      {editForm.is_proforma_finalized ? "Finalized (Locked)" : "Unlocked (Editable)"}
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Consultant Multi-Select (Spacious Grid) */}
+              <div className="space-y-2 p-4 rounded-xl border border-border/70 bg-muted/20">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5 text-primary" /> Assign Consultants to Order (Multiple Consultants Allowed)
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-64 overflow-y-auto p-3 bg-background rounded-lg border">
+                  {(() => {
+                    const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
+                    const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
+
+                    const licensingEmployees = employees.filter((emp) => licensingMemberIds.includes(emp.id));
+
+                    if (licensingEmployees.length === 0) {
+                      return <span className="text-xs text-muted-foreground col-span-3">No licensing team consultants available</span>;
+                    }
+
+                    return licensingEmployees.map((emp) => {
+                      const isChecked = (editForm.consultant_ids || []).includes(emp.id);
+                      return (
+                        <label
+                          key={emp.id}
+                          className={`flex items-center gap-2.5 p-3 rounded-lg border cursor-pointer select-none text-xs transition-colors ${isChecked ? "border-primary bg-primary/10 font-semibold text-primary" : "border-border/60 hover:bg-muted/40"}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleEditConsultantSelect(emp.id)}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-primary"
+                          />
+                          <div className="truncate">
+                            <div className="font-medium text-foreground truncate">{emp.first_name} {emp.last_name}</div>
+                            <div className="text-[10px] text-muted-foreground truncate">{emp.job_title || "Consultant"}</div>
+                          </div>
+                        </label>
+                      );
+                    });
+                  })()}
+                </div>
               </div>
-            </div>
 
-            {/* Status & Payment Status */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl border border-border/70 bg-muted/20">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Lifecycle Status</label>
-                <select
-                  value={editForm.status}
-                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                  className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="DRAFT">DRAFT</option>
-                  <option value="PROFORMA_GENERATED">PROFORMA GENERATED</option>
-                  <option value="WAITING_ON_CLIENT">WAITING ON CLIENT</option>
-                  <option value="CONFIRMED">CONFIRMED</option>
-                  <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
-                  <option value="REVIEW_DOCS">REVIEW DOCS</option>
-                  <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
-                  <option value="FINAL_DOC_READY">FINAL DOC READY</option>
-                  <option value="INVOICE_GENERATED">INVOICE GENERATED</option>
-                  <option value="WAITING_FOR_FINAL_PAYMENT">WAITING FOR FINAL PAYMENT</option>
-                  <option value="FINAL_PAYMENT_COMPLETED">FINAL PAYMENT COMPLETED</option>
-                  <option value="SOFT_COPY_DELIVERED">SOFT COPY DELIVERED</option>
-                  <option value="HARD_COPY_DELIVERED">HARD COPY DELIVERED</option>
-                  <option value="COMPLETED">COMPLETED</option>
-                  <option value="CANCELLED">CANCELLED</option>
-                </select>
+              {/* Edit Order Items */}
+              <div className="space-y-4 p-4 rounded-xl border border-border/77 bg-muted/20">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Tag className="h-3.5 w-3.5 text-primary" /> Edit Order Job Items ({(editForm.items || []).length})
+                </label>
+
+                <div className="space-y-4 max-h-96 overflow-y-auto p-1">
+                  {(editForm.items || []).map((item: any, idx: number) => (
+                    <div key={item.id || idx} className="p-4 rounded-xl border border-border/60 bg-background space-y-4">
+                      <div className="flex items-center justify-between pb-2 border-b border-border/40">
+                        <span className="text-xs font-bold text-primary font-mono">Service Item #{idx + 1}</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Service Selection */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-foreground">Select Service / Job Title *</label>
+                          <select
+                            value={item.service_id}
+                            onChange={(e) => handleEditServiceSelect(idx, e.target.value)}
+                            disabled={editForm.is_proforma_finalized}
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-80"
+                          >
+                            <option value="">Choose Service Package...</option>
+                            {services.map((s) => (
+                              <option key={s.id} value={String(s.id)}>
+                                {s.job_title} ({s.job_id})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Tier Selection */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-foreground">Select Pricing Tier *</label>
+                          <select
+                            value={item.pricing_tier}
+                            onChange={(e) => handleEditTierSelect(idx, e.target.value)}
+                            disabled={editForm.is_proforma_finalized}
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-80"
+                          >
+                            <option value="BASE">
+                              Base Price {item._raw_service ? `(${formatCurrency(item._raw_service.base_price)})` : ""}
+                            </option>
+                            <option value="PARTNER_A">
+                              Partner A (-{item._raw_service?.partner_a_discount || 20}% {item._raw_service ? `= ${formatCurrency(item._raw_service.partner_a_price ?? (item._raw_service.base_price * 0.8))}` : ""})
+                            </option>
+                            <option value="PARTNER_A1">
+                              Partner A1 (-{item._raw_service?.partner_a1_discount || 40}% {item._raw_service ? `= ${formatCurrency(item._raw_service.partner_a1_price ?? (item._raw_service.base_price * 0.6))}` : ""})
+                            </option>
+                            <option value="PARTNER_A2">
+                              Partner A2 (-{item._raw_service?.partner_a2_discount || 50}% {item._raw_service ? `= ${formatCurrency(item._raw_service.partner_a2_price ?? (item._raw_service.base_price * 0.5))}` : ""})
+                            </option>
+                            <option value="PARTNER_A3">
+                              Partner A3 (Free Text: {item._raw_service?.partner_a3_price || "Custom"})
+                            </option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Custom Price Text Input (only show if PARTNER_A3 tier is selected) */}
+                      {item.pricing_tier === "PARTNER_A3" && (
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-foreground">Custom Price Text (e.g. Free, Special Rate, Quote Needed) *</label>
+                          <Input
+                            placeholder="e.g. Special Corporate Waiver"
+                            value={item.custom_price_text || ""}
+                            disabled={editForm.is_proforma_finalized}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEditForm(prev => {
+                                const itemsCopy = [...prev.items];
+                                itemsCopy[idx] = { ...itemsCopy[idx], custom_price_text: val };
+                                return { ...prev, items: itemsCopy };
+                              });
+                            }}
+                            className="h-10 text-xs"
+                            required
+                          />
+                        </div>
+                      )}
+
+                      {/* Reflected Price Bar */}
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50 font-mono text-xs">
+                        <span className="font-medium text-muted-foreground flex items-center gap-1.5">
+                          <Tag className="h-3.5 w-3.5 text-primary" /> Active Price:
+                        </span>
+                        <span className="font-bold text-sm text-foreground">
+                          {item.pricing_tier === "PARTNER_A3"
+                            ? `Free Text: ${item.custom_price_text || "Custom"}`
+                            : formatCurrency(item.unit_price)
+                          }
+                        </span>
+                      </div>
+
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Payment Status</label>
-                <select
-                  value={editForm.payment_status}
-                  onChange={(e) => setEditForm({ ...editForm, payment_status: e.target.value })}
-                  className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="UNPAID">UNPAID</option>
-                  <option value="PARTIALLY_PAID">PARTIALLY PAID</option>
-                  <option value="PAID">PAID</option>
-                </select>
+              {/* Status & Payment Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl border border-border/70 bg-muted/20">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Lifecycle Status</label>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                    className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="DRAFT">DRAFT</option>
+                    <option value="PROFORMA_GENERATED">PROFORMA GENERATED</option>
+                    <option value="WAITING_ON_CLIENT">WAITING ON CLIENT</option>
+                    <option value="CONFIRMED">CONFIRMED</option>
+                    <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
+                    <option value="REVIEW_DOCS">REVIEW DOCS</option>
+                    <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
+                    <option value="FINAL_DOC_READY">FINAL DOC READY</option>
+                    <option value="INVOICE_GENERATED">INVOICE GENERATED</option>
+                    <option value="WAITING_FOR_FINAL_PAYMENT">WAITING FOR FINAL PAYMENT</option>
+                    <option value="FINAL_PAYMENT_COMPLETED">FINAL PAYMENT COMPLETED</option>
+                    <option value="SOFT_COPY_DELIVERED">SOFT COPY DELIVERED</option>
+                    <option value="HARD_COPY_DELIVERED">HARD COPY DELIVERED</option>
+                    <option value="COMPLETED">COMPLETED</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Payment Status</label>
+                  <select
+                    value={editForm.payment_status}
+                    onChange={(e) => setEditForm({ ...editForm, payment_status: e.target.value })}
+                    className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="UNPAID">UNPAID</option>
+                    <option value="PARTIALLY_PAID">PARTIALLY PAID</option>
+                    <option value="PAID">PAID</option>
+                  </select>
+                </div>
               </div>
-            </div>
 
-            <DialogFooter className="pt-4 border-t border-border/50">
-              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={saving} className="px-6 font-semibold shadow-md gap-2">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                Save Order Changes
-              </Button>
-            </DialogFooter>
+              <DialogFooter className="pt-4 border-t border-border/50">
+                <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={saving} className="px-6 font-semibold shadow-md gap-2">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                  Save Order Changes
+                </Button>
+              </DialogFooter>
 
-          </form>
-        </DialogContent>
-      </Dialog>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* VIEW ORDER DETAILS INLINE SLIDING PANEL (CLEAN NO-SCROLL 2-COLUMN LAYOUT) */}
@@ -1907,316 +1968,419 @@ export default function ClientOrdersPage() {
               {/* Scrollable Content Body */}
               <div className="flex-1 w-full overflow-y-auto pr-1 min-h-0 space-y-5 pt-3">
 
-              {/* 2-Column Responsive Layout Utilizing Horizontal Whitespace */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                {/* 2-Column Responsive Layout Utilizing Horizontal Whitespace */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
-                {/* Left Column (Metadata & Consultants) - 4 cols */}
-                <div className="lg:col-span-4 space-y-4">
+                  {/* Left Column (Metadata & Consultants) - 4 cols */}
+                  <div className="lg:col-span-4 space-y-4">
 
-                  {/* Entity & Rep Details */}
-                  <div className="p-4 rounded-xl border border-border/60 bg-muted/20 text-xs space-y-3">
-                    <div className="flex justify-between items-start pb-2 border-b border-border/40">
-                      <div>
-                        <span className="text-muted-foreground block font-medium uppercase text-[10px]">Target Company Entity</span>
-                        <span className="font-bold text-base text-foreground block mt-0.5">{selectedOrderGroup.company_name || "Individual Account"}</span>
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5">
-                        <Badge className={`${getPaymentStatusColor(selectedOrderGroup.payment_status)} font-mono font-bold text-[10px] uppercase`}>
-                          {selectedOrderGroup.payment_status}
-                        </Badge>
-                        {selectedOrderGroup.payment_status !== "PAID" && selectedOrderGroup.is_proforma_finalized && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-6 px-2 text-[10px] gap-1 font-bold border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30"
-                            onClick={async () => {
-                              if (selectedOrderGroup.payment_link) {
-                                navigator.clipboard.writeText(selectedOrderGroup.payment_link);
-                                toast.success("Payment link copied to clipboard!");
-                                return;
-                              }
-                              const activeToken = localStorage.getItem("hrms_token");
-                              const toastId = toast.loading("Generating secure payment link...");
-                              try {
-                                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/payment-link`, {
-                                  method: "POST",
-                                  headers: {
-                                    "Authorization": `Bearer ${activeToken}`
-                                  }
-                                });
-                                if (res.ok) {
-                                  const data = await res.json();
-                                  toast.success("Payment link generated and copied to clipboard!", { id: toastId });
-                                  setSelectedOrderGroup((prev: any) => prev ? { ...prev, payment_link: data.payment_link } : null);
-                                  setOrders(prev => prev.map(o => o.order_number === selectedOrderGroup.order_number ? { ...o, payment_link: data.payment_link } : o));
-                                  navigator.clipboard.writeText(data.payment_link);
-                                } else {
-                                  toast.error("Failed to generate payment link", { id: toastId });
-                                }
-                              } catch (err) {
-                                console.error(err);
-                                  toast.error("Error generating payment link", { id: toastId });
-                                }
-                              }}
-                            >
-                              <Link2 className="h-3 w-3" /> Copy Link
-                            </Button>
+                    {/* Entity & Rep Details */}
+                    <div className="p-4 rounded-xl border border-border/60 bg-muted/20 text-xs space-y-3">
+                      <div className="flex justify-between items-start pb-2 border-b border-border/40">
+                        <div className="space-y-1">
+                          <span className="text-muted-foreground block font-medium uppercase text-[10px]">Target Company Entity</span>
+                          <span className="font-bold text-base text-foreground block mt-0.5">{selectedOrderGroup.company_name || "Individual Account"}</span>
+                          {selectedOrderGroup.billing_company_id && selectedOrderGroup.billing_company_id !== selectedOrderGroup.company_id && (
+                            <div className="pt-1 mt-1 border-t border-border/30">
+                              <span className="text-primary block font-bold uppercase text-[9px] tracking-wider">Billed To (Invoice Recipient)</span>
+                              <span className="font-bold text-xs text-primary block">{selectedOrderGroup.billing_company_name || selectedOrderGroup.company_name}</span>
+                            </div>
                           )}
                         </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 pt-1">
-                      <div>
-                        <span className="text-muted-foreground block font-medium uppercase text-[10px]">Client Representative</span>
-                        <span className="font-semibold text-xs text-foreground block mt-0.5">{selectedOrderGroup.client_name || "-"}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground block font-medium uppercase text-[10px]">Order Date</span>
-                        <span className="font-mono font-bold text-xs text-foreground block mt-0.5">{formatDate(selectedOrderGroup.created_at)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Assigned Consultants */}
-                  <div className="p-4 rounded-xl border border-border/60 bg-background space-y-2 text-xs">
-                    <span className="text-muted-foreground font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5">
-                      <Users className="h-3.5 w-3.5 text-primary" /> Assigned Consultants
-                    </span>
-                    {selectedOrderGroup.consultants && selectedOrderGroup.consultants.length > 0 ? (
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        {selectedOrderGroup.consultants.map((c: any) => (
-                          <Badge key={c.id} variant="secondary" className="font-semibold text-xs py-1 px-2.5 gap-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                            <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
-                            <span>{c.name} <span className="text-[10px] opacity-75">({c.job_title})</span></span>
+                        <div className="flex flex-col items-end gap-1.5">
+                          <Badge className={`${getPaymentStatusColor(selectedOrderGroup.payment_status)} font-mono font-bold text-[10px] uppercase`}>
+                            {selectedOrderGroup.payment_status}
                           </Badge>
-                        ))}
+                          {isPaymentActionVisible(selectedOrderGroup) && (
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-2 text-[10px] gap-1 font-bold border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30"
+                                onClick={async () => {
+                                  if (selectedOrderGroup.payment_link) {
+                                    navigator.clipboard.writeText(selectedOrderGroup.payment_link);
+                                    toast.success("Payment link copied to clipboard!");
+                                    return;
+                                  }
+                                  const activeToken = localStorage.getItem("hrms_token");
+                                  const toastId = toast.loading("Generating secure payment link...");
+                                  try {
+                                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/payment-link`, {
+                                      method: "POST",
+                                      headers: {
+                                        "Authorization": `Bearer ${activeToken}`
+                                      }
+                                    });
+                                    if (res.ok) {
+                                      const data = await res.json();
+                                      toast.success("Payment link generated and copied to clipboard!", { id: toastId });
+                                      setSelectedOrderGroup((prev: any) => prev ? { ...prev, payment_link: data.payment_link } : null);
+                                      setOrders(prev => prev.map(o => o.order_number === selectedOrderGroup.order_number ? { ...o, payment_link: data.payment_link } : o));
+                                      navigator.clipboard.writeText(data.payment_link);
+                                    } else {
+                                      toast.error("Failed to generate payment link", { id: toastId });
+                                    }
+                                  } catch (err) {
+                                    console.error(err);
+                                    toast.error("Error generating payment link", { id: toastId });
+                                  }
+                                }}
+                              >
+                                <Link2 className="h-3 w-3" /> Copy Link
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-2 text-[10px] gap-1 font-bold border-indigo-500/20 bg-indigo-500/5 text-indigo-600 hover:bg-indigo-500/10 hover:text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/30"
+                                onClick={async () => {
+                                  const activeToken = localStorage.getItem("hrms_token");
+                                  const toastId = toast.loading("Verifying payment with Xendit...");
+                                  try {
+                                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/sync-payment`, {
+                                      method: "POST",
+                                      headers: { "Authorization": `Bearer ${activeToken}` }
+                                    });
+                                    const data = await res.json();
+                                    if (res.ok && data.status === "success") {
+                                      toast.success(data.message || "Payment verified and updated!", { id: toastId });
+                                      setSelectedOrderGroup((prev: any) => prev ? { ...prev, payment_status: data.payment_status || "PARTIALLY_PAID" } : null);
+                                      fetchData();
+                                      fetchProgressUpdates(selectedOrderGroup.order_number);
+                                    } else if (res.ok && data.status === "received") {
+                                      toast.info(`Payment status on Xendit: ${data.xendit_status || "PENDING"}`, { id: toastId });
+                                    } else {
+                                      toast.info(data.detail || data.message || "No payment detected yet", { id: toastId });
+                                    }
+                                  } catch (err) {
+                                    console.error(err);
+                                    toast.error("Error verifying payment", { id: toastId });
+                                  }
+                                }}
+                              >
+                                <RefreshCw className="h-3 w-3" /> Check Payment
+                              </Button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    ) : (
-                      <span className="text-muted-foreground italic text-xs block py-0.5">No consultants assigned to this order</span>
-                    )}
-                  </div>
 
-                  {/* Inline Mandatory Proforma Percentage Selector Card */}
-                  <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
-                        <Percent className="h-3.5 w-3.5 text-emerald-600" /> Proforma Invoice Stage <span className="text-destructive">*</span>
-                      </label>
-                      <span className="text-[11px] font-mono font-bold text-emerald-700 dark:text-emerald-400">
-                        {proformaPercent}% Selected
-                      </span>
+                      <div className="grid grid-cols-2 gap-3 pt-1">
+                        <div>
+                          <span className="text-muted-foreground block font-medium uppercase text-[10px]">Client Representative</span>
+                          <span className="font-semibold text-xs text-foreground block mt-0.5">{selectedOrderGroup.client_name || "-"}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block font-medium uppercase text-[10px]">Order Date</span>
+                          <span className="font-mono font-bold text-xs text-foreground block mt-0.5">{formatDate(selectedOrderGroup.created_at)}</span>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Input & Quick Preset Buttons */}
-                    <div className="grid grid-cols-2 gap-3">
-                      {/* Percentage Input */}
-                      <div className="space-y-1">
-                        <span className="text-[10px] uppercase font-bold text-emerald-850/80 dark:text-emerald-300/80 block">Percentage</span>
-                        <div className="relative">
+                    {/* Assigned Consultants */}
+                    <div className="p-4 rounded-xl border border-border/60 bg-background space-y-2 text-xs">
+                      <span className="text-muted-foreground font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5 text-primary" /> Assigned Consultants
+                      </span>
+                      {selectedOrderGroup.consultants && selectedOrderGroup.consultants.length > 0 ? (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {selectedOrderGroup.consultants.map((c: any) => (
+                            <Badge key={c.id} variant="secondary" className="font-semibold text-xs py-1 px-2.5 gap-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                              <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
+                              <span>{c.name} <span className="text-[10px] opacity-75">({c.job_title})</span></span>
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground italic text-xs block py-0.5">No consultants assigned to this order</span>
+                      )}
+                    </div>
+
+                    {/* Inline Mandatory Proforma Percentage Selector Card */}
+                    <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                          <Percent className="h-3.5 w-3.5 text-emerald-600" /> Proforma Invoice Stage <span className="text-destructive">*</span>
+                        </label>
+                        <span className="text-[11px] font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                          {proformaPercent}% Selected
+                        </span>
+                      </div>
+
+                      {/* Input & Quick Preset Buttons */}
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* Percentage Input */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] uppercase font-bold text-emerald-850/80 dark:text-emerald-300/80 block">Percentage</span>
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              min="1"
+                              max="100"
+                              step="0.01"
+                              value={tempPercent}
+                              onChange={(e) => handlePctChange(e.target.value)}
+                              placeholder="70"
+                              disabled={selectedOrderGroup.is_proforma_finalized}
+                              className="pr-8 font-mono text-xs font-bold bg-background disabled:opacity-85 h-9"
+                            />
+                            <Percent className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                          </div>
+                          {/* PPH 21 Checkbox */}
+                          <div className="flex items-center gap-1.5 pt-1">
+                            <input
+                              type="checkbox"
+                              id="pph21-checkbox"
+                              checked={isPph21}
+                              disabled={selectedOrderGroup.is_proforma_finalized}
+                              onChange={(e) => setIsPph21(e.target.checked)}
+                              className="h-3.5 w-3.5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600 disabled:cursor-not-allowed"
+                            />
+                            <label htmlFor="pph21-checkbox" className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 cursor-pointer select-none">
+                              Add PPH 21 (2% Tax WHT)
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Direct Amount Input */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] uppercase font-bold text-emerald-850/80 dark:text-emerald-300/80 block">Amount (IDR)</span>
                           <Input
                             type="number"
-                            min="1"
-                            max="100"
-                            step="0.01"
-                            value={tempPercent}
-                            onChange={(e) => handlePctChange(e.target.value)}
-                            placeholder="70"
+                            value={tempAmount}
+                            onChange={(e) => handleAmtChange(e.target.value)}
+                            placeholder="e.g. 7000000"
                             disabled={selectedOrderGroup.is_proforma_finalized}
-                            className="pr-8 font-mono text-xs font-bold bg-background disabled:opacity-85 h-9"
+                            className="font-mono text-xs font-bold bg-background disabled:opacity-85 h-9"
                           />
-                          <Percent className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                        </div>
-                        {/* PPH 21 Checkbox */}
-                        <div className="flex items-center gap-1.5 pt-1">
-                          <input
-                            type="checkbox"
-                            id="pph21-checkbox"
-                            checked={isPph21}
-                            disabled={selectedOrderGroup.is_proforma_finalized}
-                            onChange={(e) => setIsPph21(e.target.checked)}
-                            className="h-3.5 w-3.5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600 disabled:cursor-not-allowed"
-                          />
-                          <label htmlFor="pph21-checkbox" className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 cursor-pointer select-none">
-                            Add PPH 21 (2% Tax WHT)
-                          </label>
                         </div>
                       </div>
 
-                      {/* Direct Amount Input */}
-                      <div className="space-y-1">
-                        <span className="text-[10px] uppercase font-bold text-emerald-850/80 dark:text-emerald-300/80 block">Amount (IDR)</span>
-                        <Input
-                          type="number"
-                          value={tempAmount}
-                          onChange={(e) => handleAmtChange(e.target.value)}
-                          placeholder="e.g. 7000000"
-                          disabled={selectedOrderGroup.is_proforma_finalized}
-                          className="font-mono text-xs font-bold bg-background disabled:opacity-85 h-9"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Locked Message */}
-                    {selectedOrderGroup.is_proforma_finalized && (
-                      <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold flex items-center gap-2">
-                        <Lock className="h-3.5 w-3.5 shrink-0" />
-                        <span>Proforma invoice is finalized. Stage % is locked.</span>
-                      </div>
-                    )}
-
-                    {/* Calculated Proforma Due Preview */}
-                    {proformaPercent > 0 && selectedOrderGroup && (
-                      <div className="space-y-1.5 pt-2 border-t border-emerald-500/20 text-xs font-mono">
-                        <div className="flex justify-between items-center text-muted-foreground">
-                          <span>Proforma Stage Subtotal:</span>
-                          <span className="font-bold text-slate-700 dark:text-slate-355">
-                            {formatCurrency((selectedOrderGroup.total_amount * proformaPercent) / 100)}
-                          </span>
+                      {/* Locked Message */}
+                      {selectedOrderGroup.is_proforma_finalized && (
+                        <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold flex items-center gap-2">
+                          <Lock className="h-3.5 w-3.5 shrink-0" />
+                          <span>Proforma invoice is finalized. Stage % is locked.</span>
                         </div>
-                        {isPph21 && (
-                          <div className="flex justify-between items-center text-red-650 dark:text-red-400 font-semibold">
-                            <span>WHT PPh 21 (2% Deduction):</span>
-                            <span>
-                              -{formatCurrency(((selectedOrderGroup.total_amount * proformaPercent) / 100) * 0.02)}
+                      )}
+
+                      {/* Calculated Proforma Due Preview */}
+                      {proformaPercent > 0 && selectedOrderGroup && (
+                        <div className="space-y-1.5 pt-2 border-t border-emerald-500/20 text-xs font-mono">
+                          <div className="flex justify-between items-center text-muted-foreground">
+                            <span>Proforma Stage Subtotal:</span>
+                            <span className="font-bold text-slate-700 dark:text-slate-355">
+                              {formatCurrency((selectedOrderGroup.total_amount * proformaPercent) / 100)}
                             </span>
                           </div>
-                        )}
-                        <div className="flex justify-between items-center pt-1 border-t border-dashed border-emerald-500/15">
-                          <span className="text-emerald-800 dark:text-emerald-300 font-bold">Proforma Amount Due:</span>
-                          <span className="font-extrabold text-emerald-700 dark:text-emerald-400 text-sm">
-                            {formatCurrency(
-                              isPph21
-                                ? ((selectedOrderGroup.total_amount * proformaPercent) / 100) * 0.98
-                                : (selectedOrderGroup.total_amount * proformaPercent) / 100
-                            )}
-                          </span>
+                          {isPph21 && (
+                            <div className="flex justify-between items-center text-red-650 dark:text-red-400 font-semibold">
+                              <span>WHT PPh 21 (2% Deduction):</span>
+                              <span>
+                                -{formatCurrency(((selectedOrderGroup.total_amount * proformaPercent) / 100) * 0.02)}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center pt-1 border-t border-dashed border-emerald-500/15">
+                            <span className="text-emerald-800 dark:text-emerald-300 font-bold">Proforma Amount Due:</span>
+                            <span className="font-extrabold text-emerald-700 dark:text-emerald-400 text-sm">
+                              {formatCurrency(
+                                isPph21
+                                  ? ((selectedOrderGroup.total_amount * proformaPercent) / 100) * 0.98
+                                  : (selectedOrderGroup.total_amount * proformaPercent) / 100
+                              )}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+
+                      {/* Recorded Manual Proforma Paid Amount Notice */}
+                      {selectedOrderGroup.proforma_paid_amount != null && selectedOrderGroup.proforma_paid_amount > 0 && (
+                        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                              <DollarSign className="h-4 w-4 text-amber-600" /> Recorded Proforma Paid:
+                            </span>
+                            <Badge variant="outline" className="font-mono font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40">
+                              {formatCurrency(selectedOrderGroup.proforma_paid_amount)}
+                            </Badge>
+                          </div>
+                          <div className="text-[11px] text-muted-foreground flex justify-between pt-1 border-t border-amber-500/20 font-mono">
+                            <span>Remaining Final Balance:</span>
+                            <span className="font-bold text-foreground">
+                              {formatCurrency(Math.max(0, selectedOrderGroup.total_amount - selectedOrderGroup.proforma_paid_amount))}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action Bar */}
+                    <div className="space-y-2.5">
+                      <Button
+                        type="button"
+                        disabled={!proformaPercent || proformaPercent <= 0}
+                        onClick={() => setIsProformaPreviewOpen(true)}
+                        className="w-full gap-2 font-bold py-5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md text-sm disabled:opacity-50"
+                      >
+                        <FileText className="h-4 w-4" /> {selectedOrderGroup.is_proforma_finalized ? "View" : "Generate"} Proforma Invoice ({proformaPercent || 0}%)
+                      </Button>
+
+                      <Button
+                        type="button"
+                        disabled={(!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "FINAL_DOC_READY") && !selectedOrderGroup?.is_final_invoice_finalized}
+                        onClick={() => setIsFinalInvoicePreviewOpen(true)}
+                        className="w-full gap-2 font-bold py-5 bg-blue-600 hover:bg-blue-700 text-white shadow-md text-sm disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed"
+                      >
+                        <FileText className="h-4 w-4" /> {selectedOrderGroup?.is_final_invoice_finalized ? "View" : "Generate"} Final Invoice
+                      </Button>
+                      {(!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "FINAL_DOC_READY") && !selectedOrderGroup?.is_final_invoice_finalized && (
+                        <p className="text-[10px] text-muted-foreground text-center italic mt-0.5">
+                          Requires finalized proforma invoice & final doc ready lifecycle status.
+                        </p>
+                      )}
+
+                    </div>
+
                   </div>
 
-                  {/* Action Bar */}
-                  <div className="space-y-2.5">
-                    <Button
-                      type="button"
-                      disabled={!proformaPercent || proformaPercent <= 0}
-                      onClick={() => setIsProformaPreviewOpen(true)}
-                      className="w-full gap-2 font-bold py-5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md text-sm disabled:opacity-50"
-                    >
-                      <FileText className="h-4 w-4" /> {selectedOrderGroup.is_proforma_finalized ? "View" : "Generate"} Proforma Invoice ({proformaPercent || 0}%)
-                    </Button>
+                  {/* Right Column (Line Items & Totals) - 8 cols */}
+                  <div className="lg:col-span-8 space-y-4">
 
-                    <Button
-                      type="button"
-                      disabled={(!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "FINAL_DOC_READY") && !selectedOrderGroup?.is_final_invoice_finalized}
-                      onClick={() => setIsFinalInvoicePreviewOpen(true)}
-                      className="w-full gap-2 font-bold py-5 bg-blue-600 hover:bg-blue-700 text-white shadow-md text-sm disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed"
-                    >
-                      <FileText className="h-4 w-4" /> {selectedOrderGroup?.is_final_invoice_finalized ? "View" : "Generate"} Final Invoice
-                    </Button>
-                    {(!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "FINAL_DOC_READY") && !selectedOrderGroup?.is_final_invoice_finalized && (
-                      <p className="text-[10px] text-muted-foreground text-center italic mt-0.5">
-                        Requires finalized proforma invoice & final doc ready lifecycle status.
-                      </p>
-                    )}
-
-                  </div>
-
-                 </div>
-
-                {/* Right Column (Line Items & Totals) - 8 cols */}
-                <div className="lg:col-span-8 space-y-4">
-
-                  {/* Service Items Table */}
-                  <div className="border rounded-xl overflow-hidden text-xs shadow-xs bg-background">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-muted/60 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                          <th className="p-3">Service Package</th>
-                          <th className="p-3 text-right w-32">Price</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {(selectedOrderGroup.items || []).map((item: any, idx: number) => {
-                          const itemKey = `order-completed-${selectedOrderGroup.order_number}-${idx}`;
-                          const isExpanded = !!expandedItems[itemKey];
-                          return (
-                            <tr key={item.id || idx} className="hover:bg-muted/20 transition-colors">
-                              <td className="p-3 align-top">
-                                <div className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-950/20 shadow-none space-y-1.5 transition-all duration-200 max-w-xl">
-                                  <div className="flex flex-wrap items-center gap-1.5">
-                                    <span className="font-bold text-foreground text-xs leading-normal break-words">
-                                      {item.job_title}
-                                    </span>
-                                    {item.job_id && (
-                                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-primary/5 text-primary border-primary/20 shrink-0">
-                                        {item.job_id}
-                                      </Badge>
-                                    )}
-                                    {item.pricing_tier && (
-                                      <Badge variant="secondary" className="text-[9px] py-0 px-1.5 font-medium capitalize shrink-0">
-                                        {item.pricing_tier.toLowerCase().replace('_', ' ')}
-                                      </Badge>
-                                    )}
-                                    {item.notary && (
-                                      <Badge variant="outline" className="text-[9px] font-bold py-0 px-1.5 bg-indigo-500/5 text-indigo-600 border-indigo-500/20 shrink-0">
-                                        Notary: {item.notary.name}
-                                      </Badge>
-                                    )}
+                    {/* Service Items Table */}
+                    <div className="border rounded-xl overflow-hidden text-xs shadow-xs bg-background">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-muted/60 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
+                            <th className="p-3">Service Package</th>
+                            <th className="p-3 text-right w-32">Price</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {(selectedOrderGroup.items || []).map((item: any, idx: number) => {
+                            const itemKey = `order-completed-${selectedOrderGroup.order_number}-${idx}`;
+                            const isExpanded = !!expandedItems[itemKey];
+                            return (
+                              <tr key={item.id || idx} className="hover:bg-muted/20 transition-colors">
+                                <td className="p-3 align-top">
+                                  <div className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-950/20 shadow-none space-y-1.5 transition-all duration-200 max-w-xl">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="font-bold text-foreground text-xs leading-normal break-words">
+                                        {item.job_title}
+                                      </span>
+                                      {item.job_id && (
+                                        <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                          {item.job_id}
+                                        </Badge>
+                                      )}
+                                      {item.pricing_tier && (
+                                        <Badge variant="secondary" className="text-[9px] py-0 px-1.5 font-medium capitalize shrink-0">
+                                          {item.pricing_tier.toLowerCase().replace('_', ' ')}
+                                        </Badge>
+                                      )}
+                                      {item.notary && (
+                                        <Badge variant="outline" className="text-[9px] font-bold py-0 px-1.5 bg-indigo-500/5 text-indigo-600 border-indigo-500/20 shrink-0">
+                                          Notary: {item.notary.name}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {(() => {
+                                      const matchedService = services.find((s) => s.id === item.service_id);
+                                      const desc = item.description || matchedService?.description;
+                                      if (!desc) return null;
+                                      return (
+                                        <div className="space-y-1">
+                                          {isExpanded && (
+                                            <div className="mt-1 border-l-2 border-zinc-300 dark:border-zinc-700 pl-2 py-0.5">
+                                              {formatInvoiceDescription(desc, true)}
+                                            </div>
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleItemExpansion(itemKey)}
+                                            className="text-[9.5px] text-primary hover:text-primary/80 font-bold hover:underline block"
+                                          >
+                                            {isExpanded ? "Hide details" : "Show details"}
+                                          </button>
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
-                                  {(() => {
-                                    const matchedService = services.find((s) => s.id === item.service_id);
-                                    const desc = item.description || matchedService?.description;
-                                    if (!desc) return null;
-                                    return (
-                                      <div className="space-y-1">
-                                        {isExpanded && (
-                                          <div className="mt-1 border-l-2 border-zinc-300 dark:border-zinc-700 pl-2 py-0.5">
-                                            {formatInvoiceDescription(desc, true)}
-                                          </div>
-                                        )}
-                                        <button
-                                          type="button"
-                                          onClick={() => toggleItemExpansion(itemKey)}
-                                          className="text-[9.5px] text-primary hover:text-primary/80 font-bold hover:underline block"
-                                        >
-                                          {isExpanded ? "Hide details" : "Show details"}
-                                        </button>
-                                      </div>
-                                    );
-                                  })()}
-                                </div>
-                              </td>
-                              <td className="p-3 text-right font-mono font-bold text-foreground align-top pt-5">
-                                {item.pricing_tier === "PARTNER_A3"
-                                  ? item.custom_price_text || "Custom"
-                                  : formatCurrency(item.unit_price)
-                                }
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                                </td>
+                                <td className="p-3 text-right font-mono font-bold text-foreground align-top pt-5">
+                                  {item.pricing_tier === "PARTNER_A3"
+                                    ? item.custom_price_text || "Custom"
+                                    : formatCurrency(item.unit_price)
+                                  }
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
 
-                  {/* Grand Total Bar */}
-                  <div className="flex justify-between items-center p-4 rounded-xl border border-primary/30 bg-primary/5">
-                    <span className="text-sm font-bold text-foreground flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-primary" /> Total Agreed Contract Value:
-                    </span>
-                    <span className="text-xl font-bold font-mono text-primary">{formatCurrency(selectedOrderGroup.total_amount)}</span>
+                    {/* Financial Summary Breakdown Cards */}
+                    {(() => {
+                      const isFinalized = !!selectedOrderGroup.is_proforma_finalized;
+                      const isRecorded = selectedOrderGroup.proforma_paid_amount != null && selectedOrderGroup.proforma_paid_amount > 0;
+                      const hasProformaStage = isFinalized || isRecorded;
+
+                      const actualPaid = isRecorded
+                        ? selectedOrderGroup.proforma_paid_amount
+                        : isFinalized
+                          ? (selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100
+                          : 0;
+
+                      const remainingDue = hasProformaStage
+                        ? Math.max(0, selectedOrderGroup.total_amount - actualPaid)
+                        : null;
+
+                      return (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="p-4 rounded-xl border border-border/60 bg-card shadow-xs space-y-1">
+                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">Agreed Contract Value</span>
+                            <span className="text-lg font-extrabold font-mono text-foreground block">{formatCurrency(selectedOrderGroup.total_amount)}</span>
+                          </div>
+                          <div className="p-4 rounded-xl border border-amber-500/25 bg-amber-500/5 dark:bg-amber-500/10 shadow-xs space-y-1">
+                            <span className="text-[10px] uppercase font-bold text-amber-700 dark:text-amber-400 block">
+                              {isRecorded
+                                ? "Proforma Paid (Recorded)"
+                                : isFinalized
+                                  ? `Proforma Due (${selectedOrderGroup.proforma_stage_percent}%)`
+                                  : "Proforma Due"}
+                            </span>
+                            <span className="text-lg font-extrabold font-mono text-amber-600 block">
+                              {hasProformaStage ? (
+                                formatCurrency(actualPaid)
+                              ) : (
+                                <span className="text-muted-foreground/60 text-base font-normal font-sans">—</span>
+                              )}
+                            </span>
+                          </div>
+                          <div className="p-4 rounded-xl border border-blue-500/25 bg-blue-500/5 dark:bg-blue-500/10 shadow-xs space-y-1">
+                            <span className="text-[10px] uppercase font-bold text-blue-700 dark:text-blue-400 block">Remaining Final Balance</span>
+                            <span className="text-lg font-extrabold font-mono text-blue-600 block">
+                              {remainingDue != null ? (
+                                formatCurrency(remainingDue)
+                              ) : (
+                                <span className="text-muted-foreground/60 text-base font-normal font-sans">—</span>
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                   </div>
 
                 </div>
 
               </div>
+              {/* End of Scrollable Content Body */}
 
-            </div> 
-            {/* End of Scrollable Content Body */}
-
-          </div>
-        </motion.div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -2303,9 +2467,9 @@ export default function ClientOrdersPage() {
                           className="w-full text-left px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground flex items-center gap-2 transition-colors"
                         >
                           {item.type === "team" ? (
-                            <div 
+                            <div
                               className="h-6 w-6 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 border"
-                              style={{ 
+                              style={{
                                 backgroundColor: `${item.color || "#10b981"}15`,
                                 color: item.color || "#10b981",
                                 borderColor: `${item.color || "#10b981"}40`
@@ -2496,11 +2660,13 @@ export default function ClientOrdersPage() {
                     <div className="grid grid-cols-2 gap-6 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs">
                       <div>
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">BILLED TO (CLIENT ENTITY)</span>
-                        <h4 className="text-base font-bold text-slate-900">{selectedOrderGroup.company_name || "Client Entity"}</h4>
-                        <p className="text-slate-600 font-medium mt-0.5">
-                          Attention: <span className="font-semibold text-slate-800">{selectedOrderGroup.client_name || "Key Representative"}</span>
-                        </p>
-                        <p className="text-slate-500 text-[11px]">Reference Contract #: <span className="font-mono font-bold text-slate-800">{selectedOrderGroup.order_number}</span></p>
+                        <h4 className="text-base font-bold text-slate-900">{selectedOrderGroup.billing_company_name || selectedOrderGroup.company_name || "Client Entity"}</h4>
+                        {selectedOrderGroup.billing_company_id && selectedOrderGroup.billing_company_id !== selectedOrderGroup.company_id && (
+                          <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                            Target Company Entity: <span className="font-bold text-slate-700">{selectedOrderGroup.company_name}</span>
+                          </p>
+                        )}
+                        <p className="text-slate-500 text-[11px] mt-0.5">Reference Contract #: <span className="font-mono font-bold text-slate-800">{selectedOrderGroup.order_number}</span></p>
                       </div>
 
                       <div className="text-right border-l border-slate-200 pl-6">
@@ -2516,8 +2682,9 @@ export default function ClientOrdersPage() {
                         <thead>
                           <tr className="bg-slate-100 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
                             <th className="p-2 w-12 text-center">#</th>
-                            <th className="p-2 w-28">Pricing Tier</th>
                             <th className="p-2">Service Line Item</th>
+                            <th className="p-2 w-32">Branch / Reference</th>
+                            <th className="p-2 w-28">Pricing Tier</th>
                             <th className="p-2 text-right">Contract Price</th>
                             <th className="p-2 text-right text-emerald-700 font-extrabold">Proforma Amount ({proformaPercent}%)</th>
                           </tr>
@@ -2529,7 +2696,6 @@ export default function ClientOrdersPage() {
                             return (
                               <tr key={item.id || idx} className="hover:bg-slate-50/60">
                                 <td className="p-2 text-center font-mono font-bold text-slate-400">{idx + 1}</td>
-                                <td className="p-2 font-mono font-semibold text-slate-600 w-28">{item.pricing_tier}</td>
                                 <td className="p-2">
                                   <div className="flex flex-wrap items-center gap-2">
                                     <span className="font-bold text-slate-900 text-sm leading-tight">{item.job_title}</span>
@@ -2545,6 +2711,16 @@ export default function ClientOrdersPage() {
                                     return formatInvoiceDescription(desc);
                                   })()}
                                 </td>
+                                <td className="p-2 text-xs font-semibold text-slate-700 w-32">
+                                  {item.branch_name ? (
+                                    <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800 font-mono text-[10px] font-bold">
+                                      {item.branch_name}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 font-mono text-xs">-</span>
+                                  )}
+                                </td>
+                                <td className="p-2 font-mono font-semibold text-slate-600 w-28">{item.pricing_tier}</td>
                                 <td className="p-2 text-right font-mono font-bold text-slate-700">{formatCurrency(lineFullPrice)}</td>
                                 <td className="p-2 text-right font-mono font-bold text-emerald-700 bg-emerald-50/50">
                                   {formatCurrency(lineProformaPrice)}
@@ -2754,11 +2930,13 @@ export default function ClientOrdersPage() {
                     <div className="grid grid-cols-2 gap-6 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs">
                       <div>
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">BILLED TO (CLIENT ENTITY)</span>
-                        <h4 className="text-base font-bold text-slate-900">{selectedOrderGroup.company_name || "Client Entity"}</h4>
-                        <p className="text-slate-600 font-medium mt-0.5">
-                          Attention: <span className="font-semibold text-slate-800">{selectedOrderGroup.client_name || "Key Representative"}</span>
-                        </p>
-                        <p className="text-slate-500 text-[11px]">Reference Contract #: <span className="font-mono font-bold text-slate-800">{selectedOrderGroup.order_number}</span></p>
+                        <h4 className="text-base font-bold text-slate-900">{selectedOrderGroup.billing_company_name || selectedOrderGroup.company_name || "Client Entity"}</h4>
+                        {selectedOrderGroup.billing_company_id && selectedOrderGroup.billing_company_id !== selectedOrderGroup.company_id && (
+                          <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                            Target Company Entity: <span className="font-bold text-slate-700">{selectedOrderGroup.company_name}</span>
+                          </p>
+                        )}
+                        <p className="text-slate-500 text-[11px] mt-0.5">Reference Contract #: <span className="font-mono font-bold text-slate-800">{selectedOrderGroup.order_number}</span></p>
                       </div>
 
                       <div className="text-right border-l border-slate-200 pl-6">
@@ -2774,8 +2952,9 @@ export default function ClientOrdersPage() {
                         <thead>
                           <tr className="bg-slate-100 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
                             <th className="p-2.5 w-12 text-center">#</th>
-                            <th className="p-2.5 w-28">Pricing Tier</th>
                             <th className="p-2.5">Service Line Item</th>
+                            <th className="p-2.5 w-32">Branch / Reference</th>
+                            <th className="p-2.5 w-28">Pricing Tier</th>
                             <th className="p-2.5 text-right">Contract Price</th>
                           </tr>
                         </thead>
@@ -2785,7 +2964,6 @@ export default function ClientOrdersPage() {
                             return (
                               <tr key={item.id || idx} className="hover:bg-slate-50/60">
                                 <td className="p-2.5 text-center font-mono font-bold text-slate-400">{idx + 1}</td>
-                                <td className="p-2.5 font-mono font-semibold text-slate-600 w-28">{item.pricing_tier}</td>
                                 <td className="p-2.5">
                                   <div className="flex flex-wrap items-center gap-2">
                                     <span className="font-bold text-slate-900 text-sm leading-tight">{item.job_title}</span>
@@ -2801,6 +2979,16 @@ export default function ClientOrdersPage() {
                                     return formatInvoiceDescription(desc);
                                   })()}
                                 </td>
+                                <td className="p-2.5 text-xs font-semibold text-slate-700 w-32">
+                                  {item.branch_name ? (
+                                    <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800 font-mono text-[10px] font-bold">
+                                      {item.branch_name}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 font-mono text-xs">-</span>
+                                  )}
+                                </td>
+                                <td className="p-2.5 font-mono font-semibold text-slate-600 w-28">{item.pricing_tier}</td>
                                 <td className="p-2.5 text-right font-mono font-bold text-slate-700">{formatCurrency(lineFullPrice)}</td>
                               </tr>
                             );
@@ -2823,32 +3011,38 @@ export default function ClientOrdersPage() {
                       </div>
 
                       {/* Total Calculations */}
-                      <div className="w-full sm:w-96 space-y-1.5 text-xs font-mono">
-                        <div className="flex justify-between py-1 border-b border-slate-200 text-slate-600">
-                          <span>Total Contract Value:</span>
-                          <span className="font-bold text-slate-900">{formatCurrency(selectedOrderGroup.total_amount)}</span>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-slate-200 text-slate-600">
-                          <span>Less: Proforma Paid ({selectedOrderGroup.proforma_stage_percent || proformaPercent}%):</span>
-                          <span className="font-bold text-amber-600">-{formatCurrency((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100)}</span>
-                        </div>
-                        {isPph21 && (
-                          <div className="flex justify-between py-1 border-b border-slate-200 text-red-600 font-bold">
-                            <span>WHT PPh 21 (2% Deduction):</span>
-                            <span>-{formatCurrency((selectedOrderGroup.total_amount - ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100)) * 0.02)}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between py-2.5 px-3 rounded-lg bg-blue-600 text-white text-sm font-bold shadow-sm">
-                          <span>Total Amount Due:</span>
-                          <span>
-                            {formatCurrency(
-                              isPph21
-                                ? (selectedOrderGroup.total_amount - ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100)) * 0.98
-                                : selectedOrderGroup.total_amount - ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100)
+                      {(() => {
+                        const proformaDeduction = (selectedOrderGroup.proforma_paid_amount !== undefined && selectedOrderGroup.proforma_paid_amount !== null && selectedOrderGroup.proforma_paid_amount > 0)
+                          ? selectedOrderGroup.proforma_paid_amount
+                          : ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100);
+                        const isCustomProforma = (selectedOrderGroup.proforma_paid_amount !== undefined && selectedOrderGroup.proforma_paid_amount !== null && selectedOrderGroup.proforma_paid_amount > 0);
+                        const subtotalAfterDeduction = Math.max(0, selectedOrderGroup.total_amount - proformaDeduction);
+                        const pph21Val = isPph21 ? subtotalAfterDeduction * 0.02 : 0;
+                        const finalDue = subtotalAfterDeduction - pph21Val;
+
+                        return (
+                          <div className="w-full sm:w-96 space-y-1.5 text-xs font-mono">
+                            <div className="flex justify-between py-1 border-b border-slate-200 text-slate-600">
+                              <span>Total Contract Value:</span>
+                              <span className="font-bold text-slate-900">{formatCurrency(selectedOrderGroup.total_amount)}</span>
+                            </div>
+                            <div className="flex justify-between py-1 border-b border-slate-200 text-slate-600">
+                              <span>Less: Proforma Paid {isCustomProforma ? "(Custom Received)" : `(${selectedOrderGroup.proforma_stage_percent || proformaPercent}%)`}:</span>
+                              <span className="font-bold text-amber-600">-{formatCurrency(proformaDeduction)}</span>
+                            </div>
+                            {isPph21 && (
+                              <div className="flex justify-between py-1 border-b border-slate-200 text-red-600 font-bold">
+                                <span>WHT PPh 21 (2% Deduction):</span>
+                                <span>-{formatCurrency(pph21Val)}</span>
+                              </div>
                             )}
-                          </span>
-                        </div>
-                      </div>
+                            <div className="flex justify-between py-2.5 px-3 rounded-lg bg-blue-600 text-white text-sm font-bold shadow-sm">
+                              <span>Total Amount Due:</span>
+                              <span>{formatCurrency(finalDue)}</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                   </div>
@@ -2954,7 +3148,7 @@ export default function ClientOrdersPage() {
               {viewingTeam?.description || "No description provided for this team."}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
             {/* Team Leader */}
             <div className="flex items-center gap-2.5 bg-muted/40 p-3 rounded-xl border border-border/30">
@@ -2993,7 +3187,7 @@ export default function ClientOrdersPage() {
               )}
             </div>
           </div>
-          
+
           <DialogFooter className="p-4 border-t border-border/60 bg-muted/5 shrink-0">
             <Button variant="outline" size="sm" onClick={() => setViewingTeam(null)} className="w-full sm:w-auto font-semibold">
               Close

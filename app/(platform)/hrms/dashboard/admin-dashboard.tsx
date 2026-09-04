@@ -5,7 +5,7 @@ import { useUser } from "@/contexts/user-context";
 import CalendarWidget from "@/components/calendar-widget";
 import { resolveImageUrl } from "@/lib/utils";
 import {
-  Users, UserCheck, CalendarOff, Clock, Download, Sunrise, Sun, Moon, Gift, Calendar, Cake
+  Users, UserCheck, CalendarOff, Clock, Download, Sunrise, Sun, Moon, Calendar, Cake
 } from "lucide-react";
 import BirthdayCelebration from "@/components/birthday-celebration";
 const PerformanceDashboardTab = dynamic(() => import("@/components/performance-dashboard-tab"), {
@@ -59,7 +59,6 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [birthdayData, setBirthdayData] = useState<{ is_birthday: boolean; employee_name: string; message: string } | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
-  const [upcomingBirthdays, setUpcomingBirthdays] = useState<any[]>([]);
 
   // Filters
   const [dateFilter, setDateFilter] = useState("this-month");
@@ -151,23 +150,7 @@ export default function AdminDashboard() {
       }
     };
 
-    const fetchUpcomingBirthdays = async () => {
-      try {
-        const token = localStorage.getItem("hrms_token");
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/birthdays/upcoming`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setUpcomingBirthdays(data);
-        }
-      } catch (err) {
-        console.error("Error fetching upcoming birthdays:", err);
-      }
-    };
-
     fetchBirthdayStatus();
-    fetchUpcomingBirthdays();
   }, []);
 
   useEffect(() => {
@@ -469,59 +452,9 @@ export default function AdminDashboard() {
             gridClassName="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 w-full"
           />
 
-          {/* ROW 2 - WORKFORCE PLANNING CALENDAR & SIDEBAR INFO */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <CalendarWidget />
-            </div>
-            
-            <div className="space-y-6">
-              {/* Upcoming Birthdays Widget */}
-              <Card className="border border-border/50 bg-background/50 backdrop-blur-md shadow-sm relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1 h-full bg-amber-500" />
-                <CardHeader className="pb-3 border-b border-border/10">
-                  <CardTitle className="text-sm font-bold flex items-center gap-1.5">
-                    <Gift className="h-4 w-4 text-amber-500" /> Upcoming Birthdays
-                  </CardTitle>
-                  <CardDescription className="text-[10px]">Staff birthdays in the next 30 days</CardDescription>
-                </CardHeader>
-                <CardContent className="p-3">
-                  {upcomingBirthdays.length === 0 ? (
-                    <div className="text-xs text-muted-foreground italic text-center py-6">
-                      No upcoming birthdays in the next 30 days.
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {upcomingBirthdays.map((bday: any) => (
-                        <div key={bday.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border/20 text-xs transition-all hover:bg-muted/40">
-                          <div className="flex items-center gap-2.5">
-                            <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center font-bold text-[10px] text-primary shrink-0 border border-primary/20 overflow-hidden">
-                              {bday.profile_photo ? (
-                                <img src={resolveImageUrl(bday.profile_photo)} alt={bday.first_name} className="h-full w-full object-cover" />
-                              ) : (
-                                `${bday.first_name[0]}${bday.last_name ? bday.last_name[0] : ""}`
-                              )}
-                            </div>
-                            <div>
-                              <span className="font-bold text-foreground block">{bday.first_name} {bday.last_name || ""}</span>
-                              <span className="text-[10px] text-muted-foreground block">{bday.department}</span>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <Badge variant="secondary" className="font-bold font-mono text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20">
-                              {bday.birthday_date}
-                            </Badge>
-                            <span className="text-[9px] text-muted-foreground block mt-0.5">
-                              {bday.days_away === 0 ? "Today! 🎉" : bday.days_away === 1 ? "Tomorrow" : `${bday.days_away} days away`}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+          {/* ROW 2 - WORKFORCE PLANNING CALENDAR */}
+          <div className="w-full">
+            <CalendarWidget />
           </div>
 
         </div>

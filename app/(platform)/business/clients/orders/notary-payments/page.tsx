@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,12 +18,23 @@ import {
   Clock, 
   Calendar, 
   CreditCard, 
-  History 
+  History,
+  Landmark,
+  Zap,
+  AlertTriangle,
+  ExternalLink,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { KpiCard } from "@/components/kpi-card";
 
-export default function NotaryPaymentsPage() {
+function NotaryPaymentsContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const notaryIdParam = searchParams.get("notaryId");
+
   const [summaries, setSummaries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -32,13 +45,19 @@ export default function NotaryPaymentsPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [jobFilter, setJobFilter] = useState<"ALL" | "PAID" | "UNPAID">("ALL");
 
-  // Payment registration modal state
+  // Manual payment registration modal state
   const [payingJob, setPayingJob] = useState<any | null>(null);
   const [paymentForm, setPaymentForm] = useState({
     payment_date: new Date().toISOString().split("T")[0],
     payment_ref: ""
   });
   const [submittingPayment, setSubmittingPayment] = useState(false);
+
+  // Xendit automated disbursement modal state
+  const [disburseJob, setDisburseJob] = useState<any | null>(null);
+  const [disburseNotes, setDisburseNotes] = useState("");
+  const [disbursing, setDisbursing] = useState(false);
+  const [missingBankModalOpen, setMissingBankModalOpen] = useState(false);
 
   // Fetch summaries
   const fetchSummaries = async () => {
@@ -83,6 +102,16 @@ export default function NotaryPaymentsPage() {
     fetchSummaries();
   }, []);
 
+  // Sync state with URL query parameter (handles browser back/forward and direct links)
+  useEffect(() => {
+    if (notaryIdParam) {
+      fetchNotaryHistory(parseInt(notaryIdParam));
+    } else {
+      setSelectedNotary(null);
+      setJobs([]);
+    }
+  }, [notaryIdParam]);
+
   const formatCurrency = (val: any) => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
@@ -91,12 +120,62 @@ export default function NotaryPaymentsPage() {
     }).format(val || 0);
   };
 
-  // Handle Mark as Paid
+  // Handle Initiating Xendit Payout
+  const handleInitiateDisburse = (job: any) => {
+    if (!selectedNotary?.is_bank_configured && (!selectedNotary?.bank_name || !selectedNotary?.bank_account_number || !selectedNotary?.bank_account_holder_name)) {
+      setMissingBankModalOpen(true);
+      return;
+    }
+    setDisburseJob(job);
+    setDisburseNotes(`Notary Fee ORD-${job.order_number} ${job.job_title?.slice(0, 20)}`);
+  };
+
+  // Execute Xendit Disbursement API call
+  const handleConfirmDisburse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!disburseJob) return;
+    setDisbursing(true);
+    const toastId = toast.loading("Processing automated disbursement via Xendit...");
+    try {
+      const token = localStorage.getItem("hrms_token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/payments/${disburseJob.id}/disburse`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ description: disburseNotes })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(
+          `Disbursement submitted! Payout ID: ${data.disbursement_id || "Completed"}`,
+          { id: toastId, duration: 5000 }
+        );
+        setDisburseJob(null);
+        fetchSummaries();
+        if (selectedNotary) {
+          fetchNotaryHistory(selectedNotary.id);
+        }
+      } else {
+        const errData = await res.json();
+        toast.error(errData.detail || "Disbursement failed", { id: toastId });
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message || "An error occurred during disbursement.", { id: toastId });
+    } finally {
+      setDisbursing(false);
+    }
+  };
+
+  // Handle Mark as Paid (Manual)
   const handleMarkAsPaid = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!payingJob) return;
     setSubmittingPayment(true);
-    const toastId = toast.loading("Registering payment...");
+    const toastId = toast.loading("Registering manual payment...");
     try {
       const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/payments/${payingJob.id}/pay`, {
@@ -108,13 +187,12 @@ export default function NotaryPaymentsPage() {
         body: JSON.stringify(paymentForm)
       });
       if (res.ok) {
-        toast.success("Payment registered successfully!", { id: toastId });
+        toast.success("Manual payment registered successfully!", { id: toastId });
         setPayingJob(null);
         setPaymentForm({
           payment_date: new Date().toISOString().split("T")[0],
           payment_ref: ""
         });
-        // Reload summary & details
         fetchSummaries();
         if (selectedNotary) {
           fetchNotaryHistory(selectedNotary.id);
@@ -131,30 +209,6 @@ export default function NotaryPaymentsPage() {
     }
   };
 
-  // Handle Mark as Unpaid
-  const handleMarkAsUnpaid = async (jobId: number) => {
-    const toastId = toast.loading("Reverting payment status...");
-    try {
-      const token = localStorage.getItem("hrms_token");
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/payments/${jobId}/unpay`, {
-        method: "PUT",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (res.ok) {
-        toast.success("Payment status reverted to unpaid", { id: toastId });
-        fetchSummaries();
-        if (selectedNotary) {
-          fetchNotaryHistory(selectedNotary.id);
-        }
-      } else {
-        const errData = await res.json();
-        toast.error(errData.detail || "Failed to revert payment", { id: toastId });
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("An error occurred.", { id: toastId });
-    }
-  };
 
   // KPI calculations
   const totalCost = summaries.reduce((sum, s) => sum + s.total_earned, 0);
@@ -189,15 +243,27 @@ export default function NotaryPaymentsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <div className="flex items-center gap-2">
-            {selectedNotary && (
+            {selectedNotary ? (
               <Button 
                 variant="ghost" 
                 size="icon" 
                 className="h-8 w-8 rounded-full border border-border/50 bg-background mr-1"
-                onClick={() => setSelectedNotary(null)}
+                onClick={() => router.push("/business/clients/orders/notary-payments")}
+                title="Back to All Notaries"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
+            ) : (
+              <Link href="/business/clients/orders">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 rounded-full border border-border/50 bg-background mr-1"
+                  title="Back to Active Orders"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              </Link>
             )}
             <h1 className="text-3xl font-bold tracking-tight">
               {selectedNotary ? `Payment History - ${selectedNotary.name}` : "Notary Payments"}
@@ -276,6 +342,7 @@ export default function NotaryPaymentsPage() {
               <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50 font-semibold tracking-wider">
                 <tr>
                   <th className="p-4">Notary Public</th>
+                  <th className="p-4">Bank Payout Info</th>
                   <th className="p-4">Location</th>
                   <th className="p-4 text-center">Total Jobs</th>
                   <th className="p-4 text-center">Unpaid Jobs</th>
@@ -288,22 +355,44 @@ export default function NotaryPaymentsPage() {
               <tbody className="divide-y">
                 {filteredSummaries.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                    <td colSpan={9} className="p-8 text-center text-muted-foreground">
                       No notary payment records found matching search query.
                     </td>
                   </tr>
                 ) : (
                   filteredSummaries.map((s) => (
                     <tr key={s.notary_id} className="hover:bg-muted/10 transition-colors">
-                      <td className="p-4 font-bold text-foreground flex items-center gap-2">
-                        <Scale className="h-4 w-4 text-muted-foreground shrink-0" />
-                        {s.notary_name}
+                      <td className="p-4 font-bold text-foreground">
+                        <div className="flex items-center gap-2">
+                          <Scale className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span>{s.notary_name}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-xs">
+                        {s.bank_name && s.bank_account_number ? (
+                          <div>
+                            <div className="flex items-center gap-1 font-semibold text-foreground">
+                              <Landmark className="h-3.5 w-3.5 text-primary shrink-0" />
+                              <span>{s.bank_name}</span>
+                              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[9px] py-0 px-1 font-bold">
+                                Ready
+                              </Badge>
+                            </div>
+                            <div className="font-mono text-[11px] text-muted-foreground mt-0.5">
+                              {s.bank_account_number}
+                            </div>
+                          </div>
+                        ) : (
+                          <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[10px] py-0.5 px-2">
+                            Missing Bank Info
+                          </Badge>
+                        )}
                       </td>
                       <td className="p-4 font-medium text-muted-foreground">{s.city}</td>
                       <td className="p-4 text-center font-semibold">{s.total_jobs}</td>
                       <td className="p-4 text-center">
                         {s.total_unpaid_jobs > 0 ? (
-                          <Badge variant="outline" className="bg-amber-500/5 text-amber-600 border-amber-500/20 py-0 px-2 font-mono">
+                          <Badge variant="outline" className="bg-amber-500/5 text-amber-600 border-amber-500/20 py-0 px-2 font-mono font-bold">
                             {s.total_unpaid_jobs} unpaid
                           </Badge>
                         ) : (
@@ -320,7 +409,7 @@ export default function NotaryPaymentsPage() {
                           variant="outline" 
                           size="sm" 
                           className="font-bold text-xs h-8"
-                          onClick={() => fetchNotaryHistory(s.notary_id)}
+                          onClick={() => router.push(`/business/clients/orders/notary-payments?notaryId=${s.notary_id}`)}
                         >
                           <History className="h-3.5 w-3.5 mr-1 text-primary" /> Manage Payments
                         </Button>
@@ -333,153 +422,330 @@ export default function NotaryPaymentsPage() {
           </div>
         </div>
       ) : (
-        <div className="glass-card rounded-xl overflow-hidden animate-in fade-in duration-300">
+        <div className="space-y-4">
           
-          {/* Header Action / Filter controls */}
-          <div className="p-4 border-b border-border/50 bg-muted/20 flex flex-col sm:flex-row justify-between items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="h-8 shadow-xs font-bold"
-                onClick={() => setSelectedNotary(null)}
-              >
-                <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back to Summary
-              </Button>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Show:</span>
-              <div className="flex rounded-lg border border-border/60 p-0.5 bg-background shadow-xs">
-                {(["ALL", "UNPAID", "PAID"] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => setJobFilter(mode)}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                      jobFilter === mode 
-                        ? "bg-primary text-primary-foreground" 
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {mode === "ALL" ? "All Jobs" : mode === "PAID" ? "Paid" : "Owed/Unpaid"}
-                  </button>
-                ))}
+          {/* NOTARY BANK ACCOUNT PROFILE BANNER */}
+          <div className="p-5 rounded-xl border border-border/60 bg-card/60 backdrop-blur-md shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="p-3 rounded-xl bg-primary/10 text-primary shrink-0">
+                <Landmark className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-foreground">
+                    {selectedNotary.name} Payout Destination Account
+                  </h3>
+                  {selectedNotary.bank_name && selectedNotary.bank_account_number && selectedNotary.bank_account_holder_name ? (
+                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] py-0.5 px-2 font-bold">
+                      <CheckCircle2 className="h-3 w-3 mr-1" /> Configured for Xendit
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[10px] py-0.5 px-2 font-bold">
+                      <AlertCircle className="h-3 w-3 mr-1" /> Incomplete Bank Details
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
+                  <div>
+                    <span className="font-semibold text-foreground/80">Bank:</span>{" "}
+                    <span className="font-bold text-foreground">{selectedNotary.bank_name || "-"}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-foreground/80">Account No:</span>{" "}
+                    <span className="font-mono font-bold text-foreground">{selectedNotary.bank_account_number || "-"}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-foreground/80">Holder Name:</span>{" "}
+                    <span className="font-bold text-foreground">{selectedNotary.bank_account_holder_name || "-"}</span>
+                  </div>
+                  {selectedNotary.bank_branch && (
+                    <div>
+                      <span className="font-semibold text-foreground/80">Branch:</span>{" "}
+                      <span>{selectedNotary.bank_branch}</span>
+                    </div>
+                  )}
+                  {selectedNotary.bank_swift_code && (
+                    <div>
+                      <span className="font-semibold text-foreground/80">SWIFT:</span>{" "}
+                      <span className="font-mono uppercase">{selectedNotary.bank_swift_code}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+
+            <Link href="/business/clients/notaries">
+              <Button variant="outline" size="sm" className="h-9 text-xs font-bold shrink-0">
+                <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Edit Bank Details
+              </Button>
+            </Link>
           </div>
 
-          {/* Detailed Job List */}
-          {historyLoading ? (
-            <div className="flex flex-col items-center justify-center p-12 gap-2">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <p className="text-xs text-muted-foreground">Loading job history...</p>
+          <div className="glass-card rounded-xl overflow-hidden animate-in fade-in duration-300">
+            {/* Header Action / Filter controls */}
+            <div className="p-4 border-b border-border/50 bg-muted/20 flex flex-col sm:flex-row justify-between items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 shadow-xs font-bold"
+                  onClick={() => setSelectedNotary(null)}
+                >
+                  <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back to Summary
+                </Button>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Show:</span>
+                <div className="flex rounded-lg border border-border/60 p-0.5 bg-background shadow-xs">
+                  {(["ALL", "UNPAID", "PAID"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setJobFilter(mode)}
+                      className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                        jobFilter === mode 
+                          ? "bg-primary text-primary-foreground" 
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {mode === "ALL" ? "All Jobs" : mode === "PAID" ? "Paid" : "Owed/Unpaid"}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left border-collapse">
-                <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50 font-semibold tracking-wider">
-                  <tr>
-                    <th className="p-4">Order ID</th>
-                    <th className="p-4">Client Company</th>
-                    <th className="p-4">Service Description</th>
-                    <th className="p-4 text-right">Notary Fee</th>
-                    <th className="p-4 text-center">Lifecycle</th>
-                    <th className="p-4 text-center">Payout Status</th>
-                    <th className="p-4">Paid Reference</th>
-                    <th className="p-4 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filteredJobs.length === 0 ? (
+
+            {/* Detailed Job List */}
+            {historyLoading ? (
+              <div className="flex flex-col items-center justify-center p-12 gap-2">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <p className="text-xs text-muted-foreground">Loading job history...</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left border-collapse">
+                  <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50 font-semibold tracking-wider">
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-muted-foreground">
-                        No jobs found matching active filter category.
-                      </td>
+                      <th className="p-4">Order ID</th>
+                      <th className="p-4">Client Company</th>
+                      <th className="p-4">Service Description</th>
+                      <th className="p-4 text-right">Notary Fee</th>
+                      <th className="p-4 text-center">Lifecycle</th>
+                      <th className="p-4 text-center">Payout Status</th>
+                      <th className="p-4">Paid Reference</th>
+                      <th className="p-4 text-center">Actions</th>
                     </tr>
-                  ) : (
-                    filteredJobs.map((j) => (
-                      <tr key={j.id} className="hover:bg-muted/10 transition-colors">
-                        <td className="p-4 font-mono font-bold text-xs">{j.order_number}</td>
-                        <td className="p-4 font-medium text-foreground">{j.company_name}</td>
-                        <td className="p-4">
-                          <div className="font-semibold text-foreground text-xs leading-normal">{j.job_title}</div>
-                        </td>
-                        <td className="p-4 text-right font-mono font-bold">{formatCurrency(j.notary_fee)}</td>
-                        <td className="p-4 text-center">
-                          <Badge variant="secondary" className="text-[10px] uppercase font-bold py-0.5 px-2">
-                            {j.status}
-                          </Badge>
-                        </td>
-                        <td className="p-4 text-center">
-                          {j.notary_payment_status === "PAID" ? (
-                            <Badge variant="outline" className="bg-emerald-500/5 text-emerald-600 border-emerald-500/20 py-0.5 px-2 font-semibold">
-                              PAID
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-amber-500/5 text-amber-600 border-amber-500/20 py-0.5 px-2 font-semibold">
-                              UNPAID
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="p-4 text-xs">
-                          {j.notary_payment_status === "PAID" ? (
-                            <div className="space-y-0.5 text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                <span>{j.notary_payment_date}</span>
-                              </div>
-                              {j.notary_payment_ref && (
-                                <div className="flex items-center gap-1 font-mono text-[10px]">
-                                  <CreditCard className="h-3 w-3" />
-                                  <span>{j.notary_payment_ref}</span>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground/30 font-medium italic">-</span>
-                          )}
-                        </td>
-                        <td className="p-4 text-center">
-                          {j.notary_payment_status === "PAID" ? (
-                            <Button 
-                              type="button"
-                              variant="ghost" 
-                              size="sm" 
-                              className="font-bold text-xs h-8 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"
-                              onClick={() => handleMarkAsUnpaid(j.id)}
-                            >
-                              Reset Unpaid
-                            </Button>
-                          ) : (
-                            <Button 
-                              type="button"
-                              variant="outline" 
-                              size="sm" 
-                              className="font-bold text-xs h-8 bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-500/20 shadow-xs"
-                              onClick={() => setPayingJob(j)}
-                            >
-                              Register Payout
-                            </Button>
-                          )}
+                  </thead>
+                  <tbody className="divide-y">
+                    {filteredJobs.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                          No jobs found matching active filter category.
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    ) : (
+                      filteredJobs.map((j) => (
+                        <tr key={j.id} className="hover:bg-muted/10 transition-colors">
+                          <td className="p-4 font-mono font-bold text-xs">{j.order_number}</td>
+                          <td className="p-4 font-medium text-foreground">{j.company_name}</td>
+                          <td className="p-4">
+                            <div className="font-semibold text-foreground text-xs leading-normal">{j.job_title}</div>
+                          </td>
+                          <td className="p-4 text-right font-mono font-bold">{formatCurrency(j.notary_fee)}</td>
+                          <td className="p-4 text-center">
+                            <Badge variant="secondary" className="text-[10px] uppercase font-bold py-0.5 px-2">
+                              {j.status}
+                            </Badge>
+                          </td>
+                          <td className="p-4 text-center">
+                            {j.notary_payment_status === "PAID" ? (
+                              <Badge variant="outline" className="bg-emerald-500/5 text-emerald-600 border-emerald-500/20 py-0.5 px-2 font-semibold">
+                                PAID
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-amber-500/5 text-amber-600 border-amber-500/20 py-0.5 px-2 font-semibold">
+                                UNPAID
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="p-4 text-xs">
+                            {j.notary_payment_status === "PAID" ? (
+                              <div className="space-y-0.5 text-muted-foreground">
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  <span>{j.notary_payment_date}</span>
+                                </div>
+                                {j.notary_payment_ref && (
+                                  <div className="flex items-center gap-1 font-mono text-[10px]">
+                                    <CreditCard className="h-3 w-3" />
+                                    <span>{j.notary_payment_ref}</span>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground/30 font-medium italic">-</span>
+                            )}
+                          </td>
+                          <td className="p-4 text-center">
+                            {j.notary_payment_status === "PAID" ? (
+                              <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs select-none border border-emerald-500/20">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                <span>Settled</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center gap-1.5">
+                                <Button 
+                                  type="button"
+                                  size="sm" 
+                                  className="font-bold text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                                  onClick={() => handleInitiateDisburse(j)}
+                                >
+                                  <Zap className="h-3.5 w-3.5 mr-1 fill-current" /> Pay via Xendit
+                                </Button>
+                                <Button 
+                                  type="button"
+                                  variant="outline" 
+                                  size="sm" 
+                                  title="Record Manual Offline Transfer"
+                                  className="font-semibold text-xs h-8 px-2 text-muted-foreground hover:text-foreground"
+                                  onClick={() => setPayingJob(j)}
+                                >
+                                  <CreditCard className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* REGISTER PAYOUT DIALOG MODAL */}
+      {/* XENDIT AUTOMATED DISBURSEMENT CONFIRMATION MODAL */}
+      <Dialog open={disburseJob !== null} onOpenChange={(open) => !open && setDisburseJob(null)}>
+        <DialogContent className="max-w-lg">
+          <form onSubmit={handleConfirmDisburse}>
+            <DialogHeader>
+              <DialogTitle className="font-bold text-lg flex items-center gap-2 text-foreground">
+                <Zap className="h-5 w-5 text-emerald-600 fill-current" /> Confirm Xendit Automated Payout
+              </DialogTitle>
+              <DialogDescription>
+                Execute direct bank transfer to notary <strong>{selectedNotary?.name}</strong> using Xendit Payouts.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              {/* Payment Summary Box */}
+              <div className="p-4 rounded-xl bg-muted/30 border space-y-2.5 text-xs">
+                <div className="flex justify-between items-center border-b pb-2">
+                  <span className="text-muted-foreground font-semibold">Recipient Notary:</span>
+                  <span className="font-bold text-foreground">{selectedNotary?.name}</span>
+                </div>
+                <div className="flex justify-between items-center border-b pb-2">
+                  <span className="text-muted-foreground font-semibold">Destination Bank:</span>
+                  <span className="font-bold text-foreground">{selectedNotary?.bank_name}</span>
+                </div>
+                <div className="flex justify-between items-center border-b pb-2">
+                  <span className="text-muted-foreground font-semibold">Account Number:</span>
+                  <span className="font-mono font-bold text-foreground">{selectedNotary?.bank_account_number}</span>
+                </div>
+                <div className="flex justify-between items-center border-b pb-2">
+                  <span className="text-muted-foreground font-semibold">Account Holder Name:</span>
+                  <span className="font-bold text-foreground">{selectedNotary?.bank_account_holder_name}</span>
+                </div>
+                <div className="flex justify-between items-center border-b pb-2">
+                  <span className="text-muted-foreground font-semibold">Order / Job:</span>
+                  <span className="font-semibold text-foreground">
+                    {disburseJob?.job_title} ({disburseJob?.order_number})
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pt-1">
+                  <span className="text-muted-foreground font-bold text-sm">Disbursement Amount:</span>
+                  <span className="font-extrabold text-base text-emerald-600 dark:text-emerald-400 font-mono">
+                    {formatCurrency(disburseJob?.notary_fee)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Disbursement Description / Memo
+                </label>
+                <Input 
+                  value={disburseNotes}
+                  onChange={(e) => setDisburseNotes(e.target.value)}
+                  placeholder="e.g. Notary Fee ORD-260001"
+                  className="bg-background"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDisburseJob(null)} disabled={disbursing}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={disbursing} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-2">
+                {disbursing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Processing via Xendit...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-4 w-4 fill-current" />
+                    Send Payout via Xendit
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* MISSING BANK DETAILS ALERT MODAL */}
+      <Dialog open={missingBankModalOpen} onOpenChange={setMissingBankModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-bold text-lg flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" /> Bank Information Missing
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-sm">
+              Cannot initiate automated disbursement for <strong>{selectedNotary?.name}</strong>. 
+              The notary profile is missing required bank credentials (Bank Name, Account Number, or Account Holder Name).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-200">
+            Please navigate to the Notaries directory, edit the notary profile, and configure the <strong>Bank Details</strong> tab.
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setMissingBankModalOpen(false)}>
+              Close
+            </Button>
+            <Link href="/business/clients/notaries">
+              <Button className="font-bold">
+                Go to Notaries Directory
+              </Button>
+            </Link>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MANUAL REGISTER PAYOUT DIALOG MODAL */}
       <Dialog open={payingJob !== null} onOpenChange={(open) => !open && setPayingJob(null)}>
         <DialogContent className="max-w-md">
           <form onSubmit={handleMarkAsPaid}>
             <DialogHeader>
-              <DialogTitle className="font-bold text-lg">Register Notary Payout</DialogTitle>
+              <DialogTitle className="font-bold text-lg">Record Manual Notary Payout</DialogTitle>
               <DialogDescription>
-                Register payment made for job <strong>{payingJob?.job_title}</strong> (Order <strong>{payingJob?.order_number}</strong>). This updates accounting tracking history.
+                Register an offline payment (cash / manual bank transfer) made for job <strong>{payingJob?.job_title}</strong> (Order <strong>{payingJob?.order_number}</strong>).
               </DialogDescription>
             </DialogHeader>
 
@@ -506,7 +772,7 @@ export default function NotaryPaymentsPage() {
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Payment Reference / Notes</label>
                 <Input 
-                  placeholder="e.g. Bank Transfer ID, Receipt Code, check number..."
+                  placeholder="e.g. Manual Bank Transfer ID, Receipt Code..."
                   className="bg-background"
                   value={paymentForm.payment_ref}
                   onChange={(e) => setPaymentForm(prev => ({ ...prev, payment_ref: e.target.value }))}
@@ -519,7 +785,7 @@ export default function NotaryPaymentsPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={submittingPayment} className="font-bold">
-                {submittingPayment ? "Registering..." : "Confirm Payment"}
+                {submittingPayment ? "Registering..." : "Confirm Manual Payment"}
               </Button>
             </DialogFooter>
           </form>
@@ -527,5 +793,18 @@ export default function NotaryPaymentsPage() {
       </Dialog>
 
     </div>
+  );
+}
+
+export default function NotaryPaymentsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center h-96 gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Loading Notary Payments Summary...</p>
+      </div>
+    }>
+      <NotaryPaymentsContent />
+    </Suspense>
   );
 }

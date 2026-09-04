@@ -168,7 +168,7 @@ export default function EditClientServicePage() {
                   </h4>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-                    <div className="sm:col-span-7 space-y-2">
+                    <div className="sm:col-span-6 space-y-2">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Job Title *</label>
                       <Input
                         required
@@ -179,11 +179,16 @@ export default function EditClientServicePage() {
                       />
                     </div>
 
-                    <div className="sm:col-span-2 space-y-2">
-                      <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Job ID</label>
-                      <div className="h-10 flex items-center font-mono font-extrabold text-sm text-primary select-none pointer-events-none">
-                        {formData.job_id}
-                      </div>
+                    <div className="sm:col-span-3 space-y-2">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Job ID *</label>
+                      <Input
+                        required
+                        name="job_id"
+                        value={formData.job_id}
+                        onChange={handleInputChange}
+                        placeholder="e.g. OA-001"
+                        className="h-10 text-sm font-mono font-bold bg-background border-border/60 focus:border-primary/50 focus:ring-primary/25 rounded-xl transition-all"
+                      />
                     </div>
 
                     <div className="sm:col-span-3 space-y-2 flex flex-col justify-end pb-2">

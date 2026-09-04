@@ -5,7 +5,7 @@ import os
 import shutil
 import uuid
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import models, schemas, auth, database
 from storage import upload_file_to_supabase, delete_file_from_supabase
@@ -243,6 +243,15 @@ def get_my_assigned_orders(db: Session = Depends(database.get_db), current_user:
     
     target_emp_id = current_user.employee.id if current_user.employee else None
     
+    ALLOWED_ASSIGNED_STATUSES = [
+        "ORDER_ASSIGNED",
+        "IN_PROGRESS",
+        "REVIEW_DOCS",
+        "FINAL_DOCUMENT_PREPARATION",
+        "FINAL_DOC_READY",
+        "COMPLETED"
+    ]
+
     filtered_orders = []
     for ord_obj in all_orders:
         c_ids = ord_obj.consultant_ids or []
@@ -256,7 +265,7 @@ def get_my_assigned_orders(db: Session = Depends(database.get_db), current_user:
         if target_emp_id and isinstance(c_ids, list) and target_emp_id in c_ids:
             is_assigned = True
             
-        if is_assigned and ord_obj.status != "DRAFT":
+        if is_assigned and ord_obj.status in ALLOWED_ASSIGNED_STATUSES:
             filtered_orders.append(ord_obj)
             
     results = []
@@ -268,6 +277,14 @@ def get_my_assigned_orders(db: Session = Depends(database.get_db), current_user:
             res.company_name = ord_obj.company.company_name
         elif ord_obj.client and ord_obj.client.companies:
             res.company_name = ord_obj.client.companies[0].company_name
+            
+        if ord_obj.billing_company:
+            res.billing_company_name = ord_obj.billing_company.company_name
+        elif ord_obj.company:
+            res.billing_company_name = ord_obj.company.company_name
+        elif ord_obj.client and ord_obj.client.companies:
+            res.billing_company_name = ord_obj.client.companies[0].company_name
+
         res.consultants = get_consultants_data(db, ord_obj.consultant_ids)
         res.consultant_ids = ord_obj.consultant_ids or []
         results.append(res)
@@ -283,6 +300,14 @@ def get_client_orders(db: Session = Depends(database.get_db), current_user: mode
             emp_id = current_user.employee.id
             all_orders = orders_query.all()
             filtered = []
+            ALLOWED_ASSIGNED_STATUSES = [
+                "ORDER_ASSIGNED",
+                "IN_PROGRESS",
+                "REVIEW_DOCS",
+                "FINAL_DOCUMENT_PREPARATION",
+                "FINAL_DOC_READY",
+                "COMPLETED"
+            ]
             for ord_obj in all_orders:
                 c_ids = ord_obj.consultant_ids or []
                 if isinstance(c_ids, str):
@@ -290,7 +315,7 @@ def get_client_orders(db: Session = Depends(database.get_db), current_user: mode
                         c_ids = json.loads(c_ids)
                     except Exception:
                         c_ids = [int(x.strip()) for x in c_ids.split(",") if x.strip().isdigit()]
-                if isinstance(c_ids, list) and emp_id in c_ids and ord_obj.status != "DRAFT":
+                if isinstance(c_ids, list) and emp_id in c_ids and ord_obj.status in ALLOWED_ASSIGNED_STATUSES:
                     filtered.append(ord_obj)
             orders = filtered
         elif role_name == "CLIENT" and current_user.client:
@@ -309,6 +334,14 @@ def get_client_orders(db: Session = Depends(database.get_db), current_user: mode
             res.company_name = ord_obj.company.company_name
         elif ord_obj.client and ord_obj.client.companies:
             res.company_name = ord_obj.client.companies[0].company_name
+
+        if ord_obj.billing_company:
+            res.billing_company_name = ord_obj.billing_company.company_name
+        elif ord_obj.company:
+            res.billing_company_name = ord_obj.company.company_name
+        elif ord_obj.client and ord_obj.client.companies:
+            res.billing_company_name = ord_obj.client.companies[0].company_name
+
         res.consultants = get_consultants_data(db, ord_obj.consultant_ids)
         res.consultant_ids = ord_obj.consultant_ids or []
         results.append(res)
@@ -341,6 +374,10 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
         if existing_item:
             order_status = existing_item.status
             payment_status = existing_item.payment_status
+    else:
+        # Brand new order number generated: purge any lingering progress records
+        db.query(models.ClientOrderProgress).filter(models.ClientOrderProgress.order_number == order_num).delete(synchronize_session=False)
+        db.commit()
 
     created_rows = []
     
@@ -358,13 +395,16 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
                 if notary_fee_rec:
                     fee = notary_fee_rec.fee or 0.0
 
+        target_billing_company_id = order_req.billing_company_id or target_company_id
         db_order = models.ClientOrder(
             order_number=order_num,
             client_id=target_client_id,
             company_id=target_company_id,
+            billing_company_id=target_billing_company_id,
             service_id=item.service_id,
             job_id=item.job_id,
             job_title=item.job_title,
+            branch_name=item.branch_name,
             description=item.description,
             pricing_tier=item.pricing_tier,
             unit_price=item.unit_price,
@@ -388,12 +428,41 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
             res.company_name = db_order.company.company_name
         elif db_order.client and db_order.client.companies:
             res.company_name = db_order.client.companies[0].company_name
+
+        if db_order.billing_company:
+            res.billing_company_name = db_order.billing_company.company_name
+        elif db_order.company:
+            res.billing_company_name = db_order.company.company_name
+        elif db_order.client and db_order.client.companies:
+            res.billing_company_name = db_order.client.companies[0].company_name
             
         res.consultants = get_consultants_data(db, db_order.consultant_ids)
         res.consultant_ids = db_order.consultant_ids or []
         created_rows.append(res)
         
     return created_rows
+
+@router.delete("/orders/group/{order_number}")
+def delete_order_group(order_number: str, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    if not is_admin_or_hr(current_user):
+        raise HTTPException(status_code=403, detail="Only Admin or HR can delete orders")
+        
+    orders = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
+    if not orders:
+        # Also ensure any dangling chat history for this order_number is deleted
+        db.query(models.ClientOrderProgress).filter(models.ClientOrderProgress.order_number == order_number).delete(synchronize_session=False)
+        db.commit()
+        return {"message": "Order group and chat history deleted"}
+        
+    for ord_obj in orders:
+        db.delete(ord_obj)
+        
+    # Delete associated chat history
+    db.query(models.ClientOrderProgress).filter(models.ClientOrderProgress.order_number == order_number).delete(synchronize_session=False)
+    db.commit()
+    
+    log_activity(db, "ORDER_DELETED", f"Order {order_number} and associated chat history deleted", user_id=current_user.id)
+    return {"message": "Order group and chat history deleted successfully"}
 
 @router.delete("/orders/{id:int}")
 def delete_client_order(id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
@@ -406,15 +475,15 @@ def delete_client_order(id: int, db: Session = Depends(database.get_db), current
         
     order_number = db_order.order_number
     db.delete(db_order)
-    db.flush()
+    db.commit()
     
     # Check if there are any remaining items in this order group
     remaining = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).count()
     if remaining == 0:
         # Delete progress logs (this includes both system and user messages in the order chat)
-        db.query(models.ClientOrderProgress).filter(models.ClientOrderProgress.order_number == order_number).delete()
+        db.query(models.ClientOrderProgress).filter(models.ClientOrderProgress.order_number == order_number).delete(synchronize_session=False)
+        db.commit()
         
-    db.commit()
     return {"message": "Order deleted successfully"}
 
 @router.get("/{id:int}", response_model=schemas.ClientResponse)
@@ -514,6 +583,8 @@ def create_client(client_data: schemas.ClientCreate, db: Session = Depends(datab
 
     if client_data.order_items and len(client_data.order_items) > 0:
         order_num = generate_order_number(db)
+        db.query(models.ClientOrderProgress).filter(models.ClientOrderProgress.order_number == order_num).delete(synchronize_session=False)
+        db.commit()
         target_company_id = db_company.id if 'db_company' in locals() and db_company else None
         
         for item in client_data.order_items:
@@ -524,6 +595,7 @@ def create_client(client_data: schemas.ClientCreate, db: Session = Depends(datab
                 service_id=item.service_id,
                 job_id=item.job_id,
                 job_title=item.job_title,
+                branch_name=getattr(item, 'branch_name', None),
                 description=item.description,
                 pricing_tier=item.pricing_tier,
                 unit_price=item.unit_price,
@@ -613,6 +685,8 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
             db_order.job_id = order_update.job_id
         if order_update.job_title is not None:
             db_order.job_title = order_update.job_title
+        if hasattr(order_update, 'branch_name') and order_update.branch_name is not None:
+            db_order.branch_name = order_update.branch_name
         if order_update.description is not None:
             db_order.description = order_update.description
         if order_update.pricing_tier is not None:
@@ -639,9 +713,56 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
             db_order.is_proforma_finalized = order_update.is_proforma_finalized
             if not order_update.is_proforma_finalized:
                 db_order.is_final_invoice_finalized = False
-                update_order_group_status(db, orders_in_group, "DRAFT", current_user.id)
         if order_update.proforma_stage_percent is not None:
             db_order.proforma_stage_percent = order_update.proforma_stage_percent
+        if order_update.proforma_paid_amount is not None:
+            with status_lock:
+                old_val = db_order.proforma_paid_amount
+                new_val = order_update.proforma_paid_amount
+                db_order.proforma_paid_amount = new_val
+                for o_item in orders_in_group:
+                    o_item.proforma_paid_amount = new_val
+
+                # Post progress update to order chat if the value changed
+                if old_val != new_val:
+                    chat_msg = "Amount Received / Proforma Paid manually updated."
+                    # Check recent messages to avoid duplicate logs from concurrent calls
+                    recent_progress = db.query(models.ClientOrderProgress).filter(
+                        models.ClientOrderProgress.order_number == db_order.order_number,
+                        models.ClientOrderProgress.message == chat_msg
+                    ).order_by(models.ClientOrderProgress.id.desc()).first()
+                    
+                    is_duplicate = False
+                    if recent_progress and recent_progress.created_at:
+                        prog_time = recent_progress.created_at
+                        now_compare = datetime.utcnow() if prog_time.tzinfo is None else datetime.now(timezone.utc)
+                        if (now_compare - prog_time).total_seconds() < 15:
+                            is_duplicate = True
+
+                    if not is_duplicate:
+                        db_progress = models.ClientOrderProgress(
+                            order_number=db_order.order_number,
+                            user_id=current_user.id,
+                            message=chat_msg
+                        )
+                        db.add(db_progress)
+
+            # If an active proforma payment link existed on Xendit, expire it to prevent accidental double-payment by client
+            if db_order.xendit_invoice_id and not db_order.is_final_invoice_finalized:
+                try:
+                    from utils.xendit_client import XenditClient
+                    xendit = XenditClient()
+                    xendit.expire_invoice(db_order.xendit_invoice_id)
+                except Exception as e:
+                    print("Note: Could not expire previous Xendit invoice:", e)
+                # Clear proforma link so a clean dedicated link will be created for the final invoice
+                for o_item in orders_in_group:
+                    o_item.payment_link = None
+                    o_item.xendit_invoice_id = None
+        if order_update.billing_company_id is not None:
+            db_order.billing_company_id = order_update.billing_company_id
+            for o_item in orders_in_group:
+                o_item.billing_company_id = order_update.billing_company_id
         if order_update.is_final_invoice_finalized is not None:
             # Only allow setting to True if proforma is already finalized
             if order_update.is_final_invoice_finalized and not db_order.is_proforma_finalized:
@@ -885,13 +1006,26 @@ def create_standalone_client_company(company_data: schemas.ClientCompanyCreate, 
     if not is_admin_or_hr(current_user):
         raise HTTPException(status_code=403, detail="Not authorized to create standalone companies")
         
-    if company_data.client_id:
-        db_client = db.query(models.Client).filter(models.Client.id == company_data.client_id).first()
+    if not company_data.key_contact_person or not str(company_data.key_contact_person).strip():
+        raise HTTPException(status_code=400, detail="Key Contact Person Name is mandatory")
+    if not company_data.key_contact_email or not str(company_data.key_contact_email).strip():
+        raise HTTPException(status_code=400, detail="Key Contact Email is mandatory")
+    if not company_data.key_contact_phone or not str(company_data.key_contact_phone).strip():
+        raise HTTPException(status_code=400, detail="Key Contact Phone is mandatory")
+
+    target_client_id = company_data.client_id
+    if target_client_id:
+        db_client = db.query(models.Client).filter(models.Client.id == target_client_id).first()
         if not db_client:
             raise HTTPException(status_code=404, detail="Client not found")
+    else:
+        first_client = db.query(models.Client).first()
+        if first_client:
+            target_client_id = first_client.id
 
     comp_data_dict = company_data.model_dump() if hasattr(company_data, "model_dump") else company_data.dict()
     comp_data_dict["company_code"] = generate_company_code(db, company_data.company_name)
+    comp_data_dict["client_id"] = target_client_id
 
     db_company = models.ClientCompany(**comp_data_dict)
     db.add(db_company)
@@ -904,6 +1038,13 @@ def create_standalone_client_company(company_data: schemas.ClientCompanyCreate, 
 def create_client_company(id: int, company_data: schemas.ClientCompanyCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     if not (is_admin_or_hr(current_user) or is_client_themselves(current_user, id)):
         raise HTTPException(status_code=403, detail="Not authorized to create companies for this client")
+
+    if not company_data.key_contact_person or not str(company_data.key_contact_person).strip():
+        raise HTTPException(status_code=400, detail="Key Contact Person Name is mandatory")
+    if not company_data.key_contact_email or not str(company_data.key_contact_email).strip():
+        raise HTTPException(status_code=400, detail="Key Contact Email is mandatory")
+    if not company_data.key_contact_phone or not str(company_data.key_contact_phone).strip():
+        raise HTTPException(status_code=400, detail="Key Contact Phone is mandatory")
         
     db_client = db.query(models.Client).filter(models.Client.id == id).first()
     if not db_client:
@@ -1886,8 +2027,8 @@ def finalize_order_final_invoice(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save file to Dropbox: {str(e)}")
         
-    # Update orders
-    update_order_group_status(db, orders_in_group, "WAITING_FOR_FINAL_PAYMENT", current_user.id)
+    # Update orders to INVOICE_GENERATED
+    update_order_group_status(db, orders_in_group, "INVOICE_GENERATED", current_user.id)
     for order in orders_in_group:
         order.is_final_invoice_finalized = True
         
@@ -1979,9 +2120,9 @@ def send_order_invoice_email(
     if not first_order:
         raise HTTPException(status_code=404, detail="Order group not found")
 
-    company = db.query(models.ClientCompany).filter(models.ClientCompany.id == first_order.company_id).first()
+    company = db.query(models.ClientCompany).filter(models.ClientCompany.id == (first_order.billing_company_id or first_order.company_id)).first()
     if not company:
-        raise HTTPException(status_code=404, detail="Company not found associated with this order")
+        raise HTTPException(status_code=404, detail="Billing company not found associated with this order")
 
     # Locate the finalized invoice document for this order
     desc_keyword = "Proforma" if invoice_type == "proforma" else "Final"
@@ -2024,26 +2165,39 @@ def send_order_invoice_email(
     else:
         raise HTTPException(status_code=400, detail="Invoice URL format is unsupported")
 
-    recipient_email = company.key_contact_email if company.key_contact_email else first_order.client.email
-    recipient_name = company.key_contact_person if company.key_contact_person else first_order.client.contact_person
+    recipient_email = company.key_contact_email or (company.client.email if company.client else None) or (first_order.client.email if first_order.client else "")
+    recipient_name = company.key_contact_person or (company.client.contact_person if company.client else None) or (first_order.client.contact_person if first_order.client else "")
 
-    # Transition order statuses in this group to WAITING_ON_CLIENT
+    # Transition order statuses in this group
     orders_in_group = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
-    update_order_group_status(db, orders_in_group, "WAITING_ON_CLIENT", current_user.id)
+    if invoice_type == "final":
+        update_order_group_status(db, orders_in_group, "WAITING_FOR_FINAL_PAYMENT", current_user.id)
+    else:
+        update_order_group_status(db, orders_in_group, "WAITING_ON_CLIENT", current_user.id)
 
-    # Automatically generate Xendit payment link if not already generated
+    # Automatically generate Xendit payment link
     total_amount = sum(item.unit_price for item in orders_in_group)
-    if invoice_type == "proforma" and first_order.proforma_stage_percent:
-        total_amount = round((total_amount * first_order.proforma_stage_percent) / 100)
+    proforma_pct = first_order.proforma_stage_percent or 50
+    proforma_deduction = first_order.proforma_paid_amount if (first_order.proforma_paid_amount is not None and first_order.proforma_paid_amount > 0) else round((total_amount * proforma_pct) / 100)
 
+    if invoice_type == "proforma":
+        charge_amount = round((total_amount * proforma_pct) / 100)
+    else:
+        if first_order.payment_status == "PARTIALLY_PAID":
+            charge_amount = max(0, total_amount - proforma_deduction)
+        else:
+            charge_amount = total_amount
+
+    # Need a new link if final invoice stage or if payment link is not yet created
+    needs_new_link = (invoice_type == "final" and first_order.payment_status == "PARTIALLY_PAID") or (not first_order.payment_link)
     payment_url = first_order.payment_link
-    if not payment_url:
+    if needs_new_link:
         from utils.xendit_client import XenditClient
         xendit = XenditClient()
         try:
             res = xendit.create_invoice(
                 external_id=order_number,
-                amount=total_amount,
+                amount=charge_amount,
                 payer_email=recipient_email,
                 description=f"Payment for Service Order {order_number} ({invoice_type.capitalize()} Invoice)"
             )
@@ -2111,19 +2265,35 @@ def generate_order_payment_link(
     client = first_order.client
     if not client:
         raise HTTPException(status_code=400, detail="Client not attached to order")
-        
-    if first_order.payment_link:
+
+    # Determine whether this is proforma or final stage
+    proforma_pct = first_order.proforma_stage_percent or 50
+    proforma_deduction = first_order.proforma_paid_amount if (first_order.proforma_paid_amount is not None and first_order.proforma_paid_amount > 0) else round((total_amount * proforma_pct) / 100)
+    is_final_stage = (first_order.payment_status == "PARTIALLY_PAID" or first_order.is_final_invoice_finalized or first_order.status in ["WAITING_FOR_FINAL_PAYMENT", "FINAL_DOC_READY", "FINAL_DOCUMENT_PREPARATION"])
+
+    if is_final_stage:
+        charge_amount = max(0, total_amount - proforma_deduction)
+        inv_desc = f"Payment for Service Order {order_number} (Final Invoice)"
+    else:
+        charge_amount = round((total_amount * proforma_pct) / 100) if first_order.is_proforma_finalized else total_amount
+        inv_desc = f"Payment for Service Order {order_number} (Proforma Invoice)"
+
+    if first_order.payment_link and not is_final_stage:
         return {"payment_link": first_order.payment_link}
         
     from utils.xendit_client import XenditClient
     xendit = XenditClient()
     
+    billing_company_id = first_order.billing_company_id or first_order.company_id
+    billing_company = db.query(models.ClientCompany).filter(models.ClientCompany.id == billing_company_id).first()
+    payer_email = (billing_company.key_contact_email if (billing_company and billing_company.key_contact_email) else None) or client.email
+
     try:
         res = xendit.create_invoice(
             external_id=order_number,
-            amount=total_amount,
-            payer_email=client.email,
-            description=f"Payment for Service Order {order_number}"
+            amount=charge_amount,
+            payer_email=payer_email,
+            description=inv_desc
         )
         pay_url = res.get("invoice_url")
         inv_id = res.get("id")
@@ -2139,6 +2309,142 @@ def generate_order_payment_link(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def process_xendit_invoice_payment(db: Session, payload: dict) -> dict:
+    external_id = payload.get("external_id")
+    status = (payload.get("status") or "").upper()
+    invoice_id = payload.get("id")
+    
+    if not status:
+        return {"status": "ignored", "reason": "missing status in payload"}
+        
+    # Check if order exists by order_number or xendit_invoice_id
+    orders = []
+    if external_id:
+        orders = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == external_id).all()
+    if not orders and invoice_id:
+        orders = db.query(models.ClientOrder).filter(models.ClientOrder.xendit_invoice_id == invoice_id).all()
+        if orders:
+            external_id = orders[0].order_number
+            
+    if not orders:
+        return {"status": "ignored", "reason": "matching order not found"}
+        
+    if status in ["PAID", "SETTLED"]:
+        description = (payload.get("description") or "").lower()
+        is_proforma = "proforma" in description
+        is_final = "final" in description
+        paid_amount_val = payload.get("paid_amount") or payload.get("amount")
+        
+        total_order_amount = sum(item.unit_price for item in orders)
+        first_order = orders[0]
+
+        try:
+            parsed_paid_amount = float(paid_amount_val) if paid_amount_val is not None else float(total_order_amount)
+        except (ValueError, TypeError):
+            parsed_paid_amount = 0.0
+        
+        # Determine if this payment is specifically for the Final Invoice stage
+        is_final_stage = is_final or first_order.status == "WAITING_FOR_FINAL_PAYMENT"
+
+        existing_cash_amount = first_order.proforma_paid_amount or 0.0
+        combined_paid = parsed_paid_amount
+        is_additional_proforma = False
+
+        if not is_final_stage:
+            # Proforma / early payment stage
+            if existing_cash_amount > 0 and abs(existing_cash_amount - parsed_paid_amount) > 100:
+                combined_paid = existing_cash_amount + parsed_paid_amount
+                is_additional_proforma = True
+
+            if combined_paid >= total_order_amount:
+                new_payment_status = "PAID"
+                # Preserve existing lifecycle status (e.g. IN_PROGRESS) - do not force FINAL_PAYMENT_COMPLETED
+                target_lifecycle_status = first_order.status
+                message_text = "Additional payment received via Xendit (multiple payments received for this order)."
+            else:
+                new_payment_status = "PARTIALLY_PAID"
+                target_lifecycle_status = "ORDER_ASSIGNED" if (first_order.consultant_ids and len(first_order.consultant_ids) > 0) else "CONFIRMED"
+                if is_additional_proforma:
+                    message_text = "Additional payment received via Xendit (multiple payments received for this order)."
+                else:
+                    message_text = "Proforma payment completed successfully via Xendit."
+        else:
+            # Final invoice payment stage (after deliverables are ready/sent)
+            new_payment_status = "PAID"
+            target_lifecycle_status = "FINAL_PAYMENT_COMPLETED"
+            message_text = "Final Invoice payment completed successfully via Xendit."
+            
+        # Check if payment status changed
+        is_payment_status_changed = any(item.payment_status != new_payment_status for item in orders)
+
+        for item in orders:
+            item.payment_status = new_payment_status
+            if not is_final_stage and combined_paid > 0:
+                item.proforma_paid_amount = combined_paid
+            if invoice_id and not item.xendit_invoice_id:
+                item.xendit_invoice_id = invoice_id
+
+        # Update lifecycle status strictly when in final invoice stage or when kicking off from draft
+        if is_final_stage and first_order.status != "FINAL_PAYMENT_COMPLETED":
+            update_order_group_status(db, orders, "FINAL_PAYMENT_COMPLETED", None)
+        elif not is_final_stage:
+            # Only transition from DRAFT/PROFORMA_GENERATED/WAITING_ON_CLIENT to ORDER_ASSIGNED/CONFIRMED
+            transition_orders = [item for item in orders if item.status in ["DRAFT", "PROFORMA_GENERATED", "WAITING_ON_CLIENT"]]
+            if transition_orders:
+                update_order_group_status(db, transition_orders, target_lifecycle_status, None)
+
+        if is_payment_status_changed:
+            progress = models.ClientOrderProgress(
+                order_number=external_id,
+                message=message_text,
+                user_id=None
+            )
+            db.add(progress)
+            db.commit()
+            return {
+                "status": "success",
+                "message": f"Order {external_id} marked as {new_payment_status} (Lifecycle status: {orders[0].status})",
+                "payment_status": new_payment_status,
+                "lifecycle_status": orders[0].status
+            }
+        else:
+            db.commit()
+            return {
+                "status": "success",
+                "message": f"Payment already verified ({new_payment_status}) (Lifecycle status: {orders[0].status})",
+                "payment_status": new_payment_status,
+                "lifecycle_status": orders[0].status
+            }
+        
+    return {"status": "received", "xendit_status": status}
+
+
+@router.post("/orders/{orderNumber}/sync-payment")
+def sync_order_payment(orderNumber: str, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    orders = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == orderNumber).all()
+    if not orders:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    xendit_inv_id = None
+    for item in orders:
+        if item.xendit_invoice_id:
+            xendit_inv_id = item.xendit_invoice_id
+            break
+            
+    if not xendit_inv_id:
+        raise HTTPException(status_code=400, detail="No active Xendit invoice is linked to this order.")
+        
+    from utils.xendit_client import XenditClient
+    xendit = XenditClient()
+    try:
+        inv_data = xendit.get_invoice(xendit_inv_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch invoice from Xendit: {str(e)}")
+        
+    res = process_xendit_invoice_payment(db, inv_data)
+    return res
+
+
 public_router = APIRouter(
     prefix="/api/clients/payments",
     tags=["payments"]
@@ -2148,7 +2454,7 @@ public_router = APIRouter(
 async def xendit_webhook(request: Request, db: Session = Depends(database.get_db)):
     x_token = request.headers.get("x-callback-token")
     env_token = os.getenv("XENDIT_CALLBACK_TOKEN", "")
-    if not env_token or x_token != env_token:
+    if env_token and x_token != env_token:
         raise HTTPException(status_code=401, detail="Unauthorized webhook source")
         
     try:
@@ -2156,80 +2462,9 @@ async def xendit_webhook(request: Request, db: Session = Depends(database.get_db
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON payload")
         
-    external_id = payload.get("external_id")
-    status = payload.get("status")
-    
-    if not external_id or not status:
-        return {"status": "ignored", "reason": "missing required fields"}
-        
-    # Check if order exists
-    orders = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == external_id).all()
-    if not orders:
-        return {"status": "ignored", "reason": "matching order not found"}
-        
-    if status == "PAID":
-        description = payload.get("description", "").lower()
-        is_proforma = "proforma" in description
-        is_final = "final" in description
-        paid_amount_val = payload.get("paid_amount") or payload.get("amount")
-        
-        # Calculate total amount of the order
-        total_order_amount = sum(item.unit_price for item in orders)
-        
-        # Parse paid_amount to float for formatting
-        try:
-            parsed_paid_amount = float(paid_amount_val) if paid_amount_val is not None else float(total_order_amount)
-        except ValueError:
-            parsed_paid_amount = 0.0
-            
-        formatted_paid = f"IDR {parsed_paid_amount:,.0f}"
-        
-        # Determine if this is a partial (proforma) or full (final) payment
-        is_partial = False
-        if is_proforma:
-            is_partial = True
-        elif is_final:
-            is_partial = False
-        elif orders[0].payment_status == "PARTIALLY_PAID":
-            is_partial = False
-        elif paid_amount_val and float(paid_amount_val) < total_order_amount:
-            is_partial = True
-            
-        if is_partial:
-            new_payment_status = "PARTIALLY_PAID"
-            message_text = "Proforma payment completed successfully."
-        else:
-            new_payment_status = "PAID"
-            message_text = "Final Invoice payment completed successfully."
-            
-        # Transition execution status conditionally and log to chat
-        if not is_partial:
-            # Transition execution status to FINAL_PAYMENT_COMPLETED when final invoice is paid
-            update_order_group_status(db, orders, "FINAL_PAYMENT_COMPLETED", None)
-        else:
-            # Transition execution status conditionally for the proforma payment stage
-            transition_orders = [item for item in orders if item.status in ["DRAFT", "PROFORMA_GENERATED", "WAITING_ON_CLIENT"]]
-            if transition_orders:
-                target_status = "CONFIRMED"
-                first_trans = transition_orders[0]
-                if first_trans.consultant_ids and len(first_trans.consultant_ids) > 0:
-                    target_status = "ORDER_ASSIGNED"
-                update_order_group_status(db, transition_orders, target_status, None)
-            
-        for item in orders:
-            item.payment_status = new_payment_status
-        
-        # Log to ClientOrderProgress
-        progress = models.ClientOrderProgress(
-            order_number=external_id,
-            message=message_text,
-            user_id=None
-        )
-        db.add(progress)
-        db.commit()
-        return {"status": "success", "message": f"Order {external_id} marked as {new_payment_status}"}
-        
-    return {"status": "received"}
+    res = process_xendit_invoice_payment(db, payload)
+    return res
+
 
 
 

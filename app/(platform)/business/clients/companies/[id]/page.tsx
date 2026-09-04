@@ -108,6 +108,31 @@ export default function CompanyDetailPage() {
     setErrorMsg(null);
     setSuccessMsg(null);
 
+    if (!companyForm.company_name.trim()) {
+      setErrorMsg("Company Name is required");
+      setSaving(false);
+      setActiveTab("company");
+      return;
+    }
+    if (!companyForm.key_contact_person || !companyForm.key_contact_person.trim()) {
+      setErrorMsg("Key Contact Person Name is mandatory");
+      setSaving(false);
+      setActiveTab("contact");
+      return;
+    }
+    if (!companyForm.key_contact_email || !companyForm.key_contact_email.trim()) {
+      setErrorMsg("Key Contact Email is mandatory");
+      setSaving(false);
+      setActiveTab("contact");
+      return;
+    }
+    if (!companyForm.key_contact_phone || !companyForm.key_contact_phone.trim()) {
+      setErrorMsg("Key Contact Phone is mandatory");
+      setSaving(false);
+      setActiveTab("contact");
+      return;
+    }
+
     try {
       const payload = {
         company_name: companyForm.company_name,
@@ -325,28 +350,31 @@ export default function CompanyDetailPage() {
                   {/* Key Contact Row */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium" htmlFor="key_contact_person">Key Contact Person Name</label>
+                      <label className="text-sm font-medium" htmlFor="key_contact_person">Key Contact Person Name *</label>
                       <Input 
                         id="key_contact_person" 
+                        required
                         placeholder="John Doe" 
                         value={companyForm.key_contact_person} 
                         onChange={(e) => setCompanyForm({...companyForm, key_contact_person: e.target.value})} 
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium" htmlFor="key_contact_email">Key Contact Email</label>
+                      <label className="text-sm font-medium" htmlFor="key_contact_email">Key Contact Email *</label>
                       <Input 
                         id="key_contact_email" 
                         type="email" 
+                        required
                         placeholder="john@example.com" 
                         value={companyForm.key_contact_email} 
                         onChange={(e) => setCompanyForm({...companyForm, key_contact_email: e.target.value})} 
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium" htmlFor="key_contact_phone">Key Contact Phone</label>
+                      <label className="text-sm font-medium" htmlFor="key_contact_phone">Key Contact Phone *</label>
                       <Input 
                         id="key_contact_phone" 
+                        required
                         placeholder="+62 812..." 
                         value={companyForm.key_contact_phone} 
                         onChange={(e) => setCompanyForm({...companyForm, key_contact_phone: e.target.value})} 

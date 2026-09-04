@@ -8,18 +8,31 @@ import {
   Loader2, 
   ArrowLeft, 
   Check, 
-  Building2,
-  Building,
-  UserCheck,
-  Users,
-  Tag,
-  Plus,
-  Trash2
+  Building2, 
+  Building, 
+  UserCheck, 
+  Users, 
+  Tag, 
+  Plus, 
+  Trash2,
+  Briefcase,
+  MapPin,
+  Mail,
+  Phone,
+  FileText
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription, 
+  DialogFooter 
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 export default function NewClientOrderPage() {
@@ -38,13 +51,32 @@ export default function NewClientOrderPage() {
   // Form Fields State
   const [filterClientId, setFilterClientId] = useState<string>("");
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+  const [sameBillingCompany, setSameBillingCompany] = useState<boolean>(true);
+  const [billingCompanyId, setBillingCompanyId] = useState<string>("");
   const [selectedConsultantIds, setSelectedConsultantIds] = useState<number[]>([]);
   const [notes, setNotes] = useState("");
+
+  // Quick Create Company State
+  const [isCreateCompanyOpen, setIsCreateCompanyOpen] = useState(false);
+  const [createCompanyTarget, setCreateCompanyTarget] = useState<"billing" | "target">("billing");
+  const [creatingCompany, setCreatingCompany] = useState(false);
+  const [newCompanyForm, setNewCompanyForm] = useState({
+    company_name: "",
+    client_id: "",
+    address: "",
+    tax_number: "",
+    industry: "",
+    key_contact_person: "",
+    key_contact_email: "",
+    key_contact_phone: "",
+    notes: ""
+  });
   const [orderItems, setOrderItems] = useState<any[]>([
     {
       service_id: "",
       job_id: "",
       job_title: "",
+      branch_name: "",
       description: "",
       pricing_tier: "BASE",
       unit_price: 0,
@@ -102,6 +134,7 @@ export default function NewClientOrderPage() {
         service_id: "",
         job_id: "",
         job_title: "",
+        branch_name: "",
         description: "",
         pricing_tier: "BASE",
         unit_price: 0,
@@ -120,6 +153,7 @@ export default function NewClientOrderPage() {
           service_id: "",
           job_id: "",
           job_title: "",
+          branch_name: "",
           description: "",
           pricing_tier: "BASE",
           unit_price: 0,
@@ -203,6 +237,91 @@ export default function NewClientOrderPage() {
     });
   };
 
+  const handleOpenCreateCompany = (target: "billing" | "target") => {
+    setCreateCompanyTarget(target);
+    setNewCompanyForm({
+      company_name: "",
+      client_id: filterClientId || (clients[0] ? String(clients[0].id) : ""),
+      address: "",
+      tax_number: "",
+      industry: "",
+      key_contact_person: "",
+      key_contact_email: "",
+      key_contact_phone: "",
+      notes: ""
+    });
+    setIsCreateCompanyOpen(true);
+  };
+
+  const handleCreateCompanySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    if (!newCompanyForm.company_name.trim()) {
+      toast.error("Company name is required");
+      return;
+    }
+    if (!newCompanyForm.key_contact_person.trim()) {
+      toast.error("Key Contact Person Name is required");
+      return;
+    }
+    if (!newCompanyForm.key_contact_email.trim()) {
+      toast.error("Key Contact Email is required");
+      return;
+    }
+    if (!newCompanyForm.key_contact_phone.trim()) {
+      toast.error("Key Contact Phone is required");
+      return;
+    }
+    setCreatingCompany(true);
+    try {
+      const payload = {
+        company_name: newCompanyForm.company_name.trim(),
+        client_id: newCompanyForm.client_id ? parseInt(newCompanyForm.client_id) : (filterClientId ? parseInt(filterClientId) : (clients[0]?.id || null)),
+        address: newCompanyForm.address || null,
+        tax_number: newCompanyForm.tax_number || null,
+        industry: newCompanyForm.industry || null,
+        key_contact_person: newCompanyForm.key_contact_person || null,
+        key_contact_email: newCompanyForm.key_contact_email || null,
+        key_contact_phone: newCompanyForm.key_contact_phone || null,
+        notes: newCompanyForm.notes || null
+      };
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/standalone`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const createdComp = await res.json();
+        toast.success(`Company "${createdComp.company_name}" created successfully!`);
+        setCompanies(prev => [...prev, createdComp]);
+
+        if (createCompanyTarget === "billing") {
+          setBillingCompanyId(String(createdComp.id));
+        } else {
+          setSelectedCompanyId(String(createdComp.id));
+          if (sameBillingCompany) {
+            setBillingCompanyId(String(createdComp.id));
+          }
+        }
+
+        setIsCreateCompanyOpen(false);
+      } else {
+        const err = await res.json();
+        toast.error(err.detail || "Failed to create company");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error creating company");
+    } finally {
+      setCreatingCompany(false);
+    }
+  };
+
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
@@ -217,6 +336,7 @@ export default function NewClientOrderPage() {
         service_id: i.service_id ? parseInt(i.service_id) : null,
         job_id: i.job_id,
         job_title: i.job_title,
+        branch_name: i.branch_name ? i.branch_name.trim() : null,
         description: i.description,
         pricing_tier: i.pricing_tier,
         unit_price: i.unit_price || 0,
@@ -231,8 +351,13 @@ export default function NewClientOrderPage() {
 
     setSaving(true);
     try {
+      const finalBillingCompanyId = sameBillingCompany
+        ? parseInt(selectedCompanyId)
+        : (billingCompanyId ? parseInt(billingCompanyId) : parseInt(selectedCompanyId));
+
       const payload = {
         company_id: parseInt(selectedCompanyId),
+        billing_company_id: finalBillingCompanyId,
         items: validItems,
         consultant_ids: selectedConsultantIds,
         notes: notes || null
@@ -342,29 +467,106 @@ export default function NewClientOrderPage() {
                   </select>
                 </div>
 
-                {/* Target Company Dropdown */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/90 flex items-center gap-1">
-                    <Building className="h-3.5 w-3.5 text-muted-foreground/75" />
-                    <span>Select Target Company Entity *</span>
-                  </label>
-                  <select
-                    required
-                    value={selectedCompanyId}
-                    onChange={(e) => setSelectedCompanyId(e.target.value)}
-                    className="flex h-9 w-full rounded-lg border border-border/60 bg-background px-3 py-1 text-xs font-semibold shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <option value="">Choose Target Company...</option>
-                    {(filterClientId
-                      ? companies.filter(c => c.client_id === parseInt(filterClientId))
-                      : companies
-                    ).map((comp) => (
-                      <option key={comp.id} value={String(comp.id)}>
-                        {comp.company_name} ({comp.company_code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  {/* Target Company Dropdown */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/90 flex items-center gap-1">
+                        <Building className="h-3.5 w-3.5 text-muted-foreground/75" />
+                        <span>Select Target Company Entity *</span>
+                      </label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenCreateCompany("target")}
+                        className="h-6 px-2 text-[10px] gap-1 font-bold text-primary hover:text-primary hover:bg-primary/10"
+                      >
+                        <Plus className="h-3 w-3" /> New Company
+                      </Button>
+                    </div>
+                    <select
+                      required
+                      value={selectedCompanyId}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSelectedCompanyId(val);
+                        if (sameBillingCompany) {
+                          setBillingCompanyId(val);
+                        }
+                      }}
+                      className="flex h-9 w-full rounded-lg border border-border/60 bg-background px-3 py-1 text-xs font-semibold shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      <option value="">Choose Target Company...</option>
+                      {(filterClientId
+                        ? companies.filter(c => c.client_id === parseInt(filterClientId))
+                        : companies
+                      ).map((comp) => (
+                        <option key={comp.id} value={String(comp.id)}>
+                          {comp.company_name} ({comp.company_code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Billing Company Checkbox & Conditional Dropdown */}
+                  <div className="space-y-2 pt-2 border-t border-border/40">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={sameBillingCompany}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setSameBillingCompany(checked);
+                          if (checked) {
+                            setBillingCompanyId(selectedCompanyId);
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-primary cursor-pointer"
+                      />
+                      <span className="text-xs font-semibold text-foreground">
+                        Billing company is the same as Target Company Entity
+                      </span>
+                    </label>
+
+                    {!sameBillingCompany && (
+                      <div className="space-y-1.5 pl-6 pt-1 animate-in fade-in duration-200">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-primary flex items-center gap-1">
+                            <Building className="h-3.5 w-3.5 text-primary" />
+                            <span>Select Billing Company Entity * (Invoicing Recipient)</span>
+                          </label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenCreateCompany("billing")}
+                            className="h-6 px-2 text-[10px] gap-1 font-bold border-primary/40 text-primary hover:bg-primary/10"
+                          >
+                            <Plus className="h-3 w-3" /> Create Company
+                          </Button>
+                        </div>
+                        <select
+                          required
+                          value={billingCompanyId}
+                          onChange={(e) => setBillingCompanyId(e.target.value)}
+                          className="flex h-9 w-full rounded-lg border border-primary/50 bg-background px-3 py-1 text-xs font-semibold shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                        >
+                          <option value="">Choose Billing Company...</option>
+                          {(filterClientId
+                            ? companies.filter(c => c.client_id === parseInt(filterClientId))
+                            : companies
+                          ).map((comp) => (
+                            <option key={comp.id} value={String(comp.id)}>
+                              {comp.company_name} ({comp.company_code})
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-muted-foreground italic">
+                          Proforma and Final invoices will be addressed to and billed under this entity.
+                        </p>
+                      </div>
+                    )}
+                  </div>
 
               </div>
             </CardContent>
@@ -465,6 +667,27 @@ export default function NewClientOrderPage() {
                           </option>
                         </select>
                       </div>
+                    </div>
+
+                    {/* Branch / Entity Reference (Free Text) */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                        <span>Branch / Entity Reference</span>
+                        <span className="text-[10px] font-mono text-muted-foreground/70 italic">Optional • Printed on Invoices</span>
+                      </label>
+                      <Input
+                        value={item.branch_name || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setOrderItems((prev) => {
+                            const copy = [...prev];
+                            copy[idx].branch_name = val;
+                            return copy;
+                          });
+                        }}
+                        placeholder="e.g. Bali Branch, HQ Office, Project Alpha..."
+                        className="h-8.5 text-xs font-medium rounded-lg border-border/60 bg-background"
+                      />
                     </div>
 
                     {/* Pricing tier free text input (if A3) */}
@@ -619,6 +842,216 @@ export default function NewClientOrderPage() {
         </div>
 
       </form>
+
+      {/* Quick Create Company Modal - Spacious, Clean & Elegant */}
+      <Dialog open={isCreateCompanyOpen} onOpenChange={setIsCreateCompanyOpen}>
+        <DialogContent className="max-w-3xl sm:max-w-3xl w-full max-h-[90vh] overflow-y-auto p-0 border border-border/80 shadow-2xl rounded-2xl bg-card">
+          {/* Header Banner */}
+          <div className="p-6 pb-5 bg-muted/40 border-b border-border/60">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-11 w-11 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-xs">
+                  <Building2 className="h-6 w-6" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl font-black tracking-tight text-foreground flex items-center gap-2">
+                    Create New Company Entity
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                    Register a corporate entity profile for <span className="font-semibold text-foreground">{createCompanyTarget === "billing" ? "invoicing & billing recipient" : "service delivery target"}</span>.
+                  </DialogDescription>
+                </div>
+              </div>
+              <Badge variant="outline" className="hidden sm:inline-flex px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-wider bg-background border-border/70">
+                {createCompanyTarget === "billing" ? "Billing Entity" : "Target Entity"}
+              </Badge>
+            </div>
+          </div>
+
+          <form onSubmit={handleCreateCompanySubmit} className="p-6 sm:p-7 space-y-6">
+            
+            {/* Section 1: Company Profile */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-border/50">
+                <Briefcase className="h-4 w-4 text-primary" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">1. Corporate Identification</h4>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold text-foreground flex items-center gap-1">
+                    <span>Company / Entity Legal Name</span>
+                    <span className="text-destructive font-black">*</span>
+                  </label>
+                  <Input
+                    required
+                    value={newCompanyForm.company_name}
+                    onChange={(e) => setNewCompanyForm(prev => ({ ...prev, company_name: e.target.value }))}
+                    placeholder="e.g. PT Mandiri Cipta Solusi"
+                    className="h-10 text-sm font-medium rounded-xl border-border/70 focus-visible:ring-primary/20"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">
+                    Parent Client Representative
+                  </label>
+                  <select
+                    value={newCompanyForm.client_id}
+                    onChange={(e) => setNewCompanyForm(prev => ({ ...prev, client_id: e.target.value }))}
+                    className="flex h-10 w-full rounded-xl border border-border/70 bg-background px-3 py-2 text-xs font-semibold shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <option value="">-- Standalone (No parent client selected) --</option>
+                    {clients.map((cli) => (
+                      <option key={cli.id} value={String(cli.id)}>
+                        {cli.contact_person} ({cli.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">
+                    Industry / Business Sector
+                  </label>
+                  <Input
+                    value={newCompanyForm.industry}
+                    onChange={(e) => setNewCompanyForm(prev => ({ ...prev, industry: e.target.value }))}
+                    placeholder="e.g. Management Consulting, IT Services"
+                    className="h-10 text-xs font-medium rounded-xl border-border/70 focus-visible:ring-primary/20"
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+                    <span>Tax Identification Number (NPWP)</span>
+                    <span className="text-[10px] text-muted-foreground/80 italic font-mono">Optional</span>
+                  </label>
+                  <Input
+                    value={newCompanyForm.tax_number}
+                    onChange={(e) => setNewCompanyForm(prev => ({ ...prev, tax_number: e.target.value }))}
+                    placeholder="e.g. 01.234.567.8-901.000"
+                    className="h-10 text-xs font-mono font-medium rounded-xl border-border/70 focus-visible:ring-primary/20"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Section 2: Primary Key Contact (Mandatory) */}
+            <div className="space-y-4 p-4.5 rounded-2xl bg-muted/25 border border-border/60">
+              <div className="flex items-center justify-between pb-2 border-b border-border/50">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">2. Primary Key Contact (Invoicing & Operations)</h4>
+                </div>
+                <Badge variant="secondary" className="text-[10px] font-bold font-mono uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  Mandatory
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-foreground flex items-center gap-1">
+                    <span>Contact Name</span>
+                    <span className="text-destructive font-black">*</span>
+                  </label>
+                  <Input
+                    required
+                    value={newCompanyForm.key_contact_person}
+                    onChange={(e) => setNewCompanyForm(prev => ({ ...prev, key_contact_person: e.target.value }))}
+                    placeholder="e.g. Budi Santoso"
+                    className="h-10 text-xs font-medium rounded-xl border-border/70 focus-visible:ring-primary/20 bg-background"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-foreground flex items-center gap-1">
+                    <span>Email Address</span>
+                    <span className="text-destructive font-black">*</span>
+                  </label>
+                  <Input
+                    required
+                    type="email"
+                    value={newCompanyForm.key_contact_email}
+                    onChange={(e) => setNewCompanyForm(prev => ({ ...prev, key_contact_email: e.target.value }))}
+                    placeholder="budi@company.co.id"
+                    className="h-10 text-xs font-medium rounded-xl border-border/70 focus-visible:ring-primary/20 bg-background"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-foreground flex items-center gap-1">
+                    <span>Phone Number</span>
+                    <span className="text-destructive font-black">*</span>
+                  </label>
+                  <Input
+                    required
+                    value={newCompanyForm.key_contact_phone}
+                    onChange={(e) => setNewCompanyForm(prev => ({ ...prev, key_contact_phone: e.target.value }))}
+                    placeholder="+62 812-3456-7890"
+                    className="h-10 text-xs font-medium rounded-xl border-border/70 focus-visible:ring-primary/20 bg-background font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Section 3: Official Address & Notes */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-border/50">
+                <MapPin className="h-4 w-4 text-primary" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">3. Registered Address & Notes</h4>
+              </div>
+
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">
+                    Registered Business Address (Printed on Tax & Proforma Invoices)
+                  </label>
+                  <textarea
+                    value={newCompanyForm.address}
+                    onChange={(e) => setNewCompanyForm(prev => ({ ...prev, address: e.target.value }))}
+                    rows={2}
+                    placeholder="Suite / Floor, Building Name, Street Address, City, Postal Code..."
+                    className="flex w-full rounded-xl border border-border/70 bg-background p-3 text-xs placeholder:text-muted-foreground/50 resize-none font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">
+                    Internal Notes / Billing Instructions
+                  </label>
+                  <Input
+                    value={newCompanyForm.notes}
+                    onChange={(e) => setNewCompanyForm(prev => ({ ...prev, notes: e.target.value }))}
+                    placeholder="Special billing instructions, tax exemption details, etc."
+                    className="h-10 text-xs font-medium rounded-xl border-border/70 focus-visible:ring-primary/20"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Action Controls */}
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/60">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCreateCompanyOpen(false)}
+                className="h-10 px-5 text-xs font-bold rounded-xl border-border hover:bg-muted"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={creatingCompany}
+                className="h-10 px-6 text-xs font-bold gap-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+              >
+                {creatingCompany ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                Save & Select Company
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

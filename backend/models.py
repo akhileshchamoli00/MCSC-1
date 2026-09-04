@@ -674,9 +674,11 @@ class ClientOrder(Base):
     order_number = Column(String, index=True) # e.g. MCSX-260001
     client_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     company_id = Column(Integer, ForeignKey("client_companies.id", ondelete="SET NULL"), nullable=True)
+    billing_company_id = Column(Integer, ForeignKey("client_companies.id", ondelete="SET NULL"), nullable=True)
     service_id = Column(Integer, ForeignKey("client_services.id", ondelete="SET NULL"), nullable=True)
     job_id = Column(String, nullable=True) # e.g. OA-001
     job_title = Column(String, nullable=False)
+    branch_name = Column(String, nullable=True) # e.g. Bali Branch, HQ
     description = Column(String, nullable=True)
     pricing_tier = Column(String, default="BASE") # BASE, PARTNER_A, PARTNER_A1, PARTNER_A2, PARTNER_A3
     unit_price = Column(Float, default=0.0)
@@ -687,6 +689,7 @@ class ClientOrder(Base):
     invoice_number = Column(String, nullable=True) # e.g. INV-260001
     is_proforma_finalized = Column(Boolean, default=False)
     proforma_stage_percent = Column(Integer, default=50)
+    proforma_paid_amount = Column(Float, nullable=True, default=None)
     is_final_invoice_finalized = Column(Boolean, default=False)
     consultant_ids = Column(JSON, nullable=True, default=list) # List of assigned employee/consultant IDs
     notes = Column(String, nullable=True)
@@ -698,12 +701,14 @@ class ClientOrder(Base):
     notary_payment_status = Column(String, default="UNPAID") # UNPAID, PAID
     notary_payment_date = Column(Date, nullable=True)
     notary_payment_ref = Column(String, nullable=True)
+    notary_payout_id = Column(String, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     client = relationship("Client", backref="orders")
-    company = relationship("ClientCompany")
+    company = relationship("ClientCompany", foreign_keys=[company_id])
+    billing_company = relationship("ClientCompany", foreign_keys=[billing_company_id])
     service = relationship("ClientService")
     notary = relationship("Notary")
 
@@ -876,6 +881,13 @@ class Notary(Base):
     city = Column(String, index=True, nullable=False)
     status = Column(String, default="ACTIVE")
     notes = Column(String, nullable=True)
+    
+    # Bank & Payout Information
+    bank_name = Column(String, nullable=True) # e.g. BCA, MANDIRI, BNI, BRI, etc.
+    bank_account_number = Column(String, nullable=True)
+    bank_account_holder_name = Column(String, nullable=True)
+    bank_branch = Column(String, nullable=True)
+    bank_swift_code = Column(String, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

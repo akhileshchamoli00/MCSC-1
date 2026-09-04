@@ -79,6 +79,31 @@ export default function NewCompanyPage() {
     setLoading(true);
     setError(null);
 
+    if (!formData.company_name.trim()) {
+      setError("Company Name is required");
+      setLoading(false);
+      setActiveTab("company");
+      return;
+    }
+    if (!formData.key_contact_person.trim()) {
+      setError("Key Contact Person Name is mandatory");
+      setLoading(false);
+      setActiveTab("contact");
+      return;
+    }
+    if (!formData.key_contact_email.trim()) {
+      setError("Key Contact Email is mandatory");
+      setLoading(false);
+      setActiveTab("contact");
+      return;
+    }
+    if (!formData.key_contact_phone.trim()) {
+      setError("Key Contact Phone is mandatory");
+      setLoading(false);
+      setActiveTab("contact");
+      return;
+    }
+
     try {
       const payload = {
         ...formData,
@@ -262,31 +287,34 @@ export default function NewCompanyPage() {
                   {/* Key Contact Row */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium" htmlFor="key_contact_person">Key Contact Person Name</label>
+                      <label className="text-sm font-medium" htmlFor="key_contact_person">Key Contact Person Name *</label>
                       <Input 
                         id="key_contact_person" 
                         name="key_contact_person" 
+                        required
                         value={formData.key_contact_person} 
                         onChange={handleInputChange} 
                         placeholder="e.g. John Doe" 
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium" htmlFor="key_contact_email">Key Contact Email</label>
+                      <label className="text-sm font-medium" htmlFor="key_contact_email">Key Contact Email *</label>
                       <Input 
                         id="key_contact_email" 
                         name="key_contact_email" 
                         type="email"
+                        required
                         value={formData.key_contact_email} 
                         onChange={handleInputChange} 
                         placeholder="e.g. keycontact@company.com" 
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium" htmlFor="key_contact_phone">Key Contact Phone</label>
+                      <label className="text-sm font-medium" htmlFor="key_contact_phone">Key Contact Phone *</label>
                       <Input 
                         id="key_contact_phone" 
                         name="key_contact_phone" 
+                        required
                         value={formData.key_contact_phone} 
                         onChange={handleInputChange} 
                         placeholder="e.g. +62 812..." 

@@ -368,7 +368,17 @@ export default function AssignedOrdersPage() {
     }
   };
 
+  const ALLOWED_EXECUTION_STATUSES = [
+    "ORDER_ASSIGNED",
+    "IN_PROGRESS",
+    "REVIEW_DOCS",
+    "FINAL_DOCUMENT_PREPARATION",
+    "FINAL_DOC_READY",
+    "COMPLETED"
+  ];
+
   const filteredOrders = groupedOrders.filter(ord => {
+    if (!ALLOWED_EXECUTION_STATUSES.includes((ord.status || "").toUpperCase())) return false;
     const term = searchTerm.toLowerCase();
     const orderNum = (ord.order_number || "").toLowerCase();
     const clientName = (ord.client_name || "").toLowerCase();
@@ -401,16 +411,18 @@ export default function AssignedOrdersPage() {
       case "FINAL_DOCUMENT_PREPARATION": return "bg-orange-500/15 text-orange-600 border-orange-500/30";
       case "FINAL_DOC_READY": return "bg-lime-500/15 text-lime-600 border-lime-500/30";
       case "INVOICE_GENERATED": return "bg-pink-500/15 text-pink-600 border-pink-500/30";
+      case "WAITING_FOR_FINAL_PAYMENT": return "bg-pink-500/15 text-pink-600 border-pink-500/30";
+      case "FINAL_PAYMENT_COMPLETED": return "bg-emerald-500/15 text-emerald-600 border-emerald-500/30";
       case "SOFT_COPY_DELIVERED": return "bg-sky-500/15 text-sky-600 border-sky-500/30";
       case "HARD_COPY_DELIVERED": return "bg-violet-500/15 text-violet-600 border-violet-500/30";
       default: return "bg-primary/10 text-primary border-primary/20";
     }
   };
 
-  const totalOrdersCount = groupedOrders.length;
+  const totalOrdersCount = groupedOrders.filter(o => ALLOWED_EXECUTION_STATUSES.includes(o.status)).length;
   const inProgressOrdersCount = groupedOrders.filter(o => o.status === "IN_PROGRESS").length;
+  const reviewPrepOrdersCount = groupedOrders.filter(o => ["REVIEW_DOCS", "FINAL_DOCUMENT_PREPARATION", "FINAL_DOC_READY"].includes(o.status)).length;
   const completedOrdersCount = groupedOrders.filter(o => o.status === "COMPLETED").length;
-  const confirmedOrdersCount = groupedOrders.filter(o => o.status === "CONFIRMED").length;
 
   if (loading) {
     return (
@@ -455,15 +467,15 @@ export default function AssignedOrdersPage() {
           </CardContent>
         </Card>
 
-        {/* Confirmed Orders */}
+        {/* In Review & Prep */}
         <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
           <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0">
+            <div className="p-2 rounded-lg bg-teal-500/10 text-teal-500 border border-teal-500/20 shrink-0">
               <Receipt className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Confirmed Jobs</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{confirmedOrdersCount}</h3>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Review & Prep</p>
+              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{reviewPrepOrdersCount}</h3>
             </div>
           </CardContent>
         </Card>
@@ -643,20 +655,12 @@ export default function AssignedOrdersPage() {
                         onChange={(e) => handleUpdateStatus(ord, e.target.value)}
                         className={`h-8 px-2.5 py-1 text-xs font-bold rounded-md border shadow-xs bg-background transition-colors cursor-pointer ${getOrderStatusColor(ord.status)}`}
                       >
-                        <option value="DRAFT">DRAFT</option>
-                        <option value="PROFORMA_GENERATED">PROFORMA GENERATED</option>
-                        <option value="WAITING_ON_CLIENT">WAITING ON CLIENT</option>
-                        <option value="CONFIRMED">CONFIRMED</option>
                         <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
                         <option value="IN_PROGRESS">IN PROGRESS</option>
                         <option value="REVIEW_DOCS">REVIEW DOCS</option>
                         <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
                         <option value="FINAL_DOC_READY">FINAL DOC READY</option>
-                        <option value="INVOICE_GENERATED">INVOICE GENERATED</option>
-                        <option value="SOFT_COPY_DELIVERED">SOFT COPY DELIVERED</option>
-                        <option value="HARD_COPY_DELIVERED">HARD copy DELIVERED</option>
                         <option value="COMPLETED">COMPLETED</option>
-                        <option value="CANCELLED">CANCELLED</option>
                       </select>
                     </td>
                     <td className="p-4 text-right align-top pt-5">
@@ -827,20 +831,12 @@ export default function AssignedOrdersPage() {
                       onChange={(e) => handleUpdateStatus(selectedGroup, e.target.value)}
                       className={`h-9 w-full px-3 text-xs font-bold rounded-lg border shadow-xs bg-background transition-colors cursor-pointer ${getOrderStatusColor(selectedGroup.status)}`}
                     >
-                      <option value="DRAFT">DRAFT</option>
-                      <option value="PROFORMA_GENERATED">PROFORMA GENERATED</option>
-                      <option value="WAITING_ON_CLIENT">WAITING ON CLIENT</option>
-                      <option value="CONFIRMED">CONFIRMED</option>
                       <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
                       <option value="IN_PROGRESS">IN PROGRESS</option>
                       <option value="REVIEW_DOCS">REVIEW DOCS</option>
                       <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
                       <option value="FINAL_DOC_READY">FINAL DOC READY</option>
-                      <option value="INVOICE_GENERATED">INVOICE GENERATED</option>
-                      <option value="SOFT_COPY_DELIVERED">SOFT COPY DELIVERED</option>
-                      <option value="HARD_COPY_DELIVERED">HARD copy DELIVERED</option>
                       <option value="COMPLETED">COMPLETED</option>
-                      <option value="CANCELLED">CANCELLED</option>
                     </select>
                   </div>
 

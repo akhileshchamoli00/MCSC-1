@@ -15,7 +15,12 @@ import {
   Tag,
   MapPin,
   ShieldCheck,
-  Building
+  Building,
+  CreditCard,
+  Landmark,
+  Layers,
+  CheckCircle2,
+  AlertCircle
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiCard } from "@/components/kpi-card";
@@ -53,22 +58,10 @@ export default function NotariesPage() {
     setCurrentPage(1);
   }, [searchTerm, cityFilter, statusFilter]);
 
-  // Edit / Delete Modals
-  const [isEditOpen, setIsEditOpen] = useState(false);
+  // Delete Modal State
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedNotary, setSelectedNotary] = useState<any>(null);
   const [saving, setSaving] = useState(false);
-
-  // Edit Form State
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    address: "",
-    city: "",
-    status: "ACTIVE",
-    notes: ""
-  });
 
   const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
 
@@ -95,90 +88,7 @@ export default function NotariesPage() {
 
   useEffect(() => {
     fetchNotaries();
-    if (token) {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      })
-        .then(res => res.json())
-        .then(data => setServices(Array.isArray(data) ? data : []))
-        .catch(err => console.error("Error loading services:", err));
-    }
   }, [token]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleOpenEdit = (notary: any) => {
-    setSelectedNotary(notary);
-    setFormData({
-      name: notary.name || "",
-      email: notary.email || "",
-      phone: notary.phone || "",
-      address: notary.address || "",
-      city: notary.city || "",
-      status: notary.status || "ACTIVE",
-      notes: notary.notes || ""
-    });
-
-    const feesMap: Record<number, string> = {};
-    if (notary.service_fees) {
-      notary.service_fees.forEach((sf: any) => {
-        feesMap[sf.service_id] = String(sf.fee);
-      });
-    }
-    setServiceFees(feesMap);
-    setIsEditOpen(true);
-  };
-
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token || !selectedNotary) return;
-    setSaving(true);
-    try {
-      const feesPayload = Object.entries(serviceFees)
-        .map(([sid, val]) => ({
-          service_id: parseInt(sid),
-          fee: parseFloat(val) || 0.0
-        }))
-        .filter(x => x.fee > 0);
-
-      const payload = {
-        name: formData.name,
-        email: formData.email || null,
-        phone: formData.phone || null,
-        address: formData.address || null,
-        city: formData.city,
-        status: formData.status,
-        notes: formData.notes || null,
-        service_fees: feesPayload
-      };
-
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/${selectedNotary.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        toast.success("Notary public updated successfully!");
-        setIsEditOpen(false);
-        fetchNotaries();
-      } else {
-        const err = await res.json();
-        toast.error(err.detail || "Failed to update notary record");
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Error updating notary record");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleDeleteSubmit = async () => {
     if (!token || !selectedNotary) return;
@@ -360,6 +270,7 @@ export default function NotariesPage() {
                   <tr className="bg-muted/40 text-muted-foreground/90 font-extrabold uppercase border-b border-border/40 select-none">
                     <th className="py-3 px-4 w-1/4">Notary Name</th>
                     <th className="py-3 px-4">Contact Detail</th>
+                    <th className="py-3 px-4">Bank & Payout Details</th>
                     <th className="py-3 px-4">Jurisdiction (City)</th>
                     <th className="py-3 px-4 text-right">Configured Services</th>
                     <th className="py-3 px-4 text-center">Status</th>
@@ -387,6 +298,32 @@ export default function NotariesPage() {
                       <td className="py-3.5 px-4 text-muted-foreground font-semibold align-top space-y-1">
                         <div>Email: <span className="text-foreground font-mono">{notary.email || "-"}</span></div>
                         <div>Phone: <span className="text-foreground font-mono">{notary.phone || "-"}</span></div>
+                      </td>
+
+                      <td className="py-3.5 px-4 align-top text-xs space-y-1">
+                        {notary.bank_name && notary.bank_account_number ? (
+                          <div>
+                            <div className="flex items-center gap-1.5 font-bold text-foreground">
+                              <Landmark className="h-3.5 w-3.5 text-primary shrink-0" />
+                              <span>{notary.bank_name}</span>
+                              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[9px] py-0 px-1 font-bold">
+                                Ready
+                              </Badge>
+                            </div>
+                            <div className="font-mono text-[11px] text-muted-foreground mt-0.5">
+                              {notary.bank_account_number}
+                            </div>
+                            {notary.bank_account_holder_name && (
+                              <div className="text-[10px] text-muted-foreground truncate max-w-[180px]">
+                                {notary.bank_account_holder_name}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[10px] py-0.5 px-2 font-medium">
+                            <AlertCircle className="h-3 w-3 mr-1" /> Missing Bank Info
+                          </Badge>
+                        )}
                       </td>
 
                       <td className="py-3.5 px-4 align-top font-bold text-foreground">
@@ -419,15 +356,16 @@ export default function NotariesPage() {
                       </td>
 
                       <td className="py-3.5 px-4 align-top text-center flex items-center justify-center gap-1">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          title="Edit Notary" 
-                          onClick={() => handleOpenEdit(notary)}
-                          className="h-8 w-8 border border-transparent hover:border-border rounded-lg"
-                        >
-                          <Edit2 className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                        </Button>
+                        <Link href={`/business/clients/notaries/${notary.id}/edit`}>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            title="Edit Notary Profile" 
+                            className="h-8 w-8 border border-transparent hover:border-border rounded-lg"
+                          >
+                            <Edit2 className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                          </Button>
+                        </Link>
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -484,187 +422,6 @@ export default function NotariesPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* EDIT NOTARY DIALOG */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-4xl p-6 sm:p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-background/95 backdrop-blur-xl shadow-2xl">
-          <DialogHeader className="pb-4 border-b border-border/50">
-            <DialogTitle className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
-              <Scale className="h-6 w-6 text-primary" /> Edit Notary Profile
-            </DialogTitle>
-            <DialogDescription className="text-xs sm:text-sm mt-1 text-muted-foreground/90 font-medium">
-              Update contact info, jurisdiction, and job service fee for {selectedNotary?.name}.
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={handleEditSubmit} className="space-y-6 pt-4">
-            
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Notary Name *</label>
-                  <Input
-                    required
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    className="h-10 text-sm font-medium bg-background border-border/60 focus:border-primary/50 focus:ring-primary/25 rounded-xl transition-all"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">City / Jurisdiction *</label>
-                  <Input
-                    required
-                    name="city"
-                    value={formData.city}
-                    onChange={handleInputChange}
-                    placeholder="e.g. Jakarta Selatan"
-                    className="h-10 text-sm font-medium bg-background border-border/60 focus:border-primary/50 focus:ring-primary/25 rounded-xl transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Contact Email</label>
-                  <Input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    placeholder="e.g. notary@example.com"
-                    className="h-10 text-sm font-medium bg-background border-border/60 focus:border-primary/50 focus:ring-primary/25 rounded-xl transition-all"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Contact Phone</label>
-                  <Input
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    placeholder="e.g. +62 812 3456 789"
-                    className="h-10 text-sm font-medium bg-background border-border/60 focus:border-primary/50 focus:ring-primary/25 rounded-xl transition-all"
-                  />
-                </div>
-              </div>
-
-              {/* Panel Status Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Panel Status</label>
-                  <Select 
-                    value={formData.status} 
-                    onValueChange={(val) => setFormData(prev => ({ ...prev, status: val }))}
-                  >
-                    <SelectTrigger className="h-10 rounded-xl">
-                      <SelectValue placeholder="Select Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ACTIVE">ACTIVE</SelectItem>
-                      <SelectItem value="INACTIVE">INACTIVE</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Office Address</label>
-                <textarea
-                  name="address"
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  rows={2}
-                  className="flex w-full rounded-xl border border-border/60 bg-background p-3.5 text-sm placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary leading-relaxed font-medium transition-all"
-                  placeholder="Complete office physical address..."
-                />
-              </div>
-
-              {/* Service-Specific Fees Catalog Listing */}
-              <div className="space-y-2 pt-2 col-span-1 sm:col-span-2">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">
-                  Configure Service-Specific Fees (Owed to Notary)
-                </label>
-                <div className="border border-border/50 rounded-xl overflow-hidden bg-background/50">
-                  <div className="max-h-64 overflow-y-auto">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-muted/50 text-muted-foreground uppercase font-bold text-[10px] border-b border-border/50 select-none">
-                        <tr>
-                          <th className="p-3">Service Name</th>
-                          <th className="p-3">Service Code</th>
-                          <th className="p-3 w-44 text-right">Notary Fee (IDR)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/30">
-                        {services.filter((s) => s.needs_notary).map((s) => (
-                          <tr key={s.id} className="hover:bg-muted/10 transition-colors">
-                            <td className="p-3 font-semibold text-foreground">
-                              {s.job_title}
-                              {s.description && (
-                                <div className="text-[10px] text-muted-foreground font-normal mt-0.5 whitespace-pre-wrap break-words max-w-lg leading-relaxed">
-                                  {s.description}
-                                </div>
-                              )}
-                            </td>
-                            <td className="p-3 font-mono text-muted-foreground">{s.job_id}</td>
-                            <td className="p-3 text-right">
-                              <div className="relative inline-block w-40">
-                                <span className="absolute left-2.5 top-2.5 text-[10px] font-mono text-muted-foreground leading-none">Rp</span>
-                                <Input
-                                  type="number"
-                                  placeholder="0"
-                                  className="h-8 pl-7 text-right font-mono font-bold text-xs rounded-lg"
-                                  value={serviceFees[s.id] || ""}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setServiceFees(prev => ({ ...prev, [s.id]: val }));
-                                  }}
-                                />
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Notes / Scope Specialties</label>
-                <textarea
-                  name="notes"
-                  value={formData.notes}
-                  onChange={handleInputChange}
-                  rows={2}
-                  className="flex w-full rounded-xl border border-border/60 bg-background p-3.5 text-sm placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary leading-relaxed font-medium transition-all"
-                  placeholder="Notary specialty details (e.g. PPAT licensed, land deeds, fast remote service...)"
-                />
-              </div>
-            </div>
-
-            <DialogFooter className="pt-5 border-t border-border/30">
-              <Button 
-                type="button" 
-                variant="outline" 
-                className="rounded-xl h-10 px-4 font-bold border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-foreground transition-colors bg-transparent" 
-                onClick={() => setIsEditOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={saving} 
-                className="px-6 font-bold shadow-md rounded-xl h-10 bg-zinc-900 hover:bg-zinc-100 text-zinc-50 hover:text-zinc-900 border border-zinc-900 dark:bg-zinc-100 dark:hover:bg-zinc-900 dark:text-zinc-950 dark:hover:text-zinc-100 dark:border-zinc-100 transition-all duration-200"
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Update Notary
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       {/* DELETE CONFIRM DIALOG */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>

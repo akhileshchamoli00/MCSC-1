@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { 
   Scale, 
   Loader2, 
@@ -13,7 +13,8 @@ import {
   MapPin, 
   FileText,
   Landmark,
-  ArrowRight
+  ArrowRight,
+  Trash2
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,11 +26,24 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 
-export default function NewNotaryPage() {
+export default function EditNotaryPage() {
   const router = useRouter();
+  const params = useParams();
+  const notaryId = params?.notaryId as string;
+
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [services, setServices] = useState<any[]>([]);
   const [serviceFees, setServiceFees] = useState<Record<number, string>>({});
   const [activeTab, setActiveTab] = useState<"general" | "bank" | "fees">("general");
@@ -68,16 +82,66 @@ export default function NewNotaryPage() {
 
   const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
 
-  // Fetch catalog services
+  // Fetch Notary Data & Services
   useEffect(() => {
-    if (!token) return;
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
-      headers: { "Authorization": `Bearer ${token}` }
-    })
-      .then(res => res.json())
-      .then(data => setServices(Array.isArray(data) ? data : []))
-      .catch(err => console.error("Error loading services:", err));
-  }, [token]);
+    if (!token || !notaryId) return;
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        // 1. Fetch Notary
+        const resNotary = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/${notaryId}`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if (!resNotary.ok) {
+          toast.error("Notary public not found");
+          router.push("/business/clients/notaries");
+          return;
+        }
+
+        const data = await resNotary.json();
+        setFormData({
+          name: data.name || "",
+          email: data.email || "",
+          phone: data.phone || "",
+          address: data.address || "",
+          city: data.city || "",
+          status: data.status || "ACTIVE",
+          notes: data.notes || "",
+          bank_name: data.bank_name || "",
+          bank_account_number: data.bank_account_number || "",
+          bank_account_holder_name: data.bank_account_holder_name || "",
+          bank_branch: data.bank_branch || "",
+          bank_swift_code: data.bank_swift_code || ""
+        });
+
+        const feesMap: Record<number, string> = {};
+        if (data.service_fees) {
+          data.service_fees.forEach((sf: any) => {
+            feesMap[sf.service_id] = String(sf.fee);
+          });
+        }
+        setServiceFees(feesMap);
+
+        // 2. Fetch Services
+        const resServices = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (resServices.ok) {
+          const sData = await resServices.json();
+          setServices(Array.isArray(sData) ? sData : []);
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Error loading notary details");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [token, notaryId, router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -86,7 +150,7 @@ export default function NewNotaryPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
+    if (!token || !notaryId) return;
     setSaving(true);
     try {
       const feesPayload = Object.entries(serviceFees)
@@ -112,8 +176,8 @@ export default function NewNotaryPage() {
         service_fees: feesPayload
       };
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/`, {
-        method: "POST",
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/${notaryId}`, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
@@ -122,15 +186,39 @@ export default function NewNotaryPage() {
       });
 
       if (res.ok) {
-        toast.success("Notary registered successfully!");
+        toast.success("Notary public updated successfully!");
         router.push("/business/clients/notaries");
       } else {
         const err = await res.json();
-        toast.error(err.detail || "Failed to register notary");
+        toast.error(err.detail || "Failed to update notary record");
       }
     } catch (err) {
       console.error(err);
-      toast.error("Error registering notary");
+      toast.error("Error updating notary record");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!token || !notaryId) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/${notaryId}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        toast.success("Notary record deleted successfully!");
+        router.push("/business/clients/notaries");
+      } else {
+        const err = await res.json();
+        toast.error(err.detail || "Failed to delete notary");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error deleting notary record");
     } finally {
       setSaving(false);
     }
@@ -139,23 +227,45 @@ export default function NewNotaryPage() {
   const notaryServices = services.filter((s) => s.needs_notary);
   const configuredFeesCount = notaryServices.filter((s) => parseFloat(serviceFees[s.id] || "0") > 0).length;
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground font-medium">Loading Notary Profile...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto pb-12">
       
       {/* Title Header */}
-      <div className="flex items-start gap-4">
-        <Link href="/business/clients/notaries" className="mt-1">
-          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border border-border/50">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm shrink-0 flex items-center justify-center">
-          <Scale className="h-6 w-6" />
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-start gap-4">
+          <Link href="/business/clients/notaries" className="mt-1">
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border border-border/50">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm shrink-0 flex items-center justify-center">
+            <Scale className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Edit Notary Profile</h1>
+            <p className="text-muted-foreground mt-1">
+              Update legal credentials, bank destination account, and service fees for <strong>{formData.name}</strong>.
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Add Notary</h1>
-          <p className="text-muted-foreground mt-1">Register a new licensed notary public to your legal contractor panel list.</p>
-        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setIsDeleteOpen(true)}
+          className="text-destructive hover:bg-destructive/10 border-destructive/20 rounded-xl h-10 px-4 font-bold text-xs"
+        >
+          <Trash2 className="h-4 w-4 mr-1.5" /> Delete Notary
+        </Button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -190,7 +300,7 @@ export default function NewNotaryPage() {
               {formData.bank_name && formData.bank_account_number ? (
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
               ) : (
-                <span className="h-2 w-2 rounded-full bg-zinc-400" />
+                <span className="h-2 w-2 rounded-full bg-amber-500" />
               )}
             </button>
 
@@ -529,13 +639,42 @@ export default function NewNotaryPage() {
                   className="px-6 font-bold shadow-md gap-2 rounded-xl h-10 bg-zinc-900 hover:bg-zinc-100 text-zinc-50 hover:text-zinc-900 border border-zinc-900 dark:bg-zinc-100 dark:hover:bg-zinc-900 dark:text-zinc-950 dark:hover:text-zinc-100 dark:border-zinc-100 transition-all duration-200"
                 >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                  Save Notary & Finish
+                  Save Changes
                 </Button>
               </div>
             </div>
           </CardContent>
         </Card>
       </form>
+
+      {/* DELETE CONFIRM DIALOG */}
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent className="max-w-sm p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-background shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold">Delete Notary Record</DialogTitle>
+            <DialogDescription className="text-sm mt-1">
+              Are you sure you want to delete <span className="font-bold text-foreground">{formData.name}</span>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2">
+            <Button 
+              variant="outline" 
+              className="rounded-xl h-10 px-4 font-bold border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors bg-transparent" 
+              onClick={() => setIsDeleteOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              className="rounded-xl h-10 px-4 font-bold bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors" 
+              onClick={handleDelete} 
+              disabled={saving}
+            >
+              {saving ? "Deleting..." : "Delete Notary"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
