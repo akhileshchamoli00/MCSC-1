@@ -17,14 +17,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { useUser } from "@/contexts/user-context";
 
 export default function EditClientServicePage() {
   const router = useRouter();
   const params = useParams();
   const serviceId = params.serviceId;
+  const { isAdmin, hasPermission, loading: userLoading } = useUser();
 
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userLoading && !isAdmin && !hasPermission("clients_services", "edit")) {
+      toast.error("You do not have permission to edit service catalog items.");
+      router.push("/business/clients/services");
+    }
+  }, [userLoading, isAdmin, hasPermission, router]);
 
   const [formData, setFormData] = useState({
     job_title: "",

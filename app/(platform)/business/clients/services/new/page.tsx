@@ -21,9 +21,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { useUser } from "@/contexts/user-context";
 
 export default function AddClientServicesPage() {
   const router = useRouter();
+  const { isAdmin, hasPermission, loading: userLoading } = useUser();
+
   const [createItems, setCreateItems] = useState<any[]>([
     {
       job_id: "OA-001",
@@ -40,6 +43,13 @@ export default function AddClientServicesPage() {
   const [initialCount, setInitialCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userLoading && !isAdmin && !hasPermission("clients_services", "create")) {
+      toast.error("You do not have permission to create service catalog items.");
+      router.push("/business/clients/services");
+    }
+  }, [userLoading, isAdmin, hasPermission, router]);
 
   const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
 

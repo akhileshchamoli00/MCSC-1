@@ -32,8 +32,14 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { useUser } from "@/contexts/user-context";
 
 export default function ClientServicesPage() {
+  const { isAdmin, hasPermission } = useUser();
+  const canCreate = isAdmin || hasPermission("clients_services", "create");
+  const canEdit = isAdmin || hasPermission("clients_services", "edit");
+  const canDelete = isAdmin || hasPermission("clients_services", "delete");
+
   const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -157,11 +163,13 @@ export default function ClientServicesPage() {
           </div>
         </div>
 
-        <Link href="/business/clients/services/new">
-          <Button className="gap-2 font-semibold shadow">
-            <Plus className="h-4 w-4" /> Add New Service
-          </Button>
-        </Link>
+        {canCreate && (
+          <Link href="/business/clients/services/new">
+            <Button className="gap-2 font-semibold shadow">
+              <Plus className="h-4 w-4" /> Add New Service
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Metrics Cards Grid */}
@@ -194,7 +202,9 @@ export default function ClientServicesPage() {
             <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2 border-t">
               <Tag className="h-10 w-10 text-muted-foreground/35" />
               <span className="text-sm font-semibold">No Services Found</span>
-              <p className="text-xs max-w-sm">Click "Add New Service" above to add your first job offering to the service catalog database.</p>
+              <p className="text-xs max-w-sm">
+                {canCreate ? 'Click "Add New Service" above to add your first job offering to the service catalog database.' : 'No service catalog offerings available.'}
+              </p>
             </div>
           ) : (
             <>
@@ -211,7 +221,7 @@ export default function ClientServicesPage() {
                     <th className="p-4 text-right">Partner A1 (40% Off)</th>
                     <th className="p-4 text-right">Partner A2 (50% Off)</th>
                     <th className="p-4 text-right">Partner A3 (Free Text)</th>
-                    <th className="p-4 text-right">Actions</th>
+                    {(canEdit || canDelete) && <th className="p-4 text-right">Actions</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -267,28 +277,34 @@ export default function ClientServicesPage() {
                         </div>
                         <span className="text-[10px] text-muted-foreground">(Special Price)</span>
                       </td>
-                      <td className="p-4 text-right space-x-1">
-                        <Link href={`/business/clients/services/${service.id}/edit`}>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            title="Edit Service"
-                          >
-                            <Edit2 className="h-4 w-4 text-slate-500 hover:text-foreground" />
-                          </Button>
-                        </Link>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          title="Delete Service"
-                          onClick={() => {
-                            setSelectedService(service);
-                            setIsDeleteOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive/70 hover:text-destructive" />
-                        </Button>
-                      </td>
+                      {(canEdit || canDelete) && (
+                        <td className="p-4 text-right space-x-1">
+                          {canEdit && (
+                            <Link href={`/business/clients/services/${service.id}/edit`}>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                title="Edit Service"
+                              >
+                                <Edit2 className="h-4 w-4 text-slate-500 hover:text-foreground" />
+                              </Button>
+                            </Link>
+                          )}
+                          {canDelete && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="Delete Service"
+                              onClick={() => {
+                                setSelectedService(service);
+                                setIsDeleteOpen(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive/70 hover:text-destructive" />
+                            </Button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

@@ -238,14 +238,32 @@ export default function AccessControlPage() {
     toast.info(`${checkAll ? 'Checked' : 'Unchecked'} this permission column for all modules.`);
   };
 
-  // Toggle dynamic row (Bulk check all actions for a single module)
-  const toggleRow = (moduleId: number, checkAll: boolean) => {
-    const viewPermission = permissions.find(p => p.code === "view");
-    if (!viewPermission) return;
-    setMatrix(prev => ({
-      ...prev,
-      [`${moduleId}:${viewPermission.id}`]: checkAll
-    }));
+  const allowedPermissionCodes = ["view", "create", "edit", "delete"];
+  const sortedPermissions = React.useMemo(() => {
+    return permissions
+      .filter(p => allowedPermissionCodes.includes(p.code.toLowerCase()))
+      .sort((a, b) => {
+        const idxA = allowedPermissionCodes.indexOf(a.code.toLowerCase());
+        const idxB = allowedPermissionCodes.indexOf(b.code.toLowerCase());
+        return idxA - idxB;
+      });
+  }, [permissions]);
+
+  // Toggle dynamic row (Bulk check all actions for a single module and its submodules)
+  const toggleRow = (module: Module, checkAll: boolean) => {
+    setMatrix(prev => {
+      const next = { ...prev };
+      const applyToModule = (m: Module) => {
+        sortedPermissions.forEach(p => {
+          next[`${m.id}:${p.id}`] = checkAll;
+        });
+        if (m.sub_modules && m.sub_modules.length > 0) {
+          m.sub_modules.forEach(sub => applyToModule(sub));
+        }
+      };
+      applyToModule(module);
+      return next;
+    });
   };
 
   // Save Permissions to Backend
@@ -577,40 +595,34 @@ export default function AccessControlPage() {
                 <Table className="w-full min-w-[700px]">
                   <TableHeader className="bg-muted/50 dark:bg-muted/10 border-b border-border/30">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-[50%] py-4 font-semibold text-foreground text-left pl-6">
+                      <TableHead className="py-4 font-semibold text-foreground text-left pl-6 min-w-[260px]">
                         Modules & Sub-Modules
                       </TableHead>
-                      <TableHead className="w-[30%] py-4 text-center text-xs font-bold text-foreground">
-                        <div className="flex flex-col items-center gap-1.5">
-                          <span className="uppercase tracking-wider">Access Allowed</span>
-                          {permissions.find(p => p.code === "view") && (
+                      {sortedPermissions.map(perm => (
+                        <TableHead key={perm.id} className="py-4 text-center text-xs font-bold text-foreground px-2 min-w-[85px]">
+                          <div className="flex flex-col items-center gap-1.5">
+                            <span className="uppercase tracking-wider text-[11px]">{perm.name}</span>
                             <div className="flex gap-1">
                               <button 
-                                onClick={() => {
-                                  const viewPerm = permissions.find(p => p.code === "view");
-                                  if (viewPerm) toggleColumn(viewPerm.id, true);
-                                }} 
+                                onClick={() => toggleColumn(perm.id, true)} 
                                 className="text-[10px] text-primary hover:underline hover:text-primary/80 focus:outline-none"
-                                title="Grant access to all modules"
+                                title={`Grant ${perm.name} for all modules`}
                               >
                                 All
                               </button>
                               <span className="text-[10px] text-muted-foreground">/</span>
                               <button 
-                                onClick={() => {
-                                  const viewPerm = permissions.find(p => p.code === "view");
-                                  if (viewPerm) toggleColumn(viewPerm.id, false);
-                                }} 
+                                onClick={() => toggleColumn(perm.id, false)} 
                                 className="text-[10px] text-destructive hover:underline hover:text-destructive/80 focus:outline-none"
-                                title="Revoke access from all modules"
+                                title={`Revoke ${perm.name} from all modules`}
                               >
                                 None
                               </button>
                             </div>
-                          )}
-                        </div>
-                      </TableHead>
-                      <TableHead className="w-[20%] text-right pr-6 font-semibold text-foreground">
+                          </div>
+                        </TableHead>
+                      ))}
+                      <TableHead className="w-[140px] text-right pr-6 font-semibold text-foreground">
                         Actions
                       </TableHead>
                     </TableRow>
@@ -618,7 +630,7 @@ export default function AccessControlPage() {
                   <TableBody className="divide-y divide-border/20">
                     {filteredModulesList.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} className="text-center py-12 text-muted-foreground">
+                        <TableCell colSpan={sortedPermissions.length + 2} className="text-center py-12 text-muted-foreground">
                           <ShieldAlert className="w-12 h-12 mx-auto text-muted-foreground/30 mb-2" />
                           <p className="text-base font-semibold">No modules match your query</p>
                         </TableCell>
@@ -627,7 +639,6 @@ export default function AccessControlPage() {
                       filteredModulesList.map(module => {
                         const isExpanded = !!expandedModules[module.id];
                         const hasSubs = module.sub_modules && module.sub_modules.length > 0;
-                        const viewPerm = permissions.find(p => p.code === "view");
                         
                         return (
                           <React.Fragment key={module.id}>
@@ -657,20 +668,20 @@ export default function AccessControlPage() {
                                 </div>
                               </TableCell>
                               
-                              {/* View permission checkbox */}
-                              <TableCell className="text-center py-4">
-                                <div className="flex justify-center items-center">
-                                  {viewPerm && (
+                              {/* Dynamic permission checkboxes */}
+                              {sortedPermissions.map(perm => (
+                                <TableCell key={perm.id} className="text-center py-4 px-2">
+                                  <div className="flex justify-center items-center">
                                     <Checkbox 
-                                      checked={isChecked(module.id, viewPerm.id)}
+                                      checked={isChecked(module.id, perm.id)}
                                       onCheckedChange={(checked) => 
-                                        handleCheckboxChange(module.id, viewPerm.id, !!checked)
+                                        handleCheckboxChange(module.id, perm.id, !!checked)
                                       }
                                       className="data-[state=checked]:bg-primary cursor-pointer border-muted-foreground/40 hover:border-primary/80"
                                     />
-                                  )}
-                                </div>
-                              </TableCell>
+                                  </div>
+                                </TableCell>
+                              ))}
 
                               {/* Row shortcuts */}
                               <TableCell className="text-right py-4 pr-6">
@@ -678,7 +689,7 @@ export default function AccessControlPage() {
                                   <Button 
                                     variant="ghost" 
                                     size="sm" 
-                                    onClick={() => toggleRow(module.id, true)} 
+                                    onClick={() => toggleRow(module, true)} 
                                     className="h-7 text-[10px] font-bold text-primary hover:text-primary/80 px-2 rounded-md hover:bg-primary/10 cursor-pointer"
                                   >
                                     Enable
@@ -686,7 +697,7 @@ export default function AccessControlPage() {
                                   <Button 
                                     variant="ghost" 
                                     size="sm" 
-                                    onClick={() => toggleRow(module.id, false)} 
+                                    onClick={() => toggleRow(module, false)} 
                                     className="h-7 text-[10px] font-bold text-destructive hover:text-destructive/80 px-2 rounded-md hover:bg-destructive/10 cursor-pointer"
                                   >
                                     Disable
@@ -708,26 +719,27 @@ export default function AccessControlPage() {
                                   </div>
                                 </TableCell>
 
-                                <TableCell className="text-center py-3">
-                                  <div className="flex justify-center items-center">
-                                    {viewPerm && (
+                                {/* Dynamic permission checkboxes for sub-module */}
+                                {sortedPermissions.map(perm => (
+                                  <TableCell key={perm.id} className="text-center py-3 px-2">
+                                    <div className="flex justify-center items-center">
                                       <Checkbox 
-                                        checked={isChecked(subMod.id, viewPerm.id)}
+                                        checked={isChecked(subMod.id, perm.id)}
                                         onCheckedChange={(checked) => 
-                                          handleCheckboxChange(subMod.id, viewPerm.id, !!checked)
+                                          handleCheckboxChange(subMod.id, perm.id, !!checked)
                                         }
                                         className="data-[state=checked]:bg-primary cursor-pointer border-muted-foreground/40 hover:border-primary/80 scale-90"
                                       />
-                                    )}
-                                  </div>
-                                </TableCell>
+                                    </div>
+                                  </TableCell>
+                                ))}
 
                                 <TableCell className="text-right py-3 pr-6">
                                   <div className="flex justify-end gap-1.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
                                     <Button 
                                       variant="ghost" 
                                       size="sm" 
-                                      onClick={() => toggleRow(subMod.id, true)} 
+                                      onClick={() => toggleRow(subMod, true)} 
                                       className="h-7 text-[10px] font-bold text-primary hover:text-primary/80 px-2 rounded-md hover:bg-primary/10 cursor-pointer"
                                     >
                                       Enable
@@ -735,7 +747,7 @@ export default function AccessControlPage() {
                                     <Button 
                                       variant="ghost" 
                                       size="sm" 
-                                      onClick={() => toggleRow(subMod.id, false)} 
+                                      onClick={() => toggleRow(subMod, false)} 
                                       className="h-7 text-[10px] font-bold text-destructive hover:text-destructive/80 px-2 rounded-md hover:bg-destructive/10 cursor-pointer"
                                     >
                                       Disable

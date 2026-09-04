@@ -1544,8 +1544,8 @@ def get_client_services(db: Session = Depends(database.get_db), current_user: mo
 
 @router.post("/services/catalog", response_model=schemas.ClientServiceResponse, status_code=status.HTTP_201_CREATED)
 def create_client_service(service_data: schemas.ClientServiceCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admin or HR can create service pricing catalog entries")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_services", "create", db)):
+        raise HTTPException(status_code=403, detail="Access denied. You do not have permission to create service catalog entries.")
         
     job_id_str = (service_data.job_id or "").strip()
     if not job_id_str:
@@ -1575,8 +1575,8 @@ def create_client_service(service_data: schemas.ClientServiceCreate, db: Session
 
 @router.post("/services/catalog/bulk", response_model=List[schemas.ClientServiceResponse], status_code=status.HTTP_201_CREATED)
 def create_bulk_client_services(services_data: List[schemas.ClientServiceCreate], db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admin or HR can create service pricing catalog entries")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_services", "create", db)):
+        raise HTTPException(status_code=403, detail="Access denied. You do not have permission to create service catalog entries.")
         
     created_services = []
     total_services = db.query(func.count(models.ClientService.id)).scalar() or 0
@@ -1625,8 +1625,8 @@ def get_client_service(id: int, db: Session = Depends(database.get_db), current_
 
 @router.put("/services/catalog/{id}", response_model=schemas.ClientServiceResponse)
 def update_client_service(id: int, service_update: schemas.ClientServiceUpdate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admin or HR can update service pricing catalog entries")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_services", "edit", db)):
+        raise HTTPException(status_code=403, detail="Access denied. You do not have permission to update service catalog entries.")
         
     db_service = db.query(models.ClientService).filter(models.ClientService.id == id).first()
     if not db_service:
@@ -1649,8 +1649,8 @@ def update_client_service(id: int, service_update: schemas.ClientServiceUpdate, 
 
 @router.delete("/services/catalog/{id}")
 def delete_client_service(id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admin or HR can delete service catalog entries")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_services", "delete", db)):
+        raise HTTPException(status_code=403, detail="Access denied. You do not have permission to delete service catalog entries.")
         
     db_service = db.query(models.ClientService).filter(models.ClientService.id == id).first()
     if not db_service:
