@@ -204,22 +204,27 @@ def sync_company_update_to_stakeholder(db: Session, db_company: models.ClientCom
     replicate_key_contact_to_stakeholder(db, db_company)
 
 def is_admin_or_hr(user: models.User) -> bool:
-    if not user or not user.role:
+    if not user:
         return False
     if auth.is_super_admin(user):
         return True
-    return user.role.name.upper() == "HR"
+    if not user.role:
+        return False
+    role_name = str(user.role.name).strip().upper()
+    return role_name in ["HR", "HR ADMIN", "HR EXECUTIVE", "ADMIN", "SUPER ADMIN", "SUPERADMIN", "SYSTEM ADMIN"]
 
 def is_employee_role(user: models.User) -> bool:
     if not user:
         return False
+    if auth.is_super_admin(user) or is_admin_or_hr(user):
+        return True
     if user.role and user.role.name.upper() in ["CLIENT", "MEMBER"]:
         return False
     if hasattr(user, "employee") and user.employee is not None:
         return True
     if user.role:
         name = user.role.name.upper()
-        if "EMPLOYEE" in name or name in ["TEAM LEAD", "LICENSE CONSULTANT", "PROJECT MANAGER", "HR EXECUTIVE"]:
+        if "EMPLOYEE" in name or name in ["TEAM LEAD", "LICENSE CONSULTANT", "PROJECT MANAGER", "HR EXECUTIVE", "CONSULTANT", "STAFF", "MANAGER", "PAYROLL MANAGER", "DEPARTMENT MANAGER"]:
             return True
     return False
 
@@ -1335,7 +1340,7 @@ def get_all_client_companies(db: Session = Depends(database.get_db), current_use
 
 @router.post("/companies/standalone", response_model=schemas.ClientCompanyResponse)
 def create_standalone_client_company(company_data: schemas.ClientCompanyCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user):
+    if not (is_admin_or_hr(current_user) or is_employee_role(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized to create standalone companies")
         
     if not company_data.key_contact_person or not str(company_data.key_contact_person).strip():
@@ -1397,7 +1402,7 @@ def create_standalone_client_company(company_data: schemas.ClientCompanyCreate, 
 
 @router.post("/{id:int}/companies", response_model=schemas.ClientCompanyResponse)
 def create_client_company(id: int, company_data: schemas.ClientCompanyCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not (is_admin_or_hr(current_user) or is_client_themselves(current_user, id)):
+    if not (is_admin_or_hr(current_user) or is_employee_role(current_user) or is_client_themselves(current_user, id)):
         raise HTTPException(status_code=403, detail="Not authorized to create companies for this client")
 
     if not company_data.key_contact_person or not str(company_data.key_contact_person).strip():
@@ -1631,7 +1636,7 @@ def update_client_company(company_id: int, company_update: schemas.ClientCompany
     if not db_company:
         raise HTTPException(status_code=404, detail="Company not found")
         
-    if not (is_admin_or_hr(current_user) or is_client_themselves_for_company(current_user, company_id, db)):
+    if not (is_admin_or_hr(current_user) or is_employee_role(current_user) or is_client_themselves_for_company(current_user, company_id, db)):
         raise HTTPException(status_code=403, detail="Not authorized to update this company")
         
     if company_update.company_code:
@@ -1689,7 +1694,7 @@ def upload_company_logo(company_id: int, file: UploadFile = File(...), db: Sessi
     if not db_company:
         raise HTTPException(status_code=404, detail="Company not found")
         
-    if not (is_admin_or_hr(current_user) or is_client_themselves_for_company(current_user, company_id, db)):
+    if not (is_admin_or_hr(current_user) or is_employee_role(current_user) or is_client_themselves_for_company(current_user, company_id, db)):
         raise HTTPException(status_code=403, detail="Not authorized to change logo")
         
     if file.content_type not in ["image/png", "image/jpeg", "image/jpg"]:
