@@ -19,8 +19,12 @@ def get_employees(skip: int = 0, limit: int = 100, db: Session = Depends(databas
     return employees
 
 @router.get("/{employee_id}", response_model=schemas.EmployeeResponse)
-def get_employee(employee_id: int, db: Session = Depends(database.get_db)):
-    employee = db.query(models.Employee).filter(models.Employee.id == employee_id).first()
+def get_employee(employee_id: str, db: Session = Depends(database.get_db)):
+    employee = None
+    if employee_id.isdigit():
+        employee = db.query(models.Employee).filter(models.Employee.id == int(employee_id)).first()
+    if not employee:
+        employee = db.query(models.Employee).filter(models.Employee.employee_id_custom == employee_id).first()
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
     return employee
@@ -134,6 +138,7 @@ def delete_employee(employee_id: int, db: Session = Depends(database.get_db)):
     db.delete(db_employee)
     db.commit()
     return
+
 @router.get("/{employee_id}/documents", response_model=List[schemas.EmployeeDocumentResponse])
 def get_employee_documents(employee_id: int, db: Session = Depends(database.get_db)):
     documents = db.query(models.EmployeeDocument).filter(models.EmployeeDocument.employee_id == employee_id).all()

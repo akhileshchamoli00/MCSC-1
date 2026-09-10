@@ -19,24 +19,45 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { KpiCard } from "@/components/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { useUser } from "@/contexts/user-context";
 
 export default function CompanyDocumentsDirectory() {
+  const router = useRouter();
+  const { isAdmin, hasPermission, loading: userLoading } = useUser();
+  const canView = isAdmin || hasPermission("clients_documents", "view");
+
   const [companies, setCompanies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Authorization Check & Redirect
+  useEffect(() => {
+    if (!userLoading && !canView) {
+      toast.error("Access Denied: You do not have permission to access Documents.");
+      if (hasPermission("clients_my", "view")) {
+        router.replace("/business/assigned-orders");
+      } else {
+        router.replace("/business/dashboard");
+      }
+    }
+  }, [userLoading, canView, hasPermission, router]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
 
   const fetchData = async () => {
+    if (userLoading || !canView) return;
     const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
     if (!token) {
       setLoading(false);
       return;
     }
     try {
+      setLoading(true);
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, { 
         headers: { "Authorization": `Bearer ${token}` } 
       });
@@ -52,8 +73,10 @@ export default function CompanyDocumentsDirectory() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (!userLoading && canView) {
+      fetchData();
+    }
+  }, [userLoading, canView]);
 
   const filteredCompanies = companies.filter(c => {
     const name = c.company_name || "";
@@ -79,6 +102,15 @@ export default function CompanyDocumentsDirectory() {
   const compliantFoldersCount = companies.filter(c => c.tax_number).length;
   const parentPartnersCount = new Set(companies.map(c => c.client_id).filter(Boolean)).size;
 
+  if (userLoading || (!canView && !isAdmin)) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground font-medium">Verifying document repository permissions...</p>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -90,47 +122,61 @@ export default function CompanyDocumentsDirectory() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       
-      {/* Title Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <Link href="/business/clients" className="mt-1">
-            <Button variant="ghost" size="icon" title="Back to Clients">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm shrink-0 flex items-center justify-center">
-            <FileText className="h-6 w-6" />
+      {/* MINIMALIST METRIC RIBBON */}
+      <div className="flex flex-col lg:flex-row items-stretch gap-3 w-full">
+        <div className="grid grid-cols-2 md:grid-cols-4 flex-1 divide-y md:divide-y-0 md:divide-x divide-border/50 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs">
+          <div className="flex items-center gap-3 px-3 py-1.5">
+            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+              <Building2 className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Active Vaults</p>
+              <p className="text-lg font-bold tracking-tight">{totalFoldersCount}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Company Documents</h1>
-            <p className="text-muted-foreground text-sm">
-              Manage and upload documents for assigned corporate partners.
-            </p>
+          <div className="flex items-center gap-3 px-3 py-1.5">
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <CheckCircle className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Tax Compliance</p>
+              <p className="text-lg font-bold tracking-tight">{compliantFoldersCount}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-3 py-1.5">
+            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+              <Building className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Parent Partners</p>
+              <p className="text-lg font-bold tracking-tight">{parentPartnersCount}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-3 py-1.5">
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <FileText className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Cloud Repository</p>
+              <p className="text-lg font-bold tracking-tight">Dropbox Panel</p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
-        <KpiCard title="Active Vaults" value={totalFoldersCount} icon={Building2} colorTheme="blue" />
-        <KpiCard title="Tax Compliance" value={compliantFoldersCount} icon={CheckCircle} colorTheme="emerald" />
-        <KpiCard title="Parent Partners" value={parentPartnersCount} icon={Building} colorTheme="purple" />
-        <KpiCard title="Cloud Repository" value="Dropbox Panel" icon={FileText} colorTheme="amber" />
-      </div>
-
       {/* Companies Display Card */}
-      <Card className="border-border/50 shadow-sm overflow-hidden bg-card/60 backdrop-blur-md">
-        <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
+      <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
+        <div className="p-4 bg-muted/20 border-b border-border/40 flex flex-col sm:flex-row gap-3 items-center justify-between">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search name, code, contact or industry..."
-              className="pl-8 h-9 text-xs rounded-lg"
+              className="pl-8 h-9 text-xs rounded-xl bg-background/70 border-border/50"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold">
+          <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold tracking-wider">
             Showing {paginatedCompanies.length} of {filteredCompanies.length} entries
           </span>
         </div>
@@ -145,7 +191,7 @@ export default function CompanyDocumentsDirectory() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
+                  <tr className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
                     <th className="p-4">Company Profile</th>
                     <th className="p-4">Parent Client</th>
                     <th className="p-4">Key Contact</th>
@@ -153,10 +199,10 @@ export default function CompanyDocumentsDirectory() {
                     <th className="p-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y divide-border/30">
                   {paginatedCompanies.map((company) => {
                     return (
-                      <tr key={company.id} className="hover:bg-muted/30 transition-colors">
+                      <tr key={company.id} className="hover:bg-muted/40 transition-colors border-b border-border/30 last:border-0">
                         <td className="p-4 text-muted-foreground space-y-1">
                           <div className="flex items-center gap-2">
                             {company.logo_url ? (

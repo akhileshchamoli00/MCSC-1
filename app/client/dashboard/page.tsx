@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useClient } from "../layout";
 import { useRouter } from "next/navigation";
 import {
-  Users,
+  Package,
   FileText,
   MessageSquare,
   Megaphone,
@@ -16,11 +16,14 @@ import {
   ArrowUpRight,
   Phone,
   Mail,
-  FolderOpen,
   User,
   Sunrise,
   Sun,
-  Moon
+  Moon,
+  Users,
+  Calendar,
+  CheckCircle2,
+  Layers
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,16 +33,27 @@ import { Badge } from "@/components/ui/badge";
 import MagicBento, { BentoCardItem, BentoCard } from "@/components/magic-bento";
 import { useTheme } from "next-themes";
 
+const STATUS_LABELS: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  DRAFT: { label: "Draft", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" },
+  CONFIRMED: { label: "Confirmed", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
+  ORDER_ASSIGNED: { label: "Consultant Assigned", color: "text-indigo-600 dark:text-indigo-400", bg: "bg-indigo-500/10", border: "border-indigo-500/20" },
+  IN_PROGRESS: { label: "In Progress", color: "text-sky-600 dark:text-sky-400", bg: "bg-sky-500/10", border: "border-sky-500/20" },
+  REVIEW_DOCS: { label: "Reviewing", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
+  FINAL_DOCUMENT_PREPARATION: { label: "Doc Prep", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" },
+  FINAL_DOC_READY: { label: "Final Docs Ready", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+  WAITING_ON_CLIENT: { label: "Action Needed", color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10", border: "border-rose-500/20" },
+  COMPLETED: { label: "Completed", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" }
+};
+
 export default function ClientDashboard() {
   const { resolvedTheme } = useTheme();
-  const glowColor = resolvedTheme === "dark" ? "14, 165, 233" : "148, 163, 184";
+  const glowColor = resolvedTheme === "dark" ? "16, 185, 129" : "148, 163, 184";
   const { clientProfile, activeCompany, loading: contextLoading } = useClient();
   const router = useRouter();
 
-  const [consultants, setConsultants] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
-  const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const getGreetingData = () => {
@@ -47,54 +61,24 @@ export default function ClientDashboard() {
     if (hour >= 5 && hour < 12) {
       return {
         greeting: "Good Morning",
-        subtitle: "Access files, updates, and collaborate with your consultants.",
+        subtitle: "Track in-progress orders, access files, and coordinate directly with your consultants.",
         badge: "🌅 Sunrise Mode",
         icon: Sunrise,
-        glowColor: "148, 163, 184",
-        themeClass: "from-zinc-100/90 via-slate-50/85 to-zinc-200/80 dark:from-[#151109]/95 dark:via-[#1e140d]/90 dark:to-[#281313]/85 border-zinc-200/40 dark:border-amber-500/20",
-        textGradient: "from-zinc-700 via-slate-700 to-zinc-900 dark:from-amber-100 dark:via-orange-200 dark:to-rose-300",
-        badgeClass: "bg-zinc-500/10 dark:bg-amber-400/15 text-zinc-700 dark:text-amber-300 border-zinc-500/15 dark:border-amber-400/20",
-        orbColors: [
-          "bg-zinc-400/25 dark:bg-amber-500/20",
-          "bg-slate-400/20 dark:bg-rose-500/15",
-          "bg-zinc-400/20 dark:bg-orange-500/15"
-        ],
-        iconClass: "text-zinc-500 dark:text-amber-400 animate-pulse"
       };
     }
     if (hour >= 12 && hour < 17) {
       return {
         greeting: "Good Afternoon",
-        subtitle: "Check notifications and sync with your partner workspace.",
+        subtitle: "Review active consulting milestones and chat with consultants working on your orders.",
         badge: "☀️ Focus Mode",
         icon: Sun,
-        glowColor: "14, 165, 233",
-        themeClass: "from-sky-50/90 via-teal-50/85 to-emerald-50/80 dark:from-[#08121a]/95 dark:via-[#09181c]/90 dark:to-[#091a14]/85 border-sky-200/40 dark:border-sky-500/20",
-        textGradient: "from-sky-600 via-teal-600 to-emerald-600 dark:from-sky-200 dark:via-teal-200 dark:to-emerald-300",
-        badgeClass: "bg-sky-600/10 dark:bg-sky-400/15 text-sky-700 dark:text-sky-300 border-sky-600/15 dark:border-sky-400/20",
-        orbColors: [
-          "bg-sky-400/25 dark:bg-sky-500/20",
-          "bg-teal-400/20 dark:bg-teal-500/15",
-          "bg-emerald-400/20 dark:bg-emerald-500/15"
-        ],
-        iconClass: "text-sky-500 dark:text-sky-400 animate-[spin_30s_linear_infinite]"
       };
     }
     return {
       greeting: "Good Evening",
-      subtitle: "Reviewing your corporate consulting accounts and deliverables.",
+      subtitle: "Reviewing your active orders, completed deliverables, and consulting updates.",
       badge: "🌙 Twilight Mode",
       icon: Moon,
-      glowColor: "160, 160, 160",
-      themeClass: "from-indigo-50/90 via-purple-50/85 to-pink-50/80 dark:from-[#0b0c16]/95 dark:via-[#110d1f]/90 dark:to-[#1a0c20]/85 border-purple-200/40 dark:border-purple-500/20",
-      textGradient: "from-indigo-600 via-purple-600 to-pink-600 dark:from-indigo-200 dark:via-purple-200 dark:to-pink-300",
-      badgeClass: "bg-purple-600/10 dark:bg-purple-400/15 text-purple-700 dark:text-purple-300 border-purple-600/15 dark:border-purple-400/20",
-      orbColors: [
-        "bg-indigo-400/25 dark:bg-indigo-600/20",
-        "bg-purple-400/20 dark:bg-purple-600/15",
-        "bg-pink-400/20 dark:bg-pink-600/15"
-      ],
-      iconClass: "text-purple-500 dark:text-purple-400"
     };
   };
 
@@ -114,29 +98,23 @@ export default function ClientDashboard() {
 
     const loadDashboardData = async () => {
       try {
-        // Fetch consultants
-        const consRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${activeCompany.id}/consultants`, {
-          headers: { "Authorization": `Bearer ${token}` }
+        // Fetch Orders
+        const ordRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
+          headers: { Authorization: `Bearer ${token}` }
         });
-        if (consRes.ok) setConsultants(await consRes.json());
+        if (ordRes.ok) {
+          const allOrders = await ordRes.json();
+          setOrders(allOrders || []);
+        }
 
-        // Fetch documents
-        const docsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${activeCompany.id}/documents`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
-        if (docsRes.ok) setDocuments(await docsRes.json());
+        // Documents (kept empty for now)
+        setDocuments([]);
 
         // Fetch announcements
         const annRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/announcements`, {
-          headers: { "Authorization": `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` }
         });
         if (annRes.ok) setAnnouncements(await annRes.json());
-
-        // Fetch conversations
-        const convRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat/conversations`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
-        if (convRes.ok) setConversations(await convRes.json());
 
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
@@ -148,57 +126,56 @@ export default function ClientDashboard() {
     loadDashboardData();
   }, [clientProfile, activeCompany, contextLoading]);
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-sm text-muted-foreground">Syncing partner workspace...</p>
-        </div>
-      </div>
+  // Active in-progress orders
+  const activeOrders = React.useMemo(() => {
+    return orders.filter(
+      ord => !["COMPLETED", "HARD_COPY_DELIVERED", "CANCELLED"].includes(ord.status)
     );
-  }
+  }, [orders]);
 
-  if (!activeCompany) {
-    return (
-      <div className="flex h-[500px] items-center justify-center animate-in fade-in">
-        <div className="flex flex-col items-center gap-3 text-center max-w-md p-8 rounded-2xl border border-dashed border-border bg-background/50">
-          <ShieldAlert className="h-12 w-12 text-muted-foreground/30" />
-          <h2 className="text-xl font-bold text-foreground">No Company Assigned</h2>
-          <p className="text-sm text-muted-foreground">
-            Your client profile is active, but no company entities have been assigned to your account yet. Please contact your system administrator to link a company to your profile.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Group active orders by order_number
+  const activeOrderGroups = React.useMemo(() => {
+    const map = new Map<string, any[]>();
+    activeOrders.forEach(ord => {
+      const num = ord.order_number || `ORD-${ord.id}`;
+      if (!map.has(num)) map.set(num, []);
+      map.get(num)!.push(ord);
+    });
 
-  const primaryConsultant = consultants.find(c => c.is_primary) || consultants[0];
-  const recentDocs = documents.slice(0, 3);
-  const recentAnnouncements = announcements.slice(0, 3);
+    return Array.from(map.entries()).map(([orderNumber, items]) => ({
+      orderNumber,
+      primaryOrder: items[0],
+      items,
+      consultants: items[0].consultants || [],
+      status: items[0].status || "IN_PROGRESS"
+    }));
+  }, [activeOrders]);
 
-  const clientCards: BentoCardItem[] = [
+  const recentDocs = React.useMemo(() => documents.slice(0, 3), [documents]);
+  const recentAnnouncements = React.useMemo(() => announcements.slice(0, 3), [announcements]);
+
+  const clientCards: BentoCardItem[] = React.useMemo(() => [
     {
-      label: "My Consultants",
-      icon: Users,
-      onClick: () => router.push("/client/consultants"),
+      label: "In-Progress Orders",
+      icon: Package,
+      onClick: () => router.push("/client/orders"),
       className: "cursor-pointer",
       children: (
         <div className="mt-2 w-full">
-          <div className="text-3xl font-extrabold text-foreground">{consultants.length}</div>
-          <p className="text-[10px] text-muted-foreground mt-1">Dedicated professionals</p>
+          <div className="text-3xl font-extrabold text-foreground">{activeOrderGroups.length}</div>
+          <p className="text-[10px] text-muted-foreground mt-1">Ongoing active services</p>
         </div>
       )
     },
     {
-      label: "Active Chats",
+      label: "Order Chat",
       icon: MessageSquare,
       onClick: () => router.push("/client/chat"),
       className: "cursor-pointer",
       children: (
         <div className="mt-2 w-full">
-          <div className="text-3xl font-extrabold text-foreground">{conversations.length}</div>
-          <p className="text-[10px] text-muted-foreground mt-1">Open message threads</p>
+          <div className="text-3xl font-extrabold text-foreground">{activeOrderGroups.length}</div>
+          <p className="text-[10px] text-muted-foreground mt-1">Direct consultant threads</p>
         </div>
       )
     },
@@ -226,30 +203,32 @@ export default function ClientDashboard() {
         </div>
       )
     }
-  ];
+  ], [activeOrderGroups.length, documents.length, announcements.length, router]);
 
-  const startChatWithConsultant = async (consultantId: number) => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat/conversations`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          company_id: activeCompany.id,
-          employee_id: consultantId
-        })
-      });
-      if (response.ok) {
-        router.push("/client/chat");
-      }
-    } catch (err) {
-      console.error("Error starting chat:", err);
-    }
-  };
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Syncing partner workspace...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!activeCompany) {
+    return (
+      <div className="flex h-[500px] items-center justify-center animate-in fade-in">
+        <div className="flex flex-col items-center gap-3 text-center max-w-md p-8 rounded-2xl border border-dashed border-border bg-background/50">
+          <ShieldAlert className="h-12 w-12 text-muted-foreground/30" />
+          <h2 className="text-xl font-bold text-foreground">No Company Assigned</h2>
+          <p className="text-sm text-muted-foreground">
+            Your client profile is active, but no company entities have been assigned to your account yet. Please contact your system administrator to link a company to your profile.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -259,49 +238,49 @@ export default function ClientDashboard() {
         const GreetingIcon = greetingData.icon;
         return (
           <BentoCard
-            className="!relative !overflow-hidden p-6 sm:p-8 text-slate-800 dark:text-slate-100 shadow-2xl animate-scale-in bg-gradient-to-br from-zinc-100 via-slate-100/80 to-zinc-200/60 dark:from-[#030712] dark:via-[#09152b] dark:to-[#030712] border !border-zinc-200/80 dark:!border-slate-800/40"
+            className="!relative !overflow-hidden p-6 sm:p-8 text-foreground shadow-sm rounded-2xl animate-scale-in bg-background/50 backdrop-blur-md border !border-border/40"
             particleCount={25}
             glowColor={glowColor}
           >
             {/* Ambient Animated Floating Orbs */}
-            <div className="absolute top-[-50%] right-[-10%] w-[380px] h-[380px] rounded-full blur-[95px] pointer-events-none -z-10 animate-float-slow bg-zinc-300/30 dark:bg-sky-500/5" />
-            <div className="absolute bottom-[-30%] left-[20%] w-[320px] h-[320px] rounded-full blur-[80px] pointer-events-none -z-10 animate-float-reverse bg-slate-300/25 dark:bg-indigo-500/5" />
-            <div className="absolute top-[20%] left-[-10%] w-[260px] h-[260px] rounded-full blur-[70px] pointer-events-none -z-10 animate-float-slow bg-zinc-200/25 dark:bg-blue-500/5" />
+            <div className="absolute top-[-50%] right-[-10%] w-[380px] h-[380px] rounded-full blur-[95px] pointer-events-none -z-10 animate-float-slow bg-emerald-500/5" />
+            <div className="absolute bottom-[-30%] left-[20%] w-[320px] h-[320px] rounded-full blur-[80px] pointer-events-none -z-10 animate-float-reverse bg-teal-500/5" />
+            <div className="absolute top-[20%] left-[-10%] w-[260px] h-[260px] rounded-full blur-[70px] pointer-events-none -z-10 animate-float-slow bg-emerald-500/5" />
 
             <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-              <div className="space-y-4 max-w-2xl">
-                <Badge className="bg-zinc-500/10 dark:bg-sky-500/10 text-zinc-700 dark:text-sky-300 border border-zinc-500/20 dark:border-sky-500/15 px-3 py-1 text-xs backdrop-blur-md rounded-full font-semibold flex items-center gap-1.5 w-fit">
-                  <GreetingIcon className="h-4 w-4 text-zinc-600 dark:text-sky-400 animate-pulse" />
+              <div className="space-y-3.5 max-w-2xl">
+                <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-3 py-1 text-xs backdrop-blur-md rounded-full font-bold flex items-center gap-1.5 w-fit">
+                  <GreetingIcon className="h-3.5 w-3.5 text-emerald-500" />
                   <span>{greetingData.badge}</span>
                 </Badge>
-                <div className="space-y-2">
-                  <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-none bg-clip-text text-transparent bg-gradient-to-r from-zinc-700 via-slate-700 to-zinc-900 dark:from-sky-300 dark:via-blue-200 dark:to-indigo-300 pb-1">
+                <div className="space-y-1">
+                  <h1 className="text-2xl sm:text-4xl font-bold tracking-tight leading-tight text-foreground">
                     {greetingData.greeting}, {clientProfile?.contact_person || "Partner"}
                   </h1>
-                  <p className="text-zinc-700 dark:text-slate-300 text-sm sm:text-base leading-relaxed max-w-xl font-medium">
-                    {greetingData.subtitle} Manage your corporate accounts, access files, check notifications, and connect directly with your dedicated consultants.
+                  <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed max-w-xl">
+                    {greetingData.subtitle}
                   </p>
                 </div>
 
-                <div className="flex flex-wrap gap-4 pt-2">
-                  <div className="bg-white/80 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl px-4 py-2.5 backdrop-blur-md shadow-sm transition-all duration-300 hover:border-zinc-400/40 hover:bg-zinc-50/50 dark:hover:bg-white/10">
-                    <span className="text-[10px] font-bold text-zinc-600 dark:text-sky-400 uppercase tracking-wider block">Company</span>
-                    <span className="text-xs font-bold text-zinc-900 dark:text-white mt-0.5 block">{activeCompany?.name || "Corporate Partner"}</span>
+                <div className="flex flex-wrap gap-3 pt-1">
+                  <div className="bg-background/80 border border-border/50 rounded-xl px-3.5 py-2 backdrop-blur-md shadow-sm">
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">Company</span>
+                    <span className="text-xs font-bold text-foreground mt-0.5 block">{activeCompany?.company_name || "Corporate Partner"}</span>
                   </div>
-                  <div className="bg-white/80 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl px-4 py-2.5 backdrop-blur-md shadow-sm transition-all duration-300 hover:border-zinc-400/40 hover:bg-zinc-50/50 dark:hover:bg-white/10">
-                    <span className="text-[10px] font-bold text-zinc-600 dark:text-sky-400 uppercase tracking-wider block">Account Type</span>
-                    <span className="text-xs font-bold text-zinc-900 dark:text-white mt-0.5 block">Partner Portal</span>
+                  <div className="bg-background/80 border border-border/50 rounded-xl px-3.5 py-2 backdrop-blur-md shadow-sm">
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">Partner Code</span>
+                    <span className="text-xs font-mono font-bold text-foreground mt-0.5 block">{clientProfile?.client_code || "X260001"}</span>
                   </div>
-                  <div className="bg-white/80 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl px-4 py-2.5 backdrop-blur-md shadow-sm transition-all duration-300 hover:border-zinc-400/40 hover:bg-zinc-50/50 dark:hover:bg-white/10">
-                    <span className="text-[10px] font-bold text-zinc-600 dark:text-sky-400 uppercase tracking-wider block">Assigned Advisors</span>
-                    <span className="text-xs font-bold text-zinc-900 dark:text-white mt-0.5 block">{consultants.length} Dedicated</span>
+                  <div className="bg-background/80 border border-border/50 rounded-xl px-3.5 py-2 backdrop-blur-md shadow-sm">
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">Active Orders</span>
+                    <span className="text-xs font-bold text-foreground mt-0.5 block">{activeOrderGroups.length} Ongoing</span>
                   </div>
                 </div>
               </div>
 
-              <div className="h-28 w-28 rounded-2xl border-2 border-zinc-300/60 dark:border-white/10 bg-white/40 dark:bg-white/5 backdrop-blur-md flex items-center justify-center text-4xl font-extrabold text-zinc-700 dark:text-white shadow-xl overflow-hidden shrink-0 group self-center sm:self-start transition-all duration-300 hover:rotate-2 hover:scale-105">
-                {clientProfile?.company?.logo ? (
-                  <img src={resolveImageUrl(clientProfile.company.logo)} alt="Logo" className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300" />
+              <div className="h-24 w-24 rounded-2xl border border-border/50 bg-background/60 backdrop-blur-md flex items-center justify-center text-3xl font-extrabold text-foreground shadow-sm overflow-hidden shrink-0 group self-center sm:self-start transition-all duration-300 hover:scale-105">
+                {activeCompany?.logo_url ? (
+                  <img src={resolveImageUrl(activeCompany.logo_url)} alt="Logo" className="h-full w-full object-cover" />
                 ) : (
                   `${clientProfile?.contact_person?.[0] || ""}${clientProfile?.contact_person?.split(" ")[1]?.[0] || ""}`
                 )}
@@ -323,72 +302,134 @@ export default function ClientDashboard() {
         clickEffect
         spotlightRadius={400}
         particleCount={12}
-        glowColor={resolvedTheme === "dark" ? "255, 255, 255" : "0, 0, 0"}
+        glowColor={resolvedTheme === "dark" ? "16, 185, 129" : "148, 163, 184"}
         disableAnimations={false}
       />
 
       <div className="grid gap-6 md:grid-cols-12">
-        {/* Left Side: Announcements & Quick Actions */}
+        {/* Left Side: In-Progress Orders & Quick Actions */}
         <div className="md:col-span-7 space-y-6">
-          {/* Announcements Card */}
-          <BentoCard className="flex flex-col h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 border-b border-border/30 bg-muted/20">
-              <div className="space-y-1">
-                <CardTitle className="text-lg font-bold">Latest Announcements</CardTitle>
-                <CardDescription className="text-xs text-muted-foreground">General updates and holiday calendars</CardDescription>
+          {/* Active Orders Card */}
+          <BentoCard className="flex flex-col h-full rounded-2xl border border-border/40 bg-background/50 backdrop-blur-md">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 border-b border-border/40 bg-muted/20">
+              <div className="space-y-0.5">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <Package className="h-4 w-4 text-emerald-500" /> In-Progress Orders
+                </CardTitle>
+                <CardDescription className="text-xs text-muted-foreground">
+                  Active consulting services currently being processed
+                </CardDescription>
               </div>
-              <Button variant="ghost" size="sm" asChild className="text-xs">
-                <Link href="/client/announcements" className="flex items-center gap-1">
-                  View All <ChevronRight className="h-3.5 w-3.5" />
+              <Button variant="ghost" size="sm" asChild className="text-xs font-semibold text-muted-foreground hover:text-foreground">
+                <Link href="/client/orders" className="flex items-center gap-1">
+                  All Orders <ChevronRight className="h-3.5 w-3.5" />
                 </Link>
               </Button>
             </CardHeader>
-            <CardContent className="space-y-4 pt-4">
-              {recentAnnouncements.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground border border-dashed border-border rounded-xl">
-                  <Megaphone className="h-8 w-8 text-muted-foreground/50 mb-2" />
-                  <p className="text-xs">No announcements bulletin posted yet.</p>
+            <CardContent className="space-y-3 pt-4">
+              {activeOrderGroups.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground border border-dashed border-border/60 rounded-xl">
+                  <Package className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                  <p className="text-xs font-semibold text-foreground">No In-Progress Orders</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 max-w-xs">
+                    New orders requested will be displayed here along with assigned consultant details.
+                  </p>
                 </div>
               ) : (
-                recentAnnouncements.map((ann) => (
-                  <div key={ann.id} className="flex flex-col gap-1 p-3 rounded-lg border border-border/30 hover:border-primary/20 hover:bg-white/5 transition-all">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-sm text-foreground line-clamp-1">{ann.title}</span>
-                      <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {new Date(ann.created_at).toLocaleDateString()}
-                      </span>
+                activeOrderGroups.slice(0, 3).map(group => {
+                  const statusConfig = STATUS_LABELS[group.status] || {
+                    label: group.status,
+                    color: "text-emerald-600 dark:text-emerald-400",
+                    bg: "bg-emerald-500/10",
+                    border: "border-emerald-500/20"
+                  };
+                  const consultant = group.consultants[0];
+
+                  return (
+                    <div
+                      key={group.orderNumber}
+                      className="p-3.5 rounded-xl border border-border/40 bg-background/70 hover:border-emerald-500/30 transition-all space-y-2.5 shadow-sm"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2.5 py-0.5 rounded-md">
+                            {group.orderNumber}
+                          </span>
+                          <span
+                            className={`${statusConfig.bg} ${statusConfig.color} ${statusConfig.border} border font-bold text-[10px] px-2.5 py-0.5 rounded-full`}
+                          >
+                            {statusConfig.label}
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-7 px-2.5 flex items-center gap-1 font-bold rounded-lg cursor-pointer"
+                          asChild
+                        >
+                          <Link href={`/client/chat?order=${group.orderNumber}`}>
+                            <MessageSquare className="h-3.5 w-3.5" /> Chat
+                          </Link>
+                        </Button>
+                      </div>
+
+                      <h4 className="text-xs font-bold text-foreground line-clamp-1">
+                        {group.primaryOrder.job_title || "Consulting Service Package"}
+                      </h4>
+
+                      {/* Consultant assigned */}
+                      {consultant ? (
+                        <div className="flex items-center gap-2.5 pt-2 border-t border-border/30 text-xs">
+                          {consultant.profile_photo ? (
+                            <img
+                              src={resolveImageUrl(consultant.profile_photo)}
+                              alt={consultant.name}
+                              className="h-6 w-6 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="h-6 w-6 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-bold text-[10px]">
+                              {(consultant.name || "C")[0]}
+                            </div>
+                          )}
+                          <span className="text-muted-foreground text-[11px]">
+                            Consultant: <strong className="text-foreground font-semibold">{consultant.name}</strong>
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-[10px] text-muted-foreground italic pt-1">
+                          Consultant assignment pending
+                        </div>
+                      )}
                     </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{ann.content}</p>
-                  </div>
-                ))
+                  );
+                })
               )}
             </CardContent>
           </BentoCard>
 
           {/* Quick Actions */}
-          <BentoCard className="flex flex-col h-full">
-            <CardHeader className="border-b border-border/30 bg-muted/20 pb-3">
-              <CardTitle className="text-lg font-bold">Quick Workspace Actions</CardTitle>
-              <CardDescription className="text-xs text-muted-foreground">Frequently accessed utilities</CardDescription>
+          <BentoCard className="flex flex-col h-full rounded-2xl border border-border/40 bg-background/50 backdrop-blur-md">
+            <CardHeader className="border-b border-border/40 bg-muted/20 pb-3">
+              <CardTitle className="text-base font-bold">Quick Workspace Actions</CardTitle>
+              <CardDescription className="text-xs text-muted-foreground">Frequently accessed partner utilities</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 sm:grid-cols-2 pt-4">
               {[
-                { name: "Consultants Chat", desc: "Chat directly with advisors", link: "/client/chat", icon: MessageSquare },
-                { name: "Download Forms", desc: "View all contract documents", link: "/client/documents", icon: Download },
-                { name: "My Advisors", desc: "Contact assigned consultants", link: "/client/consultants", icon: Users },
-                { name: "Company Profile", desc: "Update corporate metadata", link: "/client/profile", icon: User }
+                { name: "My Orders", desc: "View all in-progress orders", link: "/client/orders", icon: Package },
+                { name: "Order Chat", desc: "Chat directly with consultants", link: "/client/chat", icon: MessageSquare },
+                { name: "Shared Documents", desc: "View all uploaded files", link: "/client/documents", icon: FileText },
+                { name: "Company Profile", desc: "View corporate metadata", link: "/client/profile", icon: User }
               ].map((act, i) => {
                 const Icon = act.icon;
                 return (
                   <Link href={act.link} key={i}>
-                    <div className="flex items-center gap-3 p-3 rounded-lg border border-border/40 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer group">
-                      <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all">
+                    <div className="flex items-center gap-3 p-3 rounded-xl border border-border/40 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all cursor-pointer group shadow-sm bg-background/60">
+                      <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition-all shrink-0">
                         <Icon className="h-4 w-4" />
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-foreground flex items-center gap-1">
-                          {act.name} <ArrowUpRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <span className="text-xs font-bold text-foreground flex items-center gap-1">
+                          {act.name} <ArrowUpRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity text-emerald-500" />
                         </span>
                         <span className="text-[10px] text-muted-foreground">{act.desc}</span>
                       </div>
@@ -400,77 +441,52 @@ export default function ClientDashboard() {
           </BentoCard>
         </div>
 
-        {/* Right Side: Primary Consultant & Recent Documents */}
+        {/* Right Side: Announcements & Recent Documents */}
         <div className="md:col-span-5 space-y-6">
-          {/* Dedicated Advisor */}
-          <BentoCard className="flex flex-col h-full overflow-hidden">
-            <CardHeader className="pb-3 border-b border-border/30 bg-muted/20">
-              <CardTitle className="text-lg font-bold">Primary Consultant</CardTitle>
-              <CardDescription className="text-xs text-muted-foreground">Your dedicated corporate partner account manager</CardDescription>
+          {/* Announcements Card */}
+          <BentoCard className="flex flex-col h-full rounded-2xl border border-border/40 bg-background/50 backdrop-blur-md">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 border-b border-border/40 bg-muted/20">
+              <div className="space-y-0.5">
+                <CardTitle className="text-base font-bold">Announcements</CardTitle>
+                <CardDescription className="text-xs text-muted-foreground">Company bulletins and holiday updates</CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" asChild className="text-xs font-semibold text-muted-foreground hover:text-foreground">
+                <Link href="/client/announcements" className="flex items-center gap-1">
+                  View All <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
             </CardHeader>
-            <CardContent className="pt-4">
-              {primaryConsultant ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    {primaryConsultant.profile_photo ? (
-                      <img
-                        src={resolveImageUrl(primaryConsultant.profile_photo)}
-                        alt={primaryConsultant.first_name}
-                        className="h-16 w-16 rounded-xl object-cover border border-white/10"
-                      />
-                    ) : (
-                      <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/20 text-primary font-bold text-xl border border-primary/10">
-                        {primaryConsultant.first_name[0]}
-                      </div>
-                    )}
-                    <div className="space-y-1">
-                      <h4 className="font-bold text-foreground">{primaryConsultant.first_name} {primaryConsultant.last_name}</h4>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium inline-block">
-                        {primaryConsultant.job_title || "Consultant"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2.5 pt-3 border-t border-border/40 text-xs">
-                    {primaryConsultant.email && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Mail className="h-4 w-4 text-primary" />
-                        <span className="text-foreground truncate">{primaryConsultant.email}</span>
-                      </div>
-                    )}
-                    {primaryConsultant.phone && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Phone className="h-4 w-4 text-primary" />
-                        <span className="text-foreground">{primaryConsultant.phone}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <Button
-                    className="w-full mt-4 flex items-center justify-center gap-2"
-                    onClick={() => startChatWithConsultant(primaryConsultant.id)}
-                  >
-                    <MessageSquare className="h-4 w-4" /> Message Consultant
-                  </Button>
+            <CardContent className="space-y-3 pt-4">
+              {recentAnnouncements.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground border border-dashed border-border/60 rounded-xl">
+                  <Megaphone className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                  <p className="text-xs font-semibold text-foreground">No announcements posted yet</p>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground border border-dashed border-border rounded-xl">
-                  <ShieldAlert className="h-8 w-8 text-muted-foreground/50 mb-2" />
-                  <p className="text-xs font-semibold">No Consultant Assigned Yet</p>
-                  <p className="text-[10px] text-muted-foreground mt-1 px-4">An administrator will assign your primary account manager shortly.</p>
-                </div>
+                recentAnnouncements.map(ann => (
+                  <div key={ann.id} className="flex flex-col gap-1 p-3 rounded-xl border border-border/30 hover:border-emerald-500/20 hover:bg-muted/20 transition-all bg-background/60 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-foreground line-clamp-1">{ann.title}</span>
+                      <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-1">
+                        <Clock className="h-3 w-3 text-emerald-500" />
+                        {new Date(ann.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{ann.content}</p>
+                  </div>
+                ))
               )}
             </CardContent>
           </BentoCard>
 
           {/* Recent Documents */}
-          <BentoCard className="flex flex-col h-full overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 border-b border-border/30 bg-muted/20">
-              <div className="space-y-1">
-                <CardTitle className="text-lg font-bold">Recent Documents</CardTitle>
-                <CardDescription className="text-xs text-muted-foreground">Files uploaded for your company review</CardDescription>
+          <BentoCard className="flex flex-col h-full overflow-hidden rounded-2xl border border-border/40 bg-background/50 backdrop-blur-md">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 border-b border-border/40 bg-muted/20">
+              <div className="space-y-0.5">
+                <CardTitle className="text-base font-bold">Recent Documents</CardTitle>
+                <CardDescription className="text-xs text-muted-foreground">Files uploaded for your review</CardDescription>
               </div>
-              <Button variant="ghost" size="sm" asChild className="text-xs">
+              <Button variant="ghost" size="sm" asChild className="text-xs font-semibold text-muted-foreground hover:text-foreground">
                 <Link href="/client/documents" className="flex items-center gap-1">
                   All Files <ChevronRight className="h-3.5 w-3.5" />
                 </Link>
@@ -478,25 +494,25 @@ export default function ClientDashboard() {
             </CardHeader>
             <CardContent className="space-y-3 pt-4">
               {recentDocs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground border border-dashed border-border rounded-xl">
-                  <FileText className="h-8 w-8 text-muted-foreground/50 mb-2" />
-                  <p className="text-xs">No shared documents found.</p>
+                <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground border border-dashed border-border/60 rounded-xl">
+                  <FileText className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                  <p className="text-xs font-semibold text-foreground">No shared documents found</p>
                 </div>
               ) : (
-                recentDocs.map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between p-2 rounded-lg border border-border/30 hover:bg-white/5 transition-all">
+                recentDocs.map(doc => (
+                  <div key={doc.id} className="flex items-center justify-between p-2.5 rounded-xl border border-border/30 hover:bg-muted/20 transition-all bg-background/60 shadow-sm">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
+                      <div className="h-8 w-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 flex-shrink-0">
                         <FileText className="h-4 w-4" />
                       </div>
                       <div className="flex flex-col min-w-0">
                         <span className="text-xs font-semibold text-foreground truncate">{doc.file_name}</span>
-                        <span className="text-[9px] text-muted-foreground">{new Date(doc.uploaded_at).toLocaleDateString()}</span>
+                        <span className="text-[9px] text-muted-foreground font-mono">{new Date(doc.uploaded_at).toLocaleDateString()}</span>
                       </div>
                     </div>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-foreground" asChild>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg" asChild>
                       <a href={`${process.env.NEXT_PUBLIC_API_URL}${doc.file_url}`} download target="_blank" rel="noopener noreferrer">
-                        <Download className="h-4 w-4" />
+                        <Download className="h-3.5 w-3.5" />
                       </a>
                     </Button>
                   </div>

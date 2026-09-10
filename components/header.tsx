@@ -64,6 +64,10 @@ export function Header() {
       href: `/${language}/resources/check-application-status`,
     },
     {
+      label: t.nav.trackOrder,
+      href: `/${language}/track-order`,
+    },
+    {
       label: t.nav.kbliDirectory,
       href: `/${language}/resources/kbli`,
     },

@@ -9,6 +9,8 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
+import { EmailInput } from "@/components/ui/email-input";
 
 export default function NewEmployeePage() {
   const router = useRouter();
@@ -118,6 +120,18 @@ export default function NewEmployeePage() {
       return;
     }
 
+    if (!formData.email || !isValidEmail(formData.email)) {
+      setError("Please enter a valid email address (e.g. employee@company.com).");
+      setLoading(false);
+      return;
+    }
+
+    if (formData.phone && !isValidPhoneNumber(formData.phone)) {
+      setError("Please enter a valid phone number (6 to 15 digits).");
+      setLoading(false);
+      return;
+    }
+
     try {
       const token = localStorage.getItem("hrms_token");
       if (!token) throw new Error("Authentication token not found.");
@@ -222,27 +236,24 @@ export default function NewEmployeePage() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto pb-10">
-      <div className="flex items-start gap-4">
-        <Link href="/hrms/employees" className="mt-1">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
+      {/* Top Back Action Bar */}
+      <div className="flex items-center justify-between gap-4">
+        <Link href="/hrms/employees">
+          <Button variant="outline" size="sm" className="rounded-xl gap-2 h-10 px-4 text-xs font-semibold bg-card/60 backdrop-blur-md border-border/50 shadow-xs hover:bg-muted cursor-pointer">
+            <ArrowLeft className="h-4 w-4" /> Back to Employees
           </Button>
         </Link>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Add New Employee</h1>
-          <p className="text-muted-foreground mt-1">Fill out the information below to create a new record.</p>
-        </div>
       </div>
 
       {error && (
-        <div className="bg-destructive/15 text-destructive text-sm p-4 rounded-md border border-destructive/20">
+        <div className="bg-destructive/15 text-destructive text-sm p-4 rounded-xl border border-destructive/20">
           {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
         <Tabs defaultValue="personal" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 mb-4 h-auto sm:h-12 bg-muted/50 p-1 rounded-lg">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 mb-4 h-auto sm:h-12 bg-muted/50 p-1 rounded-xl">
             <TabsTrigger value="personal" className="h-full gap-2 text-sm">
               <User className="h-4 w-4" /> <span className="hidden md:inline">Personal</span>
             </TabsTrigger>
@@ -278,11 +289,20 @@ export default function NewEmployeePage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Email Address *</label>
-                    <Input name="email" value={formData.email} onChange={handleInputChange} required type="email" placeholder="john.doe@company.com" />
+                    <EmailInput 
+                      value={formData.email} 
+                      onChange={(val) => setFormData((prev) => ({ ...prev, email: val }))} 
+                      required 
+                      placeholder="john.doe@company.com" 
+                    />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Phone Number</label>
-                    <Input name="phone" value={formData.phone} onChange={handleInputChange} type="tel" placeholder="+1 234 567 8900" />
+                    <PhoneInput 
+                      value={formData.phone} 
+                      onChange={(val) => setFormData((prev) => ({ ...prev, phone: val }))} 
+                      placeholder="812 3456 789" 
+                    />
                   </div>
                    <div className="space-y-2">
                     <label className="text-sm font-medium">Gender</label>

@@ -1,472 +1,1024 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useClient } from "../layout";
-import { 
-  Send, 
-  Paperclip, 
-  MessageSquare, 
-  Users, 
-  Clock, 
-  ShieldCheck, 
-  Loader2, 
+import {
+  Send,
+  MessageSquare,
+  Package,
+  Users,
+  Clock,
+  Loader2,
+  Phone,
+  Mail,
+  Search,
+  CheckCircle2,
+  Calendar,
+  ExternalLink,
+  Layers,
   FileText,
-  Download,
-  AlertCircle
+  RotateCw,
+  Sparkles,
+  Info,
+  ChevronRight,
+  ShieldCheck,
+  Building,
+  Check,
+  CheckCheck,
+  PanelRightClose,
+  PanelRightOpen,
+  HelpCircle,
+  CreditCard,
+  FileCheck,
+  Paperclip,
+  X,
+  File,
+  Lock,
+  UploadCloud
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { resolveImageUrl } from "@/lib/utils";
+import Link from "next/link";
+import { toast } from "sonner";
 
-export default function ClientChatPage() {
+const isSystemMessage = (msg: any) => {
+  if (!msg) return false;
+  if (!msg.user_id) return true;
+  const role = (msg.sender_role || "").toUpperCase();
+  if (role === "MILESTONE" || role === "SYSTEM") return true;
+  const name = (msg.sender_name || "").toUpperCase();
+  if (name === "SYSTEM" || name === "MILESTONE") return true;
+  const txt = (msg.message || "").toLowerCase();
+  return (
+    txt.startsWith("order execution status") ||
+    txt.startsWith("pipeline order") ||
+    txt.startsWith("order moved") ||
+    txt.startsWith("payment") ||
+    txt.startsWith("proforma payment") ||
+    txt.startsWith("final invoice payment") ||
+    txt.startsWith("additional payment") ||
+    txt.startsWith("amount received") ||
+    txt.includes("invoice has been generated") ||
+    txt.includes("proforma invoice (") ||
+    txt.includes("final documents") ||
+    txt.includes("uploaded to dropbox") ||
+    txt.includes("emailed to client") ||
+    txt.includes("assigned to review") ||
+    txt.includes("consultant is actively")
+  );
+};
+
+const getMilestoneIcon = (message: string) => {
+  const txt = (message || "").toLowerCase();
+  if (txt.includes("payment") || txt.includes("amount received") || txt.includes("paid")) {
+    return <CreditCard className="h-3.5 w-3.5 text-emerald-500 shrink-0" />;
+  }
+  if (txt.includes("invoice")) {
+    return <FileText className="h-3.5 w-3.5 text-amber-500 shrink-0" />;
+  }
+  if (txt.includes("final document") || txt.includes("dropbox")) {
+    return <FileCheck className="h-3.5 w-3.5 text-emerald-500 shrink-0" />;
+  }
+  if (txt.includes("status") || txt.includes("active orders")) {
+    return <Sparkles className="h-3.5 w-3.5 text-emerald-500 shrink-0" />;
+  }
+  return <Clock className="h-3.5 w-3.5 text-emerald-500 shrink-0" />;
+};
+
+const STATUS_CONFIG: Record<
+  string,
+  { label: string; color: string; bg: string; border: string; step: number }
+> = {
+  DRAFT: { label: "Draft", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", step: 1 },
+  CONFIRMED: { label: "Confirmed", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20", step: 1 },
+  ORDER_ASSIGNED: { label: "Assigned", color: "text-indigo-600 dark:text-indigo-400", bg: "bg-indigo-500/10", border: "border-indigo-500/20", step: 1 },
+  IN_PROGRESS: { label: "In Progress", color: "text-sky-600 dark:text-sky-400", bg: "bg-sky-500/10", border: "border-sky-500/20", step: 2 },
+  REVIEW_DOCS: { label: "Reviewing", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20", step: 3 },
+  FINAL_DOCUMENT_PREPARATION: { label: "Doc Prep", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", step: 4 },
+  FINAL_DOC_READY: { label: "Final Docs Ready", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", step: 4 },
+  WAITING_ON_CLIENT: { label: "Action Needed", color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10", border: "border-rose-500/20", step: 3 },
+  WAITING_FOR_FINAL_PAYMENT: { label: "Payment Pending", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", step: 4 },
+  FINAL_PAYMENT_COMPLETED: { label: "Paid", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", step: 4 },
+  SOFT_COPY_DELIVERED: { label: "Soft Copy Sent", color: "text-teal-600 dark:text-teal-400", bg: "bg-teal-500/10", border: "border-teal-500/20", step: 5 },
+  HARD_COPY_DELIVERED: { label: "Delivered", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", step: 5 },
+  COMPLETED: { label: "Completed", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", step: 5 },
+  CANCELLED: { label: "Cancelled", color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10", border: "border-rose-500/20", step: 0 }
+};
+
+const ORDER_STAGES = [
+  { id: 1, name: "Assigned" },
+  { id: 2, name: "In Progress" },
+  { id: 3, name: "Docs Review" },
+  { id: 4, name: "Final Prep" },
+  { id: 5, name: "Delivered" }
+];
+
+export default function ClientOrderChatPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { clientProfile, activeCompany, loading: contextLoading } = useClient();
-  const [conversations, setConversations] = useState<any[]>([]);
-  const [selectedConv, setSelectedConv] = useState<any>(null);
+
+  const [orders, setOrders] = useState<any[]>([]);
+  const [selectedOrderGroup, setSelectedOrderGroup] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
-  const [attachmentName, setAttachmentName] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState("");
-  const pathname = usePathname();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "COMPLETED">("ALL");
+  const [showRightPanel, setShowRightPanel] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Auto-select conversation from query parameter
-  useEffect(() => {
-    if (typeof window !== "undefined" && conversations.length > 0) {
-      const params = new URLSearchParams(window.location.search);
-      const convIdParam = params.get("convId");
-      if (convIdParam) {
-        const targetConv = conversations.find((c: any) => c.id.toString() === convIdParam);
-        if (targetConv) {
-          setSelectedConv(targetConv);
-        }
-      }
-    }
-  }, [conversations, pathname]);
-
-  const wsRef = useRef<WebSocket | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-
   const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-  const currentUserId = typeof window !== "undefined" ? Number(localStorage.getItem("user_id")) : null;
 
-  // 1. Fetch conversations
-  const fetchConversations = async () => {
-    if (contextLoading) return;
-    if (!clientProfile || !activeCompany || !token) {
-      setLoading(false);
-      return;
-    }
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat/conversations`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (response.ok) {
-        let data = await response.json();
-        if (activeCompany) {
-          data = data.filter((c: any) => c.company_id === activeCompany.id);
-        }
-        setConversations(data);
-        if (data.length > 0 && !selectedConv) {
-          // Auto select first conversation
-          setSelectedConv(data[0]);
-        }
-      }
-    } catch (err) {
-      console.error("Error fetching conversations:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchConversations();
-  }, [clientProfile, activeCompany, contextLoading]);
-
-  // 2. Fetch messages for selected conversation
-  const fetchMessages = async (convId: number) => {
+  // 1. Fetch Orders
+  const fetchOrders = async () => {
     if (!token) return;
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat/conversations/${convId}/messages`, {
-        headers: { "Authorization": `Bearer ${token}` }
+      setLoadingOrders(true);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      if (response.ok) {
-        setMessages(await response.json());
+      if (res.ok) {
+        const data = await res.json();
+        setOrders(data || []);
       }
     } catch (err) {
-      console.error("Error fetching messages:", err);
+      console.error("Error fetching orders:", err);
+    } finally {
+      setLoadingOrders(false);
     }
   };
 
   useEffect(() => {
-    if (!selectedConv) return;
-    fetchMessages(selectedConv.id);
-  }, [selectedConv]);
+    fetchOrders();
+  }, [clientProfile, activeCompany]);
 
-  // 3. Connect WebSocket
+  // Group orders by order_number
+  const orderGroups = React.useMemo(() => {
+    const map = new Map<string, any[]>();
+    orders.forEach(ord => {
+      if (activeCompany && ord.company_id && ord.company_id !== activeCompany.id) {
+        return;
+      }
+      const num = ord.order_number || `ORD-${ord.id}`;
+      if (!map.has(num)) map.set(num, []);
+      map.get(num)!.push(ord);
+    });
+
+    return Array.from(map.entries()).map(([orderNumber, items]) => ({
+      orderNumber,
+      primaryOrder: items[0],
+      items,
+      consultants: items[0].consultants || [],
+      status: items[0].status || "CONFIRMED",
+      createdAt: items[0].created_at
+    }));
+  }, [orders, activeCompany]);
+
+  // Auto-select order from query param or default to first
   useEffect(() => {
-    if (!token || !clientProfile || !activeCompany) return;
+    if (orderGroups.length === 0) return;
 
-    // Resolve WebSocket URL robustly for local development and production
-    let wsUrl = "";
-    if (typeof window !== "undefined") {
-      const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-      const nextPublicApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
-      
-      if (nextPublicApiUrl.startsWith("http")) {
-        const wsProtocol = nextPublicApiUrl.startsWith("https") ? "wss" : "ws";
-        const hostPart = nextPublicApiUrl.replace(/^https?:\/\//, "");
-        wsUrl = `${wsProtocol}://${hostPart}/api/chat/ws?token=${token}`;
-      } else {
-        if (window.location.port) {
-          const hostname = window.location.hostname === "localhost" ? "127.0.0.1" : window.location.hostname;
-          wsUrl = `${protocol}://${hostname}:8000/api/chat/ws?token=${token}`;
-        } else {
-          const apiPath = nextPublicApiUrl.includes("proxy") ? "/api" : (nextPublicApiUrl || "/api");
-          wsUrl = `${protocol}://${window.location.host}${apiPath}/chat/ws?token=${token}`;
-        }
+    const orderParam = searchParams.get("order");
+    if (orderParam) {
+      const matched = orderGroups.find(g => g.orderNumber === orderParam);
+      if (matched) {
+        setSelectedOrderGroup(matched);
+        return;
       }
     }
 
-    console.log("Connecting to WebSocket URL:", wsUrl);
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    if (!selectedOrderGroup) {
+      setSelectedOrderGroup(orderGroups[0]);
+    }
+  }, [orderGroups, searchParams]);
 
-    ws.onopen = () => {
-      console.log("WebSocket connected successfully");
-      setErrorMsg("");
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const newMessage = JSON.parse(event.data);
-        // Only append if it belongs to the active conversation
-        if (selectedConv && newMessage.conversation_id === selectedConv.id) {
-          setMessages((prev) => [...prev, newMessage]);
+  // 2. Fetch Messages for selected order (channel=CLIENT)
+  const fetchMessages = async (orderNumber: string, isInitial = false) => {
+    if (!token) return;
+    try {
+      if (isInitial) {
+        setLoadingMessages(true);
+      }
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/progress?channel=CLIENT`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
         }
-        
-        // Also refresh conversations list to show last updates if needed
-        fetchConversations();
-      } catch (err) {
-        console.error("Error parsing WebSocket message:", err);
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(prev => {
+          if (JSON.stringify(prev) !== JSON.stringify(data)) {
+            return data || [];
+          }
+          return prev;
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching order messages:", err);
+    } finally {
+      if (isInitial) {
+        setLoadingMessages(false);
+      }
+      setRefreshing(false);
+    }
+  };
+
+  const handleManualRefresh = () => {
+    if (!selectedOrderGroup || refreshing) return;
+    setRefreshing(true);
+    fetchMessages(selectedOrderGroup.orderNumber, false);
+  };
+
+  useEffect(() => {
+    if (!selectedOrderGroup) return;
+    fetchMessages(selectedOrderGroup.orderNumber, true);
+
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchMessages(selectedOrderGroup.orderNumber, false);
+      }
+    }, 12000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchMessages(selectedOrderGroup.orderNumber, false);
       }
     };
-
-    ws.onerror = () => {
-      setErrorMsg("WebSocket connection issue. Attempting reconnect...");
-    };
-
-    ws.onclose = () => {
-      console.log("WebSocket disconnected. Retrying in 3 seconds...");
-      setTimeout(() => {
-        // Simple reconnect logic if component is still mounted
-        if (wsRef.current === ws) {
-          fetchConversations();
-        }
-      }, 3000);
-    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      ws.close();
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [token, clientProfile, activeCompany, selectedConv]);
+  }, [selectedOrderGroup]);
 
-  // 4. Scroll to bottom
+  // Scroll to bottom when messages update
   useEffect(() => {
     if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTo({
-        top: messagesContainerRef.current.scrollHeight,
-        behavior: "smooth"
-      });
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages.length]);
 
-  // 5. Send text message
-  const handleSendMessage = (e?: React.FormEvent) => {
+  // 3. Send Message / Upload Document
+  const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!inputText.trim() && !attachmentUrl) return;
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      setErrorMsg("Connection is offline. Message not sent.");
-      return;
-    }
+    if ((!inputText.trim() && !selectedFile) || !selectedOrderGroup || !token || sending) return;
 
-    const payload = {
-      conversation_id: selectedConv.id,
-      message: inputText.trim() || null,
-      attachment: attachmentUrl
+    const messageText = inputText.trim();
+    const fileToUpload = selectedFile;
+
+    // Immediate optimistic clearing
+    setInputText("");
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    // Optimistic message entry
+    const tempId = Date.now();
+    const optimisticMsg = {
+      id: tempId,
+      order_number: selectedOrderGroup.orderNumber,
+      message: messageText || (fileToUpload ? `Uploaded document: ${fileToUpload.name}` : ""),
+      channel: "CLIENT",
+      attachment_url: fileToUpload ? "uploading..." : null,
+      attachment_name: fileToUpload ? fileToUpload.name : null,
+      created_at: new Date().toISOString(),
+      sender_name: clientProfile?.contact_person || clientProfile?.email || "You (Client)",
+      sender_role: "CLIENT",
+      is_client: true,
+      pending: true
     };
 
-    wsRef.current.send(JSON.stringify(payload));
-    
-    setInputText("");
-    setAttachmentUrl(null);
-    setAttachmentName(null);
-  };
-
-  // 6. Handle file upload
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !token) return;
-
-    setUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
+    setMessages(prev => [...prev, optimisticMsg]);
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat/upload`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        },
-        body: formData
-      });
+      setSending(true);
 
-      if (!response.ok) throw new Error("Upload failed");
+      if (fileToUpload) {
+        // Multipart upload endpoint: /upload-attachment
+        const formData = new FormData();
+        formData.append("file", fileToUpload);
+        if (messageText) {
+          formData.append("message", messageText);
+        }
 
-      const data = await response.json();
-      setAttachmentUrl(data.attachment_url);
-      setAttachmentName(data.filename);
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.orderNumber}/upload-attachment`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`
+            },
+            body: formData
+          }
+        );
+
+        if (res.ok) {
+          const savedMsg = await res.json();
+          setMessages(prev =>
+            prev.map(m => (m.id === tempId ? savedMsg : m))
+          );
+          toast.success("Document uploaded and securely delivered to your consulting team!");
+        } else {
+          const err = await res.json();
+          toast.error(err.detail || "Failed to upload document");
+          setMessages(prev => prev.filter(m => m.id !== tempId));
+          setInputText(messageText);
+          setSelectedFile(fileToUpload);
+        }
+      } else {
+        // Plain text message endpoint
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.orderNumber}/progress`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              message: messageText,
+              channel: "CLIENT"
+            })
+          }
+        );
+
+        if (res.ok) {
+          const savedMsg = await res.json();
+          setMessages(prev =>
+            prev.map(m => (m.id === tempId ? savedMsg : m))
+          );
+        } else {
+          const err = await res.json();
+          toast.error(err.detail || "Failed to deliver message");
+          setMessages(prev => prev.filter(m => m.id !== tempId));
+          setInputText(messageText);
+        }
+      }
     } catch (err) {
-      console.error("Upload error:", err);
-      setErrorMsg("Failed to upload attachment. Try again.");
+      console.error("Error posting order message:", err);
+      toast.error("Network error delivering message");
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      setInputText(messageText);
+      setSelectedFile(fileToUpload);
     } finally {
-      setUploading(false);
+      setSending(false);
+      textareaRef.current?.focus();
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-[500px] items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Opening secure chat links...</p>
-        </div>
-      </div>
-    );
-  }
+  // Filtered order groups
+  const filteredOrderGroups = orderGroups.filter(g => {
+    const term = searchTerm.toLowerCase();
+    const matchesSearch =
+      g.orderNumber.toLowerCase().includes(term) ||
+      g.items.some((it: any) => (it.job_title || "").toLowerCase().includes(term)) ||
+      g.consultants.some((c: any) => (c.name || "").toLowerCase().includes(term));
 
-  if (!activeCompany) {
-    return (
-      <div className="flex h-[calc(100vh-152px)] items-center justify-center animate-in fade-in">
-        <div className="flex flex-col items-center gap-3 text-center max-w-md p-8 rounded-2xl border border-dashed border-border bg-background/50">
-          <AlertCircle className="h-12 w-12 text-muted-foreground/30" />
-          <h2 className="text-xl font-bold text-foreground">No Company Assigned</h2>
-          <p className="text-sm text-muted-foreground">
-            Please contact your system administrator to link a company to your profile before starting conversations.
-          </p>
-        </div>
-      </div>
-    );
-  }
+    if (!matchesSearch) return false;
+
+    const isCompleted = ["COMPLETED", "HARD_COPY_DELIVERED"].includes(g.status);
+    if (statusFilter === "ACTIVE") return !isCompleted;
+    if (statusFilter === "COMPLETED") return isCompleted;
+    return true;
+  });
+
+  const primaryConsultant = selectedOrderGroup?.consultants?.[0];
+  const currentStatus = selectedOrderGroup
+    ? STATUS_CONFIG[selectedOrderGroup.status] || {
+        label: selectedOrderGroup.status,
+        color: "text-emerald-600 dark:text-emerald-400",
+        bg: "bg-emerald-500/10",
+        border: "border-emerald-500/20",
+        step: 2
+      }
+    : null;
 
   return (
-    <div className="h-[calc(100vh-152px)] md:h-[calc(100vh-168px)] flex flex-col md:flex-row rounded-2xl border border-border/40 bg-background/30 backdrop-blur-xl overflow-hidden animate-in fade-in duration-500">
-      
-      {/* Conversations Sidebar (Left) */}
-      <div className="w-full md:w-80 border-r border-border/40 bg-background/50 flex flex-col h-1/3 md:h-full flex-shrink-0">
-        <div className="p-4 border-b border-border/40 flex items-center justify-between">
-          <h2 className="font-bold text-sm text-foreground flex items-center gap-2">
-            <MessageSquare className="h-4 w-4 text-primary" /> Chats & Advice
-          </h2>
-          <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-semibold">
-            {conversations.length} Active
-          </span>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {conversations.length === 0 ? (
-            <div className="p-6 text-center text-xs text-muted-foreground flex flex-col items-center justify-center gap-2 mt-4">
-              <Users className="h-8 w-8 text-muted-foreground/30" />
-              <span>No active chats. Go to "My Consultants" to initiate chat advice.</span>
-            </div>
-          ) : (
-            conversations.map((conv) => {
-              const consultantName = conv.employee ? `${conv.employee.first_name} ${conv.employee.last_name || ""}` : "Consultant";
-              const isSelected = selectedConv?.id === conv.id;
-              
-              return (
-                <button
-                  key={conv.id}
-                  onClick={() => setSelectedConv(conv)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all
-                    ${isSelected 
-                      ? "bg-primary/10 border-l-2 border-primary text-foreground" 
-                      : "hover:bg-white/5 text-muted-foreground hover:text-foreground"
-                    }
-                  `}
-                >
-                  {conv.employee?.profile_photo ? (
-                    <img
-                      src={resolveImageUrl(conv.employee.profile_photo)}
-                      alt={consultantName}
-                      className="h-10 w-10 rounded-full object-cover border border-white/10"
-                    />
-                  ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 text-primary font-bold text-sm">
-                      {consultantName[0]}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-xs truncate text-foreground">{consultantName}</span>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground truncate block">{conv.employee?.job_title || "Consultant Advisor"}</span>
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* Message Area (Right) */}
-      <div className="flex-1 flex flex-col bg-background/10 h-2/3 md:h-full relative">
-        {selectedConv ? (
-          <>
-            {/* Header */}
-            <div className="p-4 border-b border-border/40 bg-background/40 backdrop-blur-md flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {selectedConv.employee?.profile_photo ? (
-                  <img
-                    src={resolveImageUrl(selectedConv.employee.profile_photo)}
-                    alt="Consultant"
-                    className="h-9 w-9 rounded-full object-cover border border-white/10"
-                  />
-                ) : (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 text-primary font-bold text-xs">
-                    {selectedConv.employee?.first_name?.[0]}
-                  </div>
-                )}
-                <div className="flex flex-col">
-                  <span className="font-bold text-xs text-foreground">
-                    {selectedConv.employee?.first_name} {selectedConv.employee?.last_name}
-                  </span>
-                  <span className="text-[9px] text-muted-foreground leading-none">{selectedConv.employee?.job_title || "Consultant"}</span>
-                </div>
-              </div>
-              <span className="text-[9px] px-2 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary flex items-center gap-1 font-semibold">
-                <Clock className="h-3 w-3 animate-pulse" /> Real-time Encryption
+    <div className="animate-in fade-in duration-500">
+      {/* Main Unified Workspace Card */}
+      <div className="flex flex-col md:flex-row h-[calc(100vh-10.5rem)] min-h-[580px] rounded-2xl border border-border/40 overflow-hidden bg-background/50 backdrop-blur-xl shadow-xl">
+        {/* ============================================================ */}
+        {/* LEFT COLUMN: ACTIVE ORDERS DIRECTORY                         */}
+        {/* ============================================================ */}
+        <div className="w-full md:w-72 lg:w-80 shrink-0 border-r border-border/40 flex flex-col h-full bg-muted/20 overflow-hidden">
+          {/* Search and Filters */}
+          <div className="p-3.5 border-b border-border/40 bg-muted/30 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                <Package className="h-3.5 w-3.5 text-emerald-500" /> Orders ({filteredOrderGroups.length})
               </span>
             </div>
 
-            {/* Error Notification */}
-            {errorMsg && (
-              <div className="bg-destructive/15 text-destructive border-b border-destructive/20 text-[11px] p-2 flex items-center justify-center gap-1.5 font-medium animate-bounce">
-                <AlertCircle className="h-3.5 w-3.5" /> {errorMsg}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Search orders, services..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="pl-8 text-xs h-8.5 rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50"
+              />
+            </div>
+
+            {/* Quick Status Tab Filters */}
+            <div className="flex items-center p-0.5 bg-muted/60 rounded-xl border border-border/40 text-[11px]">
+              {(["ALL", "ACTIVE", "COMPLETED"] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setStatusFilter(tab)}
+                  className={`flex-1 py-1 rounded-lg font-bold transition-all ${
+                    statusFilter === tab
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {tab === "ALL" ? "All" : tab === "ACTIVE" ? "Active" : "Done"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Orders List Stream */}
+          <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5">
+            {loadingOrders ? (
+              <div className="flex h-40 items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+              </div>
+            ) : filteredOrderGroups.length === 0 ? (
+              <div className="p-6 text-center text-muted-foreground">
+                <Package className="h-8 w-8 mx-auto mb-2 text-emerald-500/30" />
+                <p className="text-xs font-bold text-foreground">No Orders Found</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Orders for your entity will appear here.
+                </p>
+              </div>
+            ) : (
+              filteredOrderGroups.map(group => {
+                const isSelected = selectedOrderGroup?.orderNumber === group.orderNumber;
+                const statusConfig = STATUS_CONFIG[group.status] || {
+                  label: group.status,
+                  color: "text-emerald-600 dark:text-emerald-400",
+                  bg: "bg-emerald-500/10",
+                  border: "border-emerald-500/20",
+                  step: 1
+                };
+                const assigned = group.consultants[0];
+
+                return (
+                  <button
+                    key={group.orderNumber}
+                    onClick={() => setSelectedOrderGroup(group)}
+                    className={`w-full text-left p-3 rounded-xl transition-all relative ${
+                      isSelected
+                        ? "bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30 shadow-xs"
+                        : "hover:bg-muted/40 border border-transparent"
+                    }`}
+                  >
+                    {isSelected && (
+                      <div className="absolute left-0 top-3 bottom-3 w-1 bg-emerald-500 rounded-r-full shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+                    )}
+
+                    <div className="flex items-center justify-between gap-1.5 mb-1 pl-1">
+                      <span className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-[11px] px-2 py-0.5 rounded-md">
+                        {group.orderNumber}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className={`${statusConfig.bg} ${statusConfig.color} ${statusConfig.border} text-[9px] px-1.5 py-0 font-bold rounded-full`}
+                      >
+                        {statusConfig.label}
+                      </Badge>
+                    </div>
+
+                    <h4 className="text-xs font-bold text-foreground line-clamp-1 pl-1">
+                      {group.primaryOrder.job_title || "Consulting Service"}
+                    </h4>
+
+                    {/* Consultant Footer Bar */}
+                    <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-border/30 text-[10px] pl-1">
+                      {assigned ? (
+                        <div className="flex items-center gap-1.5 truncate">
+                          {assigned.profile_photo ? (
+                            <img
+                              src={resolveImageUrl(assigned.profile_photo)}
+                              alt={assigned.name}
+                              className="h-4 w-4 rounded-full object-cover shrink-0"
+                            />
+                          ) : (
+                            <div className="h-4 w-4 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-[8px] shrink-0">
+                              {(assigned.name || "C")[0]}
+                            </div>
+                          )}
+                          <span className="truncate text-foreground font-medium">{assigned.name}</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground italic">Consultant pending</span>
+                      )}
+
+                      <span className="text-muted-foreground shrink-0">
+                        {group.items.length} {group.items.length === 1 ? "Item" : "Items"}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* CENTER COLUMN: MAIN CHAT CANVAS & TIMELINE TRACKER           */}
+        {/* ============================================================ */}
+        <div className="flex-1 min-w-0 flex flex-col h-full bg-background/30 overflow-hidden transition-all">
+          {selectedOrderGroup ? (
+            <>
+              {/* Header Bar */}
+              <div className="px-5 sm:px-6 py-3 border-b border-border/40 bg-background/60 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-9 w-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                    <Package className="h-4.5 w-4.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2 py-0.5 rounded-md">
+                        {selectedOrderGroup.orderNumber}
+                      </span>
+                      {currentStatus && (
+                        <Badge
+                          variant="outline"
+                          className={`${currentStatus.bg} ${currentStatus.color} ${currentStatus.border} text-[10px] font-bold px-2 py-0.5 rounded-full`}
+                        >
+                          {currentStatus.label}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground font-semibold truncate mt-0.5">
+                      {selectedOrderGroup.primaryOrder.job_title}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {/* Consultant Card */}
+                  {primaryConsultant && (
+                    <div className="hidden sm:flex items-center gap-2 bg-background/80 border border-border/40 rounded-xl px-2.5 py-1 shadow-2xs">
+                      {primaryConsultant.profile_photo ? (
+                        <img
+                          src={resolveImageUrl(primaryConsultant.profile_photo)}
+                          alt={primaryConsultant.name}
+                          className="h-6 w-6 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="h-6 w-6 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs">
+                          {(primaryConsultant.name || "C")[0]}
+                        </div>
+                      )}
+                      <div className="text-left leading-tight">
+                        <span className="text-xs font-bold text-foreground block truncate max-w-[120px]">
+                          {primaryConsultant.name}
+                        </span>
+                        <span className="text-[9px] text-emerald-600 dark:text-emerald-400 block font-semibold">
+                          Consultant
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleManualRefresh}
+                    title="Refresh Messages"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg"
+                    disabled={refreshing}
+                  >
+                    <RotateCw className={`h-4 w-4 ${refreshing ? "animate-spin text-emerald-500" : ""}`} />
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowRightPanel(!showRightPanel)}
+                    title={showRightPanel ? "Hide Order Info" : "Show Order Info"}
+                    className="h-8 px-2.5 text-xs font-semibold gap-1 hidden lg:flex rounded-xl border-border/50"
+                  >
+                    {showRightPanel ? (
+                      <>
+                        <PanelRightClose className="h-3.5 w-3.5 text-emerald-500" /> Hide Details
+                      </>
+                    ) : (
+                      <>
+                        <PanelRightOpen className="h-3.5 w-3.5 text-emerald-500" /> Order Details
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Lifecycle Progress Stepper Bar */}
+              <div className="px-5 sm:px-6 py-2.5 border-b border-border/30 bg-muted/20 flex items-center justify-between text-xs overflow-x-auto gap-4">
+                {ORDER_STAGES.map((stg, i) => {
+                  const currentStep = currentStatus?.step || 1;
+                  const isDone = currentStep > stg.id;
+                  const isCurrent = currentStep === stg.id;
+
+                  return (
+                    <div key={stg.id} className="flex items-center gap-2 shrink-0">
+                      <div
+                        className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
+                          isDone
+                            ? "bg-emerald-600 text-white shadow-xs"
+                            : isCurrent
+                            ? "bg-emerald-500 text-white ring-2 ring-emerald-500/30 shadow-xs"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {isDone ? <Check className="h-3 w-3" /> : stg.id}
+                      </div>
+                      <span
+                        className={`text-[11px] font-semibold ${
+                          isCurrent
+                            ? "text-foreground font-bold"
+                            : isDone
+                            ? "text-foreground/80 font-medium"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {stg.name}
+                      </span>
+                      {i < ORDER_STAGES.length - 1 && (
+                        <ChevronRight className="h-3 w-3 text-muted-foreground/40 mx-1" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Message Stream */}
+              <div
+                ref={messagesContainerRef}
+                className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 bg-background/20 overscroll-contain"
+              >
+                {loadingMessages ? (
+                  <div className="flex h-full items-center justify-center">
+                    <Loader2 className="h-7 w-7 animate-spin text-emerald-500" />
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center p-8 text-muted-foreground">
+                    <MessageSquare className="h-12 w-12 text-emerald-500/30 mb-3" />
+                    <h4 className="text-base font-bold text-foreground">
+                      Start Consultation Thread
+                    </h4>
+                    <p className="text-xs text-muted-foreground max-w-md mt-1 leading-relaxed">
+                      Consult directly with your assigned consulting team on documentation requirements, review deliverables, or request real-time status updates for order{" "}
+                      <span className="font-mono font-bold text-foreground">
+                        {selectedOrderGroup.orderNumber}
+                      </span>.
+                    </p>
+                  </div>
+                ) : (
+                  messages.map((msg, idx) => {
+                    const isSystem = isSystemMessage(msg);
+                    const isSelf = msg.is_client || (msg.sender_role || "").toUpperCase() === "CLIENT";
+
+                    if (isSystem) {
+                      return (
+                        <div key={msg.id || idx} className="flex justify-center my-3 px-2">
+                          <div className="bg-muted/70 dark:bg-zinc-900/80 border border-border/80 dark:border-zinc-800 rounded-full px-3.5 py-1.5 text-xs text-muted-foreground dark:text-zinc-400 flex items-center gap-2 shadow-2xs backdrop-blur-md max-w-[90%] text-center">
+                            <div className="h-5 w-5 rounded-full bg-muted dark:bg-zinc-800 flex items-center justify-center shrink-0">
+                              {getMilestoneIcon(msg.message)}
+                            </div>
+                            <span className="font-medium text-[11px] sm:text-xs leading-snug">{msg.message}</span>
+                            <span className="text-[10px] text-muted-foreground/60 dark:text-zinc-500 shrink-0 font-mono ml-0.5">
+                              {msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={msg.id || idx}
+                        className={`flex flex-col ${isSelf ? "items-end" : "items-start"} max-w-[85%] sm:max-w-[75%] ${
+                          isSelf ? "ml-auto" : "mr-auto"
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 mb-1 px-1">
+                          {isSelf ? (
+                            <span className="text-[11px] font-bold text-foreground">
+                              You (Client)
+                            </span>
+                          ) : (
+                            <>
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border-emerald-500/20 rounded-full">
+                                Consultant
+                              </Badge>
+                              <span className="text-[11px] font-bold text-foreground">
+                                {msg.sender_name || "Consultant"}
+                              </span>
+                              {msg.sender_role && msg.sender_role !== "Milestone" && msg.sender_role !== "SYSTEM" && msg.sender_role.toUpperCase() !== "CLIENT" && (
+                                <span className="text-[10px] text-muted-foreground font-normal">
+                                  ({msg.sender_role})
+                                </span>
+                              )}
+                            </>
+                          )}
+                          <span className="text-[10px] text-muted-foreground">
+                            {msg.created_at
+                              ? new Date(msg.created_at).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit"
+                                })
+                              : ""}
+                          </span>
+                        </div>
+
+                        <div
+                          className={`p-3.5 sm:p-4 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-xs ${
+                            isSelf
+                              ? "bg-emerald-600 text-white rounded-tr-xs shadow-sm shadow-emerald-600/20"
+                              : "bg-background/80 dark:bg-zinc-900/80 text-foreground border border-border/50 rounded-tl-xs backdrop-blur-md"
+                          }`}
+                        >
+                          <div className="whitespace-pre-wrap">{msg.message}</div>
+
+                          {/* Client Uploaded Attachment Receipt */}
+                          {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
+                            <div
+                              className={`mt-2.5 flex items-center gap-2.5 p-2.5 rounded-xl border text-xs shadow-2xs backdrop-blur-xs ${
+                                isSelf
+                                  ? "bg-white/10 dark:bg-black/25 border-white/20 text-white"
+                                  : "bg-background dark:bg-zinc-950/70 border-border/50 text-foreground"
+                              }`}
+                            >
+                              <div
+                                className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${
+                                  isSelf
+                                  ? "bg-white/20 text-white border-white/30"
+                                  : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                }`}
+                              >
+                                <ShieldCheck className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <span className="font-bold truncate block text-[11px] sm:text-xs">
+                                  {msg.attachment_name || "Shared Document"}
+                                </span>
+                                <span
+                                  className={`text-[9px] sm:text-[10px] flex items-center gap-1 mt-0.5 ${
+                                    isSelf ? "text-white/80" : "text-muted-foreground"
+                                  }`}
+                                >
+                                  <Lock className="h-2.5 w-2.5 shrink-0 text-emerald-400" />
+                                  Stored in Company Vault (Order #{selectedOrderGroup.orderNumber})
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {msg.pending && (
+                            <span className="inline-block ml-2 text-[10px] opacity-70 animate-pulse">
+                              sending...
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Message Input Dock */}
+              <div className="p-3.5 sm:p-4 border-t border-border/40 bg-background/80 backdrop-blur-md space-y-2">
+                {/* Selected File Indicator Chip */}
+                {selectedFile && (
+                  <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs shadow-xs animate-in fade-in">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="h-6 w-6 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                        <FileText className="h-3.5 w-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="font-bold text-foreground truncate block text-xs">
+                          {selectedFile.name}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {(selectedFile.size / 1024).toFixed(1)} KB • Storing in Vault → {selectedOrderGroup.orderNumber}
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setSelectedFile(null);
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                      }}
+                      className="h-5 w-5 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+
+                <form
+                  onSubmit={handleSendMessage}
+                  className="flex items-end gap-2"
+                >
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    onChange={e => {
+                      if (e.target.files?.[0]) {
+                        setSelectedFile(e.target.files[0]);
+                      }
+                    }}
+                  />
+
+                  {/* Attachment Trigger Button */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Attach & Upload Document"
+                    className={`h-[46px] w-[46px] rounded-xl shrink-0 transition-colors ${
+                      selectedFile
+                        ? "border-emerald-500 text-emerald-600 bg-emerald-500/10 shadow-xs"
+                        : "border-border/50 bg-background/70 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Paperclip className="h-4 w-4" />
+                  </Button>
+
+                  <textarea
+                    ref={textareaRef}
+                    placeholder={
+                      selectedFile
+                        ? `Add an optional note with ${selectedFile.name} (Press Enter to send)...`
+                        : `Message your consultant regarding ${selectedOrderGroup.orderNumber} (Press Enter to send)...`
+                    }
+                    value={inputText}
+                    onChange={e => setInputText(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    rows={1}
+                    className="flex-1 text-xs sm:text-sm bg-background/70 border border-border/50 rounded-xl px-3.5 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 resize-none placeholder:text-muted-foreground min-h-[46px] max-h-32 leading-relaxed"
+                  />
+
+                  <Button
+                    type="submit"
+                    disabled={(!inputText.trim() && !selectedFile) || sending}
+                    className="flex items-center gap-1.5 text-xs sm:text-sm font-bold px-4 h-[46px] shrink-0 rounded-xl shadow-md"
+                  >
+                    {sending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                    <span>{sending ? "Sending..." : "Send"}</span>
+                  </Button>
+                </form>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-8">
+              <Package className="h-12 w-12 text-emerald-500/30 mb-3" />
+              <h3 className="text-base font-bold text-foreground">Select an Order</h3>
+              <p className="text-xs text-muted-foreground max-w-sm mt-1">
+                Choose an active order from the left sidebar to start or continue your consultation.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* ============================================================ */}
+        {/* RIGHT COLUMN: ORDER INTELLIGENCE & WORKSPACE DRAWER          */}
+        {/* ============================================================ */}
+        {showRightPanel && selectedOrderGroup && (
+          <div className="w-72 lg:w-80 shrink-0 border-l border-border/40 hidden lg:flex flex-col h-full bg-muted/20 overflow-y-auto p-4 space-y-4">
+            {/* Order Overview Card */}
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">
+                Order Overview
+              </span>
+              <div className="p-3.5 rounded-2xl border border-border/40 bg-background/50 backdrop-blur-md space-y-2.5 text-xs shadow-2xs">
+                <div>
+                  <span className="text-muted-foreground text-[10px] uppercase font-bold block">Service Title</span>
+                  <span className="font-bold text-foreground block text-xs mt-0.5">
+                    {selectedOrderGroup.primaryOrder.job_title}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground text-[10px] uppercase font-bold block">Order Reference</span>
+                  <span className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2 py-0.5 rounded-md inline-block mt-0.5">
+                    {selectedOrderGroup.orderNumber}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground text-[10px] uppercase font-bold block">Status</span>
+                  <Badge variant="outline" className="mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    {selectedOrderGroup.status}
+                  </Badge>
+                </div>
+                {selectedOrderGroup.primaryOrder.total_amount > 0 && (
+                  <div>
+                    <span className="text-muted-foreground text-[10px] uppercase font-bold block">Total Amount</span>
+                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs block mt-0.5">
+                      IDR {Number(selectedOrderGroup.primaryOrder.total_amount).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Assigned Consultant Contact Card */}
+            {primaryConsultant && (
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">
+                  Assigned Consultant
+                </span>
+                <div className="p-3.5 rounded-2xl border border-border/40 bg-background/50 backdrop-blur-md space-y-3 text-xs shadow-2xs">
+                  <div className="flex items-center gap-2.5">
+                    {primaryConsultant.profile_photo ? (
+                      <img
+                        src={resolveImageUrl(primaryConsultant.profile_photo)}
+                        alt={primaryConsultant.name}
+                        className="h-9 w-9 rounded-xl object-cover border border-emerald-500/20"
+                      />
+                    ) : (
+                      <div className="h-9 w-9 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs border border-emerald-500/20">
+                        {(primaryConsultant.name || "C")[0]}
+                      </div>
+                    )}
+                    <div>
+                      <span className="font-bold text-foreground text-xs block">
+                        {primaryConsultant.name}
+                      </span>
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-semibold">
+                        {primaryConsultant.job_title || "Lead Consultant"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {primaryConsultant.phone && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                      className="w-full text-xs font-bold gap-1.5 h-8 rounded-xl shadow-xs"
+                    >
+                      <a
+                        href={`https://wa.me/${primaryConsultant.phone.replace(/[^0-9]/g, "")}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <Phone className="h-3.5 w-3.5 text-emerald-500" /> WhatsApp Direct
+                      </a>
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
 
-            {/* Scrollable messages list */}
-            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.map((msg) => {
-                const isMe = msg.sender_id === currentUserId;
-                const dateStr = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                
-                return (
-                  <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[70%] space-y-1 ${isMe ? "text-right" : "text-left"}`}>
-                      <div className={`p-3 rounded-xl shadow-md border text-xs leading-relaxed
-                        ${isMe 
-                          ? "bg-primary/25 text-foreground border-primary/20 rounded-tr-none" 
-                          : "bg-white/5 text-foreground border-white/10 rounded-tl-none"
-                        }
-                      `}>
-                        {msg.message && <p>{msg.message}</p>}
-                        
-                        {msg.attachment && (
-                          <div className="mt-2 p-2 rounded bg-black/20 border border-white/5 flex items-center justify-between gap-3 text-[11px] max-w-full overflow-hidden">
-                            <div className="flex items-center gap-1.5 truncate">
-                              <FileText className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                              <span className="truncate">{msg.attachment.split("/").pop() || "Attachment"}</span>
-                            </div>
-                            <Button size="icon" variant="ghost" className="h-6 w-6" asChild>
-                              <a href={`${process.env.NEXT_PUBLIC_API_URL}${msg.attachment}`} download target="_blank" rel="noopener noreferrer">
-                                <Download className="h-3.5 w-3.5" />
-                              </a>
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                      <span className="text-[9px] text-muted-foreground block px-1">{dateStr}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Input Bar */}
-            <form onSubmit={handleSendMessage} className="p-4 border-t border-border/40 bg-background/50 backdrop-blur-md flex flex-col gap-2">
-              
-              {/* Attachment Display */}
-              {attachmentUrl && (
-                <div className="flex items-center justify-between p-2 rounded-lg bg-primary/10 border border-primary/20 text-xs max-w-xs animate-in slide-in-from-bottom duration-200">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <FileText className="h-4 w-4 text-primary flex-shrink-0" />
-                    <span className="truncate text-foreground font-medium">{attachmentName}</span>
-                  </div>
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => { setAttachmentUrl(null); setAttachmentName(null); }}
-                    className="text-muted-foreground hover:text-foreground text-[10px] h-6 px-1.5"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  disabled={uploading}
-                  onClick={() => fileInputRef.current?.click()}
-                  className="bg-background/40 hover:bg-white/5 flex-shrink-0"
-                >
-                  {uploading ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  ) : (
-                    <Paperclip className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                  )}
+            {/* Quick Actions Links */}
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">
+                Quick Shortcuts
+              </span>
+              <div className="space-y-1.5 text-xs">
+                <Button variant="ghost" asChild className="w-full justify-start text-xs h-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/40 font-semibold">
+                  <Link href={`/client/orders?order=${selectedOrderGroup.orderNumber}`}>
+                    <Package className="h-3.5 w-3.5 mr-2 text-emerald-500" /> View Order Details
+                  </Link>
                 </Button>
-
-                <Input
-                  type="text"
-                  placeholder={attachmentUrl ? "Optional message with attachment..." : "Enter message to advisor..."}
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  className="flex-1 bg-background/40 border-border/40"
-                />
-
-                <Button type="submit" size="icon" className="flex-shrink-0">
-                  <Send className="h-4 w-4" />
+                <Button variant="ghost" asChild className="w-full justify-start text-xs h-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/40 font-semibold">
+                  <Link href="/client/documents">
+                    <FileText className="h-3.5 w-3.5 mr-2 text-emerald-500" /> Shared Documents
+                  </Link>
                 </Button>
               </div>
-            </form>
-          </>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
-            <MessageSquare className="h-12 w-12 text-muted-foreground/30 mb-2" />
-            <h3 className="font-bold text-foreground">Select a Chat Conversation</h3>
-            <p className="text-xs max-w-xs mt-1 text-muted-foreground">
-              Please choose a consultant from the list on the left to review message history and start chatting.
-            </p>
+            </div>
           </div>
         )}
       </div>
-
     </div>
   );
 }

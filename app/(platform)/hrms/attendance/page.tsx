@@ -137,19 +137,67 @@ export default function AttendancePage() {
   const paginatedHistory = myHistory.slice(startIndex, endIndex);
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Attendance</h1>
-        <p className="text-muted-foreground mt-1">Clock in and out using your current location.</p>
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto pb-12">
+      {/* Minimalist Metrics Strip */}
+      <div className="flex flex-col md:flex-row items-stretch gap-3 w-full">
+        {/* Minimalist Metric Strip - Expanded Horizontally */}
+        <div className="grid grid-cols-2 md:grid-cols-4 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs flex-1 gap-2 sm:gap-0 divide-y md:divide-y-0 md:divide-x divide-border/50">
+          
+          {/* Status Today */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
+              <Clock className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Status Today</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{todayRecord ? todayRecord.status : "Not Checked In"}</p>
+            </div>
+          </div>
+
+          {/* Clock In */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Clock In</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">
+                {todayRecord?.clock_in_time ? new Date(todayRecord.clock_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--:--"}
+              </p>
+            </div>
+          </div>
+
+          {/* Hours Worked */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/20 shrink-0">
+              <MapPin className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Hours Worked</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{todayRecord?.working_hours || 0} hrs</p>
+            </div>
+          </div>
+
+          {/* History Log */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
+              <FileText className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">History Log</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{myHistory.length} Days</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Clock In Panel */}
-        <Card className="border-border/50 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
+        <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl relative">
+          <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">
-              <MapPin className="h-5 w-5 text-primary" /> Geofenced Check In
+              <MapPin className="h-5 w-5 text-emerald-600 dark:text-emerald-400" /> Geofenced Check In
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">

@@ -8,6 +8,8 @@ import { MapPin, Phone, Mail, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import BorderGlow from "@/components/ui/BorderGlow";
+import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
+import { EmailInput } from "@/components/ui/email-input";
 
 export default function ContactPage() {
   const { language } = useLanguage();
@@ -90,6 +92,19 @@ export default function ContactPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.email || !isValidEmail(formData.email)) {
+      setStatus("error");
+      setErrorMessage("Please enter a valid email address (e.g. your@email.com).");
+      return;
+    }
+
+    if (formData.phone && !isValidPhoneNumber(formData.phone)) {
+      setStatus("error");
+      setErrorMessage("Please enter a valid phone number (6 to 15 digits).");
+      return;
+    }
+
     setStatus("submitting");
     setErrorMessage(null);
 
@@ -253,30 +268,26 @@ export default function ContactPage() {
                     <label className="mb-2 block text-sm font-medium">
                       Email
                     </label>
-                    <input
-                      type="email"
-                      name="email"
+                    <EmailInput
                       value={formData.email}
-                      onChange={handleChange}
+                      onChange={(val) => setFormData((prev) => ({ ...prev, email: val }))}
                       required
                       disabled={status === "submitting"}
-                      className="w-full rounded-md border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary transition-shadow disabled:opacity-50"
                       placeholder={localT.emailPlaceholder}
+                      className="w-full"
                     />
                   </div>
                   <div>
                     <label className="mb-2 block text-sm font-medium">
                       {localT.phone}
                     </label>
-                    <input
-                      type="tel"
-                      name="phone"
+                    <PhoneInput
                       value={formData.phone}
-                      onChange={handleChange}
+                      onChange={(val) => setFormData((prev) => ({ ...prev, phone: val }))}
                       required
                       disabled={status === "submitting"}
-                      className="w-full rounded-md border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary transition-shadow disabled:opacity-50"
-                      placeholder="+62 xxx xxx xxx"
+                      placeholder="812 3456 789"
+                      className="w-full"
                     />
                   </div>
                   <div>

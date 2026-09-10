@@ -109,64 +109,65 @@ export default function MyPayrollPage() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">My Payroll</h1>
-        <p className="text-muted-foreground mt-1">View your salary details and download official payslips.</p>
-        <div className="mt-4 flex items-start gap-3 p-4 bg-primary/5 border border-primary/20 rounded-xl text-sm shadow-sm backdrop-blur-sm transition-all duration-200 hover:bg-primary/10">
-          <div className="h-8 w-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
-            <Lock className="h-4 w-4 text-primary" />
-          </div>
-          <div>
-            <strong className="text-foreground text-base">Password Protected PDF</strong>
-            <p className="text-muted-foreground mt-0.5 leading-relaxed">
-              Your payslip PDF is encrypted for security. The password has been sent to your registered email address.
-            </p>
-          </div>
+    <div className="space-y-6 max-w-7xl mx-auto">
+
+      <div className="flex items-start gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-xs shadow-sm backdrop-blur-sm">
+        <div className="h-8 w-8 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center shrink-0">
+          <Lock className="h-4 w-4" />
+        </div>
+        <div>
+          <strong className="text-foreground text-sm">Password Protected PDF</strong>
+          <p className="text-muted-foreground mt-0.5 leading-relaxed">
+            Your payslip PDF is encrypted for security. The decryption password has been emailed to your registered address.
+          </p>
         </div>
       </div>
 
-      <Card className="border-border/50 shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Wallet className="h-5 w-5" /> Salary History
+      <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
+        <CardHeader className="bg-muted/20 border-b border-border/40 py-3.5 px-5">
+          <CardTitle className="flex items-center gap-2 text-sm font-bold text-foreground">
+            <Wallet className="h-4 w-4 text-emerald-500" /> Salary History
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-y border-border/50">
+              <thead className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
                 <tr>
-                  <th className="px-6 py-4 font-medium">Payroll Period</th>
-                  <th className="px-6 py-4 font-medium">Status</th>
-                  <th className="px-6 py-4 font-medium text-right">Actions</th>
+                  <th className="px-5 py-3.5">Payroll Period</th>
+                  <th className="px-5 py-3.5">Status</th>
+                  <th className="px-5 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/50">
+              <tbody className="divide-y divide-border/30">
                 {payrolls.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="px-6 py-12 text-center text-muted-foreground">
-                      <FileText className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                      No payroll records available yet.
+                    <td colSpan={3} className="px-5 py-12 text-center text-muted-foreground">
+                      <FileText className="h-10 w-10 mx-auto mb-2 opacity-30 text-emerald-500" />
+                      <p className="text-xs">No payroll records available yet.</p>
                     </td>
                   </tr>
                 ) : (
                   paginatedPayrolls.map((payroll) => (
-                    <tr key={payroll.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-6 py-4 font-medium text-primary">
+                    <tr key={payroll.id} className="hover:bg-muted/40 transition-colors">
+                      <td className="px-5 py-4 font-semibold text-foreground">
                         {getMonthName(payroll.payroll_month)} {payroll.payroll_year}
                       </td>
-                      <td className="px-6 py-4">
-                        <Badge variant="outline" className={`
-                          ${payroll.status === 'Generated' ? 'bg-primary/10 text-primary border-primary/20' : ''}
-                          ${payroll.status === 'Paid' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : ''}
-                        `}>
-                          {payroll.status}
-                        </Badge>
+                      <td className="px-5 py-4">
+                        {payroll.status === 'Generated' && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                            Generated
+                          </span>
+                        )}
+                        {payroll.status === 'Paid' && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            Paid
+                          </span>
+                        )}
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <Button variant="outline" size="sm" className="gap-2 text-muted-foreground hover:text-foreground" onClick={() => handleEmailPayslip(payroll.id)}>
-                          <Mail className="h-4 w-4" /> Email Payslip
+                      <td className="px-5 py-4 text-right">
+                        <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs font-semibold rounded-lg" onClick={() => handleEmailPayslip(payroll.id)}>
+                          <Mail className="h-3.5 w-3.5" /> Email Payslip
                         </Button>
                       </td>
                     </tr>
@@ -177,7 +178,7 @@ export default function MyPayrollPage() {
           </div>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+            <div className="flex items-center justify-between px-5 py-4 border-t border-border/40 bg-muted/10">
               <div className="text-xs text-muted-foreground">
                 Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
                 <span className="font-medium text-foreground">{Math.min(payrolls.length, endIndex)}</span> of{" "}
@@ -189,7 +190,7 @@ export default function MyPayrollPage() {
                   size="sm"
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
-                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                  className="h-8 text-xs rounded-lg border-border/50"
                 >
                   Previous
                 </Button>
@@ -201,7 +202,7 @@ export default function MyPayrollPage() {
                   size="sm"
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                   disabled={currentPage === totalPages}
-                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                  className="h-8 text-xs rounded-lg border-border/50"
                 >
                   Next
                 </Button>

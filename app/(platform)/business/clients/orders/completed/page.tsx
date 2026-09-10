@@ -39,22 +39,35 @@ import {
   ShieldCheck,
   X,
   Lock,
+  Unlock,
+  Phone,
   Mail,
   MessageSquare,
   Link2,
-  RefreshCw
+  RefreshCw,
+  Send,
+  Paperclip,
+  FileCheck,
+  AlertCircle,
+  Clock
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { KpiCard } from "@/components/kpi-card";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
+import { EmailInput } from "@/components/ui/email-input";
 import domToImage from "dom-to-image";
 import { jsPDF } from "jspdf";
 import { motion, AnimatePresence } from "framer-motion";
+import { DualOrderChatDialog } from "@/components/dual-order-chat-dialog";
+import { useUser } from "@/contexts/user-context";
 
 export default function ClientOrdersPage() {
   const router = useRouter();
+  const { isAdmin, hasPermission, loading: userLoading } = useUser();
+  const canView = isAdmin || hasPermission("clients_orders_completed", "view");
+
   const [orders, setOrders] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
@@ -63,6 +76,18 @@ export default function ClientOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Authorization Check & Redirect
+  useEffect(() => {
+    if (!userLoading && !canView) {
+      toast.error("Access Denied: You do not have permission to access Completed Orders.");
+      if (hasPermission("clients_my", "view")) {
+        router.replace("/business/assigned-orders");
+      } else {
+        router.replace("/business/dashboard");
+      }
+    }
+  }, [userLoading, canView, hasPermission, router]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -74,6 +99,30 @@ export default function ClientOrdersPage() {
   const [progressUpdates, setProgressUpdates] = useState<any[]>([]);
   const [loadingProgress, setLoadingProgress] = useState(false);
   const [newProgressMessage, setNewProgressMessage] = useState("");
+
+  // Email & WhatsApp Invoice Confirmation Modal State
+  const [isEmailConfirmOpen, setIsEmailConfirmOpen] = useState(false);
+  const [emailConfirmType, setEmailConfirmType] = useState<'proforma' | 'final' | null>(null);
+  const [emailConfirmAddress, setEmailConfirmAddress] = useState("");
+  const [emailConfirmPhone, setEmailConfirmPhone] = useState("");
+  const [invoiceDeliveryChannel, setInvoiceDeliveryChannel] = useState<'both' | 'email' | 'whatsapp'>('both');
+  const [usePrimaryInvoiceContact, setUsePrimaryInvoiceContact] = useState(true);
+  const [primaryInvoiceEmail, setPrimaryInvoiceEmail] = useState("");
+  const [primaryInvoicePhone, setPrimaryInvoicePhone] = useState("");
+
+  // Send Final Documents Modal States
+  const [isSendDocsModalOpen, setIsSendDocsModalOpen] = useState(false);
+  const [sendDocsOrder, setSendDocsOrder] = useState<any>(null);
+  const [sendDocsEmail, setSendDocsEmail] = useState("");
+  const [sendDocsRecipientName, setSendDocsRecipientName] = useState("");
+  const [sendDocsCustomMessage, setSendDocsCustomMessage] = useState("");
+  const [sendDocsDocuments, setSendDocsDocuments] = useState<any[]>([]);
+  const [sendDocsZipInfo, setSendDocsZipInfo] = useState<any>(null);
+  const [fetchingDocsLoading, setFetchingDocsLoading] = useState(false);
+  const [sendingDocsLoading, setSendingDocsLoading] = useState(false);
+  const [usePrimaryDocsContact, setUsePrimaryDocsContact] = useState(true);
+  const [primaryDocsEmail, setPrimaryDocsEmail] = useState("");
+  const [primaryDocsRecipientName, setPrimaryDocsRecipientName] = useState("");
 
   // Mentions / Tagging States
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -117,6 +166,44 @@ export default function ClientOrdersPage() {
             </div>
           );
         })}
+      </div>
+    );
+  };
+
+
+  const renderVendorBadge = (item: any) => {
+    if (!item || !item.notary) return null;
+    const notary = item.notary;
+    const matchedService = services?.find((s: any) => s.id === item.service_id);
+    const isGov = notary.vendor_type === "GOVERNMENT_OFFICER" || notary.is_gov_officer || Boolean(matchedService?.needs_gov_officer);
+    const isOther = notary.vendor_type === "OTHER_VENDORS" || notary.is_other_vendor || Boolean(matchedService?.needs_other_vendors);
+
+    const prefix = isGov ? "Govt Body" : isOther ? "Vendor" : "Notary";
+    const baseColor = isGov
+      ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20"
+      : isOther
+        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+        : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
+
+    const vStatus = notary.validation_status;
+    const isPending = vStatus === "PENDING_VALIDATION" || !vStatus;
+    const isRevision = vStatus === "NEEDS_REVISION";
+
+    return (
+      <div className="inline-flex items-center gap-1 flex-wrap">
+        <Badge variant="outline" className={`text-[9px] font-bold py-0 px-1.5 ${baseColor} shrink-0`}>
+          {prefix}: {notary.name}
+        </Badge>
+        {isPending && (
+          <Badge variant="outline" className="text-[8px] font-bold py-0 px-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 shrink-0 flex items-center gap-0.5" title="Vendor pending admin validation">
+            <Clock className="h-2 w-2" /> Pending Validation
+          </Badge>
+        )}
+        {isRevision && (
+          <Badge variant="outline" className="text-[8px] font-bold py-0 px-1 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 shrink-0 flex items-center gap-0.5" title="Vendor needs revision">
+            <AlertCircle className="h-2 w-2" /> Revision Needed
+          </Badge>
+        )}
       </div>
     );
   };
@@ -321,9 +408,6 @@ export default function ClientOrdersPage() {
   const [tempPercent, setTempPercent] = useState<string>("70");
   const [tempAmount, setTempAmount] = useState<string>("");
   const [isPph21, setIsPph21] = useState<boolean>(false);
-  const [isEmailConfirmOpen, setIsEmailConfirmOpen] = useState(false);
-  const [emailConfirmType, setEmailConfirmType] = useState<'proforma' | 'final' | null>(null);
-  const [emailConfirmAddress, setEmailConfirmAddress] = useState("");
 
 
 
@@ -340,6 +424,7 @@ export default function ClientOrdersPage() {
   });
 
   const fetchData = async () => {
+    if (userLoading || !canView) return;
     const activeToken = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
     if (!activeToken) {
       setLoading(false);
@@ -376,13 +461,15 @@ export default function ClientOrdersPage() {
   };
 
   useEffect(() => {
-    fetchData();
+    if (!userLoading && canView) {
+      fetchData();
+    }
     if (typeof window !== "undefined" && !(window as any).html2pdf) {
       const script = document.createElement("script");
       script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
       document.head.appendChild(script);
     }
-  }, []);
+  }, [userLoading, canView]);
 
   // Lock body scroll when overlays are active to avoid double scrollbars and empty spaces
   useEffect(() => {
@@ -738,8 +825,8 @@ export default function ClientOrdersPage() {
 
   const totalOrdersCount = allCompletedOrders.length;
   const totalRevenue = allCompletedOrders.reduce((acc, curr) => acc + (curr.total_amount || 0), 0);
-  const totalNotaryFees = allCompletedOrders.reduce((acc, curr) => acc + (curr.total_notary_fee || 0), 0);
-  const totalActualEarnings = totalRevenue - totalNotaryFees;
+  const totalVendorFees = allCompletedOrders.reduce((acc, curr) => acc + (curr.total_notary_fee || 0), 0);
+  const totalActualEarnings = totalRevenue - totalVendorFees;
   const pendingCollectionCount = allCompletedOrders.filter(o => o.payment_status !== "PAID").length;
 
   const allocatedStaffSet = new Set<number>();
@@ -755,30 +842,30 @@ export default function ClientOrdersPage() {
 
   const getOrderStatusColor = (status: string) => {
     switch (status) {
-      case "COMPLETED": return "bg-emerald-500/15 text-emerald-600 border-emerald-500/30";
-      case "CONFIRMED": return "bg-purple-500/15 text-purple-600 border-purple-500/30";
-      case "DRAFT": return "bg-zinc-500/15 text-zinc-600 border-zinc-500/30";
-      case "CANCELLED": return "bg-destructive/15 text-destructive border-destructive/30";
-      case "PROFORMA_GENERATED": return "bg-cyan-500/15 text-cyan-600 border-cyan-500/30";
-      case "WAITING_ON_CLIENT": return "bg-amber-500/15 text-amber-600 border-amber-500/30";
-      case "ORDER_ASSIGNED": return "bg-indigo-500/15 text-indigo-600 border-indigo-500/30";
-      case "REVIEW_DOCS": return "bg-teal-500/15 text-teal-600 border-teal-500/30";
-      case "FINAL_DOCUMENT_PREPARATION": return "bg-orange-500/15 text-orange-600 border-orange-500/30";
-      case "FINAL_DOC_READY": return "bg-lime-500/15 text-lime-600 border-lime-500/30";
-      case "INVOICE_GENERATED": return "bg-pink-500/15 text-pink-600 border-pink-500/30";
-      case "WAITING_FOR_FINAL_PAYMENT": return "bg-pink-500/15 text-pink-600 border-pink-500/30";
-      case "FINAL_PAYMENT_COMPLETED": return "bg-emerald-500/15 text-emerald-600 border-emerald-500/30";
-      case "SOFT_COPY_DELIVERED": return "bg-sky-500/15 text-sky-600 border-sky-500/30";
-      case "HARD_COPY_DELIVERED": return "bg-violet-500/15 text-violet-600 border-violet-500/30";
-      default: return "bg-primary/10 text-primary border-primary/20";
+      case "COMPLETED": return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold";
+      case "CONFIRMED": return "bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20 font-bold";
+      case "DRAFT": return "bg-zinc-500/10 dark:bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border-zinc-500/20 font-bold";
+      case "CANCELLED": return "bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/20 font-bold";
+      case "PROFORMA_GENERATED": return "bg-cyan-500/10 dark:bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/20 font-bold";
+      case "WAITING_ON_CLIENT": return "bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20 font-bold";
+      case "ORDER_ASSIGNED": return "bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 font-bold";
+      case "REVIEW_DOCS": return "bg-teal-500/10 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400 border-teal-500/20 font-bold";
+      case "FINAL_DOCUMENT_PREPARATION": return "bg-orange-500/10 dark:bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/20 font-bold";
+      case "FINAL_DOC_READY": return "bg-lime-500/10 dark:bg-lime-500/15 text-lime-600 dark:text-lime-400 border-lime-500/20 font-bold";
+      case "INVOICE_GENERATED": return "bg-pink-500/10 dark:bg-pink-500/15 text-pink-600 dark:text-pink-400 border-pink-500/20 font-bold";
+      case "WAITING_FOR_FINAL_PAYMENT": return "bg-pink-500/10 dark:bg-pink-500/15 text-pink-600 dark:text-pink-400 border-pink-500/20 font-bold";
+      case "FINAL_PAYMENT_COMPLETED": return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold";
+      case "SOFT_COPY_DELIVERED": return "bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/20 font-bold";
+      case "HARD_COPY_DELIVERED": return "bg-violet-500/10 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/20 font-bold";
+      default: return "bg-primary/10 text-primary border-primary/20 font-bold";
     }
   };
 
   const getPaymentStatusColor = (pStatus: string) => {
     switch (pStatus) {
-      case "PAID": return "bg-emerald-500/15 text-emerald-600 border-emerald-500/30";
-      case "PARTIALLY_PAID": return "bg-amber-500/15 text-amber-600 border-amber-500/30";
-      default: return "bg-red-500/15 text-red-600 border-red-500/30";
+      case "PAID": return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold";
+      case "PARTIALLY_PAID": return "bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20 font-bold";
+      default: return "bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/20 font-bold";
     }
   };
 
@@ -943,43 +1030,79 @@ export default function ClientOrdersPage() {
     const targetCompanyObj = companies.find((c: any) => c.id === selectedOrderGroup.company_id);
     const clientObj = clients.find((c: any) => c.id === (companyObj?.client_id || selectedOrderGroup.client_id) || c.contact_person === selectedOrderGroup.client_name);
     const targetEmail = companyObj?.key_contact_email || targetCompanyObj?.key_contact_email || clientObj?.email || "";
+    const targetPhone = companyObj?.key_contact_phone || targetCompanyObj?.key_contact_phone || clientObj?.phone || clientObj?.phone_number || "";
 
-    if (!targetEmail) {
-      toast.error("No recipient email found for this billing company/client.");
-      return;
-    }
-
+    setPrimaryInvoiceEmail(targetEmail);
+    setPrimaryInvoicePhone(targetPhone);
+    setUsePrimaryInvoiceContact(true);
     setEmailConfirmType(invoiceType);
     setEmailConfirmAddress(targetEmail);
+    setEmailConfirmPhone(targetPhone);
+    setInvoiceDeliveryChannel('both');
     setIsEmailConfirmOpen(true);
   };
 
   const executeSendInvoiceEmail = async () => {
-    if (!selectedOrderGroup || !emailConfirmType || !emailConfirmAddress) return;
+    if (!selectedOrderGroup || !emailConfirmType) return;
+
+    const isEmailActive = invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'email';
+    const isWhatsAppActive = invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'whatsapp';
+
+    if (isEmailActive) {
+      if (!emailConfirmAddress.trim() || !isValidEmail(emailConfirmAddress)) {
+        toast.error("Please enter a valid recipient email address (e.g. client@company.com).");
+        return;
+      }
+    }
+
+    if (isWhatsAppActive) {
+      if (!emailConfirmPhone.trim()) {
+        toast.error("Please enter a WhatsApp mobile number to send WhatsApp notification.");
+        return;
+      }
+      if (!isValidPhoneNumber(emailConfirmPhone)) {
+        toast.error("Please enter a valid WhatsApp mobile number (6 to 15 digits).");
+        return;
+      }
+    }
 
     setSendingEmail(true);
     setIsEmailConfirmOpen(false);
     const activeToken = localStorage.getItem("hrms_token");
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/send-invoice-email?invoice_type=${emailConfirmType}`, {
+      const url = `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/send-invoice-email?invoice_type=${emailConfirmType}&recipient_email=${encodeURIComponent(emailConfirmAddress.trim())}&recipient_phone=${encodeURIComponent(emailConfirmPhone.trim())}&send_email=${isEmailActive}&send_whatsapp=${isWhatsAppActive}`;
+      const res = await fetch(url, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${activeToken}`
         }
       });
       if (res.ok) {
-        toast.success(`Successfully sent ${emailConfirmType} invoice email to ${emailConfirmAddress}!`);
-        const targetStatus = emailConfirmType === 'final' ? "WAITING_FOR_FINAL_PAYMENT" : "WAITING_ON_CLIENT";
-        // Update selectedOrderGroup status in UI
-        setSelectedOrderGroup((prev: any) => prev ? { ...prev, status: targetStatus } : null);
+        const updatedOrders = await res.json();
+        const channelLabel = invoiceDeliveryChannel === 'both'
+          ? "via Email & WhatsApp"
+          : (invoiceDeliveryChannel === 'email' ? "via Email" : "via WhatsApp");
+
+        toast.success(`Successfully dispatched ${emailConfirmType} invoice ${channelLabel}!`);
+
+        // Update selectedOrderGroup status with the actual status returned from the backend
+        if (updatedOrders && updatedOrders.length > 0) {
+          const firstUpdated = updatedOrders[0];
+          setSelectedOrderGroup((prev: any) => prev ? { ...prev, ...firstUpdated, status: firstUpdated.status } : null);
+        }
         // Refresh full list
         fetchData();
 
         // Post automated update to order chat
         try {
+          const isResend = emailConfirmType === 'proforma'
+            ? (selectedOrderGroup.status && !['DRAFT', 'PROFORMA_GENERATED'].includes(selectedOrderGroup.status))
+            : (selectedOrderGroup.status && ['WAITING_FOR_FINAL_PAYMENT', 'FINAL_PAYMENT_COMPLETED', 'SOFT_COPY_DELIVERED', 'HARD_COPY_DELIVERED', 'COMPLETED'].includes(selectedOrderGroup.status));
+
+          const chatVerb = isResend ? "re-sent" : "sent";
           const chatMsg = emailConfirmType === 'proforma'
-            ? "Proforma invoice email has been sent to the client"
-            : "Final invoice email has been sent to the client";
+            ? `Proforma invoice has been ${chatVerb} to the client ${channelLabel}`
+            : `Final invoice has been ${chatVerb} to the client ${channelLabel}`;
 
           const chatRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/progress`, {
             method: "POST",
@@ -999,15 +1122,131 @@ export default function ClientOrdersPage() {
         fetchProgressUpdates(selectedOrderGroup.order_number);
       } else {
         const err = await res.json();
-        toast.error(err.detail || `Failed to send ${emailConfirmType} invoice email`);
+        toast.error(err.detail || `Failed to send ${emailConfirmType} invoice`);
       }
     } catch (err) {
       console.error(err);
-      toast.error("Error sending invoice email");
+      toast.error("Error sending invoice");
     } finally {
       setSendingEmail(false);
       setEmailConfirmType(null);
       setEmailConfirmAddress("");
+      setEmailConfirmPhone("");
+      setInvoiceDeliveryChannel('both');
+    }
+  };
+
+  const handleOpenSendDocs = async (orderGroup: any) => {
+    if (!orderGroup) return;
+    setSendDocsOrder(orderGroup);
+    setSendDocsCustomMessage("");
+    setUsePrimaryDocsContact(true);
+    setIsSendDocsModalOpen(true);
+
+    // Initial email resolution from cached companies & clients
+    const billingCompanyId = orderGroup.billing_company_id || orderGroup.company_id;
+    const companyObj = companies.find((c: any) => c.id === billingCompanyId);
+    const targetCompanyObj = companies.find((c: any) => c.id === orderGroup.company_id);
+    const clientObj = clients.find((c: any) => c.id === (companyObj?.client_id || orderGroup.client_id) || c.contact_person === orderGroup.client_name);
+
+    const initialEmail = companyObj?.key_contact_email || targetCompanyObj?.key_contact_email || clientObj?.email || "";
+    const initialName = companyObj?.key_contact_person || targetCompanyObj?.key_contact_person || clientObj?.contact_person || orderGroup.company_name || "";
+
+    setPrimaryDocsEmail(initialEmail);
+    setPrimaryDocsRecipientName(initialName);
+    setSendDocsEmail(initialEmail);
+    setSendDocsRecipientName(initialName);
+    setSendDocsDocuments([]);
+    setFetchingDocsLoading(true);
+
+    const activeToken = localStorage.getItem("hrms_token");
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderGroup.order_number}/final-documents`, {
+        headers: { "Authorization": `Bearer ${activeToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSendDocsDocuments(data.documents || []);
+        setSendDocsZipInfo({
+          zip_password: data.zip_password,
+          zip_filename: data.zip_filename,
+          target_company_code: data.target_company_code,
+          target_tax_number: data.target_tax_number,
+        });
+        if (data.recipient_email && !initialEmail) {
+          setPrimaryDocsEmail(data.recipient_email);
+          setSendDocsEmail(data.recipient_email);
+        }
+        if (data.recipient_name && !initialName) {
+          setPrimaryDocsRecipientName(data.recipient_name);
+          setSendDocsRecipientName(data.recipient_name);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch order final documents:", err);
+    } finally {
+      setFetchingDocsLoading(false);
+    }
+  };
+
+  const executeSendFinalDocs = async () => {
+    if (!sendDocsOrder || !sendDocsEmail.trim() || !isValidEmail(sendDocsEmail)) {
+      toast.error("Please enter a valid recipient email address (e.g. client@company.com).");
+      return;
+    }
+
+    setSendingDocsLoading(true);
+    const activeToken = localStorage.getItem("hrms_token");
+    const toastId = toast.loading(`Dispatching final documents to ${sendDocsEmail}...`);
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${sendDocsOrder.order_number}/send-final-documents`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${activeToken}`
+        },
+        body: JSON.stringify({
+          recipient_email: sendDocsEmail.trim(),
+          recipient_name: sendDocsRecipientName.trim() || undefined,
+          custom_message: sendDocsCustomMessage.trim() || undefined
+        })
+      });
+
+      if (res.ok) {
+        let updatedDocsOrders = null;
+        try {
+          updatedDocsOrders = await res.json();
+        } catch (jsonErr) {
+          console.warn("Could not parse response JSON:", jsonErr);
+        }
+        toast.success(`Final documents successfully delivered to ${sendDocsEmail}!`, { id: toastId });
+        setIsSendDocsModalOpen(false);
+
+        // Update local state with the actual status returned from the backend
+        if (updatedDocsOrders && updatedDocsOrders.length > 0) {
+          const firstDocsUpdated = updatedDocsOrders[0];
+          setOrders(prev => prev.map(o => o.order_number === sendDocsOrder.order_number ? { ...o, ...firstDocsUpdated, status: firstDocsUpdated.status } : o));
+          setSelectedOrderGroup((prev: any) => prev && prev.order_number === sendDocsOrder.order_number ? { ...prev, ...firstDocsUpdated, status: firstDocsUpdated.status } : prev);
+        }
+
+        fetchData();
+        fetchProgressUpdates(sendDocsOrder.order_number);
+      } else {
+        let errMsg = "Failed to send final documents.";
+        try {
+          const err = await res.json();
+          errMsg = err.detail || err.message || errMsg;
+        } catch {
+          errMsg = `Server returned status ${res.status}: ${res.statusText || "Internal Server Error"}`;
+        }
+        toast.error(errMsg, { id: toastId });
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Error sending final documents.", { id: toastId });
+    } finally {
+      setSendingDocsLoading(false);
     }
   };
 
@@ -1327,6 +1566,15 @@ export default function ClientOrdersPage() {
     }
   };
 
+  if (userLoading || (!canView && !isAdmin)) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground font-medium">Verifying completed order permissions...</p>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center gap-3 text-muted-foreground">
@@ -1340,37 +1588,70 @@ export default function ClientOrdersPage() {
     <>
       <div className="space-y-6 animate-in fade-in duration-500 w-full max-w-none pb-12">
 
-        {/* Title Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <Link href="/business/clients" className="mt-1">
-              <Button variant="ghost" size="icon" title="Back to Clients">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm shrink-0 flex items-center justify-center">
-              <ShoppingCart className="h-6 w-6" />
+        {/* Minimalist Metrics Strip Row */}
+        <div className="flex flex-col md:flex-row items-stretch gap-3 w-full">
+          {/* Minimalist Metric Strip - Expanded Horizontally */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs flex-1 gap-2 sm:gap-0 divide-y sm:divide-y-0 sm:divide-x divide-border/50">
+            
+            {/* Total Orders */}
+            <div className="flex items-center gap-3 px-2 sm:px-3 py-1.5 md:py-0 justify-start sm:justify-center">
+              <div className="h-9 w-9 rounded-xl bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/20 shrink-0">
+                <ShoppingCart className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Fulfilled Orders</p>
+                <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{totalOrdersCount}</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Completed Orders</h1>
-              <p className="text-muted-foreground text-sm">
-                View historical record of all completed and paid client service orders.
-              </p>
+
+            {/* Confirmed Value */}
+            <div className="flex items-center gap-3 px-2 sm:px-3 py-1.5 md:py-0 justify-start sm:justify-center">
+              <div className="h-9 w-9 rounded-xl bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-500/20 shrink-0">
+                <DollarSign className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Confirmed Value</p>
+                <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{formatCurrency(totalRevenue)}</p>
+              </div>
+            </div>
+
+            {/* Actual Earnings */}
+            <div className="flex items-center gap-3 px-2 sm:px-3 py-1.5 md:py-0 justify-start sm:justify-center">
+              <div className="h-9 w-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
+                <CheckCircle2 className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Actual Earnings</p>
+                <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{formatCurrency(totalActualEarnings)}</p>
+              </div>
+            </div>
+
+            {/* Vendor Owed */}
+            <div className="flex items-center gap-3 px-2 sm:px-3 py-1.5 md:py-0 justify-start sm:justify-center">
+              <div className="h-9 w-9 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
+                <Scale className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Vendor Disbursed</p>
+                <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{formatCurrency(totalVendorFees)}</p>
+              </div>
+            </div>
+
+            {/* Staff Allocated */}
+            <div className="flex items-center gap-3 px-2 sm:px-3 py-1.5 md:py-0 justify-start sm:justify-center">
+              <div className="h-9 w-9 rounded-xl bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
+                <Users className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Staff Assigned</p>
+                <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{allocatedStaffCount}</p>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Metrics Cards Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 w-full">
-          <KpiCard title="Total Orders" value={totalOrdersCount} icon={ShoppingCart} colorTheme="purple" />
-          <KpiCard title="Confirmed Value" value={formatCurrency(totalRevenue)} icon={DollarSign} colorTheme="sky" />
-          <KpiCard title="Actual Earnings" value={formatCurrency(totalActualEarnings)} icon={CheckCircle2} colorTheme="emerald" />
-          <KpiCard title="Notary Owed" value={formatCurrency(totalNotaryFees)} icon={Scale} colorTheme="amber" />
-          <KpiCard title="Staff Allocated" value={allocatedStaffCount} icon={Users} colorTheme="blue" />
-        </div>
-
         {/* Main Orders Table */}
-        <Card className="border-border/50 shadow-sm overflow-hidden bg-card/60 backdrop-blur-md">
+        <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
           <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -1405,7 +1686,7 @@ export default function ClientOrdersPage() {
                         <th className="p-4">Service Package</th>
                         <th className="p-4">Assigned Consultants</th>
                         <th className="p-4 text-right">Total Amount</th>
-                        <th className="p-4 text-right">Notary Fee</th>
+                        <th className="p-4 text-right">Vendor Fee</th>
                         <th className="p-4 text-right">Actual Earnings</th>
                         <th className="p-4 text-center">Payment</th>
                         <th className="p-4 text-center">Lifecycle Status</th>
@@ -1436,7 +1717,29 @@ export default function ClientOrdersPage() {
                             )}
                           </td>
                           <td className="p-4 font-bold text-foreground text-sm align-top pt-5">
-                            <div>{ord.company_name || "Personal Client Account"}</div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span>{ord.company_name || "Personal Client Account"}</span>
+                              {(() => {
+                                const comp = companies.find((c: any) => c.id === (ord.company_id || ord.company?.id)) || ord.company;
+                                if (!comp) return null;
+                                const vStatus = comp.validation_status;
+                                if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
+                                  return (
+                                    <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 flex items-center gap-0.5" title="Company pending admin validation">
+                                      <Clock className="h-2.5 w-2.5" /> Pending Company
+                                    </Badge>
+                                  );
+                                }
+                                if (vStatus === "NEEDS_REVISION") {
+                                  return (
+                                    <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 flex items-center gap-0.5" title="Company needs revision">
+                                      <AlertCircle className="h-2.5 w-2.5" /> Revision Required
+                                    </Badge>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </div>
                             <div className="text-xs font-normal text-muted-foreground flex items-center gap-1 mt-1">
                               <Building className="h-3 w-3 text-muted-foreground" /> {ord.client_name || "Representative"}
                             </div>
@@ -1454,11 +1757,7 @@ export default function ClientOrdersPage() {
                                         {item.job_id}
                                       </Badge>
                                     )}
-                                    {item.notary && (
-                                      <Badge variant="outline" className="text-[9px] font-bold py-0 px-1.5 bg-indigo-500/5 text-indigo-600 border-indigo-500/20 shrink-0">
-                                        Notary: {item.notary.name}
-                                      </Badge>
-                                    )}
+                                    {renderVendorBadge(item)}
                                   </div>
                                 ))}
                               </div>
@@ -1565,11 +1864,21 @@ export default function ClientOrdersPage() {
                             </div>
                           </td>
                           <td className="p-4 text-center align-top pt-5">
-                            <Badge className={`${getOrderStatusColor(ord.status)} font-bold border text-[11px]`}>
-                              {ord.status || "CONFIRMED"}
+                            <Badge className={`${getOrderStatusColor(ord.status)} font-bold border text-[11px] flex items-center gap-1 justify-center mx-auto`}>
+                              <Lock className="h-3 w-3" />
+                              {ord.status || "COMPLETED"}
                             </Badge>
                           </td>
                           <td className="p-4 text-right space-x-1 align-top pt-5">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-2.5 text-xs font-bold gap-1.5 border-sky-500/30 bg-sky-500/10 text-sky-600 hover:bg-sky-500/20 hover:text-sky-700 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/40 shadow-xs inline-flex items-center"
+                              title="Send final documents to client email"
+                              onClick={() => handleOpenSendDocs(ord)}
+                            >
+                              <Send className="h-3.5 w-3.5" /> Send Docs
+                            </Button>
                             <Button
                               size="icon"
                               variant="ghost"
@@ -1937,60 +2246,82 @@ export default function ClientOrdersPage() {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "tween", ease: "easeInOut", duration: 0.3 }}
-            className="fixed inset-0 z-50 bg-background flex flex-col overflow-hidden pt-4 px-4 pb-4 sm:pt-6 sm:px-6 sm:pb-6 lg:pt-8 lg:px-8 lg:pb-6"
+            className="fixed inset-y-0 right-0 z-50 w-full md:w-[calc(100vw-260px)] bg-white text-zinc-900 flex flex-col overflow-hidden pt-4 px-4 pb-4 sm:pt-6 sm:px-6 sm:pb-6 lg:pt-6 lg:px-8 lg:pb-6 shadow-2xl border-l border-zinc-200"
           >
-            <div className="max-w-7xl w-full mx-auto flex-1 flex flex-col overflow-hidden min-h-0">
+            <div className="max-w-7xl w-full mx-auto flex-1 flex flex-col overflow-hidden min-h-0 text-zinc-900">
 
               {/* Header with Back Button */}
-              <div className="flex items-center justify-between pb-3 border-b border-border/60 shrink-0">
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-200 shrink-0">
                 <div className="flex items-center gap-3">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setIsViewOpen(false)}
-                    className="gap-2 font-bold shadow-xs"
+                    className="gap-2 font-bold shadow-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border-zinc-300 transition-colors"
                   >
                     <ArrowLeft className="h-4 w-4" /> Back to Orders List
                   </Button>
-                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                    <Receipt className="h-6 w-6 text-primary" /> Order Summary & Consultants
+                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 flex items-center gap-2">
+                    <Receipt className="h-6 w-6 text-zinc-600" /> Order Summary & Consultants
                   </h2>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="font-mono text-sm font-bold px-3 py-1 bg-primary/10 border-primary/30 text-primary">
+                  <Badge variant="outline" className="font-mono text-xs font-bold px-3 py-1 bg-zinc-100 text-zinc-800 border border-zinc-300 rounded-lg">
                     {selectedOrderGroup.order_number}
                   </Badge>
-                  <Button variant="ghost" size="icon" onClick={() => setIsViewOpen(false)} className="rounded-full h-8 w-8 text-muted-foreground hover:text-foreground">
+                  <Button variant="ghost" size="icon" onClick={() => setIsViewOpen(false)} className="rounded-full h-8 w-8 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100">
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
 
               {/* Scrollable Content Body */}
-              <div className="flex-1 w-full overflow-y-auto pr-1 min-h-0 space-y-5 pt-3">
+              <div className="flex-1 w-full overflow-y-auto pr-1 min-h-0 space-y-6 pt-4 text-zinc-900">
 
                 {/* 2-Column Responsive Layout Utilizing Horizontal Whitespace */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
                   {/* Left Column (Metadata & Consultants) - 4 cols */}
                   <div className="lg:col-span-4 space-y-4">
 
                     {/* Entity & Rep Details */}
-                    <div className="p-4 rounded-xl border border-border/60 bg-muted/20 text-xs space-y-3">
-                      <div className="flex justify-between items-start pb-2 border-b border-border/40">
+                    <div className="p-5 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-4">
+                      <div className="flex justify-between items-start pb-3 border-b border-zinc-100">
                         <div className="space-y-1">
-                          <span className="text-muted-foreground block font-medium uppercase text-[10px]">Target Company Entity</span>
-                          <span className="font-bold text-base text-foreground block mt-0.5">{selectedOrderGroup.company_name || "Individual Account"}</span>
+                          <span className="text-zinc-500 block font-bold uppercase text-[10px] tracking-wider">Target Company Entity</span>
+                          <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                            <span className="font-bold text-lg text-zinc-900 block">{selectedOrderGroup.company_name || "Individual Account"}</span>
+                            {(() => {
+                              const comp = companies.find((c: any) => c.id === (selectedOrderGroup.company_id || selectedOrderGroup.company?.id)) || selectedOrderGroup.company;
+                              if (!comp) return null;
+                              const vStatus = comp.validation_status;
+                              if (vStatus === "PENDING_VALIDATION" || (!vStatus && selectedOrderGroup.company_id)) {
+                                return (
+                                  <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-amber-50 text-amber-700 border-amber-300 flex items-center gap-1 rounded-full">
+                                    <Clock className="h-3 w-3" /> Pending Admin Validation
+                                  </Badge>
+                                );
+                              }
+                              if (vStatus === "NEEDS_REVISION") {
+                                return (
+                                  <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5 bg-red-50 text-red-700 border-red-300 flex items-center gap-1 rounded-full">
+                                    <AlertCircle className="h-3 w-3" /> Revision Required
+                                  </Badge>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
                           {selectedOrderGroup.billing_company_id && selectedOrderGroup.billing_company_id !== selectedOrderGroup.company_id && (
-                            <div className="pt-1 mt-1 border-t border-border/30">
-                              <span className="text-primary block font-bold uppercase text-[9px] tracking-wider">Billed To (Invoice Recipient)</span>
-                              <span className="font-bold text-xs text-primary block">{selectedOrderGroup.billing_company_name || selectedOrderGroup.company_name}</span>
+                            <div className="pt-1.5 mt-1 border-t border-zinc-100">
+                              <span className="text-zinc-500 block font-bold uppercase text-[9px] tracking-wider">Billed To (Invoice Recipient)</span>
+                              <span className="font-semibold text-xs text-zinc-800 block">{selectedOrderGroup.billing_company_name || selectedOrderGroup.company_name}</span>
                             </div>
                           )}
                         </div>
                         <div className="flex flex-col items-end gap-1.5">
-                          <Badge className={`${getPaymentStatusColor(selectedOrderGroup.payment_status)} font-mono font-bold text-[10px] uppercase`}>
+                          <Badge className={`${getPaymentStatusColor(selectedOrderGroup.payment_status)} font-mono font-bold text-xs uppercase px-2.5 py-1 rounded-lg`}>
                             {selectedOrderGroup.payment_status}
                           </Badge>
                           {isPaymentActionVisible(selectedOrderGroup) && (
@@ -1998,7 +2329,7 @@ export default function ClientOrdersPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-6 px-2 text-[10px] gap-1 font-bold border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30"
+                                className="h-7 px-2.5 text-[11px] gap-1.5 font-semibold border-zinc-300 bg-zinc-50 text-zinc-700 hover:bg-zinc-100 shadow-xs transition-colors rounded-lg"
                                 onClick={async () => {
                                   if (selectedOrderGroup.payment_link) {
                                     navigator.clipboard.writeText(selectedOrderGroup.payment_link);
@@ -2029,12 +2360,12 @@ export default function ClientOrdersPage() {
                                   }
                                 }}
                               >
-                                <Link2 className="h-3 w-3" /> Copy Link
+                                <Link2 className="h-3.5 w-3.5 text-zinc-500" /> Copy Link
                               </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-6 px-2 text-[10px] gap-1 font-bold border-indigo-500/20 bg-indigo-500/5 text-indigo-600 hover:bg-indigo-500/10 hover:text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/30"
+                                className="h-7 px-2.5 text-[11px] gap-1.5 font-semibold border-zinc-300 bg-zinc-50 text-zinc-700 hover:bg-zinc-100 shadow-xs transition-colors rounded-lg"
                                 onClick={async () => {
                                   const activeToken = localStorage.getItem("hrms_token");
                                   const toastId = toast.loading("Verifying payment with Xendit...");
@@ -2060,60 +2391,65 @@ export default function ClientOrdersPage() {
                                   }
                                 }}
                               >
-                                <RefreshCw className="h-3 w-3" /> Check Payment
+                                <RefreshCw className="h-3.5 w-3.5 text-zinc-500" /> Check Payment
                               </Button>
                             </div>
                           )}
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3 pt-1">
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <span className="text-muted-foreground block font-medium uppercase text-[10px]">Client Representative</span>
-                          <span className="font-semibold text-xs text-foreground block mt-0.5">{selectedOrderGroup.client_name || "-"}</span>
+                          <span className="text-zinc-500 block font-bold uppercase text-[10px] tracking-wider">Client Representative</span>
+                          <span className="font-semibold text-sm text-zinc-900 block mt-0.5">{selectedOrderGroup.client_name || "-"}</span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground block font-medium uppercase text-[10px]">Order Date</span>
-                          <span className="font-mono font-bold text-xs text-foreground block mt-0.5">{formatDate(selectedOrderGroup.created_at)}</span>
+                          <span className="text-zinc-500 block font-bold uppercase text-[10px] tracking-wider">Order Date</span>
+                          <span className="font-mono font-semibold text-sm text-zinc-900 block mt-0.5">{formatDate(selectedOrderGroup.created_at)}</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Assigned Consultants */}
-                    <div className="p-4 rounded-xl border border-border/60 bg-background space-y-2 text-xs">
-                      <span className="text-muted-foreground font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5">
-                        <Users className="h-3.5 w-3.5 text-primary" /> Assigned Consultants
+                    <div className="p-4 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-2.5">
+                      <span className="text-zinc-500 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5 pb-2 border-b border-zinc-100">
+                        <Users className="h-3.5 w-3.5 text-zinc-500" /> Assigned Consulting Team
                       </span>
                       {selectedOrderGroup.consultants && selectedOrderGroup.consultants.length > 0 ? (
-                        <div className="flex flex-wrap gap-2 pt-1">
+                        <div className="grid grid-cols-2 gap-2 pt-0.5">
                           {selectedOrderGroup.consultants.map((c: any) => (
-                            <Badge key={c.id} variant="secondary" className="font-semibold text-xs py-1 px-2.5 gap-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                              <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
-                              <span>{c.name} <span className="text-[10px] opacity-75">({c.job_title})</span></span>
-                            </Badge>
+                            <div key={c.id} className="flex items-center gap-2 py-2 px-2.5 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 transition-all duration-150">
+                              <div className="h-7 w-7 rounded-full bg-zinc-200 text-zinc-800 font-bold flex items-center justify-center text-xs shrink-0 border border-zinc-300">
+                                {c.name.substring(0, 2).toUpperCase()}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <span className="font-semibold text-zinc-900 block truncate text-xs">{c.name}</span>
+                                <span className="text-[10px] text-zinc-500 block truncate">{c.job_title || "Consultant"}</span>
+                              </div>
+                            </div>
                           ))}
                         </div>
                       ) : (
-                        <span className="text-muted-foreground italic text-xs block py-0.5">No consultants assigned to this order</span>
+                        <span className="text-zinc-500 italic text-xs block py-1">No consultants assigned to this order</span>
                       )}
                     </div>
 
                     {/* Inline Mandatory Proforma Percentage Selector Card */}
-                    <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
-                          <Percent className="h-3.5 w-3.5 text-emerald-600" /> Proforma Invoice Stage <span className="text-destructive">*</span>
+                    <div className="p-5 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-4">
+                      <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+                        <label className="text-xs font-bold uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
+                          <Percent className="h-4 w-4 text-zinc-500" /> Proforma Invoice Stage <span className="text-red-500">*</span>
                         </label>
-                        <span className="text-[11px] font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                        <Badge variant="outline" className="text-xs font-mono font-bold bg-zinc-100 text-zinc-800 border-zinc-300 px-2.5 py-0.5 rounded-full">
                           {proformaPercent}% Selected
-                        </span>
+                        </Badge>
                       </div>
 
                       {/* Input & Quick Preset Buttons */}
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {/* Percentage Input */}
-                        <div className="space-y-1">
-                          <span className="text-[10px] uppercase font-bold text-emerald-850/80 dark:text-emerald-300/80 block">Percentage</span>
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] uppercase font-bold text-zinc-500 block">Percentage</span>
                           <div className="relative">
                             <Input
                               type="number"
@@ -2124,68 +2460,68 @@ export default function ClientOrdersPage() {
                               onChange={(e) => handlePctChange(e.target.value)}
                               placeholder="70"
                               disabled={selectedOrderGroup.is_proforma_finalized}
-                              className="pr-8 font-mono text-xs font-bold bg-background disabled:opacity-85 h-9"
+                              className="pr-8 font-mono text-sm font-bold bg-zinc-50 border-zinc-300 text-zinc-900 focus-visible:ring-zinc-400 h-10 rounded-xl"
                             />
-                            <Percent className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                            <Percent className="absolute right-3 top-3 h-4 w-4 text-zinc-400 pointer-events-none" />
                           </div>
                           {/* PPH 21 Checkbox */}
-                          <div className="flex items-center gap-1.5 pt-1">
+                          <div className="flex items-center gap-2 pt-1.5">
                             <input
                               type="checkbox"
                               id="pph21-checkbox"
                               checked={isPph21}
                               disabled={selectedOrderGroup.is_proforma_finalized}
                               onChange={(e) => setIsPph21(e.target.checked)}
-                              className="h-3.5 w-3.5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600 disabled:cursor-not-allowed"
+                              className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 cursor-pointer accent-zinc-900 disabled:cursor-not-allowed"
                             />
-                            <label htmlFor="pph21-checkbox" className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 cursor-pointer select-none">
+                            <label htmlFor="pph21-checkbox" className="text-xs font-semibold text-zinc-700 cursor-pointer select-none">
                               Add PPH 21 (2% Tax WHT)
                             </label>
                           </div>
                         </div>
 
                         {/* Direct Amount Input */}
-                        <div className="space-y-1">
-                          <span className="text-[10px] uppercase font-bold text-emerald-850/80 dark:text-emerald-300/80 block">Amount (IDR)</span>
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] uppercase font-bold text-zinc-500 block">Amount (IDR)</span>
                           <Input
                             type="number"
                             value={tempAmount}
                             onChange={(e) => handleAmtChange(e.target.value)}
                             placeholder="e.g. 7000000"
                             disabled={selectedOrderGroup.is_proforma_finalized}
-                            className="font-mono text-xs font-bold bg-background disabled:opacity-85 h-9"
+                            className="font-mono text-sm font-bold bg-zinc-50 border-zinc-300 text-zinc-900 focus-visible:ring-zinc-400 h-10 rounded-xl"
                           />
                         </div>
                       </div>
 
                       {/* Locked Message */}
                       {selectedOrderGroup.is_proforma_finalized && (
-                        <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold flex items-center gap-2">
-                          <Lock className="h-3.5 w-3.5 shrink-0" />
-                          <span>Proforma invoice is finalized. Stage % is locked.</span>
+                        <div className="p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-600 text-xs font-medium flex items-center gap-2">
+                          <Lock className="h-4 w-4 text-zinc-500 shrink-0" />
+                          <span>Proforma invoice is finalized. Stage percentage is locked.</span>
                         </div>
                       )}
 
                       {/* Calculated Proforma Due Preview */}
                       {proformaPercent > 0 && selectedOrderGroup && (
-                        <div className="space-y-1.5 pt-2 border-t border-emerald-500/20 text-xs font-mono">
-                          <div className="flex justify-between items-center text-muted-foreground">
-                            <span>Proforma Stage Subtotal:</span>
-                            <span className="font-bold text-slate-700 dark:text-slate-355">
+                        <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200 space-y-2 text-xs">
+                          <div className="flex justify-between items-center text-zinc-500">
+                            <span>Proforma Subtotal:</span>
+                            <span className="font-semibold font-mono text-zinc-900">
                               {formatCurrency((selectedOrderGroup.total_amount * proformaPercent) / 100)}
                             </span>
                           </div>
                           {isPph21 && (
-                            <div className="flex justify-between items-center text-red-650 dark:text-red-400 font-semibold">
-                              <span>WHT PPh 21 (2% Deduction):</span>
-                              <span>
+                            <div className="flex justify-between items-center text-red-600 font-semibold">
+                              <span>WHT PPh 21 (2%):</span>
+                              <span className="font-mono">
                                 -{formatCurrency(((selectedOrderGroup.total_amount * proformaPercent) / 100) * 0.02)}
                               </span>
                             </div>
                           )}
-                          <div className="flex justify-between items-center pt-1 border-t border-dashed border-emerald-500/15">
-                            <span className="text-emerald-800 dark:text-emerald-300 font-bold">Proforma Amount Due:</span>
-                            <span className="font-extrabold text-emerald-700 dark:text-emerald-400 text-sm">
+                          <div className="flex justify-between items-center pt-2 border-t border-zinc-200">
+                            <span className="text-zinc-900 font-bold">Proforma Amount Due:</span>
+                            <span className="font-extrabold font-mono text-zinc-950 text-base">
                               {formatCurrency(
                                 isPph21
                                   ? ((selectedOrderGroup.total_amount * proformaPercent) / 100) * 0.98
@@ -2198,18 +2534,18 @@ export default function ClientOrdersPage() {
 
                       {/* Recorded Manual Proforma Paid Amount Notice */}
                       {selectedOrderGroup.proforma_paid_amount != null && selectedOrderGroup.proforma_paid_amount > 0 && (
-                        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2">
+                        <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200 text-xs space-y-2">
                           <div className="flex justify-between items-center">
-                            <span className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-                              <DollarSign className="h-4 w-4 text-amber-600" /> Recorded Proforma Paid:
+                            <span className="font-semibold text-zinc-700 flex items-center gap-1.5">
+                              <DollarSign className="h-4 w-4 text-zinc-500" /> Recorded Proforma Paid:
                             </span>
-                            <Badge variant="outline" className="font-mono font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40">
+                            <Badge variant="outline" className="font-mono font-bold bg-zinc-200 text-zinc-900 border-zinc-300 rounded-md">
                               {formatCurrency(selectedOrderGroup.proforma_paid_amount)}
                             </Badge>
                           </div>
-                          <div className="text-[11px] text-muted-foreground flex justify-between pt-1 border-t border-amber-500/20 font-mono">
+                          <div className="text-[11px] text-zinc-500 flex justify-between pt-1 border-t border-zinc-200 font-mono">
                             <span>Remaining Final Balance:</span>
-                            <span className="font-bold text-foreground">
+                            <span className="font-bold text-zinc-900">
                               {formatCurrency(Math.max(0, selectedOrderGroup.total_amount - selectedOrderGroup.proforma_paid_amount))}
                             </span>
                           </div>
@@ -2223,25 +2559,32 @@ export default function ClientOrdersPage() {
                         type="button"
                         disabled={!proformaPercent || proformaPercent <= 0}
                         onClick={() => setIsProformaPreviewOpen(true)}
-                        className="w-full gap-2 font-bold py-5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md text-sm disabled:opacity-50"
+                        className="w-full gap-2 font-semibold h-11 text-sm"
                       >
-                        <FileText className="h-4 w-4" /> {selectedOrderGroup.is_proforma_finalized ? "View" : "Generate"} Proforma Invoice ({proformaPercent || 0}%)
+                        <FileText className="h-4 w-4 shrink-0" /> {selectedOrderGroup.is_proforma_finalized ? "View" : "Generate"} Proforma Invoice ({proformaPercent || 0}%)
                       </Button>
 
                       <Button
                         type="button"
                         disabled={(!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "FINAL_DOC_READY") && !selectedOrderGroup?.is_final_invoice_finalized}
                         onClick={() => setIsFinalInvoicePreviewOpen(true)}
-                        className="w-full gap-2 font-bold py-5 bg-blue-600 hover:bg-blue-700 text-white shadow-md text-sm disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed"
+                        className="w-full gap-2 font-semibold h-11 text-sm"
                       >
-                        <FileText className="h-4 w-4" /> {selectedOrderGroup?.is_final_invoice_finalized ? "View" : "Generate"} Final Invoice
+                        <FileText className="h-4 w-4 shrink-0" /> {selectedOrderGroup?.is_final_invoice_finalized ? "View" : "Generate"} Final Invoice
                       </Button>
                       {(!selectedOrderGroup?.is_proforma_finalized || selectedOrderGroup?.status !== "FINAL_DOC_READY") && !selectedOrderGroup?.is_final_invoice_finalized && (
-                        <p className="text-[10px] text-muted-foreground text-center italic mt-0.5">
+                        <p className="text-[11px] text-zinc-400 text-center italic">
                           Requires finalized proforma invoice & final doc ready lifecycle status.
                         </p>
                       )}
 
+                      <Button
+                        type="button"
+                        onClick={() => handleOpenSendDocs(selectedOrderGroup)}
+                        className="w-full gap-2 font-semibold h-11 text-sm"
+                      >
+                        <Send className="h-4 w-4 shrink-0" /> Send Final Documents to Client
+                      </Button>
                     </div>
 
                   </div>
@@ -2250,41 +2593,42 @@ export default function ClientOrdersPage() {
                   <div className="lg:col-span-8 space-y-4">
 
                     {/* Service Items Table */}
-                    <div className="border rounded-xl overflow-hidden text-xs shadow-xs bg-background">
+                    <div className="border border-zinc-200 rounded-2xl overflow-hidden shadow-xs bg-white">
                       <table className="w-full text-left border-collapse">
                         <thead>
-                          <tr className="bg-muted/60 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                            <th className="p-3">Service Package</th>
-                            <th className="p-3 text-right w-32">Price</th>
+                          <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 uppercase font-bold text-[10px] tracking-wider">
+                            <th className="p-4">Service Package</th>
+                            <th className="p-4 text-right w-36">Price</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y">
+                        <tbody className="divide-y divide-zinc-200">
                           {(selectedOrderGroup.items || []).map((item: any, idx: number) => {
                             const itemKey = `order-completed-${selectedOrderGroup.order_number}-${idx}`;
                             const isExpanded = !!expandedItems[itemKey];
                             return (
-                              <tr key={item.id || idx} className="hover:bg-muted/20 transition-colors">
-                                <td className="p-3 align-top">
-                                  <div className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-950/20 shadow-none space-y-1.5 transition-all duration-200 max-w-xl">
+                              <tr key={item.id || idx} className="hover:bg-zinc-50/60 transition-colors">
+                                <td className="p-4 align-top">
+                                  <div className="p-3 rounded-xl border border-zinc-200 bg-zinc-50/50 shadow-none space-y-1.5 transition-all duration-200 max-w-xl">
                                     <div className="flex flex-wrap items-center gap-1.5">
-                                      <span className="font-bold text-foreground text-xs leading-normal break-words">
+                                      <span className="font-bold text-zinc-950 text-xs leading-normal break-words">
                                         {item.job_title}
                                       </span>
                                       {item.job_id && (
-                                        <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                        <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-white text-zinc-700 border-zinc-200 shrink-0">
                                           {item.job_id}
                                         </Badge>
                                       )}
+                                      {item.branch_name && (
+                                        <Badge variant="outline" className="text-[9px] font-medium py-0 px-1.5 bg-white text-zinc-700 border-zinc-200 shrink-0">
+                                          {item.branch_name}
+                                        </Badge>
+                                      )}
                                       {item.pricing_tier && (
-                                        <Badge variant="secondary" className="text-[9px] py-0 px-1.5 font-medium capitalize shrink-0">
+                                        <Badge variant="secondary" className="text-[9px] py-0 px-1.5 font-medium capitalize shrink-0 bg-white text-zinc-600 border border-zinc-200">
                                           {item.pricing_tier.toLowerCase().replace('_', ' ')}
                                         </Badge>
                                       )}
-                                      {item.notary && (
-                                        <Badge variant="outline" className="text-[9px] font-bold py-0 px-1.5 bg-indigo-500/5 text-indigo-600 border-indigo-500/20 shrink-0">
-                                          Notary: {item.notary.name}
-                                        </Badge>
-                                      )}
+                                      {renderVendorBadge(item)}
                                     </div>
                                     {(() => {
                                       const matchedService = services.find((s) => s.id === item.service_id);
@@ -2293,14 +2637,14 @@ export default function ClientOrdersPage() {
                                       return (
                                         <div className="space-y-1">
                                           {isExpanded && (
-                                            <div className="mt-1 border-l-2 border-zinc-300 dark:border-zinc-700 pl-2 py-0.5">
+                                            <div className="mt-1 border-l-2 border-zinc-300 pl-2 py-0.5 text-xs text-zinc-700">
                                               {formatInvoiceDescription(desc, true)}
                                             </div>
                                           )}
                                           <button
                                             type="button"
                                             onClick={() => toggleItemExpansion(itemKey)}
-                                            className="text-[9.5px] text-primary hover:text-primary/80 font-bold hover:underline block"
+                                            className="text-[10px] text-zinc-500 hover:text-zinc-900 font-semibold hover:underline block"
                                           >
                                             {isExpanded ? "Hide details" : "Show details"}
                                           </button>
@@ -2309,7 +2653,7 @@ export default function ClientOrdersPage() {
                                     })()}
                                   </div>
                                 </td>
-                                <td className="p-3 text-right font-mono font-bold text-foreground align-top pt-5">
+                                <td className="p-4 text-right font-mono font-bold text-sm text-zinc-950 align-top pt-6">
                                   {item.pricing_tier === "PARTNER_A3"
                                     ? item.custom_price_text || "Custom"
                                     : formatCurrency(item.unit_price)
@@ -2340,33 +2684,33 @@ export default function ClientOrdersPage() {
 
                       return (
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div className="p-4 rounded-xl border border-border/60 bg-card shadow-xs space-y-1">
-                            <span className="text-[10px] uppercase font-bold text-muted-foreground block">Agreed Contract Value</span>
-                            <span className="text-lg font-extrabold font-mono text-foreground block">{formatCurrency(selectedOrderGroup.total_amount)}</span>
+                          <div className="p-4 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-1">
+                            <span className="text-[10px] uppercase font-bold text-zinc-500 block tracking-wider">Agreed Contract Value</span>
+                            <span className="text-xl font-bold font-mono text-zinc-950 block">{formatCurrency(selectedOrderGroup.total_amount)}</span>
                           </div>
-                          <div className="p-4 rounded-xl border border-amber-500/25 bg-amber-500/5 dark:bg-amber-500/10 shadow-xs space-y-1">
-                            <span className="text-[10px] uppercase font-bold text-amber-700 dark:text-amber-400 block">
+                          <div className="p-4 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-1">
+                            <span className="text-[10px] uppercase font-bold text-zinc-500 block tracking-wider">
                               {isRecorded
                                 ? "Proforma Paid (Recorded)"
                                 : isFinalized
                                   ? `Proforma Due (${selectedOrderGroup.proforma_stage_percent}%)`
                                   : "Proforma Due"}
                             </span>
-                            <span className="text-lg font-extrabold font-mono text-amber-600 block">
+                            <span className="text-xl font-bold font-mono text-zinc-950 block">
                               {hasProformaStage ? (
                                 formatCurrency(actualPaid)
                               ) : (
-                                <span className="text-muted-foreground/60 text-base font-normal font-sans">—</span>
+                                <span className="text-zinc-400 text-base font-normal font-sans">—</span>
                               )}
                             </span>
                           </div>
-                          <div className="p-4 rounded-xl border border-blue-500/25 bg-blue-500/5 dark:bg-blue-500/10 shadow-xs space-y-1">
-                            <span className="text-[10px] uppercase font-bold text-blue-700 dark:text-blue-400 block">Remaining Final Balance</span>
-                            <span className="text-lg font-extrabold font-mono text-blue-600 block">
+                          <div className="p-4 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-1">
+                            <span className="text-[10px] uppercase font-bold text-zinc-500 block tracking-wider">Remaining Final Balance</span>
+                            <span className="text-xl font-bold font-mono text-zinc-950 block">
                               {remainingDue != null ? (
                                 formatCurrency(remainingDue)
                               ) : (
-                                <span className="text-muted-foreground/60 text-base font-normal font-sans">—</span>
+                                <span className="text-zinc-400 text-base font-normal font-sans">—</span>
                               )}
                             </span>
                           </div>
@@ -2386,157 +2730,16 @@ export default function ClientOrdersPage() {
         )}
       </AnimatePresence>
 
-      {/* ORDER CHAT SLIDING PANEL */}
-      <AnimatePresence>
-        {isChatOpen && selectedOrderGroup && (
-          <motion.div
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "tween", ease: "easeInOut", duration: 0.3 }}
-            className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-background border-l border-border shadow-2xl flex flex-col overflow-hidden"
-          >
-            {/* Header */}
-            <div className="p-4 border-b border-border/60 flex items-center justify-between shrink-0 bg-muted/20">
-              <div>
-                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-emerald-600" /> Order Chat
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5 font-mono">
-                  Order #{selectedOrderGroup.order_number} ({selectedOrderGroup.company_name})
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsChatOpen(false)}
-                className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* Chat Messages Log */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/5">
-              {loadingProgress ? (
-                <div className="flex flex-col items-center justify-center h-full py-12 text-muted-foreground gap-2">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  <span className="text-xs">Loading progress chat history...</span>
-                </div>
-              ) : progressUpdates.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full py-12 text-muted-foreground/60 space-y-2">
-                  <MessageSquare className="h-10 w-10 opacity-30" />
-                  <p className="text-xs italic">No messages or progress logs posted yet.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {progressUpdates.map((upd) => (
-                    <div
-                      key={upd.id}
-                      className="p-3.5 rounded-2xl bg-card border border-border/50 text-xs space-y-2 shadow-xs"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-foreground text-xs">{upd.sender_name}</span>
-                        <span className="text-[10px] text-muted-foreground font-mono">
-                          {new Date(upd.created_at).toLocaleString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                      </div>
-                      <div className="text-muted-foreground whitespace-pre-wrap leading-relaxed text-xs">
-                        {renderMessageContent(upd.message)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Footer Input Area */}
-            <div className="p-4 border-t border-border/60 bg-background shrink-0">
-              <form onSubmit={handlePostProgress} className="space-y-3">
-                <div className="relative">
-                  {showSuggestions && filteredEmployees.length > 0 && (
-                    <div className="absolute bottom-full left-0 mb-2 z-50 w-full max-w-[280px] bg-background border border-border rounded-xl shadow-xl max-h-40 overflow-y-auto divide-y divide-border/40">
-                      {filteredEmployees.map((item) => (
-                        <button
-                          key={`${item.type}-${item.id}`}
-                          type="button"
-                          onClick={() => selectSuggestion(item)}
-                          className="w-full text-left px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground flex items-center gap-2 transition-colors"
-                        >
-                          {item.type === "team" ? (
-                            <div
-                              className="h-6 w-6 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 border"
-                              style={{
-                                backgroundColor: `${item.color || "#10b981"}15`,
-                                color: item.color || "#10b981",
-                                borderColor: `${item.color || "#10b981"}40`
-                              }}
-                            >
-                              <Users className="h-3 w-3" />
-                            </div>
-                          ) : (
-                            <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center font-bold text-[10px] text-primary shrink-0 border border-primary/20">
-                              {item.first_name?.[0] || ""}{item.last_name?.[0] || ""}
-                            </div>
-                          )}
-                          <div className="truncate">
-                            <span className="font-semibold text-foreground">
-                              {item.type === "team" ? item.name : `${item.first_name} ${item.last_name}`}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground block truncate">
-                              {item.type === "team" ? `${item.code} • Work Team` : (item.department?.name || "Finance")}
-                            </span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <textarea
-                    id="chat-textarea"
-                    value={newProgressMessage}
-                    onChange={(e) => handleTextChange(e.target.value, e.target.selectionStart)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && showSuggestions && filteredEmployees.length > 0) {
-                        e.preventDefault();
-                        selectSuggestion(filteredEmployees[0]);
-                      }
-                    }}
-                    rows={3}
-                    className="flex w-full rounded-xl border border-input bg-background px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
-                    placeholder="Write a progress update or tag team members using @..."
-                    required
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsChatOpen(false)}
-                    className="font-semibold text-xs h-9 px-4"
-                  >
-                    Close
-                  </Button>
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={postingProgress}
-                    className="font-semibold text-xs gap-1.5 h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white"
-                  >
-                    {postingProgress ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                    Send Message
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* DUAL ORDER CHAT DIALOG (SIDE-BY-SIDE CLIENT & INTERNAL CHAT) */}
+      <DualOrderChatDialog
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        orderNumber={selectedOrderGroup?.order_number || null}
+        orderTitle={selectedOrderGroup?.items?.[0]?.job_title}
+        companyName={selectedOrderGroup?.company_name}
+        clientName={selectedOrderGroup?.client_name}
+        orderStatus={selectedOrderGroup?.status}
+      />
 
       {/* PROFORMA INVOICE FULL-PAGE VIEW (MAX WIDESCREEN - ZERO SCROLLBAR) */}
       <AnimatePresence>
@@ -2551,25 +2754,25 @@ export default function ClientOrdersPage() {
             <div className="max-w-7xl w-full h-full flex flex-col justify-between space-y-4">
 
               {/* Top Navigation & Action Header */}
-              <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl bg-slate-900 text-white shadow-lg print:hidden w-full shrink-0">
+              <div className="flex items-center justify-between pb-3 border-b border-border/60 shrink-0 print:hidden w-full">
                 <div className="flex items-center gap-3">
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={() => setIsProformaPreviewOpen(false)}
-                    className="gap-2 text-slate-300 hover:text-white hover:bg-slate-800 font-semibold h-8 text-xs"
+                    className="gap-2 font-bold shadow-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border-zinc-300 dark:bg-black dark:hover:bg-zinc-900 dark:text-white dark:border-white/60 dark:hover:border-white h-8 text-xs transition-colors"
                   >
                     <ArrowLeft className="h-4 w-4" /> Back to Order Summary
                   </Button>
-                  <div className="h-4 w-px bg-slate-700 hidden sm:block" />
-                  <span className="font-bold text-xs sm:text-sm flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-emerald-400" /> Proforma Invoice ({proformaPercent}%)
+                  <div className="h-4 w-px bg-border hidden sm:block" />
+                  <span className="font-bold text-xs sm:text-sm flex items-center gap-2 text-foreground">
+                    <FileText className="h-4 w-4 text-emerald-500" /> Proforma Invoice ({proformaPercent}%)
                   </span>
                 </div>
 
                 <div className="flex items-center gap-2 text-xs">
                   {selectedOrderGroup.is_proforma_finalized ? (
-                    <Badge className="bg-amber-500/20 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30 gap-1.5 px-3 py-1.5 text-xs font-bold font-mono">
+                    <Badge className="bg-amber-500/20 text-amber-500 dark:text-amber-300 hover:bg-amber-500/20 border border-amber-500/40 gap-1.5 px-3 py-1.5 text-xs font-bold font-mono">
                       <Lock className="h-3.5 w-3.5" /> Finalized & Saved
                     </Badge>
                   ) : (
@@ -2577,7 +2780,8 @@ export default function ClientOrdersPage() {
                       onClick={handleFinalizeInvoice}
                       disabled={finalizingInvoice}
                       size="sm"
-                      className="gap-2 font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm text-xs h-8 px-4"
+                      variant="outline"
+                      className="gap-2 font-bold text-xs h-8 px-4"
                     >
                       {finalizingInvoice ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
                       Finalize Invoice
@@ -2588,17 +2792,18 @@ export default function ClientOrdersPage() {
                       onClick={() => handleSendInvoiceEmail('proforma')}
                       disabled={sendingEmail}
                       size="sm"
-                      className="gap-2 font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm text-xs h-8 px-4"
+                      variant="outline"
+                      className="gap-2 font-bold text-xs h-8 px-4"
                     >
-                      {sendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                      Email Proforma
+                      {sendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      Send Proforma
                     </Button>
                   )}
                   <Button
                     onClick={handleDownloadPDF}
                     disabled={downloadingPdf}
                     size="sm"
-                    className="gap-2 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm text-xs h-8 px-4"
+                    className="gap-2 font-bold shadow-sm text-xs h-8 px-4"
                   >
                     {downloadingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                     Download PDF File
@@ -2607,7 +2812,7 @@ export default function ClientOrdersPage() {
                     variant="outline"
                     onClick={handlePrintInPage}
                     size="sm"
-                    className="gap-2 font-bold bg-white/10 hover:bg-white/20 text-white border-white/30 text-xs h-8 px-4"
+                    className="gap-2 font-bold text-xs h-8 px-4"
                   >
                     <Printer className="h-4 w-4" /> Print Document
                   </Button>
@@ -2615,13 +2820,12 @@ export default function ClientOrdersPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => setIsProformaPreviewOpen(false)}
-                    className="text-slate-300 hover:text-white hover:bg-slate-800 rounded-full h-8 w-8"
+                    className="text-muted-foreground hover:text-foreground hover:bg-muted dark:hover:bg-zinc-800 rounded-full h-8 w-8"
                   >
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
-
               {/* Scrollable Container for the Invoice Card */}
               <div className="flex-1 w-full overflow-y-auto pr-1">
                 <div className="p-6 sm:p-8 bg-white text-slate-900 print-area w-full min-h-full flex flex-col justify-between" id="proforma-invoice-doc">
@@ -2787,7 +2991,7 @@ export default function ClientOrdersPage() {
 
                   {/* Signature Box at bottom */}
                   <div className="pt-4 border-t border-slate-200 flex justify-between items-end text-xs mt-auto w-full">
-                    <div className="text-slate-500 text-[11px] leading-tight max-w-sm">
+                    <div className="text-slate-550 text-[11px] leading-tight max-w-sm">
                       <p className="font-bold text-slate-700">Notice:</p>
                       <p>This Proforma Invoice is issued for milestone payment processing.</p>
                       <p>Tax invoice (Faktur Pajak) will be provided upon full payment receipt.</p>
@@ -2821,25 +3025,25 @@ export default function ClientOrdersPage() {
             <div className="max-w-7xl w-full h-full flex flex-col justify-between space-y-4">
 
               {/* Top Navigation & Action Header */}
-              <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl bg-slate-900 text-white shadow-lg print:hidden w-full shrink-0">
+              <div className="flex items-center justify-between pb-3 border-b border-border/60 shrink-0 print:hidden w-full">
                 <div className="flex items-center gap-3">
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={() => setIsFinalInvoicePreviewOpen(false)}
-                    className="gap-2 text-slate-300 hover:text-white hover:bg-slate-800 font-semibold h-8 text-xs"
+                    className="gap-2 font-bold shadow-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border-zinc-300 dark:bg-black dark:hover:bg-zinc-900 dark:text-white dark:border-white/60 dark:hover:border-white h-8 text-xs transition-colors"
                   >
                     <ArrowLeft className="h-4 w-4" /> Back to Order Summary
                   </Button>
-                  <div className="h-4 w-px bg-slate-700 hidden sm:block" />
-                  <span className="font-bold text-xs sm:text-sm flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-blue-400" /> Final Invoice
+                  <div className="h-4 w-px bg-border hidden sm:block" />
+                  <span className="font-bold text-xs sm:text-sm flex items-center gap-2 text-foreground">
+                    <FileText className="h-4 w-4 text-blue-500" /> Final Invoice
                   </span>
                 </div>
 
                 <div className="flex items-center gap-2 text-xs">
                   {selectedOrderGroup.is_final_invoice_finalized ? (
-                    <Badge className="bg-amber-500/20 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30 gap-1.5 px-3 py-1.5 text-xs font-bold font-mono">
+                    <Badge className="bg-amber-500/20 text-amber-500 dark:text-amber-300 hover:bg-amber-500/20 border border-amber-500/40 gap-1.5 px-3 py-1.5 text-xs font-bold font-mono">
                       <Lock className="h-3.5 w-3.5" /> Finalized & Saved
                     </Badge>
                   ) : (
@@ -2847,7 +3051,8 @@ export default function ClientOrdersPage() {
                       onClick={handleFinalizeFinalInvoice}
                       disabled={finalizingFinalInvoice}
                       size="sm"
-                      className="gap-2 font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm text-xs h-8 px-4"
+                      variant="outline"
+                      className="gap-2 font-bold text-xs h-8 px-4"
                     >
                       {finalizingFinalInvoice ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
                       Finalize Invoice
@@ -2858,17 +3063,18 @@ export default function ClientOrdersPage() {
                       onClick={() => handleSendInvoiceEmail('final')}
                       disabled={sendingEmail}
                       size="sm"
-                      className="gap-2 font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm text-xs h-8 px-4"
+                      variant="outline"
+                      className="gap-2 font-bold text-xs h-8 px-4"
                     >
-                      {sendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                      Email Final
+                      {sendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      Send Invoice
                     </Button>
                   )}
                   <Button
                     onClick={handleDownloadFinalPDF}
                     disabled={downloadingFinalPdf}
                     size="sm"
-                    className="gap-2 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm text-xs h-8 px-4"
+                    className="gap-2 font-bold shadow-sm text-xs h-8 px-4"
                   >
                     {downloadingFinalPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                     Download PDF File
@@ -2877,7 +3083,7 @@ export default function ClientOrdersPage() {
                     variant="outline"
                     onClick={handlePrintFinalInPage}
                     size="sm"
-                    className="gap-2 font-bold bg-white/10 hover:bg-white/20 text-white border-white/30 text-xs h-8 px-4"
+                    className="gap-2 font-bold text-xs h-8 px-4"
                   >
                     <Printer className="h-4 w-4" /> Print Document
                   </Button>
@@ -2885,7 +3091,7 @@ export default function ClientOrdersPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => setIsFinalInvoicePreviewOpen(false)}
-                    className="text-slate-300 hover:text-white hover:bg-slate-800 rounded-full h-8 w-8"
+                    className="text-muted-foreground hover:text-foreground hover:bg-muted dark:hover:bg-zinc-800 rounded-full h-8 w-8"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -3088,32 +3294,275 @@ export default function ClientOrdersPage() {
           </DialogHeader>
 
           <DialogFooter className="pt-4 border-t border-border/40 gap-2">
-            <Button type="button" variant="outline" onClick={() => setIsDeleteOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setIsDeleteOpen(false)} className="dark:bg-black dark:border-white/60 dark:text-white dark:hover:bg-zinc-900 dark:hover:border-white">
               Cancel
             </Button>
-            <Button type="button" variant="destructive" disabled={saving} onClick={handleDeleteSubmit}>
+            <Button type="button" variant="destructive" disabled={saving} onClick={handleDeleteSubmit} className="bg-rose-600 hover:bg-rose-700 text-white font-bold">
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Delete Order
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* EMAIL CONFIRMATION DIALOG */}
+      {/* EMAIL & WHATSAPP CONFIRMATION DIALOG */}
       <Dialog open={isEmailConfirmOpen} onOpenChange={setIsEmailConfirmOpen}>
-        <DialogContent className="max-w-md p-6 bg-background border border-border text-foreground rounded-xl shadow-2xl">
-          <DialogHeader className="space-y-2">
-            <DialogTitle className="text-lg font-bold flex items-center gap-2 text-primary">
-              <Mail className="h-5 w-5 text-primary" /> Confirm Email Dispatch
-            </DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground pt-1 leading-relaxed">
-              Please confirm the email address to be sent is:
-              <span className="block mt-2 p-3 bg-muted/60 border border-border rounded-lg font-mono font-bold text-foreground text-center break-all select-all shadow-inner">
-                {emailConfirmAddress}
-              </span>
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl w-[94vw] p-0 bg-background border border-border text-foreground rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden">
+          {/* Header */}
+          <div className={`p-6 sm:p-7 pb-5 border-b border-border/60 ${emailConfirmType === 'final'
+              ? 'bg-gradient-to-r from-emerald-500/15 via-emerald-500/5 to-transparent dark:from-emerald-950/50 dark:via-emerald-950/20'
+              : 'bg-gradient-to-r from-primary/15 via-primary/5 to-transparent dark:from-primary/30 dark:via-primary/10'
+            }`}>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+              <DialogTitle className={`text-xl sm:text-2xl font-bold flex items-center gap-3 ${emailConfirmType === 'final' ? 'text-emerald-600 dark:text-emerald-400' : 'text-primary'
+                }`}>
+                <div className={`h-10 w-10 rounded-2xl flex items-center justify-center border shadow-xs shrink-0 ${emailConfirmType === 'final'
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-primary/15 border-primary/30 text-primary'
+                  }`}>
+                  <Mail className="h-5 w-5" />
+                </div>
+                <span>Dispatch {emailConfirmType === 'final' ? 'Final Tax' : 'Proforma'} Invoice</span>
+              </DialogTitle>
+              {selectedOrderGroup && (
+                <Badge variant="outline" className={`font-mono text-xs sm:text-sm font-bold px-3 py-1 ${emailConfirmType === 'final'
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-primary/10 border-primary/30 text-primary'
+                  }`}>
+                  {selectedOrderGroup.order_number}
+                </Badge>
+              )}
+            </div>
+            <DialogDescription className="text-xs sm:text-sm text-muted-foreground leading-relaxed max-w-xl">
+              Dispatches the official PDF invoice directly to the client's verified email and mobile phone with secure instant payment link.
             </DialogDescription>
-          </DialogHeader>
 
-          <DialogFooter className="pt-4 border-t border-border/40 gap-2 mt-4">
+            {/* Entity & Amount Summary Card */}
+            {selectedOrderGroup && (
+              <div className="mt-4 p-4 rounded-2xl bg-background/90 dark:bg-zinc-900/90 border border-border/80 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-9 w-9 rounded-xl bg-muted/60 border border-border/60 flex items-center justify-center shrink-0">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="font-bold text-foreground text-sm block truncate">
+                      {selectedOrderGroup.company_name || selectedOrderGroup.client_name || "Client Entity"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Billing & Invoicing Entity
+                    </span>
+                  </div>
+                </div>
+                <div className="text-left sm:text-right shrink-0">
+                  <span className="text-xs text-muted-foreground block font-medium">
+                    {emailConfirmType === 'final' ? 'Final Invoice Total' : `Proforma Amount (${proformaPercent}%)`}
+                  </span>
+                  <div className="flex items-center gap-2 sm:justify-end">
+                    <span className="font-mono font-bold text-base sm:text-lg text-foreground">
+                      {emailConfirmType === 'final'
+                        ? `Rp ${(selectedOrderGroup.total_amount || 0).toLocaleString("id-ID")}`
+                        : `Rp ${((selectedOrderGroup.total_amount || 0) * (proformaPercent / 100)).toLocaleString("id-ID")}`
+                      }
+                    </span>
+                    <Badge variant="secondary" className="text-[10px] py-0.5 px-2 font-semibold">
+                      {emailConfirmType === 'final' ? '100% Full Total' : `Stage ${proformaPercent}%`}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="p-6 sm:p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+            {/* Primary Contact Details Checkbox Option */}
+            <label className={`flex items-start gap-3.5 p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer select-none ${usePrimaryInvoiceContact
+                ? "bg-primary/5 dark:bg-primary/10 border-primary/40 shadow-xs ring-1 ring-primary/20"
+                : "bg-muted/30 border-border hover:bg-muted/50"
+              }`}>
+              <input
+                type="checkbox"
+                checked={usePrimaryInvoiceContact}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setUsePrimaryInvoiceContact(checked);
+                  if (checked) {
+                    setEmailConfirmAddress(primaryInvoiceEmail);
+                    setEmailConfirmPhone(primaryInvoicePhone);
+                  }
+                }}
+                className="h-4 w-4 rounded mt-1 text-primary focus:ring-primary border-border cursor-pointer"
+              />
+              <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-bold text-foreground leading-tight">
+                    Send to the primary contact details
+                  </span>
+                  <span className={`text-[10px] sm:text-xs font-mono font-semibold px-2 py-0.5 rounded-lg border ${usePrimaryInvoiceContact
+                      ? "bg-primary/15 border-primary/30 text-primary"
+                      : "bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400"
+                    }`}>
+                    {usePrimaryInvoiceContact ? "🔒 Locked (Primary Details)" : "✏️ Custom Recipient"}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {usePrimaryInvoiceContact
+                    ? "Fields are automatically locked to the registered company primary contact info. Uncheck to specify an alternative recipient."
+                    : "Primary contact lock is disabled. You can now edit the recipient email address and WhatsApp mobile number below."}
+                </p>
+              </div>
+            </label>
+
+            {/* Delivery Channel Selector */}
+            <div className="space-y-2.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  Delivery Channel Selection
+                </span>
+                <span className="text-xs text-muted-foreground/80 font-normal">Choose delivery method</span>
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setInvoiceDeliveryChannel('both')}
+                  className={`flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-2xl border text-center transition-all cursor-pointer select-none gap-1.5 ${invoiceDeliveryChannel === 'both'
+                      ? 'bg-primary text-primary-foreground border-primary font-bold shadow-md ring-2 ring-primary/40'
+                      : 'bg-zinc-100 dark:bg-black dark:border-white/40 text-zinc-700 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-900 dark:hover:border-white font-medium'
+                    }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Mail className="h-4 w-4" />
+                    <span className="text-xs font-bold">+</span>
+                    <Phone className="h-4 w-4" />
+                  </div>
+                  <span className="text-xs sm:text-sm leading-tight font-bold">Email & WhatsApp</span>
+                  <span className="text-[10px] opacity-80 leading-tight">Both Channels</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setInvoiceDeliveryChannel('email')}
+                  className={`flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-2xl border text-center transition-all cursor-pointer select-none gap-1.5 ${invoiceDeliveryChannel === 'email'
+                      ? 'bg-sky-600 text-white border-sky-600 font-bold shadow-md ring-2 ring-sky-500/40'
+                      : 'bg-zinc-100 dark:bg-black dark:border-white/40 text-zinc-700 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-900 dark:hover:border-white font-medium'
+                    }`}
+                >
+                  <Mail className="h-4 w-4 mb-0.5" />
+                  <span className="text-xs sm:text-sm leading-tight font-bold">Email Only</span>
+                  <span className="text-[10px] opacity-80 leading-tight">PDF Attachment</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setInvoiceDeliveryChannel('whatsapp')}
+                  className={`flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-2xl border text-center transition-all cursor-pointer select-none gap-1.5 ${invoiceDeliveryChannel === 'whatsapp'
+                      ? 'bg-emerald-600 text-white border-emerald-600 font-bold shadow-md ring-2 ring-emerald-500/40'
+                      : 'bg-zinc-100 dark:bg-black dark:border-white/40 text-zinc-700 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-900 dark:hover:border-white font-medium'
+                    }`}
+                >
+                  <Phone className="h-4 w-4 mb-0.5" />
+                  <span className="text-xs sm:text-sm leading-tight font-bold">WhatsApp Only</span>
+                  <span className="text-[10px] opacity-80 leading-tight">Meta Cloud API</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Email Address & WhatsApp Phone Fields Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+              {/* Email Address Field */}
+              <div className={`space-y-2 transition-opacity ${invoiceDeliveryChannel === 'whatsapp' ? 'opacity-40' : 'opacity-100'
+                }`}>
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                    Recipient Email {invoiceDeliveryChannel !== 'whatsapp' && <span className="text-destructive">*</span>}
+                  </span>
+                  {invoiceDeliveryChannel === 'whatsapp' ? (
+                    <span className="text-[10px] text-muted-foreground italic">
+                      (Optional)
+                    </span>
+                  ) : usePrimaryInvoiceContact ? (
+                    <span className="text-[10px] text-muted-foreground/80 flex items-center gap-1 font-normal">
+                      <Lock className="h-2.5 w-2.5" /> Read-only
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-primary flex items-center gap-1 font-semibold">
+                      <Unlock className="h-2.5 w-2.5" /> Editable
+                    </span>
+                  )}
+                </label>
+                <EmailInput
+                  placeholder="client@company.com"
+                  value={emailConfirmAddress}
+                  disabled={usePrimaryInvoiceContact || invoiceDeliveryChannel === 'whatsapp'}
+                  required={invoiceDeliveryChannel !== 'whatsapp'}
+                  onChange={(val) => setEmailConfirmAddress(val)}
+                  className="h-10 text-xs sm:text-sm"
+                />
+              </div>
+
+              {/* WhatsApp Phone Field */}
+              <div className={`space-y-2 transition-opacity ${invoiceDeliveryChannel === 'email' ? 'opacity-40' : 'opacity-100'
+                }`}>
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                    WhatsApp Mobile Number {invoiceDeliveryChannel !== 'email' && <span className="text-destructive">*</span>}
+                  </span>
+                  {invoiceDeliveryChannel === 'email' ? (
+                    <span className="text-[10px] text-muted-foreground italic">
+                      (Optional)
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                      Meta Cloud API
+                    </span>
+                  )}
+                </label>
+                <PhoneInput
+                  placeholder="812 3456 789"
+                  value={emailConfirmPhone}
+                  disabled={usePrimaryInvoiceContact || invoiceDeliveryChannel === 'email'}
+                  required={invoiceDeliveryChannel !== 'email'}
+                  onChange={(val) => setEmailConfirmPhone(val)}
+                />
+              </div>
+            </div>
+
+            {/* Channel Info Card */}
+            <div className={`p-4 sm:p-5 rounded-2xl border text-xs sm:text-sm transition-colors ${invoiceDeliveryChannel === 'both'
+                ? 'border-primary/30 bg-primary/5 dark:bg-primary/10 text-foreground'
+                : invoiceDeliveryChannel === 'email'
+                  ? 'border-sky-500/30 bg-sky-500/10 dark:bg-sky-950/20 text-sky-950 dark:text-sky-200'
+                  : 'border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-200'
+              }`}>
+              <div className="flex items-center gap-2.5 font-bold text-xs sm:text-sm mb-1">
+                {invoiceDeliveryChannel === 'both' ? (
+                  <>
+                    <Mail className="h-4 w-4 text-primary shrink-0" />
+                    <span>Dispatches via Email & WhatsApp Meta Cloud API</span>
+                  </>
+                ) : invoiceDeliveryChannel === 'email' ? (
+                  <>
+                    <Mail className="h-4 w-4 text-sky-600 shrink-0" />
+                    <span>Dispatches PDF invoice attachment to client's email</span>
+                  </>
+                ) : (
+                  <>
+                    <Phone className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span>Dispatches official WhatsApp message with PDF & payment link</span>
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {invoiceDeliveryChannel === 'both'
+                  ? 'Client will receive the PDF invoice attachment by email and an interactive WhatsApp notification with secure payment link.'
+                  : invoiceDeliveryChannel === 'email'
+                    ? 'Official PDF invoice with itemized breakdown and bank details will be delivered straight to client inbox.'
+                    : 'Official WhatsApp direct message with attached PDF invoice and instant payment link will be sent.'}
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="p-5 sm:p-6 px-6 sm:px-8 border-t border-border/60 bg-muted/10 gap-3 shrink-0 flex items-center justify-end">
             <Button
               type="button"
               variant="outline"
@@ -3121,19 +3570,296 @@ export default function ClientOrdersPage() {
                 setIsEmailConfirmOpen(false);
                 setEmailConfirmType(null);
                 setEmailConfirmAddress("");
+                setEmailConfirmPhone("");
+                setInvoiceDeliveryChannel('both');
               }}
-              className="text-xs font-semibold h-9"
+              className="text-xs sm:text-sm font-semibold h-10 sm:h-11 px-5 dark:bg-black dark:border-white/60 dark:text-white dark:hover:bg-zinc-900 dark:hover:border-white rounded-xl"
             >
               Cancel
             </Button>
             <Button
               type="button"
               onClick={executeSendInvoiceEmail}
-              disabled={sendingEmail}
-              className="text-xs font-bold h-9 bg-primary hover:bg-primary/90 text-primary-foreground shadow-md gap-1.5"
+              disabled={
+                sendingEmail ||
+                (invoiceDeliveryChannel === 'both' && (!emailConfirmAddress.trim() || !isValidEmail(emailConfirmAddress) || !emailConfirmPhone.trim() || !isValidPhoneNumber(emailConfirmPhone))) ||
+                (invoiceDeliveryChannel === 'email' && (!emailConfirmAddress.trim() || !isValidEmail(emailConfirmAddress))) ||
+                (invoiceDeliveryChannel === 'whatsapp' && (!emailConfirmPhone.trim() || !isValidPhoneNumber(emailConfirmPhone)))
+              }
+              className={`text-xs sm:text-sm font-bold h-10 sm:h-11 px-6 shadow-md gap-2 rounded-xl disabled:opacity-40 disabled:bg-zinc-300 dark:disabled:bg-zinc-800 disabled:text-zinc-500 ${emailConfirmType === 'final'
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500'
+                  : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                }`}
             >
-              {sendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-              Send Invoice Email
+              {sendingEmail ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              {invoiceDeliveryChannel === 'both'
+                ? "Send via Email & WhatsApp"
+                : invoiceDeliveryChannel === 'email'
+                  ? "Send via Email"
+                  : "Send via WhatsApp"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* SEND FINAL DOCUMENTS CONFIRMATION DIALOG */}
+      <Dialog open={isSendDocsModalOpen} onOpenChange={setIsSendDocsModalOpen}>
+        <DialogContent className="sm:max-w-3xl md:max-w-4xl w-[95vw] p-0 bg-background border border-border text-foreground rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden">
+          {/* Header */}
+          <div className="p-6 sm:p-7 pb-5 border-b border-border/60 bg-gradient-to-r from-sky-500/15 via-sky-500/5 to-transparent dark:from-sky-950/50 dark:via-sky-950/20">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+              <DialogTitle className="text-xl sm:text-2xl font-bold flex items-center gap-3 text-sky-600 dark:text-sky-400">
+                <div className="h-10 w-10 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-600 dark:text-sky-400 shadow-xs shrink-0">
+                  <Send className="h-5 w-5" />
+                </div>
+                <span>Send Final Deliverable Documents</span>
+              </DialogTitle>
+              {sendDocsOrder && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="font-mono text-xs sm:text-sm font-bold bg-sky-500/10 border-sky-500/30 text-sky-600 dark:text-sky-400 px-3 py-1">
+                    {sendDocsOrder.order_number}
+                  </Badge>
+                  <Badge variant="secondary" className="text-xs sm:text-sm font-semibold px-2.5 py-1">
+                    {sendDocsDocuments.length} files attached
+                  </Badge>
+                </div>
+              )}
+            </div>
+            <DialogDescription className="text-xs sm:text-sm text-muted-foreground leading-relaxed max-w-2xl">
+              Dispatch official deliverables directly from the Dropbox order folder to the client as an AES-256 password-protected ZIP archive.
+            </DialogDescription>
+
+            {/* Entity Summary */}
+            {sendDocsOrder && (
+              <div className="mt-4 p-4 rounded-2xl bg-background/90 dark:bg-zinc-900/90 border border-border/80 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-9 w-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-600 shrink-0">
+                    <Building2 className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="font-bold text-foreground text-sm block truncate">
+                      {sendDocsOrder.company_name || sendDocsOrder.client_name || "Individual Client"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Client Entity & Organization
+                    </span>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-xs font-mono bg-muted/50 px-3 py-1">
+                  Dropbox Cloud Synced
+                </Badge>
+              </div>
+            )}
+          </div>
+
+          <div className="p-6 sm:p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+            {/* Primary Contact Details Checkbox Option */}
+            <label className={`flex items-start gap-3.5 p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer select-none ${usePrimaryDocsContact
+                ? "bg-sky-500/5 dark:bg-sky-950/20 border-sky-500/40 shadow-xs ring-1 ring-sky-500/20"
+                : "bg-muted/30 border-border hover:bg-muted/50"
+              }`}>
+              <input
+                type="checkbox"
+                checked={usePrimaryDocsContact}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setUsePrimaryDocsContact(checked);
+                  if (checked) {
+                    setSendDocsEmail(primaryDocsEmail);
+                    setSendDocsRecipientName(primaryDocsRecipientName);
+                  }
+                }}
+                className="h-4 w-4 rounded mt-1 text-sky-600 focus:ring-sky-500 border-border cursor-pointer"
+              />
+              <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-bold text-foreground leading-tight">
+                    Send to the primary contact details
+                  </span>
+                  <span className={`text-[10px] sm:text-xs font-mono font-semibold px-2 py-0.5 rounded-lg border ${usePrimaryDocsContact
+                      ? "bg-sky-500/15 border-sky-500/30 text-sky-600 dark:text-sky-400"
+                      : "bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400"
+                    }`}>
+                    {usePrimaryDocsContact ? "🔒 Locked (Primary Contact)" : "✏️ Custom Recipient"}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {usePrimaryDocsContact
+                    ? "Fields are automatically locked to registered primary contact info. Uncheck to customize recipient email or contact person."
+                    : "Primary lock disabled. You can specify a custom recipient email address and contact person below."}
+                </p>
+              </div>
+            </label>
+
+            {/* Recipient Information Form Section */}
+            <div className="space-y-4 bg-muted/40 dark:bg-zinc-900/40 p-5 sm:p-6 rounded-2xl border border-border/60">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+                {/* Recipient Email */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                      Recipient Email Address <span className="text-destructive">*</span>
+                    </span>
+                    {usePrimaryDocsContact ? (
+                      <span className="text-[10px] text-muted-foreground/80 flex items-center gap-1 font-normal">
+                        <Lock className="h-2.5 w-2.5" /> Read-only
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-sky-600 dark:text-sky-400 flex items-center gap-1 font-semibold">
+                        <Unlock className="h-2.5 w-2.5" /> Editable
+                      </span>
+                    )}
+                  </label>
+                  <EmailInput
+                    placeholder="client@company.com"
+                    value={sendDocsEmail}
+                    disabled={usePrimaryDocsContact}
+                    onChange={(val) => setSendDocsEmail(val)}
+                    className="h-10 text-xs sm:text-sm"
+                  />
+                </div>
+
+                {/* Recipient Name */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <span>Recipient Contact Name</span>
+                    {usePrimaryDocsContact ? (
+                      <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <Lock className="h-2.5 w-2.5" /> Locked
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-sky-600 font-semibold flex items-center gap-1">
+                        <Unlock className="h-2.5 w-2.5" /> Editable
+                      </span>
+                    )}
+                  </label>
+                  <Input
+                    type="text"
+                    disabled={usePrimaryDocsContact}
+                    placeholder="Contact Person"
+                    value={sendDocsRecipientName}
+                    onChange={(e) => setSendDocsRecipientName(e.target.value)}
+                    className={`h-10 text-xs sm:text-sm rounded-xl ${usePrimaryDocsContact
+                        ? "bg-muted/70 cursor-not-allowed opacity-90 select-none border-border/50"
+                        : "bg-background border-zinc-300 dark:border-zinc-700"
+                      }`}
+                  />
+                </div>
+              </div>
+
+              {/* Optional Custom Message Note */}
+              <div className="space-y-2 pt-1">
+                <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                  Optional Delivery Note / Custom Message
+                </label>
+                <Input
+                  type="text"
+                  placeholder="e.g. Please find the legalized articles of association and official deed documents attached..."
+                  value={sendDocsCustomMessage}
+                  onChange={(e) => setSendDocsCustomMessage(e.target.value)}
+                  className="h-10 text-xs sm:text-sm bg-background border-zinc-300 dark:border-zinc-700 rounded-xl"
+                />
+              </div>
+            </div>
+
+            {/* Security & Password-Protected ZIP Details Card */}
+            <div className="p-4 sm:p-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-950/20 text-xs sm:text-sm space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 font-bold text-emerald-800 dark:text-emerald-300">
+                <span className="flex items-center gap-2 text-sm">
+                  <Lock className="h-4 w-4 text-emerald-600 shrink-0" />
+                  Password-Protected AES-256 ZIP Archive
+                </span>
+                <Badge variant="outline" className="font-mono text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-500/20 border-emerald-500/30 px-2.5 py-0.5">
+                  Auto-Encrypted
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                All deliverable files will be compressed into a secure encrypted ZIP archive (<span className="font-mono font-semibold text-foreground">{sendDocsZipInfo?.zip_filename || "Documents.zip"}</span>).
+              </p>
+              <div className="flex flex-wrap items-center gap-2 pt-1 font-mono text-xs">
+                <span className="text-muted-foreground font-sans font-medium">ZIP Extraction Password:</span>
+                <span className="font-bold text-emerald-700 dark:text-emerald-300 bg-background/80 px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                  {sendDocsZipInfo?.zip_password || "NPWP + Company Code"}
+                </span>
+                <span className="text-[11px] text-muted-foreground italic font-sans">
+                  (NPWP: {sendDocsZipInfo?.target_tax_number || "N/A"} • Company Code: {sendDocsZipInfo?.target_company_code || "N/A"})
+                </span>
+              </div>
+            </div>
+
+            {/* Final Documents Breakdown */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <FileCheck className="h-4 w-4 text-sky-600" /> Deliverables from Dropbox ({sendDocsDocuments.length})
+                </label>
+                <span className="text-xs text-muted-foreground font-mono bg-muted/50 px-2.5 py-0.5 rounded">
+                  /Final Documents
+                </span>
+              </div>
+
+              {fetchingDocsLoading ? (
+                <div className="p-8 rounded-2xl border border-dashed border-border flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                  <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
+                  <span className="text-sm font-medium">Scanning Dropbox order folder for final documents...</span>
+                </div>
+              ) : sendDocsDocuments.length === 0 ? (
+                <div className="p-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300 text-xs sm:text-sm space-y-1.5">
+                  <div className="font-bold flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                    No Deliverables Found in Final Documents Folder
+                  </div>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    Please upload the completed final documents in the Company Documents section or Dropbox folder before sending.
+                  </p>
+                </div>
+              ) : (
+                <div className="border border-border/60 rounded-2xl overflow-hidden divide-y divide-border/40 bg-card">
+                  {sendDocsDocuments.map((doc, idx) => (
+                    <div key={idx} className="p-3.5 sm:p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-8 w-8 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-600 shrink-0">
+                          <Paperclip className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-xs sm:text-sm font-bold text-foreground block truncate">{doc.file_name}</span>
+                          <span className="text-xs text-muted-foreground font-mono block mt-0.5">
+                            {doc.size ? `${(doc.size / 1024).toFixed(1)} KB • ` : ""}{doc.document_type || "Final Document"}
+                          </span>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-xs font-mono font-semibold text-emerald-600 bg-emerald-500/10 border-emerald-500/20 px-2.5 py-0.5 shrink-0">
+                        Ready
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="p-5 sm:p-6 px-6 sm:px-8 border-t border-border/60 bg-muted/10 gap-3 shrink-0 flex items-center justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsSendDocsModalOpen(false)}
+              className="text-xs sm:text-sm font-semibold h-10 sm:h-11 px-5 dark:bg-black dark:border-white/60 dark:text-white dark:hover:bg-zinc-900 dark:hover:border-white rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={executeSendFinalDocs}
+              disabled={sendingDocsLoading || fetchingDocsLoading || !sendDocsEmail.trim() || !isValidEmail(sendDocsEmail) || sendDocsDocuments.length === 0}
+              className="text-xs sm:text-sm font-bold h-10 sm:h-11 px-6 bg-sky-600 hover:bg-sky-700 text-white shadow-md gap-2 rounded-xl disabled:opacity-40 disabled:bg-zinc-300 dark:disabled:bg-zinc-800 disabled:text-zinc-500"
+            >
+              {sendingDocsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Confirm & Send Documents
             </Button>
           </DialogFooter>
         </DialogContent>

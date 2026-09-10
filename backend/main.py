@@ -36,7 +36,7 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
-from routers import departments, employees, attendance, leave, payroll, assets, timesheets, performance, roles, profile, dashboard, notifications, holidays, calendar as calendar_router, clients, chat, announcements, access_control, companies, dropbox, notaries, teams
+from routers import departments, employees, attendance, leave, payroll, assets, timesheets, performance, roles, profile, dashboard, notifications, holidays, calendar as calendar_router, clients, chat, announcements, access_control, companies, dropbox, notaries, teams, webhooks, accurate
 app.include_router(departments.router)
 app.include_router(employees.router)
 app.include_router(attendance.router)
@@ -54,12 +54,15 @@ app.include_router(calendar_router.router)
 app.include_router(notaries.router, prefix="/api/clients/notaries", tags=["notaries"])
 app.include_router(clients.router)
 app.include_router(clients.public_router)
+app.include_router(clients.public_orders_router)
 app.include_router(chat.router)
 app.include_router(announcements.router)
 app.include_router(access_control.router)
 app.include_router(companies.router)
 app.include_router(dropbox.router)
 app.include_router(teams.router)
+app.include_router(webhooks.router)
+app.include_router(accurate.router)
 
 # Mount uploads directory
 import os
@@ -152,6 +155,134 @@ def register(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
     db.commit()
     db.refresh(db_user)
     return db_user
+
+
+@app.post("/api/auth/member-register")
+def register_member(
+    req: schemas.MemberRegisterRequest,
+    response: Response,
+    db: Session = Depends(database.get_db)
+):
+    from routers.clients import validate_and_clean_email, validate_and_clean_phone
+    
+    clean_email = validate_and_clean_email(req.email, "Email Address", required=True)
+    clean_phone = validate_and_clean_phone(req.phone, "Mobile Number", required=False) if req.phone else None
+
+    if req.password != req.confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+        
+    if len(req.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        
+    existing_user = auth.get_user_by_email(db, email=clean_email)
+    if existing_user:
+        raise HTTPException(status_code=400, detail="An account with this email already exists. Please log in.")
+        
+    # Get or create MEMBER role
+    member_role = db.query(models.Role).filter(models.Role.name == "MEMBER").first()
+    if not member_role:
+        member_role = models.Role(name="MEMBER", description="Public Registered Member Role")
+        db.add(member_role)
+        db.commit()
+        db.refresh(member_role)
+        
+    # Create User
+    hashed_password = auth.get_password_hash(req.password)
+    new_user = models.User(
+        email=clean_email,
+        hashed_password=hashed_password,
+        role_id=member_role.id,
+        is_active=True
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    # Create Member record
+    new_member = models.Member(
+        user_id=new_user.id,
+        full_name=req.name.strip(),
+        email=clean_email,
+        phone=clean_phone,
+        date_of_birth=req.date_of_birth,
+        status="ACTIVE"
+    )
+    db.add(new_member)
+    db.commit()
+    db.refresh(new_member)
+    
+    # Generate Access Token
+    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = auth.create_access_token(
+        data={"sub": new_user.email}, expires_delta=access_token_expires
+    )
+    
+    response.set_cookie(
+        key="hrms_token",
+        value=access_token,
+        httponly=True,
+        secure=os.getenv("ENV", "development") == "production" or os.getenv("SECURE_COOKIES", "false").lower() == "true",
+        samesite="lax",
+        max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": new_user.id,
+            "email": new_user.email,
+            "name": new_member.full_name,
+            "role": "MEMBER",
+            "phone": new_member.phone,
+            "date_of_birth": str(new_member.date_of_birth) if new_member.date_of_birth else None
+        }
+    }
+
+
+@app.post("/api/auth/member-login")
+def login_member(
+    req: schemas.MemberLoginRequest,
+    response: Response,
+    db: Session = Depends(database.get_db)
+):
+    user = auth.get_user_by_email(db, email=req.email.lower().strip())
+    if not user or not user.is_active or not auth.verify_password(req.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password."
+        )
+        
+    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = auth.create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    
+    response.set_cookie(
+        key="hrms_token",
+        value=access_token,
+        httponly=True,
+        secure=os.getenv("ENV", "development") == "production" or os.getenv("SECURE_COOKIES", "false").lower() == "true",
+        samesite="lax",
+        max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+    
+    user_name = user.name
+    if user.member:
+        user_name = user.member.full_name
+        
+    role_name = user.role.name if user.role else "MEMBER"
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user_name,
+            "role": role_name
+        }
+    }
 
 from utils.rate_limiter import check_login_rate_limit, record_failed_attempt, clear_failed_attempts
 

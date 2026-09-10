@@ -275,23 +275,80 @@ export default function AdminPayrollPage() {
   const prevMonthCost = prevMonthPayrolls.reduce((sum, p) => sum + p.net_salary, 0);
 
   return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-0">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Payroll Management</h1>
-          <p className="text-muted-foreground mt-1">Manage employee salaries and generate payslips.</p>
+    <div className="space-y-6">
+      {/* MINIMALIST METRIC RIBBON & ACTION CONTROLS */}
+      <div className="flex flex-col lg:flex-row items-stretch gap-3 w-full">
+        {/* 5-Column Minimalist Metric Ribbon */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs flex-1 gap-2 sm:gap-0 divide-y md:divide-y-0 md:divide-x divide-border/50">
+          
+          {/* Total Staff */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
+              <Users className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Total Staff</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{totalEmployees}</p>
+            </div>
+          </div>
+
+          {/* Paid / Generated */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
+              <CheckCircle className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Paid / Generated</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{generatedCount}</p>
+            </div>
+          </div>
+
+          {/* Pending */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
+              <Clock className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Pending</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{pendingCount}</p>
+            </div>
+          </div>
+
+          {/* Current Cost */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20 shrink-0">
+              <Wallet className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Current Cost</p>
+              <p className="text-sm sm:text-base font-bold text-foreground leading-tight truncate">IDR {currentMonthCost.toLocaleString()}</p>
+            </div>
+          </div>
+
+          {/* Prev Month */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/20 shrink-0">
+              <Wallet className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Prev Month</p>
+              <p className="text-sm sm:text-base font-bold text-foreground leading-tight truncate">IDR {prevMonthCost.toLocaleString()}</p>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Aligned Period Controls & Generate Button */}
+        <div className="flex items-center gap-2 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-1.5 px-3 shadow-xs shrink-0 flex-wrap sm:flex-nowrap min-h-[48px]">
           <Select
             value={searchMonth.toString()}
             onValueChange={(val) => setSearchMonth(parseInt(val))}
           >
-            <SelectTrigger className="h-9 w-32 bg-background border border-input text-sm shadow-sm font-medium">
+            <SelectTrigger className="h-9 w-32 rounded-xl bg-background/80 border-border/50 text-xs font-semibold">
               <SelectValue placeholder="Month" />
             </SelectTrigger>
-            <SelectContent position="popper">
+            <SelectContent position="popper" className="rounded-xl">
               {[...Array(12)].map((_, i) => (
-                <SelectItem key={i + 1} value={(i + 1).toString()}>
+                <SelectItem key={i + 1} value={(i + 1).toString()} className="text-xs">
                   {getMonthName(i + 1)}
                 </SelectItem>
               ))}
@@ -301,126 +358,131 @@ export default function AdminPayrollPage() {
             type="number"
             value={searchYear}
             onChange={(e) => setSearchYear(parseInt(e.target.value))}
-            className="w-24 h-9"
+            className="w-20 h-9 rounded-xl bg-background/80 border-border/50 text-xs font-semibold"
           />
-          <Button onClick={handleOpenGenerateModal} className="h-9 shadow-md ml-1">
-            <PlusCircle className="h-4 w-4 mr-2" /> Generate Monthly Drafts
+          <Button 
+            onClick={handleOpenGenerateModal} 
+            className="h-9 gap-2 font-bold shadow-sm rounded-xl px-4 text-xs bg-primary text-primary-foreground hover:bg-primary/90 transition-all shrink-0 cursor-pointer"
+          >
+            <PlusCircle className="h-4 w-4" /> Generate Drafts
           </Button>
         </div>
       </div>
 
       {isPayslipGenerationRestricted(searchMonth, searchYear) && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 flex items-start gap-3 text-amber-800 dark:text-amber-300">
-          <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-start gap-3 text-amber-800 dark:text-amber-300">
+          <AlertCircle className="h-5 w-5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
           <div>
-            <h4 className="font-semibold">Payroll Period Incomplete / Generation Restricted</h4>
-            <p className="text-sm opacity-90 mt-0.5">
+            <h4 className="font-bold text-xs">Payroll Period Incomplete / Generation Restricted</h4>
+            <p className="text-xs opacity-90 mt-0.5">
               The payroll period for {getMonthName(searchMonth)} {searchYear} is not yet complete (runs from the 27th of the last month to the 26th of the current month). Payroll generation and payslip locking are restricted until the 27th of the month.
             </p>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <KpiCard title="Total Employees" value={totalEmployees} icon={Users} colorTheme="sky" />
-        <KpiCard title="Payslips Generated" value={generatedCount} icon={CheckCircle} colorTheme="emerald" />
-        <KpiCard title="Pending Payroll" value={pendingCount} icon={Clock} colorTheme="amber" />
-        <KpiCard title="Current Month Cost" value={`IDR ${currentMonthCost.toLocaleString()}`} icon={Wallet} colorTheme="indigo" />
-        <KpiCard title="Previous Month Cost" value={`IDR ${prevMonthCost.toLocaleString()}`} icon={Wallet} colorTheme="purple" />
+      {/* Search & Actions Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search employee name, ID, company..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50"
+          />
+        </div>
+        <Button
+          onClick={() => setConfirmSendAllOpen(true)}
+          className="h-10 gap-2 font-bold shadow-sm rounded-xl px-4 text-xs shrink-0"
+          disabled={isPayslipGenerationRestricted(searchMonth, searchYear)}
+        >
+          <Send className="h-3.5 w-3.5" /> Lock & Send All
+        </Button>
       </div>
 
-      <Card className="border-border/50 shadow-sm">
-        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
-            <CardTitle className="text-xl">Payroll Records</CardTitle>
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search employee name or ID..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9"
-              />
-            </div>
-          </div>
-          <Button
-            onClick={() => setConfirmSendAllOpen(true)}
-            className="h-9 shadow-sm shrink-0 w-full sm:w-auto"
-            disabled={isPayslipGenerationRestricted(searchMonth, searchYear)}
-          >
-            <Send className="h-4 w-4 mr-2" /> Lock & Send All
-          </Button>
-        </CardHeader>
-        <CardContent>
+      {/* Payroll Table Card */}
+      <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50">
+              <thead className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Employee ID</th>
-                  <th className="px-4 py-3 font-medium">Employee Name</th>
-                  <th className="px-4 py-3 font-medium">Company Name</th>
-                  <th className="px-4 py-3 font-medium">Month</th>
-                  <th className="px-4 py-3 font-medium">Basic Salary</th>
-                  <th className="px-4 py-3 font-medium">Net Salary</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium text-right">Actions</th>
+                  <th className="px-5 py-3.5">Employee ID</th>
+                  <th className="px-5 py-3.5">Employee Name</th>
+                  <th className="px-5 py-3.5">Company Name</th>
+                  <th className="px-5 py-3.5">Month</th>
+                  <th className="px-5 py-3.5">Basic Salary</th>
+                  <th className="px-5 py-3.5">Net Salary</th>
+                  <th className="px-5 py-3.5">Status</th>
+                  <th className="px-5 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/50">
+              <tbody className="divide-y divide-border/30">
                 {filteredPayrolls.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
-                      <FileText className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                      No payroll records found for {getMonthName(searchMonth)} {searchYear}.
+                      <FileText className="h-10 w-10 mx-auto mb-2 opacity-30 text-emerald-500" />
+                      <p className="text-xs">No payroll records found for {getMonthName(searchMonth)} {searchYear}.</p>
                     </td>
                   </tr>
                 ) : (
                   paginatedPayrolls.map((payroll) => (
-                    <tr key={payroll.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-3 font-medium">
-                        {payroll.employee?.employee_id_custom || `EMP${payroll.employee_id}`}
+                    <tr key={payroll.id} className="hover:bg-muted/40 transition-colors">
+                      <td className="px-5 py-4">
+                        <span className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2.5 py-0.5 rounded-md inline-block">
+                          {payroll.employee?.employee_id_custom || `EMP${payroll.employee_id}`}
+                        </span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-5 py-4 font-semibold text-foreground">
                         {payroll.employee ? `${payroll.employee.first_name} ${payroll.employee.last_name}` : "-"}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-5 py-4 text-muted-foreground text-xs font-medium">
                         {payroll.employee?.company_name || "-"}
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">
+                      <td className="px-5 py-4 text-muted-foreground text-xs">
                         {getMonthName(payroll.payroll_month)} {payroll.payroll_year}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-5 py-4 font-medium text-muted-foreground text-xs">
                         IDR {payroll.basic_salary.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="px-4 py-3 font-bold text-green-600">
+                      <td className="px-5 py-4 font-bold text-emerald-600 dark:text-emerald-400 text-xs">
                         IDR {payroll.net_salary.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="outline" className={`
-                          ${payroll.status === 'Draft' ? 'bg-orange-50 text-orange-600 border-orange-200' : ''}
-                          ${payroll.status === 'Generated' ? 'bg-blue-50 text-blue-600 border-blue-200' : ''}
-                          ${payroll.status === 'Paid' ? 'bg-green-50 text-green-600 border-green-200' : ''}
-                        `}>
-                          {payroll.status}
-                        </Badge>
+                      <td className="px-5 py-4">
+                        {payroll.status === 'Draft' && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                            Draft
+                          </span>
+                        )}
+                        {payroll.status === 'Generated' && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                            Generated
+                          </span>
+                        )}
+                        {payroll.status === 'Paid' && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            Paid
+                          </span>
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
+                      <td className="px-5 py-4 text-right space-x-1.5 whitespace-nowrap">
                         {payroll.status === "Draft" ? (
                           <Button
                             size="sm"
-                            className="h-8 gap-1"
+                            className="h-8 gap-1.5 text-xs font-semibold rounded-lg"
                             onClick={() => handleSendPayslip(payroll.id)}
                             disabled={isPayslipGenerationRestricted(payroll.payroll_month, payroll.payroll_year)}
                           >
                             <Send className="h-3 w-3" /> Lock & Send
                           </Button>
                         ) : (
-                          <Button size="icon" className="h-7 w-7" onClick={() => handleDownload(payroll.id, payroll.payroll_month, payroll.payroll_year, payroll.employee?.employee_id_custom || payroll.employee_id || `EMP00${payroll.employee?.id || ''}`)} title="Download Encrypted PDF">
-                            <Download className="h-3.5 w-3.5" />
+                          <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg" onClick={() => handleDownload(payroll.id, payroll.payroll_month, payroll.payroll_year, payroll.employee?.employee_id_custom || payroll.employee_id || `EMP00${payroll.employee?.id || ''}`)} title="Download Encrypted PDF">
+                            <Download className="h-3.5 w-3.5 text-foreground" />
                           </Button>
                         )}
-                        <Button variant="ghost" size="sm" className="h-8 gap-1" onClick={() => router.push(`/payroll/${payroll.id}`)}>
-                          <Eye className="h-4 w-4" /> View
+                        <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs font-semibold rounded-lg" onClick={() => router.push(`/payroll/${payroll.id}`)}>
+                          <Eye className="h-3.5 w-3.5" /> View
                         </Button>
                       </td>
                     </tr>
@@ -431,7 +493,7 @@ export default function AdminPayrollPage() {
           </div>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4 border-t border-border/50 bg-transparent mt-4">
+            <div className="flex items-center justify-between px-5 py-4 border-t border-border/40 bg-muted/10">
               <div className="text-xs text-muted-foreground">
                 Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
                 <span className="font-medium text-foreground">{Math.min(filteredPayrolls.length, endIndex)}</span> of{" "}
@@ -443,7 +505,7 @@ export default function AdminPayrollPage() {
                   size="sm"
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
-                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                  className="h-8 text-xs rounded-lg border-border/50"
                 >
                   Previous
                 </Button>
@@ -455,7 +517,7 @@ export default function AdminPayrollPage() {
                   size="sm"
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                   disabled={currentPage === totalPages}
-                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                  className="h-8 text-xs rounded-lg border-border/50"
                 >
                   Next
                 </Button>
@@ -465,33 +527,32 @@ export default function AdminPayrollPage() {
         </CardContent>
       </Card>
 
-
-
       {/* Lock & Send All Modal */}
       <Dialog open={confirmSendAllOpen} onOpenChange={setConfirmSendAllOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl text-blue-700">
-              <Send className="h-5 w-5" /> Lock & Send All Payslips
+        <DialogContent className="sm:max-w-md border border-border/50 bg-background/95 backdrop-blur-xl shadow-2xl rounded-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
+          <DialogHeader className="border-b border-border/40 pb-4">
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold text-foreground">
+              <Send className="h-5 w-5 text-emerald-500" /> Lock & Send All Payslips
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
               Are you sure you want to finalize and lock ALL Draft and Generated payslips for <strong>{getMonthName(searchMonth)} {searchYear}</strong>?
             </DialogDescription>
           </DialogHeader>
-          <div className="py-2 text-sm text-muted-foreground">
+          <div className="py-3 text-xs text-muted-foreground">
             This will:
-            <ul className="list-disc list-inside mt-2 text-sm space-y-1">
+            <ul className="list-disc list-inside mt-2 text-xs space-y-1 text-foreground font-medium">
               <li>Generate a secure random password for each employee</li>
               <li>Encrypt all PDF payslips</li>
               <li>Send an email to each employee with their password</li>
               <li>Make the payslip visible and downloadable in their Employee Portal</li>
             </ul>
           </div>
-          <DialogFooter className="mt-4 flex gap-2 sm:justify-end">
-            <Button variant="outline" onClick={() => setConfirmSendAllOpen(false)} disabled={generatingAll}>
+          <DialogFooter className="border-t border-border/40 pt-4 mt-2 flex gap-2 sm:justify-end">
+            <Button variant="outline" className="rounded-xl" onClick={() => setConfirmSendAllOpen(false)} disabled={generatingAll}>
               Cancel
             </Button>
-            <Button onClick={handleSendAllPayslips} disabled={generatingAll}>
+            <Button className="rounded-xl font-bold" onClick={handleSendAllPayslips} disabled={generatingAll}>
               {generatingAll ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
               ) : (
@@ -502,23 +563,23 @@ export default function AdminPayrollPage() {
         </DialogContent>
       </Dialog>
 
-
       {/* Restricted Generation Prompt Modal */}
       <Dialog open={restrictedPromptOpen} onOpenChange={setRestrictedPromptOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl text-destructive">
-              <AlertCircle className="h-5 w-5" /> Payroll Generation Restricted
+        <DialogContent className="sm:max-w-md border border-rose-200 dark:border-rose-950/50 bg-background/95 backdrop-blur-xl shadow-2xl rounded-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-rose-500" />
+          <DialogHeader className="border-b border-border/40 pb-4">
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold text-destructive">
+              <AlertCircle className="h-5 w-5 text-rose-500" /> Payroll Generation Restricted
             </DialogTitle>
-            <DialogDescription className="text-foreground pt-2">
+            <DialogDescription className="text-xs text-foreground pt-2 font-medium">
               Payroll generation for the current month is restricted until the 27th of the month.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-2 text-sm text-muted-foreground">
+          <div className="py-3 text-xs text-muted-foreground leading-relaxed">
             The salary calculation period runs from the 27th of last month to the 26th of the current month. To prevent discrepancies, you cannot generate payroll records for the current month prior to the 27th.
           </div>
-          <DialogFooter className="mt-4">
-            <Button type="button" onClick={() => setRestrictedPromptOpen(false)}>
+          <DialogFooter className="border-t border-border/40 pt-4 mt-2">
+            <Button type="button" className="rounded-xl" onClick={() => setRestrictedPromptOpen(false)}>
               Okay
             </Button>
           </DialogFooter>

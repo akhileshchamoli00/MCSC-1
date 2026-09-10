@@ -156,9 +156,10 @@ def get_recent_leaves(db: Session = Depends(get_db), current_user: models.User =
     ).order_by(models.LeaveRequest.created_at.desc()).limit(10).all()
     data = []
     for l in leaves:
+        emp_name = f"{l.employee.first_name} {l.employee.last_name}" if l.employee else "Unknown"
         data.append({
             "id": l.id,
-            "employee_name": f"{l.employee.first_name} {l.employee.last_name}",
+            "employee_name": emp_name,
             "leave_type": l.leave_type,
             "days": l.days_requested,
             "status": l.status,
@@ -177,9 +178,10 @@ def get_pending_timesheets(db: Session = Depends(get_db), current_user: models.U
     
     data = []
     for ts in timesheets:
+        emp_name = f"{ts.employee.first_name} {ts.employee.last_name}" if ts.employee else "Unknown"
         data.append({
             "id": ts.id,
-            "employee_name": f"{ts.employee.first_name} {ts.employee.last_name}",
+            "employee_name": emp_name,
             "week_start": ts.week_start.strftime("%Y-%m-%d"),
             "total_hours": ts.total_hours,
             "status": ts.status,
@@ -435,9 +437,10 @@ def get_admin_dashboard_summary(db: Session = Depends(get_db), current_user: mod
     ).order_by(models.LeaveRequest.created_at.desc()).limit(10).all()
     recent_leaves = []
     for l in recent_leaves_query:
+        emp_name = f"{l.employee.first_name} {l.employee.last_name}" if l.employee else "Unknown"
         recent_leaves.append({
             "id": l.id,
-            "employee_name": f"{l.employee.first_name} {l.employee.last_name}",
+            "employee_name": emp_name,
             "leave_type": l.leave_type,
             "days": l.days_requested,
             "status": l.status,
@@ -450,9 +453,10 @@ def get_admin_dashboard_summary(db: Session = Depends(get_db), current_user: mod
     ).order_by(models.Timesheet.updated_at.desc()).limit(10).all()
     pending_timesheets = []
     for ts in pending_ts_query:
+        emp_name = f"{ts.employee.first_name} {ts.employee.last_name}" if ts.employee else "Unknown"
         pending_timesheets.append({
             "id": ts.id,
-            "employee_name": f"{ts.employee.first_name} {ts.employee.last_name}",
+            "employee_name": emp_name,
             "week_start": ts.week_start.strftime("%Y-%m-%d"),
             "total_hours": ts.total_hours,
             "status": ts.status,

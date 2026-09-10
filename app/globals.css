@@ -408,5 +408,97 @@
     box-shadow: 0 4px 20px rgba(var(--glow-color), 0.1), 0 0 30px rgba(var(--glow-color), 0.05);
     border-color: rgba(var(--glow-color), 0.3) !important;
   }
+
+  /* Universal Website-Wide Button & Icon Color Synchronization */
+  button svg,
+  [data-slot="button"] svg {
+    color: currentColor !important;
+    transition: color 0.15s ease-in-out, fill 0.15s ease-in-out;
+  }
+
+  /* -------------------------------------------------------------
+   * DEFAULT (SOLID) BUTTONS:
+   * Light Mode: Black button -> on hover turns WHITE with BLACK text & border
+   * Dark Mode: White button -> on hover turns BLACK with WHITE text & border
+   * ------------------------------------------------------------- */
+  /* Light Mode Hover for Solid/Default buttons */
+  [data-slot="button"][data-variant="default"]:not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-red-"]):not([class*="bg-blue-"]):not([class*="bg-indigo-"]):not([class*="bg-amber-"]):hover:not([disabled]),
+  [data-slot="button"]:not([data-variant]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-red-"]):not([class*="bg-blue-"]):not([class*="bg-indigo-"]):not([class*="bg-amber-"]):hover:not([disabled]) {
+    background-color: #ffffff !important;
+    color: #09090b !important;
+    border-color: #09090b !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  [data-slot="button"][data-variant="default"]:not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-red-"]):not([class*="bg-blue-"]):not([class*="bg-indigo-"]):not([class*="bg-amber-"]):hover svg,
+  [data-slot="button"]:not([data-variant]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-red-"]):not([class*="bg-blue-"]):not([class*="bg-indigo-"]):not([class*="bg-amber-"]):hover svg,
+  [data-slot="button"][data-variant="default"]:not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-red-"]):not([class*="bg-blue-"]):not([class*="bg-indigo-"]):not([class*="bg-amber-"]):hover span,
+  [data-slot="button"]:not([data-variant]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-red-"]):not([class*="bg-blue-"]):not([class*="bg-indigo-"]):not([class*="bg-amber-"]):hover span {
+    color: #09090b !important;
+  }
+
+  /* Dark Mode Hover for Solid/Default buttons */
+  .dark [data-slot="button"][data-variant="default"]:not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-red-"]):not([class*="bg-blue-"]):not([class*="bg-indigo-"]):not([class*="bg-amber-"]):hover:not([disabled]),
+  .dark [data-slot="button"]:not([data-variant]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-red-"]):not([class*="bg-blue-"]):not([class*="bg-indigo-"]):not([class*="bg-amber-"]):hover:not([disabled]) {
+    background-color: #09090b !important;
+    color: #ffffff !important;
+    border-color: #ffffff !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+  }
+
+  .dark [data-slot="button"][data-variant="default"]:not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-red-"]):not([class*="bg-blue-"]):not([class*="bg-indigo-"]):not([class*="bg-amber-"]):hover svg,
+  .dark [data-slot="button"]:not([data-variant]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-red-"]):not([class*="bg-blue-"]):not([class*="bg-indigo-"]):not([class*="bg-amber-"]):hover svg,
+  .dark [data-slot="button"][data-variant="default"]:not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-red-"]):not([class*="bg-blue-"]):not([class*="bg-indigo-"]):not([class*="bg-amber-"]):hover span,
+  .dark [data-slot="button"]:not([data-variant]):not([class*="bg-emerald-"]):not([class*="bg-rose-"]):not([class*="bg-red-"]):not([class*="bg-blue-"]):not([class*="bg-indigo-"]):not([class*="bg-amber-"]):hover span {
+    color: #ffffff !important;
+  }
+
+  /* -------------------------------------------------------------
+   * OUTLINE, GHOST & SECONDARY ACTION BUTTONS:
+   * Light Mode: Starts light -> on hover inverts to SOLID BLACK with WHITE text & icons
+   * Dark Mode: Starts dark -> on hover inverts to SOLID WHITE with BLACK text & icons
+   * ------------------------------------------------------------- */
+  /* Light Mode Hover for Outline, Ghost & Secondary buttons */
+  [data-slot="button"][data-variant="outline"]:not([class*="border-destructive"]):not([class*="text-destructive"]):not([class*="hover:text-destructive"]):hover:not([disabled]),
+  [data-slot="button"][data-variant="ghost"]:not([class*="border-destructive"]):not([class*="text-destructive"]):not([class*="hover:text-destructive"]):hover:not([disabled]),
+  [data-slot="button"][data-variant="secondary"]:hover:not([disabled]) {
+    background-color: #09090b !important;
+    color: #ffffff !important;
+    border-color: #09090b !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  [data-slot="button"][data-variant="outline"]:not([class*="border-destructive"]):not([class*="text-destructive"]):not([class*="hover:text-destructive"]):hover svg,
+  [data-slot="button"][data-variant="ghost"]:not([class*="border-destructive"]):not([class*="text-destructive"]):not([class*="hover:text-destructive"]):hover svg,
+  [data-slot="button"][data-variant="secondary"]:hover svg,
+  [data-slot="button"][data-variant="outline"]:not([class*="border-destructive"]):not([class*="text-destructive"]):not([class*="hover:text-destructive"]):hover span,
+  [data-slot="button"][data-variant="ghost"]:not([class*="border-destructive"]):not([class*="text-destructive"]):not([class*="hover:text-destructive"]):hover span,
+  [data-slot="button"][data-variant="secondary"]:hover span {
+    color: #ffffff !important;
+  }
+
+  /* Dark Mode Hover for Outline, Ghost & Secondary buttons */
+  .dark [data-slot="button"][data-variant="outline"]:not([class*="border-destructive"]):not([class*="text-destructive"]):not([class*="hover:text-destructive"]):hover:not([disabled]),
+  .dark [data-slot="button"][data-variant="ghost"]:not([class*="border-destructive"]):not([class*="text-destructive"]):not([class*="hover:text-destructive"]):hover:not([disabled]),
+  .dark [data-slot="button"][data-variant="secondary"]:hover:not([disabled]) {
+    background-color: #ffffff !important;
+    color: #09090b !important;
+    border-color: #ffffff !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
+  }
+
+  .dark [data-slot="button"][data-variant="outline"]:not([class*="border-destructive"]):not([class*="text-destructive"]):not([class*="hover:text-destructive"]):hover svg,
+  .dark [data-slot="button"][data-variant="ghost"]:not([class*="border-destructive"]):not([class*="text-destructive"]):not([class*="hover:text-destructive"]):hover svg,
+  .dark [data-slot="button"][data-variant="secondary"]:hover svg,
+  .dark [data-slot="button"][data-variant="outline"]:not([class*="border-destructive"]):not([class*="text-destructive"]):not([class*="hover:text-destructive"]):hover span,
+  .dark [data-slot="button"][data-variant="ghost"]:not([class*="border-destructive"]):not([class*="text-destructive"]):not([class*="hover:text-destructive"]):hover span,
+  .dark [data-slot="button"][data-variant="secondary"]:hover span {
+    color: #09090b !important;
+  }
 }
+
 

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Date, Enum, Float, JSON, Table
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Date, Enum, Float, JSON, Table, Text
 import enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -26,6 +26,23 @@ class User(Base):
     role = relationship("Role")
     employee = relationship("Employee", back_populates="user", uselist=False)
     client = relationship("Client", back_populates="user", uselist=False)
+    member = relationship("Member", back_populates="user", uselist=False)
+
+    @property
+    def name(self) -> str:
+        if self.employee:
+            parts = [p for p in [self.employee.first_name, self.employee.last_name] if p]
+            if parts:
+                return " ".join(parts).strip()
+        if self.member and self.member.full_name:
+            return self.member.full_name
+        if self.client and self.client.contact_person:
+            return self.client.contact_person
+        if self.email and "@" in self.email:
+            prefix = self.email.split("@")[0]
+            clean = " ".join([word.capitalize() for word in prefix.replace(".", " ").replace("_", " ").replace("-", " ").split()])
+            return clean or self.email
+        return self.email or f"User #{self.id}"
 
 class Department(Base):
     __tablename__ = "departments"
@@ -493,6 +510,14 @@ class ClientCompany(Base):
     industry = Column(String, nullable=True)
     logo_url = Column(String, nullable=True)
     status = Column(String, default="ACTIVE")
+    
+    # Validation & Approval Workflow
+    validation_status = Column(String, default="PENDING_VALIDATION", index=True) # PENDING_VALIDATION | VALIDATED | NEEDS_REVISION
+    created_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    validated_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    validated_at = Column(DateTime(timezone=True), nullable=True)
+    validation_notes = Column(String, nullable=True)
+    
     key_contact_person = Column(String, nullable=True)
     key_contact_email = Column(String, nullable=True)
     key_contact_phone = Column(String, nullable=True)
@@ -500,10 +525,19 @@ class ClientCompany(Base):
     director_email = Column(String, nullable=True)
     director_contact = Column(String, nullable=True)
     notes = Column(String, nullable=True)
+    
+    # Accurate Online Integration Fields
+    accurate_customer_id = Column(String, nullable=True, index=True)
+    accurate_customer_no = Column(String, nullable=True, index=True)
+    accurate_sync_status = Column(String, default="NOT_SYNCED") # NOT_SYNCED, SYNCED, FAILED
+    accurate_last_synced_at = Column(DateTime(timezone=True), nullable=True)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     client = relationship("Client", back_populates="companies")
+    creator = relationship("User", foreign_keys=[created_by_user_id])
+    validator = relationship("User", foreign_keys=[validated_by_user_id])
     consultants = relationship("ClientConsultant", back_populates="company", cascade="all, delete-orphan")
     projects = relationship("Project", back_populates="company")
     conversations = relationship("Conversation", back_populates="company")
@@ -533,6 +567,22 @@ class Client(Base):
     
     user = relationship("User", back_populates="client")
     companies = relationship("ClientCompany", back_populates="client", cascade="all, delete-orphan")
+
+
+class Member(Base):
+    __tablename__ = "members"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True)
+    full_name = Column(String, nullable=False)
+    email = Column(String, index=True, nullable=False)
+    phone = Column(String, nullable=True)  # Mobile number
+    date_of_birth = Column(Date, nullable=True)
+    status = Column(String, default="ACTIVE")  # ACTIVE, SUSPENDED
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    user = relationship("User", back_populates="member")
 
 
 class ClientConsultant(Base):
@@ -623,8 +673,16 @@ class Announcement(Base):
     title = Column(String)
     content = Column(String)
     target_role = Column(String, default="ALL") # "ALL", "EMPLOYEE", "CLIENT"
+    status = Column(String, default="PUBLISHED") # "DRAFT", "PUBLISHED", "ARCHIVED"
+    category = Column(String, default="GENERAL") # "REGULATION", "TAX_UPDATE", "CORPORATE", "OPERATIONAL", "GENERAL"
+    priority = Column(String, default="NORMAL") # "NORMAL", "HIGH", "URGENT"
+    is_pinned = Column(Boolean, default=False)
+    attachment_url = Column(String, nullable=True)
+    attachment_name = Column(String, nullable=True)
+    published_at = Column(DateTime(timezone=True), nullable=True, server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    created_by = Column(Integer, ForeignKey("users.id"))
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     
     creator = relationship("User")
 
@@ -662,6 +720,8 @@ class ClientService(Base):
     partner_a3_price = Column(String, nullable=True) # Free text pricing for Partner A3
     
     needs_notary = Column(Boolean, default=False)
+    needs_gov_officer = Column(Boolean, default=False)
+    needs_other_vendors = Column(Boolean, default=False)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -703,6 +763,16 @@ class ClientOrder(Base):
     notary_payment_ref = Column(String, nullable=True)
     notary_payout_id = Column(String, nullable=True)
     
+    # Accurate Online Integration Fields
+    accurate_so_id = Column(String, nullable=True, index=True) # Accurate Sales Order (Proforma) ID
+    accurate_so_no = Column(String, nullable=True, index=True) # e.g. SO.2026.09.0001
+    accurate_inv_id = Column(String, nullable=True, index=True) # Accurate Sales Invoice ID
+    accurate_inv_no = Column(String, nullable=True, index=True) # e.g. INV.2026.09.0001
+    accurate_receipt_no = Column(String, nullable=True) # e.g. CR.2026.09.0001
+    accurate_sync_status = Column(String, default="NOT_SYNCED") # NOT_SYNCED, SO_CREATED, INV_CREATED, PAID, FAILED
+    accurate_sync_error = Column(String, nullable=True)
+    accurate_last_synced_at = Column(DateTime(timezone=True), nullable=True)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -720,6 +790,9 @@ class ClientOrderProgress(Base):
     order_number = Column(String, index=True, nullable=False)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True)
     message = Column(String, nullable=False)
+    channel = Column(String, default="INTERNAL", index=True)  # "CLIENT" or "INTERNAL"
+    attachment_url = Column(String, nullable=True)
+    attachment_name = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User")
@@ -881,6 +954,10 @@ class Notary(Base):
     city = Column(String, index=True, nullable=False)
     status = Column(String, default="ACTIVE")
     notes = Column(String, nullable=True)
+    vendor_type = Column(String, nullable=True, default="NOTARY")
+    is_notary = Column(Boolean, default=True)
+    is_gov_officer = Column(Boolean, default=False)
+    is_other_vendor = Column(Boolean, default=False)
     
     # Bank & Payout Information
     bank_name = Column(String, nullable=True) # e.g. BCA, MANDIRI, BNI, BRI, etc.
@@ -889,9 +966,18 @@ class Notary(Base):
     bank_branch = Column(String, nullable=True)
     bank_swift_code = Column(String, nullable=True)
     
+    # Validation & Approval Workflow
+    validation_status = Column(String, default="PENDING_VALIDATION", index=True) # PENDING_VALIDATION | VALIDATED | NEEDS_REVISION
+    created_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    validated_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    validated_at = Column(DateTime(timezone=True), nullable=True)
+    validation_notes = Column(String, nullable=True)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    creator = relationship("User", foreign_keys=[created_by_user_id])
+    validator = relationship("User", foreign_keys=[validated_by_user_id])
     service_fees = relationship("NotaryServiceFee", back_populates="notary", cascade="all, delete-orphan")
 
 
@@ -932,6 +1018,54 @@ class Team(Base):
     
     leader = relationship("Employee", foreign_keys=[leader_id])
     members = relationship("Employee", secondary=team_members, backref="teams")
+
+
+class AccurateConfig(Base):
+    __tablename__ = "accurate_configs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(String, nullable=True) # Accurate OAuth Client ID
+    client_secret = Column(String, nullable=True) # Accurate OAuth Client Secret
+    api_key = Column(String, nullable=True) # Open API Token / Standalone Token
+    access_token = Column(String, nullable=True)
+    refresh_token = Column(String, nullable=True)
+    token_expires_at = Column(DateTime(timezone=True), nullable=True)
+    
+    database_id = Column(String, nullable=True) # Connected DB ID (e.g. 123456)
+    database_alias = Column(String, nullable=True) # Connected DB Name (e.g. "PT Mandiri Cipta Solusi")
+    
+    # Default Account & Tax Mappings
+    default_bank_account_no = Column(String, nullable=True, default="1101") # Kas / Bank (BCA)
+    default_bank_account_name = Column(String, nullable=True, default="Bank BCA")
+    default_sales_account_no = Column(String, nullable=True, default="4101") # Pendapatan Jasa
+    default_ar_account_no = Column(String, nullable=True, default="1103") # Piutang Usaha
+    default_dp_account_no = Column(String, nullable=True, default="2102") # Uang Muka Penjualan
+    default_tax_ppn_no = Column(String, nullable=True, default="PPN 11%") # Kode Pajak
+    
+    # Automation Triggers
+    auto_sync_on_proforma = Column(Boolean, default=True) # Auto push when proforma is finalized
+    auto_sync_on_payment = Column(Boolean, default=True) # Auto push receipt when payment confirmed
+    auto_sync_on_final_invoice = Column(Boolean, default=True) # Auto push final invoice
+    
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class AccurateSyncLog(Base):
+    __tablename__ = "accurate_sync_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    event_type = Column(String, index=True) # CUSTOMER_SYNC, PROFORMA_SO, SALES_INVOICE, SALES_RECEIPT, TEST_CONNECTION
+    status = Column(String, index=True) # SUCCESS, FAILED, PENDING
+    reference_id = Column(String, nullable=True, index=True) # e.g. "order_12" or "company_17"
+    reference_number = Column(String, nullable=True, index=True) # e.g. "MCSX-260001" or "MOD"
+    accurate_doc_no = Column(String, nullable=True) # e.g. "SO.2026.09.0001" or "INV.2026.09.0001"
+    request_payload = Column(Text, nullable=True)
+    response_payload = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
 
 
 

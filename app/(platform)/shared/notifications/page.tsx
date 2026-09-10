@@ -27,12 +27,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast } from "sonner";
+import { useUser } from "@/contexts/user-context";
 
 export default function NotificationsPage() {
+  const { isAdmin, hasPermission } = useUser();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
 
   const fetchNotifications = async () => {
@@ -124,7 +128,56 @@ export default function NotificationsPage() {
       markAsRead(notif.id);
     }
     if (notif.action_url) {
-      router.push(notif.action_url);
+      let targetUrl = notif.action_url;
+      if (!isAdmin) {
+        if (targetUrl.startsWith("/business/clients/orders/completed")) {
+          if (!hasPermission("clients_orders_completed", "view")) {
+            if (hasPermission("clients_my", "view") && targetUrl.includes("order=")) {
+              const match = targetUrl.match(/order=([^&]+)/);
+              targetUrl = `/business/assigned-orders?order=${match ? match[1] : ""}&chat=true`;
+            } else {
+              toast.error("Access Denied: You do not have permission to access Completed Orders.");
+              return;
+            }
+          }
+        } else if (targetUrl.startsWith("/business/clients/orders/cancelled")) {
+          if (!hasPermission("clients_orders_cancelled", "view")) {
+            if (hasPermission("clients_my", "view") && targetUrl.includes("order=")) {
+              const match = targetUrl.match(/order=([^&]+)/);
+              targetUrl = `/business/assigned-orders?order=${match ? match[1] : ""}&chat=true`;
+            } else {
+              toast.error("Access Denied: You do not have permission to access Cancelled Orders.");
+              return;
+            }
+          }
+        } else if (targetUrl.startsWith("/business/clients/orders/pipeline")) {
+          if (!hasPermission("clients_orders_pipeline", "view")) {
+            if (hasPermission("clients_my", "view") && targetUrl.includes("order=")) {
+              const match = targetUrl.match(/order=([^&]+)/);
+              targetUrl = `/business/assigned-orders?order=${match ? match[1] : ""}&chat=true`;
+            } else {
+              toast.error("Access Denied: You do not have permission to access Pipeline Orders.");
+              return;
+            }
+          }
+        } else if (targetUrl.startsWith("/business/clients/orders")) {
+          if (!hasPermission("clients_orders_active", "view")) {
+            if (hasPermission("clients_my", "view") && targetUrl.includes("order=")) {
+              const match = targetUrl.match(/order=([^&]+)/);
+              targetUrl = `/business/assigned-orders?order=${match ? match[1] : ""}&chat=true`;
+            } else {
+              toast.error("Access Denied: You do not have permission to access Active Orders.");
+              return;
+            }
+          }
+        } else if (targetUrl.startsWith("/business/assigned-orders")) {
+          if (!hasPermission("clients_my", "view")) {
+            toast.error("Access Denied: You do not have permission to access Assigned Orders.");
+            return;
+          }
+        }
+      }
+      router.push(targetUrl);
     }
   };
 
@@ -142,6 +195,13 @@ export default function NotificationsPage() {
     
     if (filterType !== "ALL" && n.module !== filterType) return false;
     
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchTitle = (n.title || "").toLowerCase().includes(q);
+      const matchMsg = (n.message || "").toLowerCase().includes(q);
+      if (!matchTitle && !matchMsg) return false;
+    }
+
     return true;
   });
 
@@ -182,6 +242,7 @@ export default function NotificationsPage() {
                   <SelectItem value="Payroll">Payroll</SelectItem>
                   <SelectItem value="Attendance">Attendance</SelectItem>
                   <SelectItem value="Assets">Assets</SelectItem>
+                  <SelectItem value="clients">Clients & Orders</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -192,6 +253,8 @@ export default function NotificationsPage() {
                 type="search"
                 placeholder="Search notifications..."
                 className="pl-8"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
           </div>

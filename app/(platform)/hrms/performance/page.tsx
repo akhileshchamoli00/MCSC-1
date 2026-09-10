@@ -505,39 +505,71 @@ export default function PerformancePage() {
   return (
     <div className="flex-1 space-y-8 pb-10">
       
-      {/* Visual Header */}
-      <div className="relative overflow-hidden p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-zinc-100 via-slate-100/80 to-zinc-200/60 dark:from-[#030712] dark:via-[#09152b] dark:to-[#030712] border border-zinc-200/80 dark:border-slate-800/40">
-        <div className="absolute top-[-50%] right-[-10%] w-[380px] h-[380px] rounded-full blur-[95px] pointer-events-none -z-10 animate-float-slow bg-zinc-300/30 dark:bg-sky-500/5" />
-        <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="space-y-2">
-            <Badge className="bg-primary/10 text-primary border border-primary/20 px-3 py-1 text-xs backdrop-blur-md rounded-full font-semibold flex items-center gap-1.5 w-fit">
-              <Award className="h-4 w-4" />
-              <span>Performance Evaluation Center</span>
-            </Badge>
-            <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-none bg-clip-text text-transparent bg-gradient-to-r from-zinc-700 via-slate-700 to-zinc-900 dark:from-sky-300 dark:via-blue-200 dark:to-indigo-300 pb-1">
-              Evaluations & Goals
-            </h1>
-            <p className="text-zinc-700 dark:text-slate-300 text-sm sm:text-base leading-relaxed max-w-xl font-medium">
-              Review accomplishments, record constructive feedback, set milestones, and tracks employee development.
-            </p>
+      {/* Minimalist Metrics Strip */}
+      <div className="flex flex-col md:flex-row items-stretch gap-3 w-full">
+        {/* Minimalist Metric Strip - Expanded Horizontally */}
+        <div className="grid grid-cols-2 md:grid-cols-4 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs flex-1 gap-2 sm:gap-0 divide-y md:divide-y-0 md:divide-x divide-border/50">
+          
+          {/* Pending Reviews */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
+              <Clock className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Pending Reviews</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{stats.pending_reviews}</p>
+            </div>
+          </div>
+
+          {/* Completed */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
+              <CheckCircle className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Completed</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{stats.completed_reviews}</p>
+            </div>
+          </div>
+
+          {/* Top Performers */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Top Performers</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{stats.top_performers}</p>
+            </div>
+          </div>
+
+          {/* Needs Focus */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center border border-rose-500/20 shrink-0">
+              <AlertCircle className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Needs Focus</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{stats.needing_improvement}</p>
+            </div>
           </div>
         </div>
       </div>
 
       <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="grid grid-cols-2 md:flex md:w-fit gap-1 bg-background border border-border p-1 rounded-xl">
-          <TabsTrigger value="dashboard" className="rounded-lg text-xs font-semibold px-4 py-2">Dashboard</TabsTrigger>
+        <TabsList className="grid grid-cols-2 md:flex md:w-fit gap-1 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 p-1.5 rounded-2xl h-auto">
+          <TabsTrigger value="dashboard" className="rounded-xl text-xs font-semibold px-4 py-2 cursor-pointer">Dashboard</TabsTrigger>
           {(role === "ADMIN" || isManager) && (
-            <TabsTrigger value="evaluations" className="rounded-lg text-xs font-semibold px-4 py-2">Evaluations</TabsTrigger>
+            <TabsTrigger value="evaluations" className="rounded-xl text-xs font-semibold px-4 py-2 cursor-pointer">Evaluations</TabsTrigger>
           )}
-          <TabsTrigger value="goals" className="rounded-lg text-xs font-semibold px-4 py-2">Goals</TabsTrigger>
+          <TabsTrigger value="goals" className="rounded-xl text-xs font-semibold px-4 py-2 cursor-pointer">Goals</TabsTrigger>
           {role === "ADMIN" && (
-            <TabsTrigger value="cycles" className="rounded-lg text-xs font-semibold px-4 py-2">Review Cycles</TabsTrigger>
+            <TabsTrigger value="cycles" className="rounded-xl text-xs font-semibold px-4 py-2 cursor-pointer">Review Cycles</TabsTrigger>
           )}
           {role === "EMPLOYEE" && (
             <>
-              <TabsTrigger value="my-reviews" className="rounded-lg text-xs font-semibold px-4 py-2">My Reviews</TabsTrigger>
-              <TabsTrigger value="self-reviews" className="rounded-lg text-xs font-semibold px-4 py-2">Self-Evaluations</TabsTrigger>
+              <TabsTrigger value="my-reviews" className="rounded-xl text-xs font-semibold px-4 py-2 cursor-pointer">My Reviews</TabsTrigger>
+              <TabsTrigger value="self-reviews" className="rounded-xl text-xs font-semibold px-4 py-2 cursor-pointer">Self-Evaluations</TabsTrigger>
             </>
           )}
         </TabsList>

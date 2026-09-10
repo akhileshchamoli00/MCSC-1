@@ -98,4 +98,30 @@ class NotificationManager:
         
         return notif
 
+    def remove_notifications_by_reference_sync(self, db: Session, reference_id: int, module: str = "announcements", notif_type: str = "ANNOUNCEMENT"):
+        # 1. Find all affected user_ids
+        notifs = db.query(models.Notification).filter(
+            models.Notification.reference_id == reference_id,
+            (models.Notification.module.ilike(f"%{module}%")) | (models.Notification.type == notif_type)
+        ).all()
+        
+        affected_users = set([n.user_id for n in notifs if n.user_id])
+        
+        # 2. Delete from DB
+        db.query(models.Notification).filter(
+            models.Notification.reference_id == reference_id,
+            (models.Notification.module.ilike(f"%{module}%")) | (models.Notification.type == notif_type)
+        ).delete(synchronize_session=False)
+        db.commit()
+        
+        # 3. Push real-time event to affected users so bell icon count updates immediately
+        if hasattr(self, 'loop') and self.loop:
+            import asyncio
+            for uid in affected_users:
+                asyncio.run_coroutine_threadsafe(self.send_personal_message({
+                    "action": "REFRESH_NOTIFICATIONS",
+                    "reference_id": reference_id,
+                    "module": module
+                }, uid), self.loop)
+
 manager = NotificationManager()

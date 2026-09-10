@@ -55,7 +55,8 @@ const nextConfig = {
       { source: '/chat-center/:path*', destination: '/business/chat-center/:path*', permanent: true },
       { source: '/chat/:path*', destination: '/business/chat/:path*', permanent: true },
       { source: '/clients/:path*', destination: '/business/clients/:path*', permanent: true },
-      { source: '/my-clients/:path*', destination: '/business/my-clients/:path*', permanent: true },
+      { source: '/my-clients', destination: '/business/assigned-orders', permanent: true },
+      { source: '/my-clients/:path*', destination: '/business/assigned-orders/:path*', permanent: true },
       { source: '/assigned-orders/:path*', destination: '/business/assigned-orders/:path*', permanent: true },
       { source: '/teams/:path*', destination: '/business/teams/:path*', permanent: true },
       {

@@ -19,10 +19,11 @@ import {
   Camera,
   Edit2,
   Trash2,
-  LockOpen
+  LockOpen,
+  ShieldCheck,
+  Clock
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { KpiCard } from "@/components/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -42,14 +43,33 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { useUser } from "@/contexts/user-context";
 
 export default function ClientList() {
+  const router = useRouter();
+  const { isAdmin, hasPermission, loading: userLoading } = useUser();
+  const canView = isAdmin || hasPermission("clients_all", "view");
+
   const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Authorization Check & Redirect
+  useEffect(() => {
+    if (!userLoading && !canView) {
+      toast.error("Access Denied: You do not have permission to access Partners.");
+      if (hasPermission("clients_my", "view")) {
+        router.replace("/business/assigned-orders");
+      } else {
+        router.replace("/business/dashboard");
+      }
+    }
+  }, [userLoading, canView, hasPermission, router]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -79,11 +99,13 @@ export default function ClientList() {
   const [successMsg, setSuccessMsg] = useState("");
 
   const fetchClients = async () => {
+    if (userLoading || !canView) return;
     if (!token) {
       setLoading(false);
       return;
     }
     try {
+      setLoading(true);
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
@@ -98,8 +120,10 @@ export default function ClientList() {
   };
 
   useEffect(() => {
-    fetchClients();
-  }, []);
+    if (!userLoading && canView) {
+      fetchClients();
+    }
+  }, [userLoading, canView]);
 
   const handleEditClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,6 +230,15 @@ export default function ClientList() {
   const endIndex = startIndex + 10;
   const paginatedClients = filteredClients.slice(startIndex, endIndex);
 
+  if (userLoading || (!canView && !isAdmin)) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground font-medium">Verifying partner directory permissions...</p>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -217,34 +250,62 @@ export default function ClientList() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
 
-      {/* Title Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm shrink-0 flex items-center justify-center">
-            <Users className="h-6 w-6" />
+      {/* Minimalist Metrics Strip & Action Button Row */}
+      <div className="flex flex-col md:flex-row items-stretch gap-3 w-full">
+        {/* Minimalist Metric Strip - Expanded Horizontally */}
+        <div className="grid grid-cols-2 md:grid-cols-4 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs flex-1 gap-2 sm:gap-0 divide-y md:divide-y-0 md:divide-x divide-border/50">
+          
+          {/* Total Partners */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/20 shrink-0">
+              <Users className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Total Partners</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{clients.length}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Partner Directory</h1>
-            <p className="text-muted-foreground text-sm">
-              Manage partner companies, representative details, portal credentials, and upload logos.
-            </p>
+
+          {/* Active Panels */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
+              <CheckCircle className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Active Panels</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{clients.filter(c => c.status === "ACTIVE").length}</p>
+            </div>
+          </div>
+
+          {/* Corporate Entities */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
+              <Building className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Corporate Entities</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{clients.reduce((acc, curr) => acc + (curr.companies?.length || 0), 0)}</p>
+            </div>
+          </div>
+
+          {/* Portal Credentials */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
+              <LockOpen className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Portal Credentials</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{clients.filter(c => c.user_id).length}</p>
+            </div>
           </div>
         </div>
 
-        {/* Create Client Link */}
-        <Link href="/business/clients/new">
-          <Button className="flex items-center gap-2">
+        {/* Add New Partner Button */}
+        <Link href="/business/clients/new" className="shrink-0 flex items-stretch">
+          <Button className="gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm">
             <Plus className="h-4 w-4" /> Add New Partner
           </Button>
         </Link>
-      </div>
-
-      {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
-        <KpiCard title="Total Partners" value={clients.length} icon={Users} colorTheme="purple" />
-        <KpiCard title="Active Panels" value={clients.filter(c => c.status === "ACTIVE").length} icon={CheckCircle} colorTheme="emerald" />
-        <KpiCard title="Corporate Entities" value={clients.reduce((acc, curr) => acc + (curr.companies?.length || 0), 0)} icon={Building} colorTheme="blue" />
-        <KpiCard title="Portal Credentials" value={clients.filter(c => c.user_id).length} icon={LockOpen} colorTheme="amber" />
       </div>
 
       {/* Notifications */}
@@ -260,7 +321,7 @@ export default function ClientList() {
       )}
 
       {/* Clients Display Card */}
-      <Card className="border-border/50 shadow-sm overflow-hidden bg-card/60 backdrop-blur-md">
+      <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md">
         <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -311,30 +372,30 @@ export default function ClientList() {
                     <th className="p-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y divide-border/40">
                   {paginatedClients.map((client) => (
                     <tr key={client.id} className="hover:bg-muted/30 transition-colors">
                       <td className="p-4 text-muted-foreground space-y-1">
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 text-primary font-bold">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold shadow-xs shrink-0">
                             {(client.contact_person || "").substring(0, 2).toUpperCase()}
                           </div>
                           <div>
                             <div className="text-foreground font-semibold flex items-center gap-2">
                               <span>{client.contact_person}</span>
                               {client.client_code && (
-                                <Badge variant="outline" className="font-mono text-xs font-bold bg-primary/10 border-primary/30 text-primary py-0.5 px-2">
+                                <span className="font-mono text-[11px] font-bold bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-200 py-0.5 px-2 rounded-md">
                                   {client.client_code}
-                                </Badge>
+                                </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-1.5">
-                              <Mail className="h-3.5 w-3.5 text-primary/70" />
+                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-0.5">
+                              <Mail className="h-3 w-3 opacity-70" />
                               <span>{client.email}</span>
                             </div>
                             {client.phone && (
-                              <div className="flex items-center gap-1.5">
-                                <Phone className="h-3.5 w-3.5 text-primary/70" />
+                              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                <Phone className="h-3 w-3 opacity-70" />
                                 <span>{client.phone}</span>
                               </div>
                             )}
@@ -347,16 +408,27 @@ export default function ClientList() {
                              client.companies.map((comp: any) => (
                                <div
                                  key={comp.id}
-                                 className="flex flex-col px-2.5 py-1 rounded-md bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 shadow-xs text-left max-w-[160px] truncate"
-                                 title={`${comp.company_name} (Code: ${comp.company_code})`}
+                                 className="flex flex-col px-2.5 py-1 rounded-xl bg-background/60 border border-border/40 shadow-xs text-left max-w-[180px]"
+                                 title={`${comp.company_name} (${comp.validation_status === "VALIDATED" ? "Verified" : "Pending Review"})`}
                                >
-                                 <span className="text-slate-900 dark:text-slate-100 font-bold text-xs truncate">
-                                   {comp.company_name}
-                                 </span>
+                                 <div className="flex items-center gap-1">
+                                   <span className="text-foreground font-bold text-xs truncate">
+                                     {comp.company_name}
+                                   </span>
+                                   {comp.validation_status === "VALIDATED" ? (
+                                      <span title="Verified Profile" className="inline-flex">
+                                        <ShieldCheck className="h-3 w-3 text-emerald-500 shrink-0" />
+                                      </span>
+                                    ) : (
+                                      <span title="Pending Admin Validation" className="inline-flex">
+                                        <Clock className="h-3 w-3 text-amber-500 shrink-0" />
+                                      </span>
+                                    )}
+                                 </div>
                                  <span className="text-[10px] text-muted-foreground font-mono font-semibold truncate mt-0.5">
                                    {comp.company_code}
                                  </span>
-                                </div>
+                               </div>
                              ))
                            ) : (
                              <span className="text-muted-foreground italic font-normal text-xs">No companies linked</span>
@@ -364,16 +436,22 @@ export default function ClientList() {
                          </div>
                        </td>
                       <td className="p-4">
-                        <Badge
-                          variant={client.status === "ACTIVE" ? "default" : "destructive"}
-                          className="cursor-pointer"
+                        <button
+                          type="button"
                           onClick={() => handleToggleStatus(client)}
+                          className={`inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border transition-all ${
+                            client.status === "ACTIVE"
+                              ? "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
+                              : "bg-zinc-500/10 dark:bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border-zinc-500/20 hover:bg-zinc-500/20"
+                          }`}
+                          title="Click to toggle operational status"
                         >
-                          {client.status}
-                        </Badge>
+                          <span className={`h-1.5 w-1.5 rounded-full mr-1.5 ${client.status === "ACTIVE" ? "bg-emerald-500 animate-pulse" : "bg-zinc-400"}`} />
+                          {client.status === "ACTIVE" ? "Active" : "Disabled"}
+                        </button>
                       </td>
                       <td className="p-4 text-right space-x-1.5">
-                        <Link href={`/clients/${client.id}/edit`}>
+                        <Link href={`/business/clients/${client.id}/edit`}>
                           <Button
                             size="icon"
                             variant="ghost"

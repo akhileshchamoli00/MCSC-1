@@ -1,5 +1,8 @@
 import sys
+import os
 from sqlalchemy import text
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import engine
 
@@ -116,7 +119,15 @@ def run_migrations():
         for idx_sql, idx_name in [
             ("CREATE INDEX IF NOT EXISTS ix_attendance_employee_id ON attendance (employee_id)", "ix_attendance_employee_id"),
             ("CREATE INDEX IF NOT EXISTS ix_attendance_corrections_employee_id ON attendance_corrections (employee_id)", "ix_attendance_corrections_employee_id"),
-            ("CREATE INDEX IF NOT EXISTS ix_attendance_corrections_status ON attendance_corrections (status)", "ix_attendance_corrections_status")
+            ("CREATE INDEX IF NOT EXISTS ix_attendance_corrections_status ON attendance_corrections (status)", "ix_attendance_corrections_status"),
+            ("CREATE INDEX IF NOT EXISTS ix_client_orders_order_number ON client_orders (order_number)", "ix_client_orders_order_number"),
+            ("CREATE INDEX IF NOT EXISTS ix_client_orders_client_id ON client_orders (client_id)", "ix_client_orders_client_id"),
+            ("CREATE INDEX IF NOT EXISTS ix_client_orders_company_id ON client_orders (company_id)", "ix_client_orders_company_id"),
+            ("CREATE INDEX IF NOT EXISTS ix_client_orders_status ON client_orders (status)", "ix_client_orders_status"),
+            ("CREATE INDEX IF NOT EXISTS ix_client_order_progress_order_number ON client_order_progress (order_number)", "ix_client_order_progress_order_number"),
+            ("CREATE INDEX IF NOT EXISTS ix_client_companies_client_id ON client_companies (client_id)", "ix_client_companies_client_id"),
+            ("CREATE INDEX IF NOT EXISTS ix_client_consultants_company_id ON client_consultants (company_id)", "ix_client_consultants_company_id"),
+            ("CREATE INDEX IF NOT EXISTS ix_client_consultants_employee_id ON client_consultants (employee_id)", "ix_client_consultants_employee_id")
         ]:
             try:
                 conn.execute(text(idx_sql))
@@ -209,7 +220,7 @@ def run_migrations():
             conn.rollback()
             print(f"Error migrating client codes: {e}")
 
-        # Add needs_notary to client_services
+        # Add needs_notary, needs_gov_officer, needs_other_vendors to client_services
         try:
             conn.execute(text("ALTER TABLE client_services ADD COLUMN needs_notary BOOLEAN DEFAULT FALSE"))
             conn.commit()
@@ -217,6 +228,22 @@ def run_migrations():
         except Exception as e:
             conn.rollback()
             handle_migration_error("needs_notary", "client_services", e)
+
+        try:
+            conn.execute(text("ALTER TABLE client_services ADD COLUMN needs_gov_officer BOOLEAN DEFAULT FALSE"))
+            conn.commit()
+            print("Added column 'needs_gov_officer' to 'client_services' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("needs_gov_officer", "client_services", e)
+
+        try:
+            conn.execute(text("ALTER TABLE client_services ADD COLUMN needs_other_vendors BOOLEAN DEFAULT FALSE"))
+            conn.commit()
+            print("Added column 'needs_other_vendors' to 'client_services' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("needs_other_vendors", "client_services", e)
 
         # Add notary_id to client_orders
         try:
@@ -279,15 +306,19 @@ def run_migrations():
             conn.rollback()
             handle_migration_error("notary_payout_id", "client_orders", e)
 
-        # Add bank details columns to notaries
-        notary_bank_cols = [
+        # Add bank details and vendor type columns to notaries
+        notary_cols = [
             ("bank_name", "VARCHAR(255) DEFAULT NULL"),
             ("bank_account_number", "VARCHAR(255) DEFAULT NULL"),
             ("bank_account_holder_name", "VARCHAR(255) DEFAULT NULL"),
             ("bank_branch", "VARCHAR(255) DEFAULT NULL"),
-            ("bank_swift_code", "VARCHAR(255) DEFAULT NULL")
+            ("bank_swift_code", "VARCHAR(255) DEFAULT NULL"),
+            ("vendor_type", "VARCHAR(50) DEFAULT 'NOTARY'"),
+            ("is_notary", "BOOLEAN DEFAULT TRUE"),
+            ("is_gov_officer", "BOOLEAN DEFAULT FALSE"),
+            ("is_other_vendor", "BOOLEAN DEFAULT FALSE")
         ]
-        for col, col_type in notary_bank_cols:
+        for col, col_type in notary_cols:
             try:
                 conn.execute(text(f"ALTER TABLE notaries ADD COLUMN {col} {col_type}"))
                 conn.commit()
@@ -295,6 +326,96 @@ def run_migrations():
             except Exception as e:
                 conn.rollback()
                 handle_migration_error(col, "notaries", e)
+
+        # Add validation and approval columns to client_companies
+        company_cols = [
+            ("validation_status", "VARCHAR(50) DEFAULT 'PENDING_VALIDATION'"),
+            ("created_by_user_id", "INTEGER REFERENCES users(id) ON DELETE SET NULL"),
+            ("validated_by_user_id", "INTEGER REFERENCES users(id) ON DELETE SET NULL"),
+            ("validated_at", "TIMESTAMP WITH TIME ZONE DEFAULT NULL"),
+            ("validation_notes", "TEXT DEFAULT NULL")
+        ]
+        for col, col_type in company_cols:
+            try:
+                conn.execute(text(f"ALTER TABLE client_companies ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                print(f"Added column '{col}' to 'client_companies' table.")
+            except Exception as e:
+                conn.rollback()
+                handle_migration_error(col, "client_companies", e)
+
+        # For existing active companies, mark them as VALIDATED so they are already verified
+        try:
+            conn.execute(text("UPDATE client_companies SET validation_status = 'VALIDATED' WHERE validation_status IS NULL OR validation_status = ''"))
+            conn.commit()
+            print("Set default validation_status = 'VALIDATED' for existing client_companies.")
+        except Exception as e:
+            conn.rollback()
+            print(f"Notice on updating existing client_companies: {e}")
+
+        # Add validation and approval columns to notaries (vendors)
+        notary_val_cols = [
+            ("validation_status", "VARCHAR(50) DEFAULT 'PENDING_VALIDATION'"),
+            ("created_by_user_id", "INTEGER REFERENCES users(id) ON DELETE SET NULL"),
+            ("validated_by_user_id", "INTEGER REFERENCES users(id) ON DELETE SET NULL"),
+            ("validated_at", "TIMESTAMP WITH TIME ZONE DEFAULT NULL"),
+            ("validation_notes", "TEXT DEFAULT NULL")
+        ]
+        for col, col_type in notary_val_cols:
+            try:
+                conn.execute(text(f"ALTER TABLE notaries ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                print(f"Added column '{col}' to 'notaries' table.")
+            except Exception as e:
+                conn.rollback()
+                handle_migration_error(col, "notaries", e)
+
+        # Add channel, attachment_url, and attachment_name columns to client_order_progress
+        progress_cols = [
+            ("channel", "VARCHAR(50) DEFAULT 'INTERNAL'"),
+            ("attachment_url", "VARCHAR(500) DEFAULT NULL"),
+            ("attachment_name", "VARCHAR(255) DEFAULT NULL")
+        ]
+        for col, col_type in progress_cols:
+            try:
+                conn.execute(text(f"ALTER TABLE client_order_progress ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                print(f"Added column '{col}' to 'client_order_progress' table.")
+            except Exception as e:
+                conn.rollback()
+                handle_migration_error(col, "client_order_progress", e)
+
+        # Ensure any existing progress records without channel get default 'INTERNAL' or 'CLIENT'
+        try:
+            conn.execute(text("UPDATE client_order_progress SET channel = 'INTERNAL' WHERE channel IS NULL OR channel = ''"))
+            conn.execute(text("""
+                UPDATE client_order_progress
+                SET channel = 'CLIENT'
+                WHERE user_id IS NULL
+                   OR message ILIKE 'Order execution status has been updated to%'
+                   OR message ILIKE 'Pipeline order has been moved to Active Orders%'
+                   OR message ILIKE '%payment completed successfully via Xendit%'
+                   OR message ILIKE 'Additional payment received via Xendit%'
+                   OR message ILIKE 'Proforma invoice (%has been generated and saved%'
+                   OR message ILIKE 'Final invoice has been generated and saved%'
+                   OR message ILIKE 'Final documents uploaded to Dropbox%'
+                   OR message ILIKE 'Final documents (%have been emailed to client%'
+                   OR message ILIKE 'Amount Received / Proforma Paid manually updated%'
+            """))
+            # Ensure all messages from client users are channel='CLIENT'
+            conn.execute(text("""
+                UPDATE client_order_progress
+                SET channel = 'CLIENT'
+                WHERE user_id IN (
+                    SELECT u.id FROM users u
+                    JOIN roles r ON u.role_id = r.id
+                    WHERE UPPER(r.name) = 'CLIENT'
+                )
+            """))
+            conn.commit()
+            print("Updated client messages and automated lifecycle & payment status messages to channel='CLIENT'.")
+        except Exception as e:
+            conn.rollback()
 
     print("Migration check complete.")
 

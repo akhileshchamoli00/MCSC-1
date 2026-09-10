@@ -2,23 +2,69 @@ import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+root_env = Path(__file__).resolve().parent.parent.parent / ".env.local"
+backend_env = Path(__file__).resolve().parent.parent / ".env"
 
-GMAIL_USER = os.getenv("GMAIL_USER")
-GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+if root_env.exists():
+    load_dotenv(dotenv_path=root_env, override=True)
+if backend_env.exists():
+    load_dotenv(dotenv_path=backend_env, override=True)
+load_dotenv(override=True)
+
+def send_smtp_email(msg: MIMEMultipart, recipient_email: str, description: str = "email") -> bool:
+    """
+    Sends an outbound email via configured SMTP (reads GMAIL_USER & GMAIL_APP_PASSWORD directly from .env.local).
+    """
+    if root_env.exists():
+        load_dotenv(dotenv_path=root_env, override=True)
+    if backend_env.exists():
+        load_dotenv(dotenv_path=backend_env, override=True)
+
+    sender_email = os.getenv("SENDER_EMAIL") or os.getenv("GMAIL_USER") or "admin@mcsc.co.id"
+    sender_name = os.getenv("SENDER_NAME", "PT Mandiri Cipta Solusi")
+
+    if not msg.get("From"):
+        msg["From"] = f"{sender_name} <{sender_email}>"
+
+    msg["To"] = recipient_email
+
+    host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    port = int(os.getenv("SMTP_PORT", "587"))
+    user = os.getenv("GMAIL_USER") or os.getenv("SMTP_USER")
+    password = (os.getenv("GMAIL_APP_PASSWORD") or os.getenv("SMTP_PASSWORD") or "").replace(" ", "")
+
+    if not host or not user or not password:
+        print(f"WARNING: SMTP credentials (GMAIL_USER / GMAIL_APP_PASSWORD) not found in .env.local. Failed to send {description} to {recipient_email}.")
+        return False
+
+    try:
+        print(f"[SMTP ({host}:{port})] Sending {description} to {recipient_email} from {sender_email}...")
+        if port == 465:
+            with smtplib.SMTP_SSL(host, port, timeout=25) as server:
+                server.login(user, password)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(host, port, timeout=25) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(user, password)
+                server.send_message(msg)
+
+        print(f"[SMTP ({host})] SUCCESS: Successfully delivered {description} to {recipient_email}")
+        return True
+    except Exception as e:
+        print(f"[SMTP ({host})] FAILED to send {description} to {recipient_email}: {str(e)}")
+        return False
 
 def send_welcome_email(employee_email: str, employee_name: str, password: str):
     """
     Send welcome email to a new employee with their login credentials.
     """
-    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
-        print("WARNING: GMAIL_USER or GMAIL_APP_PASSWORD not set in .env. Email won't be sent.")
-        return
-
     subject = "Welcome to MCS Consulting HRMS"
-    
     frontend_url = os.getenv("FRONTEND_URL", "https://www.mcsc.co.id")
     
     body = f"""Dear {employee_name},
@@ -38,29 +84,16 @@ MCS Consulting HRMS
 """
 
     msg = MIMEMultipart()
-    msg['From'] = GMAIL_USER
-    msg['To'] = employee_email
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'plain'))
 
-    try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-            server.send_message(msg)
-        print(f"Successfully sent welcome email to {employee_email}")
-    except Exception as e:
-        print(f"Failed to send email to {employee_email}: {str(e)}")
+    return send_smtp_email(msg, employee_email, "welcome email")
 
 
 def send_payslip_password_email(employee_email: str, employee_name: str, month_year: str, password: str):
     """
     Send the payslip password to the employee's email in a separate email.
     """
-    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
-        print("WARNING: GMAIL_USER or GMAIL_APP_PASSWORD not set in .env. Email won't be sent.")
-        print(f"Would have sent to {employee_email}: Password is {password}")
-        return
-
     subject = f"Your Payslip Password - {month_year}"
     
     body = f"""Dear {employee_name},
@@ -79,28 +112,16 @@ MCS Consulting HRMS
 """
 
     msg = MIMEMultipart()
-    msg['From'] = GMAIL_USER
-    msg['To'] = employee_email
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'plain'))
 
-    try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-            server.send_message(msg)
-        print(f"Successfully sent password email to {employee_email}")
-    except Exception as e:
-        print(f"Failed to send password email to {employee_email}: {str(e)}")
+    return send_smtp_email(msg, employee_email, "payslip password email")
 
 
 def send_payslip_attachment_email(employee_email: str, employee_name: str, month_year: str, pdf_content: bytes, pdf_filename: str):
     """
     Send the encrypted PDF payslip over the email as an attachment.
     """
-    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
-        print("WARNING: GMAIL_USER or GMAIL_APP_PASSWORD not set in .env. Email won't be sent.")
-        return
-
     subject = f"Your Payslip Attachment - {month_year}"
     
     body = f"""Dear {employee_name},
@@ -114,8 +135,6 @@ MCS Consulting HRMS
 """
 
     msg = MIMEMultipart()
-    msg['From'] = GMAIL_USER
-    msg['To'] = employee_email
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'plain'))
 
@@ -125,24 +144,13 @@ MCS Consulting HRMS
         part['Content-Disposition'] = f'attachment; filename="{pdf_filename or "payslip.pdf"}"'
         msg.attach(part)
 
-    try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-            server.send_message(msg)
-        print(f"Successfully sent attachment email to {employee_email}")
-    except Exception as e:
-        print(f"Failed to send attachment email to {employee_email}: {str(e)}")
+    return send_smtp_email(msg, employee_email, "payslip attachment email")
 
 
 def send_password_reset_email(employee_email: str, reset_link: str):
     """
     Send the password reset link to the employee's email.
     """
-    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
-        print("WARNING: GMAIL_USER or GMAIL_APP_PASSWORD not set in .env. Email won't be sent.")
-        print(f"Would have sent reset link to {employee_email}: {reset_link}")
-        return
-
     subject = "Reset Your Password - MCS Consulting HRMS"
     
     body = f"""Hello,
@@ -159,27 +167,17 @@ MCS Consulting HRMS
 """
 
     msg = MIMEMultipart()
-    msg['From'] = GMAIL_USER
-    msg['To'] = employee_email
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'plain'))
 
-    try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-            server.send_message(msg)
-        print(f"Successfully sent password reset email to {employee_email}")
-    except Exception as e:
-        print(f"Failed to send email to {employee_email}: {str(e)}")
+    return send_smtp_email(msg, employee_email, "password reset email")
 
 
 def send_invoice_attachment_email(recipient_email: str, recipient_name: str, invoice_type: str, pdf_content: bytes, pdf_filename: str, payment_url: str = None):
     """
     Send finalized proforma or final invoice attachment to a client, with an optional payment checkout URL.
     """
-    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
-        print("WARNING: GMAIL_USER or GMAIL_APP_PASSWORD not set in .env. Email won't be sent.")
-        return
+
 
     subject = f"PT Mandiri Cipta Solusi - {invoice_type.title()} Invoice"
     
@@ -391,8 +389,6 @@ def send_invoice_attachment_email(recipient_email: str, recipient_name: str, inv
 """
 
     msg = MIMEMultipart("mixed")
-    msg['From'] = GMAIL_USER
-    msg['To'] = recipient_email
     msg['Subject'] = subject
 
     # Create the alternative part for text/html
@@ -422,10 +418,1330 @@ def send_invoice_attachment_email(recipient_email: str, recipient_name: str, inv
         part['Content-Disposition'] = f'attachment; filename="{pdf_filename}"'
         msg.attach(part)
 
-    try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-            server.send_message(msg)
-        print(f"Successfully sent {invoice_type} invoice email to {recipient_email}")
-    except Exception as e:
-        print(f"Failed to send {invoice_type} invoice email to {recipient_email}: {str(e)}")
+    return send_smtp_email(msg, recipient_email, f"{invoice_type} invoice email")
+
+
+def send_notary_payment_voucher_email(
+    notary_email: str,
+    notary_name: str,
+    order_number: str,
+    company_name: str,
+    job_title: str,
+    amount: float,
+    bank_name: str,
+    bank_account_number: str,
+    bank_account_holder_name: str,
+    payment_date: str,
+    payout_ref: str,
+    custom_message: str = None,
+    pdf_content: bytes = None,
+    pdf_filename: str = None
+):
+    """
+    Send an official Payment Voucher / Remittance Advice email to the Notary after disbursement,
+    following the standard invoice email template with embedded MCS logo in header and attached PDF.
+    """
+
+
+    voucher_no = f"PV-{order_number}"
+    formatted_amount = f"IDR {int(amount):,}".replace(",", ".")
+    subject = f"PT Mandiri Cipta Solusi - Payment Voucher ({voucher_no})"
+    attachment_name = pdf_filename or f"{voucher_no}.pdf"
+
+    from datetime import datetime
+    transmission_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
+
+    # 1. Plain Text Fallback Body
+    text_body = f"""Dear {notary_name},
+
+Please find attached our official Payment Voucher & Remittance Advice ({attachment_name}) for your review and records.
+
+PAYMENT VOUCHER DETAILS:
+- Billing Entity: PT Mandiri Cipta Solusi
+- Document Type: Payment Voucher & Remittance Advice
+- Voucher No: {voucher_no}
+- Order Reference: ORD-{order_number}
+- Service / Deed: {job_title}
+- Settled Amount: {formatted_amount}
+- Payment Date: {payment_date}
+- Status: Settled
+- Attachment: {attachment_name}
+
+{f"Note: {custom_message}" if custom_message else ""}
+
+If you have any questions or require further assistance, please feel free to reply directly to this email.
+
+Regards,
+PT Mandiri Cipta Solusi (MCS Consulting)
+"""
+
+    # 2. Clean, Simple HTML Body matching Proforma Invoice template
+    html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{subject}</title>
+  <style>
+    body {{
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      background-color: #f8fafc;
+      color: #334155;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }}
+    .wrapper {{
+      width: 100%;
+      background-color: #f8fafc;
+      padding: 30px 10px;
+    }}
+    .container {{
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }}
+    .header {{
+      background-color: #ffffff;
+      padding: 30px;
+      text-align: center;
+      border-bottom: 1px solid #e2e8f0;
+    }}
+    .content {{
+      padding: 40px 30px;
+    }}
+    .greeting {{
+      font-size: 16px;
+      font-weight: bold;
+      color: #0f172a;
+      margin-bottom: 20px;
+    }}
+    .message {{
+      font-size: 15px;
+      line-height: 1.6;
+      color: #475569;
+      margin-bottom: 30px;
+    }}
+    .details-card {{
+      background-color: #f1f5f9;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 30px;
+      border: 1px solid #e2e8f0;
+    }}
+    .details-label {{
+      color: #64748b;
+      font-weight: 550;
+      font-size: 14px;
+    }}
+    .details-value {{
+      color: #0f172a;
+      font-weight: 600;
+      font-size: 14px;
+    }}
+    .footer {{
+      background-color: #f8fafc;
+      padding: 25px 30px;
+      text-align: center;
+      border-top: 1px solid #f1f5f9;
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }}
+    .footer a {{
+      color: #64748b;
+      text-decoration: underline;
+    }}
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="header">
+        <img src="cid:msc_logo" alt="MCSC Logo" style="height: 50px; width: auto; display: block; margin: 0 auto;">
+      </div>
+      <div class="content">
+        <div class="greeting">Dear {notary_name},</div>
+        <div class="message">
+          Please find attached our official <strong>Payment Voucher &amp; Remittance Advice</strong> ({attachment_name}) for your review and records.
+        </div>
+        
+        <div class="details-card" style="margin-bottom: 0;">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Billing Entity:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right;">PT Mandiri Cipta Solusi</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Document Type:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right;">Payment Voucher &amp; Remittance Advice</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Voucher No:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right; font-family: monospace;">{voucher_no}</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Order Reference:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right; font-family: monospace;">ORD-{order_number}</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Service / Deed:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right;">{job_title}</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Settled Amount:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right; font-weight: 700; color: #047857;">{formatted_amount}</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Payment Date:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right;">{payment_date}</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Status:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right; color: #059669; font-weight: 700;">Settled</td>
+            </tr>
+            <tr>
+              <td class="details-label">Attachment:</td>
+              <td class="details-value" style="text-align: right; color: #0284c7;">&#128206; {attachment_name}</td>
+            </tr>
+          </table>
+        </div>
+        
+        {f'''
+        <div class="details-card" style="margin-top: 15px; margin-bottom: 0; font-size: 13px; color: #475569; font-style: italic;">
+          <strong style="font-style: normal; color: #0f172a;">Note:</strong> {custom_message}
+        </div>
+        ''' if custom_message else ''}
+
+        <div class="message" style="margin-bottom: 0; margin-top: 20px;">
+          If you have any questions or require further assistance, please feel free to reply directly to this email.
+        </div>
+      </div>
+      <div class="footer">
+        This is an automated payment remittance transmission from PT Mandiri Cipta Solusi.<br>
+        Office: Springhill Office Tower, Lantai 9 Unit 9C, Jakarta, Indonesia | <a href="https://www.mcsc.co.id">www.mcsc.co.id</a>
+      </div>
+      <div style="display:none !important; font-size:1px; color:#ffffff; line-height:1px; max-height:0px; max-width:0px; opacity:0; overflow:hidden;">
+        Transmission ID: {transmission_id}
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+    msg = MIMEMultipart("mixed")
+    msg['Subject'] = subject
+
+    # Create the alternative part for text/html
+    alt_part = MIMEMultipart("alternative")
+    alt_part.attach(MIMEText(text_body, 'plain'))
+    alt_part.attach(MIMEText(html_body, 'html'))
+    msg.attach(alt_part)
+
+    # Attach MCSC Logo inline
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    logo_path = os.path.join(base_dir, "public", "logo.png")
+    if os.path.exists(logo_path):
+        from email.mime.image import MIMEImage
+        try:
+            with open(logo_path, "rb") as f:
+                logo_data = f.read()
+                msg_image = MIMEImage(logo_data)
+                msg_image.add_header('Content-ID', '<msc_logo>')
+                msg_image.add_header('Content-Disposition', 'inline', filename="logo.png")
+                msg.attach(msg_image)
+        except Exception as img_err:
+            print("Failed to attach logo inline:", img_err)
+
+    # Attach PDF Voucher if provided
+    if pdf_content:
+        from email.mime.application import MIMEApplication
+        part = MIMEApplication(pdf_content, Name=attachment_name)
+        part['Content-Disposition'] = f'attachment; filename="{attachment_name}"'
+        msg.attach(part)
+
+    return send_smtp_email(msg, notary_email, f"payment voucher email ({voucher_no})")
+
+
+def create_password_protected_zip(attachments: list, password: str = None) -> bytes:
+    """
+    Creates a universally compatible password-protected ZIP archive using standard
+    PKWARE ZipCrypto encryption and Deflate compression (ZIP 2.0 specification).
+    
+    This ensures native, error-free extraction directly in Windows File Explorer,
+    macOS Archive Utility, 7-Zip, WinRAR, Linux, iOS, and Android file managers.
+    """
+    import io
+    import zlib
+    import struct
+    import time
+    import os
+    import zipfile
+
+    if not attachments:
+        return b""
+
+    clean_attachments = []
+    for item in attachments:
+        if isinstance(item, (tuple, list)):
+            fn, data = item[0], item[1]
+        elif isinstance(item, dict):
+            fn, data = item.get("filename", "document.pdf"), item.get("content", b"")
+        else:
+            continue
+            
+        if not data:
+            continue
+        if isinstance(data, str):
+            data = data.encode("utf-8")
+        clean_attachments.append((str(fn), data))
+
+    if not clean_attachments:
+        return b""
+
+    # If no password provided, return standard ZIP archive
+    if not password:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+            for fn, data in clean_attachments:
+                zf.writestr(fn, data)
+        return buf.getvalue()
+
+    pwd_bytes = str(password).encode("utf-8")
+    
+    # Precompute CRC table
+    crctable = []
+    for i in range(256):
+        c = i
+        for _ in range(8):
+            if c & 1:
+                c = (c >> 1) ^ 0xEDB88320
+            else:
+                c >>= 1
+        crctable.append(c)
+
+    def crc32_byte(b, crc):
+        return (crc >> 8) ^ crctable[(crc ^ b) & 0xFF]
+
+    def create_encrypter():
+        k0 = 305419896
+        k1 = 591751049
+        k2 = 878082192
+
+        def update(b):
+            nonlocal k0, k1, k2
+            k0 = crc32_byte(b, k0)
+            k1 = (k1 + (k0 & 0xFF)) & 0xFFFFFFFF
+            k1 = (k1 * 134775813 + 1) & 0xFFFFFFFF
+            k2 = crc32_byte((k1 >> 24) & 0xFF, k2)
+
+        for p in pwd_bytes:
+            update(p)
+
+        def encrypt_bytes(data):
+            res = bytearray()
+            for b in data:
+                k = k2 | 2
+                keystream = ((k * (k ^ 1)) >> 8) & 0xFF
+                update(b)
+                res.append(b ^ keystream)
+            return bytes(res)
+
+        return encrypt_bytes
+
+    buf = io.BytesIO()
+    cd_records = []
+    
+    now = time.localtime()
+    dos_time = (now.tm_hour << 11) | (now.tm_min << 5) | (now.tm_sec // 2)
+    dos_date = ((now.tm_year - 1980) << 9) | (now.tm_mon << 5) | now.tm_mday
+
+    for filename, raw_bytes in clean_attachments:
+        clean_fn = filename.replace('\\', '/').strip('/')
+        fn_bytes = clean_fn.encode("utf-8")
+        file_crc = zlib.crc32(raw_bytes) & 0xFFFFFFFF
+        uncompressed_size = len(raw_bytes)
+        
+        # Deflate compression (raw stream without zlib wrapper)
+        compressor = zlib.compressobj(level=9, method=zlib.DEFLATED, wbits=-15, memLevel=8, strategy=zlib.Z_DEFAULT_STRATEGY)
+        deflated_data = compressor.compress(raw_bytes) + compressor.flush()
+        
+        # 12-byte encryption header: 11 pseudo-random bytes + 1 byte matching (file_crc >> 24) & 0xFF
+        rand_bytes = os.urandom(11)
+        check_byte = bytes([(file_crc >> 24) & 0xFF])
+        header_plain = rand_bytes + check_byte
+        
+        encrypter = create_encrypter()
+        encrypted_header = encrypter(header_plain)
+        encrypted_data = encrypter(deflated_data)
+        
+        payload = encrypted_header + encrypted_data
+        compressed_size = len(payload)
+        
+        local_header_offset = buf.tell()
+        flag_bits = 0x801  # Bit 0 = Encrypted, Bit 11 = UTF-8 string encoding
+        
+        local_header = struct.pack(
+            '<4sHHHHHIIIHH',
+            b'PK\x03\x04',
+            20,             # version needed: 2.0
+            flag_bits,
+            8,              # compression: Deflate
+            dos_time,
+            dos_date,
+            file_crc,
+            compressed_size,
+            uncompressed_size,
+            len(fn_bytes),
+            0
+        ) + fn_bytes
+        
+        buf.write(local_header)
+        buf.write(payload)
+        
+        cd_records.append((
+            flag_bits,
+            dos_time,
+            dos_date,
+            file_crc,
+            compressed_size,
+            uncompressed_size,
+            fn_bytes,
+            local_header_offset
+        ))
+
+    cd_start_offset = buf.tell()
+    
+    for flag_bits, dos_time, dos_date, file_crc, compressed_size, uncompressed_size, fn_bytes, local_header_offset in cd_records:
+        cd_header = struct.pack(
+            '<4sHHHHHHIIIHHHHHII',
+            b'PK\x01\x02',
+            20,                 # version made by (2.0)
+            20,                 # version needed to extract (2.0)
+            flag_bits,
+            8,                  # Deflate
+            dos_time,
+            dos_date,
+            file_crc,
+            compressed_size,
+            uncompressed_size,
+            len(fn_bytes),
+            0,                  # extra field length
+            0,                  # comment length
+            0,                  # disk number
+            0,                  # internal attributes
+            0x81B60020,         # external attributes
+            local_header_offset
+        ) + fn_bytes
+        buf.write(cd_header)
+        
+    cd_end_offset = buf.tell()
+    cd_size = cd_end_offset - cd_start_offset
+    total_entries = len(cd_records)
+    
+    eocd = struct.pack(
+        '<4sHHHHIIH',
+        b'PK\x05\x06',
+        0,
+        0,
+        total_entries,
+        total_entries,
+        cd_size,
+        cd_start_offset,
+        0
+    )
+    buf.write(eocd)
+    
+    return buf.getvalue()
+
+
+def send_final_documents_email(
+    recipient_email: str,
+    recipient_name: str,
+    order_number: str,
+    company_name: str,
+    attachments: list,
+    custom_message: str = None,
+    company_code: str = None,
+    tax_number: str = None,
+    zip_password: str = None,
+    zip_filename: str = None
+):
+    """
+    Send official delivery email with all final deliverable documents packaged into a simple,
+    natively compatible password-protected ZIP file directly to the client.
+    Password format: [Target Company Tax ID / NPWP] + [Company Code] (e.g., 123123A260008).
+    """
+    import io
+    import re
+    from datetime import datetime
+
+    subject = f"PT Mandiri Cipta Solusi - Delivery of Final Documents (Order {order_number})"
+    transmission_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
+    delivery_date = datetime.now().strftime("%d %B %Y")
+
+    # Normalize attachments list
+    normalized_attachments = []
+    for item in attachments:
+        if isinstance(item, tuple) or isinstance(item, list):
+            normalized_attachments.append((item[0], item[1]))
+        elif isinstance(item, dict):
+            normalized_attachments.append((item.get("filename", "document.pdf"), item.get("content", b"")))
+
+    doc_names = [fn for fn, _ in normalized_attachments]
+    doc_count = len(normalized_attachments)
+
+    # Resolve ZIP password
+    effective_tax = (tax_number or "").strip()
+    effective_code = (company_code or "").strip()
+    effective_password = zip_password or (f"{effective_tax}{effective_code}" if effective_tax else effective_code) or "MCSC2026"
+    
+    # Resolve ZIP file name
+    clean_company = re.sub(r'[/\\?%*:|"<> ]', '_', company_name or "Client")
+    final_zip_name = zip_filename or f"{clean_company}_{order_number}_Final_Documents.zip"
+
+    # Build simple, universal Password-Protected ZIP Archive
+    zip_bytes = create_password_protected_zip(normalized_attachments, effective_password)
+    zip_size_kb = round(len(zip_bytes) / 1024, 1) if zip_bytes else 0
+
+    # 1. Plain Text Fallback Body
+    doc_list_text = "\n".join([f"- {fn}" for fn in doc_names])
+    text_body = f"""Dear {recipient_name or 'Valued Client'},
+
+We are pleased to deliver the completed final documents for your service order reference {order_number}.
+
+DELIVERY DETAILS:
+- Company Entity: {company_name or 'N/A'}
+- Order Reference: {order_number}
+- Delivery Date: {delivery_date}
+- Encrypted Delivery Archive: {final_zip_name} ({zip_size_kb} KB)
+- Number of Archived Documents: {doc_count}
+
+PASSWORD PROTECTION INSTRUCTIONS:
+For your privacy and corporate confidentiality, all documents are packaged in a password-protected ZIP archive attached to this email.
+
+To unlock and extract the documents:
+- ZIP Archive Password:
+  Formula: [Target Company Tax ID / NPWP] + [Company Code]
+  Example: If Company Tax ID = 12345 and Company Code = A678910, the password is 12345A678910
+
+DOCUMENTS INCLUDED IN ARCHIVE:
+{doc_list_text if doc_list_text else '- (Final documents included in ZIP archive)'}
+
+{f"Note: {custom_message}" if custom_message else ""}
+
+Please find the password-protected ZIP file attached to this email. You can open and extract it using any standard archive utility (Windows File Explorer, macOS Archive Utility, 7-Zip, or WinRAR).
+
+Regards,
+PT Mandiri Cipta Solusi (MCS Consulting)
+Springhill Office Tower, Lantai 9 Unit 9C, Jakarta, Indonesia
+www.mcsc.co.id
+"""
+
+    # 2. HTML Table for included files inside the ZIP
+    docs_rows_html = ""
+    for idx, fn in enumerate(doc_names, 1):
+        docs_rows_html += f"""
+        <tr>
+          <td style="padding: 9px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #0f172a; font-family: monospace;">
+            &#128196; <strong>{fn}</strong>
+          </td>
+          <td style="padding: 9px 12px; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #0284c7; text-align: right; font-weight: 600; text-transform: uppercase;">
+            Protected in ZIP
+          </td>
+        </tr>
+        """
+
+    # 3. Professional HTML Body
+    html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{subject}</title>
+  <style>
+    body {{
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      background-color: #f8fafc;
+      color: #334155;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }}
+    .wrapper {{
+      width: 100%;
+      background-color: #f8fafc;
+      padding: 30px 10px;
+    }}
+    .container {{
+      max-width: 620px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 14px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }}
+    .header {{
+      background-color: #ffffff;
+      padding: 30px;
+      text-align: center;
+      border-bottom: 1px solid #e2e8f0;
+    }}
+    .content {{
+      padding: 35px 30px;
+    }}
+    .greeting {{
+      font-size: 16px;
+      font-weight: bold;
+      color: #0f172a;
+      margin-bottom: 18px;
+    }}
+    .message {{
+      font-size: 14.5px;
+      line-height: 1.6;
+      color: #475569;
+      margin-bottom: 22px;
+    }}
+    .details-card {{
+      background-color: #f8fafc;
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 22px;
+      border: 1px solid #e2e8f0;
+    }}
+    .details-label {{
+      color: #64748b;
+      font-weight: 550;
+      font-size: 13px;
+    }}
+    .details-value {{
+      color: #0f172a;
+      font-weight: 600;
+      font-size: 13px;
+    }}
+    .security-box {{
+      background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+      border: 1.5px solid #86efac;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 25px;
+    }}
+    .security-title {{
+      color: #166534;
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }}
+    .password-badge {{
+      display: inline-block;
+      background-color: #ffffff;
+      border: 1.5px dashed #16a34a;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 16px;
+      font-weight: 700;
+      color: #15803d;
+      letter-spacing: 1px;
+      margin-top: 8px;
+    }}
+    .docs-table {{
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+    }}
+    .footer {{
+      background-color: #f8fafc;
+      padding: 25px 30px;
+      text-align: center;
+      border-top: 1px solid #f1f5f9;
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }}
+    .footer a {{
+      color: #64748b;
+      text-decoration: underline;
+    }}
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="header">
+        <img src="cid:msc_logo" alt="MCSC Logo" style="height: 50px; width: auto; display: block; margin: 0 auto;">
+      </div>
+      <div class="content">
+        <div class="greeting">Dear {recipient_name or 'Valued Client'},</div>
+        
+        <div class="message">
+          We are pleased to deliver the completed final documents for your service order reference <strong>{order_number}</strong> ({company_name or 'Client Entity'}).
+        </div>
+
+        <!-- SECURITY & PASSWORD CARD -->
+        <div class="security-box">
+          <div class="security-title">
+            &#128274; Password-Protected Deliverables Archive Attached
+          </div>
+          <div style="font-size: 13px; color: #1e293b; line-height: 1.55;">
+            To ensure the highest standard of data privacy and corporate confidentiality, all deliverable documents are encrypted inside the attached file <strong>{final_zip_name}</strong>.
+          </div>
+          
+          <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #bbf7d0; font-size: 12.5px; color: #334155;">
+            <div style="font-weight: 700; color: #166534; margin-bottom: 4px;">ZIP Archive Password:</div>
+            <div style="color: #475569; font-size: 12.5px; margin-bottom: 4px;">
+              Formula: <strong>[Target Company Tax ID / NPWP]</strong> + <strong>[Company Code]</strong>
+            </div>
+            <div style="color: #64748b; font-size: 11.5px; font-style: italic;">
+              Example: If Company Tax ID = 12345 and Company Code = A678910, the password is <span style="font-family: monospace; font-weight: 600; color: #166534;">12345A678910</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- DETAILS CARD -->
+        <div class="details-card">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Order Reference:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right; font-family: monospace;">{order_number}</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Company Entity:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right;">{company_name or 'Client Entity'}</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Delivery Date:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right;">{delivery_date}</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Attached Archive:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right; color: #0284c7; font-family: monospace;">{final_zip_name} ({zip_size_kb} KB)</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 4px;">Archived Files:</td>
+              <td class="details-value" style="padding-bottom: 4px; text-align: right;">{doc_count} document(s)</td>
+            </tr>
+          </table>
+
+          {f'''
+          <table class="docs-table">
+            <thead>
+              <tr style="background-color: #f1f5f9;">
+                <th style="padding: 7px 12px; font-size: 11px; text-transform: uppercase; color: #64748b; text-align: left;">Archived Document File</th>
+                <th style="padding: 7px 12px; font-size: 11px; text-transform: uppercase; color: #64748b; text-align: right;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {docs_rows_html}
+            </tbody>
+          </table>
+          ''' if doc_names else ''}
+        </div>
+        
+        {f'''
+        <div class="details-card" style="margin-top: 15px; margin-bottom: 25px; font-size: 13px; color: #475569; font-style: italic;">
+          <strong style="font-style: normal; color: #0f172a;">Delivery Note:</strong> {custom_message}
+        </div>
+        ''' if custom_message else ''}
+
+        <div class="message" style="margin-bottom: 0;">
+          Please download and unlock the attached ZIP archive for your corporate filing and records.
+        </div>
+      </div>
+      <div class="footer">
+        This is an official document transmission from PT Mandiri Cipta Solusi.<br>
+        Office: Springhill Office Tower, Lantai 9 Unit 9C, Jakarta, Indonesia | <a href="https://www.mcsc.co.id">www.mcsc.co.id</a>
+      </div>
+      <div style="display:none !important; font-size:1px; color:#ffffff; line-height:1px; max-height:0px; max-width:0px; opacity:0; overflow:hidden;">
+        Transmission ID: {transmission_id}
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+    msg = MIMEMultipart("mixed")
+    msg['Subject'] = subject
+
+    # Create the alternative part for text/html
+    alt_part = MIMEMultipart("alternative")
+    alt_part.attach(MIMEText(text_body, 'plain'))
+    alt_part.attach(MIMEText(html_body, 'html'))
+    msg.attach(alt_part)
+
+    # Attach MCSC Logo inline
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    logo_path = os.path.join(base_dir, "public", "logo.png")
+    if os.path.exists(logo_path):
+        from email.mime.image import MIMEImage
+        try:
+            with open(logo_path, "rb") as f:
+                logo_data = f.read()
+                msg_image = MIMEImage(logo_data)
+                msg_image.add_header('Content-ID', '<msc_logo>')
+                msg_image.add_header('Content-Disposition', 'inline', filename="logo.png")
+                msg.attach(msg_image)
+        except Exception as img_err:
+            print("Failed to attach logo inline:", img_err)
+
+    # Attach the password-protected ZIP archive
+    if zip_bytes:
+        from email.mime.application import MIMEApplication
+        zip_part = MIMEApplication(zip_bytes, Name=final_zip_name)
+        zip_part.add_header('Content-Disposition', 'attachment', filename=final_zip_name)
+        msg.attach(zip_part)
+
+    return send_smtp_email(msg, recipient_email, f"encrypted final documents ZIP ({doc_count} files) for order {order_number}")
+
+
+def send_company_welcome_verified_email(
+    recipient_email: str,
+    recipient_name: str,
+    company_name: str,
+    company_code: str,
+    tax_number: str = None,
+    industry: str = None,
+    address: str = None,
+    key_contact_phone: str = None,
+    portal_url: str = None
+) -> bool:
+    """
+    Send an official welcome & verification email to a newly verified company with an embedded
+    unique MCS Corporate ID Card, highlighting the unique Company Code (e.g., A260001) and
+    emphasizing its permanent importance for order tracking, client portal access, and consultant chat.
+    """
+    from datetime import datetime
+    import os
+
+    effective_code = (company_code or "").strip().upper()
+    effective_name = (company_name or "Valued Client").strip()
+    effective_recipient = (recipient_name or "Company Representative").strip()
+    effective_tax = (tax_number or "N/A").strip()
+    effective_industry = (industry or "Corporate Advisory & Business Licensing").strip()
+    effective_address = (address or "Indonesia").strip()
+    
+    frontend_url = portal_url or os.getenv("FRONTEND_URL", "https://www.mcsc.co.id")
+    login_url = f"{frontend_url}/login"
+    track_url = f"{frontend_url}/en/track-order"
+    
+    issued_date = datetime.now().strftime("%d %B %Y")
+    member_since = datetime.now().strftime("%m/%y")
+    transmission_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
+
+    subject = f"Welcome to MCS Group - Official Company Registration & Verified ID [{effective_code}]"
+
+    # 1. Plain Text Fallback Body
+    text_body = f"""Dear {effective_recipient},
+
+Welcome to the MCS Consulting Group!
+
+We are pleased to inform you that your company, {effective_name}, has been officially verified and onboarded into the MCS corporate consulting system.
+
+===================================================================
+MCS CORPORATE IDENTITY - OFFICIAL CLIENT ID CARD
+===================================================================
+Company Entity: {effective_name}
+PERMANENT COMPANY ID: {effective_code}
+Authorized Contact: {effective_recipient}
+Industry: {effective_industry}
+Member Since: {member_since} ({issued_date})
+Status: VERIFIED & ACTIVE
+===================================================================
+
+*** YOUR PERMANENT COMPANY ID [{effective_code}] ***
+Your unique Company ID ({effective_code}) safely links all your corporate records and orders. Please retain this code in your records for:
+
+1. Live Order Tracking & Milestone Updates (at {track_url})
+2. Unified & Secure Data Storage for all your company documents and files
+3. Fast Consultant Assistance whenever you need support
+
+ACCESS YOUR PORTAL:
+You can log in to your dedicated corporate workspace anytime at:
+{login_url}
+
+If you need any assistance, our consulting team is available at:
+- Email: admin@mcsc.co.id
+- WhatsApp: +62-878-7796-7799
+- Office: Springhill Office Tower, Lantai 9 Unit 9C, Jakarta Utara, Indonesia
+
+Warm regards,
+PT Mandiri Cipta Solusi (MCS Consulting)
+Corporate Advisory, Licensing & Compliance Services
+www.mcsc.co.id
+"""
+
+    # 2. Luxury Responsive HTML Email Body with Amex Platinum Look & Feel
+    html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{subject}</title>
+  <style>
+    body {{
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f1f5f9;
+      color: #1e293b;
+      -webkit-font-smoothing: antialiased;
+    }}
+    .wrapper {{
+      width: 100%;
+      background-color: #f1f5f9;
+      padding: 30px 10px;
+    }}
+    .container {{
+      max-width: 640px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      border: 1px solid #e2e8f0;
+    }}
+    .header {{
+      background-color: #ffffff;
+      padding: 30px;
+      text-align: center;
+      border-bottom: 1px solid #e2e8f0;
+    }}
+    .content {{
+      padding: 36px 32px;
+    }}
+    .greeting {{
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 0 0 14px;
+      letter-spacing: -0.3px;
+    }}
+    .message {{
+      font-size: 14px;
+      line-height: 1.65;
+      color: #475569;
+      margin-bottom: 24px;
+    }}
+    
+    /* ==========================================================================
+       LUXURY EXECUTIVE MIDNIGHT TITANIUM CARD (FRESH & ELEGANT)
+       ========================================================================== */
+    .titanium-card-outer {{
+      margin: 30px 0;
+    }}
+    .titanium-card {{
+      background: #0d1527;
+      background: 
+        radial-gradient(circle at 18% 18%, rgba(2, 132, 199, 0.32) 0%, transparent 48%),
+        radial-gradient(circle at 82% 82%, rgba(245, 158, 11, 0.22) 0%, transparent 45%),
+        radial-gradient(circle at 50% 50%, rgba(22, 163, 74, 0.15) 0%, transparent 55%),
+        linear-gradient(145deg, #0b1120 0%, #131c31 45%, #080d1a 100%);
+      border: 1.5px solid rgba(255, 255, 255, 0.22);
+      border-radius: 20px;
+      padding: 38px 36px 30px;
+      color: #ffffff;
+      box-shadow: 
+        inset 0 1px 2px rgba(255, 255, 255, 0.4), 
+        inset 0 -1px 2px rgba(0, 0, 0, 0.8), 
+        0 24px 50px -10px rgba(11, 17, 32, 0.55),
+        0 8px 24px -4px rgba(2, 132, 199, 0.25);
+      position: relative;
+      overflow: hidden;
+    }}
+    .card-emblem-wrap {{
+      text-align: center;
+      margin-bottom: 16px;
+    }}
+    .card-emblem-img {{
+      height: 72px;
+      width: auto;
+      max-width: 110px;
+      display: inline-block;
+      filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.5));
+    }}
+    .card-wing-table {{
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 24px;
+    }}
+    .card-wing-line {{
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    }}
+    .card-wing-text {{
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #f8fafc;
+      text-shadow: 0 1px 3px #000000, 0 0 14px rgba(255, 255, 255, 0.45);
+      text-align: center;
+      white-space: nowrap;
+      padding: 0 14px;
+    }}
+    .card-number-section {{
+      margin: 22px 0 26px;
+      text-align: center;
+    }}
+    .card-number-label {{
+      font-size: 8.5px;
+      font-weight: 800;
+      color: #93c5fd;
+      text-transform: uppercase;
+      letter-spacing: 3.5px;
+      margin-bottom: 6px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    }}
+    .card-number-val {{
+      font-size: 34px;
+      font-weight: 900;
+      letter-spacing: 9px;
+      color: #ffffff;
+      font-family: 'Courier New', 'OCR A Extended', monospace;
+      margin: 0;
+      line-height: 1.1;
+      text-shadow: 0 1px 0 #ffffff, 0 -1px 0 #0f172a, 1px 2px 4px rgba(0, 0, 0, 0.95), 2px 4px 10px rgba(0, 0, 0, 0.9), 0 0 18px rgba(255, 255, 255, 0.7), 0 0 32px rgba(56, 189, 248, 0.45);
+    }}
+
+    /* Card Details Grid */
+    .card-bottom-table {{
+      width: 100%;
+      border-collapse: collapse;
+      border-top: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.6);
+      padding-top: 16px;
+      margin-top: 18px;
+    }}
+    .card-detail-label {{
+      font-size: 8px;
+      font-weight: 800;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      line-height: 1;
+      margin-bottom: 3px;
+    }}
+    .card-detail-val {{
+      font-size: 13.5px;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: 0.5px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 260px;
+    }}
+    .card-detail-val-sub {{
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #cbd5e1;
+    }}
+
+    /* Comforting Member Privileges & Benefits Box */
+    .privilege-box {{
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-top: 3.5px solid #0284c7;
+      border-radius: 14px;
+      padding: 24px 26px;
+      margin: 28px 0;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+    }}
+    .privilege-title {{
+      font-size: 15px;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 0 0 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }}
+    .privilege-intro {{
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: #475569;
+      margin: 0 0 14px;
+    }}
+    .privilege-list {{
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }}
+    .privilege-item {{
+      font-size: 13px;
+      line-height: 1.6;
+      color: #334155;
+      margin-bottom: 10px;
+      padding-left: 24px;
+      position: relative;
+    }}
+    .privilege-item::before {{
+      content: "✓";
+      position: absolute;
+      left: 0;
+      top: 0;
+      color: #0284c7;
+      font-weight: 800;
+      font-size: 14px;
+    }}
+    .privilege-tip {{
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-top: 16px;
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: #475569;
+    }}
+
+    /* Action Buttons */
+    .cta-container {{
+      text-align: center;
+      margin: 32px 0 16px;
+    }}
+    .btn-action-primary {{
+      display: block;
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      color: #ffffff !important;
+      text-decoration: none;
+      padding: 13px 18px;
+      border-radius: 10px;
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 0.3px;
+      text-align: center;
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+      box-sizing: border-box;
+      width: 100%;
+    }}
+    .btn-action-secondary {{
+      display: block;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #ffffff !important;
+      border: 1px solid #334155;
+      text-decoration: none;
+      padding: 13px 18px;
+      border-radius: 10px;
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 0.3px;
+      text-align: center;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.25);
+      box-sizing: border-box;
+      width: 100%;
+    }}
+
+    /* Footer */
+    .footer {{
+      background-color: #f8fafc;
+      border-top: 1px solid #e2e8f0;
+      padding: 24px 30px;
+      text-align: center;
+      font-size: 11.5px;
+      color: #64748b;
+      line-height: 1.6;
+    }}
+    .footer a {{
+      color: #0284c7;
+      text-decoration: none;
+      font-weight: 600;
+    }}
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      
+      <!-- Top Branding Header -->
+      <div class="header">
+        <img src="cid:msc_logo" alt="MCSC Logo" style="height: 50px; width: auto; display: block; margin: 0 auto;">
+      </div>
+
+      <div class="content">
+        <h1 class="greeting">Welcome to the MCS Group, {effective_recipient}!</h1>
+        
+        <div class="message">
+          We are pleased to inform you that <strong>{effective_name}</strong> has been successfully registered, verified, and officially onboarded into the MCS corporate network.
+        </div>
+
+        <!-- ================================================================ -->
+        <!-- MATTE BLACK METAL CARD WITH WHITE LASER ENGRAVINGS               -->
+        <!-- ================================================================ -->
+        <div class="titanium-card-outer">
+          <div class="titanium-card">
+            
+            <!-- Centered Prominent MCS Logo Header -->
+            <div class="card-emblem-wrap">
+              <img src="cid:msc_icon_logo" alt="MCS Logo" class="card-emblem-img">
+            </div>
+
+            <!-- Wing Lines with Centered Corporate Identity Card Subtitle -->
+            <table class="card-wing-table" border="0" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="width: 16%; vertical-align: middle;">
+                  <div class="card-wing-line"></div>
+                </td>
+                <td class="card-wing-text" style="vertical-align: middle;">
+                  CORPORATE IDENTITY CARD
+                </td>
+                <td style="width: 16%; vertical-align: middle;">
+                  <div class="card-wing-line"></div>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Stamped Laser-Engraved Permanent Company ID -->
+            <div class="card-number-section">
+              <div class="card-number-label">Permanent Company ID</div>
+              <div class="card-number-val">{effective_code}</div>
+            </div>
+
+            <!-- Card Bottom Metadata (White Laser-Etched on Black Metal) -->
+            <table class="card-bottom-table" border="0" cellpadding="0" cellspacing="0">
+              <tr>
+                <!-- Left: Corporate Entity & Authorized Contact -->
+                <td style="text-align: left; vertical-align: bottom; width: 65%; padding-top: 10px;">
+                  <div class="card-detail-label">Corporate Entity</div>
+                  <div class="card-detail-val">{effective_name}</div>
+                  <div style="margin-top: 4px;">
+                    <span style="font-size: 8px; letter-spacing: 1.5px; color: #94a3b8; font-weight: 800;">AUTH:</span>
+                    <span class="card-detail-val-sub">{effective_recipient}</span>
+                  </div>
+                </td>
+
+                <!-- Right: Member Since -->
+                <td style="text-align: right; vertical-align: bottom; width: 35%; padding-top: 10px;">
+                  <div class="card-detail-label">Member Since</div>
+                  <div class="card-detail-val" style="font-size: 13.5px; font-weight: 900; color: #ffffff; letter-spacing: 0.5px;">{member_since}</div>
+                </td>
+              </tr>
+            </table>
+
+          </div>
+        </div>
+
+        <!-- COMFORTING MEMBER PRIVILEGES & KEY ACCESS -->
+        <div class="privilege-box">
+          <div class="privilege-title">
+            <span style="font-size: 16px;">✨</span> <strong>Your Permanent Company ID &amp; Order Tracking</strong>
+          </div>
+          <div class="privilege-intro">
+            Your permanent Company ID (<strong>{effective_code}</strong>) keeps all your corporate records and orders unified, secure, and easily accessible:
+          </div>
+          <ul class="privilege-list">
+            <li class="privilege-item"><strong>Live Order Tracking:</strong> Track real-time progress and milestone updates for your ongoing orders anytime.</li>
+            <li class="privilege-item"><strong>Unified &amp; Secure Data:</strong> All your company information and order history are safely stored under your permanent ID.</li>
+            <li class="privilege-item"><strong>Fast Consultant Assistance:</strong> Simply share your Company ID so our consultants can instantly look up your orders and assist you.</li>
+          </ul>
+          <div class="privilege-tip">
+            💡 <strong>Helpful Tip:</strong> Bookmark your order tracking link or keep your Company ID (<strong>{effective_code}</strong>) handy whenever you need to check order status or contact our team.
+          </div>
+        </div>
+
+        <!-- Call To Action (Equal Size Buttons) -->
+        <div class="cta-container">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 500px; margin: 0 auto;">
+            <tr>
+              <td style="width: 50%; padding: 0 6px; vertical-align: middle;">
+                <a href="{track_url}" class="btn-action-primary" target="_blank">Track Order Status &rarr;</a>
+              </td>
+              <td style="width: 50%; padding: 0 6px; vertical-align: middle;">
+                <a href="https://www.mcsc.co.id" class="btn-action-secondary" target="_blank">Visit Our Website &rarr;</a>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="footer">
+        <strong>PT Mandiri Cipta Solusi (MCS Consulting)</strong><br>
+        Springhill Office Tower, Lantai 9 Unit 9C, Jl. Benyamin Sueb Blok D7, Kemayoran, Jakarta Utara 14410<br>
+        WhatsApp: +62-878-7796-7799 &bull; Email: <a href="mailto:admin@mcsc.co.id">admin@mcsc.co.id</a> &bull; Web: <a href="https://www.mcsc.co.id">www.mcsc.co.id</a>
+      </div>
+      
+      <div style="display:none !important; font-size:1px; color:#ffffff; line-height:1px; max-height:0px; max-width:0px; opacity:0; overflow:hidden;">
+        Transmission ID: {transmission_id} | Ref: {effective_code}
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+    msg = MIMEMultipart("mixed")
+    msg['Subject'] = subject
+
+    # Create the alternative part for text/html
+    alt_part = MIMEMultipart("alternative")
+    alt_part.attach(MIMEText(text_body, 'plain'))
+    alt_part.attach(MIMEText(html_body, 'html'))
+    msg.attach(alt_part)
+
+    # Attach MCSC Header Logo inline (<msc_logo>)
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    logo_path = os.path.join(base_dir, "public", "logo.png")
+    if os.path.exists(logo_path):
+        from email.mime.image import MIMEImage
+        try:
+            with open(logo_path, "rb") as f:
+                logo_data = f.read()
+                msg_image = MIMEImage(logo_data)
+                msg_image.add_header('Content-ID', '<msc_logo>')
+                msg_image.add_header('Content-Disposition', 'inline', filename="logo.png")
+                msg.attach(msg_image)
+        except Exception as img_err:
+            print("Failed to attach logo inline:", img_err)
+
+    # Attach MCSC Card Dark Logo inline (<msc_card_logo>)
+    logo_dark_path = os.path.join(base_dir, "public", "logo-dark.png")
+    if os.path.exists(logo_dark_path):
+        from email.mime.image import MIMEImage
+        try:
+            with open(logo_dark_path, "rb") as f:
+                logo_dark_data = f.read()
+                msg_card_image = MIMEImage(logo_dark_data)
+                msg_card_image.add_header('Content-ID', '<msc_card_logo>')
+                msg_card_image.add_header('Content-Disposition', 'inline', filename="logo-dark.png")
+                msg.attach(msg_card_image)
+        except Exception as img_err:
+            print("Failed to attach dark logo inline:", img_err)
+
+    # Attach MCSC Monogram Icon inline (<msc_icon_logo>)
+    icon_path = os.path.join(base_dir, "public", "icon.png")
+    if os.path.exists(icon_path):
+        from email.mime.image import MIMEImage
+        try:
+            with open(icon_path, "rb") as f:
+                icon_data = f.read()
+                msg_icon_image = MIMEImage(icon_data)
+                msg_icon_image.add_header('Content-ID', '<msc_icon_logo>')
+                msg_icon_image.add_header('Content-Disposition', 'inline', filename="icon.png")
+                msg.attach(msg_icon_image)
+        except Exception as img_err:
+            print("Failed to attach icon inline:", img_err)
+
+    return send_smtp_email(msg, recipient_email, f"company welcome & verified ID card email for {effective_name} ({effective_code})")
+
+
+
+
+
+

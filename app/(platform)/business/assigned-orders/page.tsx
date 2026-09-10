@@ -13,6 +13,8 @@ import {
   Clock,
   Users,
   MessageSquare,
+  Lock,
+  AlertCircle,
   X
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -30,13 +32,28 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { DualOrderChatDialog } from "@/components/dual-order-chat-dialog";
+import { useUser } from "@/contexts/user-context";
 
 export default function AssignedOrdersPage() {
+  const router = useRouter();
+  const { isAdmin, hasPermission, loading: userLoading } = useUser();
+  const canView = isAdmin || hasPermission("clients_my", "view");
+
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingStatus, setSavingStatus] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Authorization Check & Redirect
+  useEffect(() => {
+    if (!userLoading && !canView) {
+      toast.error("Access Denied: You do not have permission to access Assigned Orders.");
+      router.replace("/business/dashboard");
+    }
+  }, [userLoading, canView, router]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -254,6 +271,7 @@ export default function AssignedOrdersPage() {
   };
 
   const fetchAssignedOrders = async () => {
+    if (userLoading || !canView) return;
     const activeToken = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
     if (!activeToken) {
       setLoading(false);
@@ -276,6 +294,7 @@ export default function AssignedOrdersPage() {
   };
 
   const fetchMetaData = async () => {
+    if (userLoading || !canView) return;
     const activeToken = localStorage.getItem("hrms_token");
     if (!activeToken) return;
     try {
@@ -291,9 +310,11 @@ export default function AssignedOrdersPage() {
   };
 
   useEffect(() => {
-    fetchAssignedOrders();
-    fetchMetaData();
-  }, []);
+    if (!userLoading && canView) {
+      fetchAssignedOrders();
+      fetchMetaData();
+    }
+  }, [userLoading, canView]);
 
   // Group raw rows by order_number
   const groupedOrdersMap = new Map<string, any>();
@@ -305,6 +326,7 @@ export default function AssignedOrdersPage() {
         client_name: ord.client_name,
         company_name: ord.company_name,
         company_id: ord.company_id,
+        company: ord.company,
         created_at: ord.created_at,
         status: ord.status || "CONFIRMED",
         payment_status: ord.payment_status || "UNPAID",
@@ -369,12 +391,25 @@ export default function AssignedOrdersPage() {
   };
 
   const ALLOWED_EXECUTION_STATUSES = [
+    "CONFIRMED",
     "ORDER_ASSIGNED",
     "IN_PROGRESS",
     "REVIEW_DOCS",
     "FINAL_DOCUMENT_PREPARATION",
     "FINAL_DOC_READY",
+    "WAITING_FOR_FINAL_PAYMENT",
+    "FINAL_PAYMENT_COMPLETED",
+    "SOFT_COPY_DELIVERED",
+    "HARD_COPY_DELIVERED",
     "COMPLETED"
+  ];
+
+  const CONSULTANT_EDITABLE_STATUSES = [
+    "ORDER_ASSIGNED",
+    "IN_PROGRESS",
+    "REVIEW_DOCS",
+    "FINAL_DOCUMENT_PREPARATION",
+    "FINAL_DOC_READY"
   ];
 
   const filteredOrders = groupedOrders.filter(ord => {
@@ -399,23 +434,23 @@ export default function AssignedOrdersPage() {
 
   const getOrderStatusColor = (status: string) => {
     switch (status) {
-      case "COMPLETED": return "bg-emerald-500/15 text-emerald-600 border-emerald-500/30";
-      case "CONFIRMED": return "bg-purple-500/15 text-purple-600 border-purple-500/30";
-      case "DRAFT": return "bg-zinc-500/15 text-zinc-600 border-zinc-500/30";
-      case "CANCELLED": return "bg-destructive/15 text-destructive border-destructive/30";
-      case "PROFORMA_GENERATED": return "bg-cyan-500/15 text-cyan-600 border-cyan-500/30";
-      case "WAITING_ON_CLIENT": return "bg-amber-500/15 text-amber-600 border-amber-500/30";
-      case "ORDER_ASSIGNED": return "bg-indigo-500/15 text-indigo-600 border-indigo-500/30";
-      case "IN_PROGRESS": return "bg-blue-500/15 text-blue-600 border-blue-500/30";
-      case "REVIEW_DOCS": return "bg-teal-500/15 text-teal-600 border-teal-500/30";
-      case "FINAL_DOCUMENT_PREPARATION": return "bg-orange-500/15 text-orange-600 border-orange-500/30";
-      case "FINAL_DOC_READY": return "bg-lime-500/15 text-lime-600 border-lime-500/30";
-      case "INVOICE_GENERATED": return "bg-pink-500/15 text-pink-600 border-pink-500/30";
-      case "WAITING_FOR_FINAL_PAYMENT": return "bg-pink-500/15 text-pink-600 border-pink-500/30";
-      case "FINAL_PAYMENT_COMPLETED": return "bg-emerald-500/15 text-emerald-600 border-emerald-500/30";
-      case "SOFT_COPY_DELIVERED": return "bg-sky-500/15 text-sky-600 border-sky-500/30";
-      case "HARD_COPY_DELIVERED": return "bg-violet-500/15 text-violet-600 border-violet-500/30";
-      default: return "bg-primary/10 text-primary border-primary/20";
+      case "COMPLETED": return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold";
+      case "CONFIRMED": return "bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20 font-bold";
+      case "DRAFT": return "bg-zinc-500/10 dark:bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border-zinc-500/20 font-bold";
+      case "CANCELLED": return "bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/20 font-bold";
+      case "PROFORMA_GENERATED": return "bg-cyan-500/10 dark:bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/20 font-bold";
+      case "WAITING_ON_CLIENT": return "bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20 font-bold";
+      case "ORDER_ASSIGNED": return "bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 font-bold";
+      case "IN_PROGRESS": return "bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/20 font-bold";
+      case "REVIEW_DOCS": return "bg-teal-500/10 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400 border-teal-500/20 font-bold";
+      case "FINAL_DOCUMENT_PREPARATION": return "bg-orange-500/10 dark:bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/20 font-bold";
+      case "FINAL_DOC_READY": return "bg-lime-500/10 dark:bg-lime-500/15 text-lime-600 dark:text-lime-400 border-lime-500/20 font-bold";
+      case "INVOICE_GENERATED": return "bg-pink-500/10 dark:bg-pink-500/15 text-pink-600 dark:text-pink-400 border-pink-500/20 font-bold";
+      case "WAITING_FOR_FINAL_PAYMENT": return "bg-pink-500/10 dark:bg-pink-500/15 text-pink-600 dark:text-pink-400 border-pink-500/20 font-bold";
+      case "FINAL_PAYMENT_COMPLETED": return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold";
+      case "SOFT_COPY_DELIVERED": return "bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/20 font-bold";
+      case "HARD_COPY_DELIVERED": return "bg-violet-500/10 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/20 font-bold";
+      default: return "bg-primary/10 text-primary border-primary/20 font-bold";
     }
   };
 
@@ -423,6 +458,15 @@ export default function AssignedOrdersPage() {
   const inProgressOrdersCount = groupedOrders.filter(o => o.status === "IN_PROGRESS").length;
   const reviewPrepOrdersCount = groupedOrders.filter(o => ["REVIEW_DOCS", "FINAL_DOCUMENT_PREPARATION", "FINAL_DOC_READY"].includes(o.status)).length;
   const completedOrdersCount = groupedOrders.filter(o => o.status === "COMPLETED").length;
+
+  if (userLoading || (!canView && !isAdmin)) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground font-medium">Verifying allocated order permissions...</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -437,78 +481,50 @@ export default function AssignedOrdersPage() {
     <>
       <div className="space-y-6 animate-in fade-in duration-500 w-full max-w-none pb-12">
       
-      {/* Title Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm shrink-0 flex items-center justify-center">
-            <ShoppingCart className="h-6 w-6" />
+      {/* MINIMALIST METRIC RIBBON */}
+      <div className="flex flex-col lg:flex-row items-stretch gap-3 w-full">
+        <div className="grid grid-cols-2 md:grid-cols-4 flex-1 divide-y md:divide-y-0 md:divide-x divide-border/50 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs">
+          <div className="flex items-center gap-3 px-3 py-1.5">
+            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+              <ShoppingCart className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Total Assigned</p>
+              <p className="text-lg font-bold tracking-tight">{totalOrdersCount}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Assigned Client Orders</h1>
-            <p className="text-muted-foreground text-sm">
-              Service orders allocated to you for execution and consulting support. Update job status as work progresses.
-            </p>
+          <div className="flex items-center gap-3 px-3 py-1.5">
+            <div className="p-2 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400">
+              <Receipt className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Review & Prep</p>
+              <p className="text-lg font-bold tracking-tight">{reviewPrepOrdersCount}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-3 py-1.5">
+            <div className="p-2 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
+              <Clock className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">In Progress</p>
+              <p className="text-lg font-bold tracking-tight">{inProgressOrdersCount}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-3 py-1.5">
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Completed Jobs</p>
+              <p className="text-lg font-bold tracking-tight">{completedOrdersCount}</p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
-        {/* Total Assigned Orders */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-500 border border-purple-500/20 shrink-0">
-              <ShoppingCart className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Total Assigned</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{totalOrdersCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* In Review & Prep */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-teal-500/10 text-teal-500 border border-teal-500/20 shrink-0">
-              <Receipt className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Review & Prep</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{reviewPrepOrdersCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* In Progress Orders */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20 shrink-0">
-              <Clock className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">In Progress</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{inProgressOrdersCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Completed Orders */}
-        <Card className="border border-border/40 bg-background/50 backdrop-blur-md shadow-sm">
-          <CardContent className="p-3 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0">
-              <CheckCircle2 className="h-4 w-4" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold truncate">Completed Jobs</p>
-              <h3 className="text-base font-extrabold text-foreground leading-none mt-0.5">{completedOrdersCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Orders List Card */}
-      <Card className="border-border/50 shadow-sm overflow-hidden bg-card/60 backdrop-blur-md">
+      <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
         <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -573,8 +589,26 @@ export default function AssignedOrdersPage() {
                       )}
                     </td>
                     <td className="p-4 text-muted-foreground space-y-1 align-top pt-5">
-                      <div className="text-foreground font-semibold text-sm">
-                        {ord.company_name || "Personal Client"}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-foreground font-semibold text-sm">{ord.company_name || "Personal Client"}</span>
+                        {(() => {
+                          const vStatus = ord.company?.validation_status;
+                          if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
+                            return (
+                              <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 flex items-center gap-0.5" title="Company pending admin validation">
+                                <Clock className="h-2.5 w-2.5" /> Pending Company
+                              </Badge>
+                            );
+                          }
+                          if (vStatus === "NEEDS_REVISION") {
+                            return (
+                              <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 flex items-center gap-0.5" title="Company needs revision">
+                                <AlertCircle className="h-2.5 w-2.5" /> Revision Required
+                              </Badge>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                       <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
                         <Building className="h-3.5 w-3.5 shrink-0" />
@@ -649,19 +683,30 @@ export default function AssignedOrdersPage() {
                       {formatDate(ord.created_at)}
                     </td>
                     <td className="p-4 text-center align-top pt-5">
-                      <select
-                        value={ord.status}
-                        disabled={savingStatus}
-                        onChange={(e) => handleUpdateStatus(ord, e.target.value)}
-                        className={`h-8 px-2.5 py-1 text-xs font-bold rounded-md border shadow-xs bg-background transition-colors cursor-pointer ${getOrderStatusColor(ord.status)}`}
-                      >
-                        <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
-                        <option value="IN_PROGRESS">IN PROGRESS</option>
-                        <option value="REVIEW_DOCS">REVIEW DOCS</option>
-                        <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
-                        <option value="FINAL_DOC_READY">FINAL DOC READY</option>
-                        <option value="COMPLETED">COMPLETED</option>
-                      </select>
+                      {CONSULTANT_EDITABLE_STATUSES.includes((ord.status || "").toUpperCase()) ? (
+                        <select
+                          value={ord.status}
+                          disabled={savingStatus}
+                          onChange={(e) => handleUpdateStatus(ord, e.target.value)}
+                          className={`h-8 px-2.5 py-1 text-xs font-bold rounded-md border shadow-xs bg-background transition-colors cursor-pointer ${getOrderStatusColor(ord.status)}`}
+                        >
+                          <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
+                          <option value="IN_PROGRESS">IN PROGRESS</option>
+                          <option value="REVIEW_DOCS">REVIEW DOCS</option>
+                          <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
+                          <option value="FINAL_DOC_READY">FINAL DOC READY</option>
+                          <option value="COMPLETED">COMPLETED</option>
+                        </select>
+                      ) : ord.status === "COMPLETED" ? (
+                        <Badge variant="outline" className="text-xs font-bold py-1 px-2.5 uppercase shadow-xs whitespace-nowrap bg-emerald-500/15 text-emerald-600 border-emerald-500/30 flex items-center justify-center gap-1 mx-auto">
+                          <Lock className="h-3 w-3 text-emerald-600 shrink-0" />
+                          COMPLETED
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className={`text-xs font-bold py-1 px-2.5 uppercase shadow-xs whitespace-nowrap ${getOrderStatusColor(ord.status)}`}>
+                          {(ord.status || "").replace(/_/g, " ")}
+                        </Badge>
+                      )}
                     </td>
                     <td className="p-4 text-right align-top pt-5">
                       <Button
@@ -824,20 +869,36 @@ export default function AssignedOrdersPage() {
                   
                   {/* Execution Status Selector */}
                   <div className="p-4 rounded-xl border border-border bg-card shadow-xs space-y-3">
-                    <span className="text-muted-foreground font-bold uppercase tracking-wider text-[10px] block">Execution Stage</span>
-                    <select
-                      value={selectedGroup.status}
-                      disabled={savingStatus}
-                      onChange={(e) => handleUpdateStatus(selectedGroup, e.target.value)}
-                      className={`h-9 w-full px-3 text-xs font-bold rounded-lg border shadow-xs bg-background transition-colors cursor-pointer ${getOrderStatusColor(selectedGroup.status)}`}
-                    >
-                      <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
-                      <option value="IN_PROGRESS">IN PROGRESS</option>
-                      <option value="REVIEW_DOCS">REVIEW DOCS</option>
-                      <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
-                      <option value="FINAL_DOC_READY">FINAL DOC READY</option>
-                      <option value="COMPLETED">COMPLETED</option>
-                    </select>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground font-bold uppercase tracking-wider text-[10px] block">Execution Stage</span>
+                      {!CONSULTANT_EDITABLE_STATUSES.includes((selectedGroup.status || "").toUpperCase()) && (
+                        <span className="text-[10px] font-mono text-muted-foreground italic">View-only Stage</span>
+                      )}
+                    </div>
+                    {CONSULTANT_EDITABLE_STATUSES.includes((selectedGroup.status || "").toUpperCase()) ? (
+                      <select
+                        value={selectedGroup.status}
+                        disabled={savingStatus}
+                        onChange={(e) => handleUpdateStatus(selectedGroup, e.target.value)}
+                        className={`h-9 w-full px-3 text-xs font-bold rounded-lg border shadow-xs bg-background transition-colors cursor-pointer ${getOrderStatusColor(selectedGroup.status)}`}
+                      >
+                        <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
+                        <option value="IN_PROGRESS">IN PROGRESS</option>
+                        <option value="REVIEW_DOCS">REVIEW DOCS</option>
+                        <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
+                        <option value="FINAL_DOC_READY">FINAL DOC READY</option>
+                        <option value="COMPLETED">COMPLETED</option>
+                      </select>
+                    ) : selectedGroup.status === "COMPLETED" ? (
+                      <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5 uppercase tracking-wide">
+                        <Lock className="h-3.5 w-3.5" />
+                        COMPLETED (LOCKED)
+                      </div>
+                    ) : (
+                      <div className={`p-2.5 rounded-lg border text-xs font-bold text-center uppercase tracking-wide ${getOrderStatusColor(selectedGroup.status)}`}>
+                        {(selectedGroup.status || "").replace(/_/g, " ")}
+                      </div>
+                    )}
                   </div>
 
                   {/* Team Roster */}
@@ -1001,7 +1062,7 @@ export default function AssignedOrdersPage() {
                 setPendingConfirmGroup(null);
                 setPendingConfirmStatus("");
               }}
-              className="text-xs font-semibold bg-slate-50 hover:bg-slate-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-200 transition-colors"
+              className="text-xs font-semibold"
             >
               Cancel
             </Button>
@@ -1021,151 +1082,16 @@ export default function AssignedOrdersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ORDER CHAT SLIDING PANEL */}
-      <AnimatePresence>
-        {isChatOpen && selectedGroup && (
-          <motion.div
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "tween", ease: "easeInOut", duration: 0.3 }}
-            className="fixed inset-y-0 right-0 z-[70] w-full max-w-lg bg-background border-l border-border shadow-2xl flex flex-col overflow-hidden"
-          >
-            {/* Header */}
-            <div className="p-4 border-b border-border/60 flex items-center justify-between shrink-0 bg-muted/20">
-              <div>
-                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-emerald-600" /> Order Chat
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5 font-mono">
-                  Order #{selectedGroup.order_number} ({selectedGroup.company_name})
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsChatOpen(false)}
-                className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* Chat Messages Log */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/5">
-              {loadingProgress ? (
-                <div className="flex flex-col items-center justify-center h-full py-12 text-muted-foreground gap-2">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  <span className="text-xs">Loading progress chat history...</span>
-                </div>
-              ) : progressUpdates.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full py-12 text-muted-foreground/60 space-y-2">
-                  <MessageSquare className="h-10 w-10 opacity-30" />
-                  <p className="text-xs italic">No messages or progress logs posted yet.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {progressUpdates.map((upd) => (
-                    <div
-                      key={upd.id}
-                      className="flex flex-col gap-1 p-3.5 rounded-2xl border border-border bg-card shadow-xs relative"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-foreground text-xs">{upd.sender_name}</span>
-                        <span className="text-[10px] text-muted-foreground font-mono">
-                          {new Date(upd.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      </div>
-                      <div className="text-muted-foreground whitespace-pre-wrap leading-relaxed text-xs">
-                        {renderMessageContent(upd.message)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Footer Input Area */}
-            <div className="p-4 border-t border-border/60 bg-background shrink-0">
-              <form onSubmit={handlePostProgress} className="space-y-3">
-                <div className="relative">
-                  {showSuggestions && filteredEmployees.length > 0 && (
-                    <div className="absolute bottom-full left-0 mb-2 z-50 w-full max-w-[280px] bg-background border border-border rounded-xl shadow-xl max-h-40 overflow-y-auto divide-y divide-border/40">
-                      {filteredEmployees.map((item) => (
-                        <button
-                          key={`${item.type}-${item.id}`}
-                          type="button"
-                          onClick={() => selectSuggestion(item)}
-                          className="w-full text-left px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground flex items-center gap-2 transition-colors"
-                        >
-                          {item.type === "team" ? (
-                            <div 
-                              className="h-6 w-6 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 border"
-                              style={{ 
-                                backgroundColor: `${item.color || "#10b981"}15`,
-                                color: item.color || "#10b981",
-                                borderColor: `${item.color || "#10b981"}40`
-                              }}
-                            >
-                              <Users className="h-3 w-3" />
-                            </div>
-                          ) : (
-                            <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center font-bold text-[10px] text-primary shrink-0 border border-primary/20">
-                              {item.first_name?.[0] || ""}{item.last_name?.[0] || ""}
-                            </div>
-                          )}
-                          <div className="truncate">
-                            <span className="font-semibold text-foreground">
-                              {item.type === "team" ? item.name : `${item.first_name} ${item.last_name}`}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground block truncate">
-                              {item.type === "team" ? `${item.code} • Work Team` : (item.department?.name || "Finance")}
-                            </span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <textarea
-                    id="chat-textarea"
-                    value={newProgressMessage}
-                    onChange={(e) => handleTextChange(e.target.value, e.target.selectionStart)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && showSuggestions && filteredEmployees.length > 0) {
-                        e.preventDefault();
-                        selectSuggestion(filteredEmployees[0]);
-                      }
-                    }}
-                    rows={3}
-                    className="flex w-full rounded-xl border border-input bg-background px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
-                    placeholder="Write a progress update or tag team members using @..."
-                    required
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsChatOpen(false)}
-                    className="rounded-xl font-bold h-9 px-4 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-900"
-                  >
-                    Close
-                  </Button>
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={postingProgress}
-                    className="px-4 font-bold shadow-md rounded-xl h-9 bg-zinc-900 hover:bg-zinc-100 text-zinc-50 hover:text-zinc-900 border border-zinc-900 dark:bg-zinc-100 dark:hover:bg-zinc-900 dark:text-zinc-950 dark:hover:text-zinc-100 dark:border-zinc-100 transition-all duration-200"
-                  >
-                    {postingProgress ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send Update"}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* DUAL ORDER CHAT DIALOG (SIDE-BY-SIDE CLIENT & INTERNAL CHAT) */}
+      <DualOrderChatDialog
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        orderNumber={selectedGroup?.order_number || null}
+        orderTitle={selectedGroup?.items?.[0]?.job_title}
+        companyName={selectedGroup?.company_name}
+        clientName={selectedGroup?.client_name}
+        orderStatus={selectedGroup?.status}
+      />
 
       {/* VIEW TEAM MEMBERS DIALOG */}
       <Dialog open={!!viewingTeam} onOpenChange={(open) => !open && setViewingTeam(null)}>

@@ -148,100 +148,106 @@ export default function AttendanceSettingsPage() {
   };
 
   if (loading) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs text-muted-foreground font-medium">Loading settings...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!isAdmin) {
-    return <div className="text-center p-10 text-red-500">Access Denied. Admins only.</div>;
+    return (
+      <div className="text-center p-12 bg-background/50 backdrop-blur-md rounded-2xl border border-border/40 max-w-md mx-auto my-12">
+        <p className="text-sm font-semibold text-rose-500">Access Denied. Admins only.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-2xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Attendance Settings</h1>
-        <p className="text-muted-foreground mt-1">Configure Geofencing limits and office coordinates.</p>
-      </div>
-
-      <Card className="border-border/50 shadow-sm relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5 text-primary" /> Office Location Perimeter
+    <div className="space-y-6 animate-in fade-in duration-500 max-w-3xl mx-auto pb-16">
+      <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl relative">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 shrink-0" />
+        <CardHeader className="pt-6">
+          <CardTitle className="text-base font-bold flex items-center gap-2">
+            <Target className="h-4 w-4 text-emerald-500" /> Office Location Perimeter
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs">
             Employees must be within the specified radius in meters of these coordinates to Clock In or Clock Out.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Office Name</label>
-              <Input {...register("office_name")} required />
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold">Office Name</label>
+              <Input {...register("office_name")} required className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50" />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-1">
-                  <MapPin className="h-3 w-3 text-muted-foreground" /> Latitude
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold flex items-center gap-1">
+                  <MapPin className="h-3 w-3 text-emerald-500" /> Latitude
                 </label>
-                <Input type="number" step="any" {...register("latitude")} required />
+                <Input type="number" step="any" {...register("latitude")} required className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50" />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-1">
-                  <MapPin className="h-3 w-3 text-muted-foreground" /> Longitude
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold flex items-center gap-1">
+                  <MapPin className="h-3 w-3 text-emerald-500" /> Longitude
                 </label>
-                <Input type="number" step="any" {...register("longitude")} required />
+                <Input type="number" step="any" {...register("longitude")} required className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50" />
               </div>
             </div>
 
-            <div className="space-y-2 bg-muted/40 p-4 rounded-lg border border-border/50">
-              <label className="text-sm font-medium">Geofence Radius (Meters)</label>
+            <div className="space-y-1.5 bg-muted/20 p-4 rounded-xl border border-border/40">
+              <label className="text-xs font-semibold">Geofence Radius (Meters)</label>
               <div className="flex items-center gap-4">
-                <Input type="number" {...register("radius_meters")} className="w-32" required />
+                <Input type="number" {...register("radius_meters")} className="w-36 h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50" required />
               </div>
             </div>
 
-            <div className="space-y-2 bg-muted/40 p-4 rounded-lg border border-border/50">
-              <div className="flex items-center justify-between">
+            <div className="space-y-3 bg-muted/20 p-4 rounded-xl border border-border/40">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
-                  <label className="text-sm font-medium flex items-center gap-2">
-                    <Wifi className="h-4 w-4 text-primary" /> Allowed Office IP Address (Optional)
+                  <label className="text-xs font-semibold flex items-center gap-1.5">
+                    <Wifi className="h-3.5 w-3.5 text-emerald-500" /> Allowed Office IP Address (Optional)
                   </label>
-                  <p className="text-xs text-muted-foreground mt-1">Restrict clock-ins to a specific Wi-Fi network. Leave blank to disable.</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Restrict clock-ins to a specific Wi-Fi network. Leave blank to disable.</p>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={handleAutoDetectIP}>
+                <Button type="button" variant="outline" size="sm" onClick={handleAutoDetectIP} className="h-8 text-xs rounded-lg border-border/50 cursor-pointer self-start sm:self-auto">
                   Auto-Detect My IP
                 </Button>
               </div>
-              <Input placeholder="e.g. 192.168.1.1 or 203.0.113.45" {...register("allowed_ip_address")} />
+              <Input placeholder="e.g. 192.168.1.1 or 203.0.113.45" {...register("allowed_ip_address")} className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50" />
             </div>
 
-            <Button type="submit" disabled={saving} className="w-full">
-              {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : <><Save className="mr-2 h-4 w-4" /> Save Configuration</>}
+            <Button type="submit" disabled={saving} className="w-full h-10 text-xs font-bold rounded-xl shadow-sm cursor-pointer">
+              {saving ? <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> Saving...</> : <><Save className="mr-2 h-3.5 w-3.5" /> Save Configuration</>}
             </Button>
           </form>
         </CardContent>
       </Card>
 
       {/* General Celebration Settings */}
-      <Card className="border-border/50 shadow-sm relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Gift className="h-5 w-5 text-emerald-500" /> General Celebration Settings
+      <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl relative">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 shrink-0" />
+        <CardHeader className="pt-6">
+          <CardTitle className="text-base font-bold flex items-center gap-2">
+            <Gift className="h-4 w-4 text-emerald-500" /> General Celebration Settings
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs">
             Configure system-wide notifications and automated celebrations.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between p-4 rounded-xl border border-border/50 bg-muted/40">
+          <div className="flex items-center justify-between p-4 rounded-xl border border-border/40 bg-muted/20">
             <div className="space-y-0.5">
-              <label className="text-sm font-semibold flex items-center gap-1.5" htmlFor="notify-birthdays-toggle">
+              <label className="text-xs font-bold flex items-center gap-1.5" htmlFor="notify-birthdays-toggle">
                 Team Birthday Awareness
               </label>
-              <p className="text-xs text-muted-foreground">
-                Notify colleagues when it is an employee's birthday.
+              <p className="text-[11px] text-muted-foreground">
+                Notify colleagues on their dashboard when it is an employee's birthday.
               </p>
             </div>
             <div className="flex items-center gap-2">

@@ -60,24 +60,24 @@ export function BookingSection({ isEmbedded = false }: { isEmbedded?: boolean } 
   return (
     <section className={isEmbedded ? "w-full h-full relative" : "py-8 md:py-12 bg-background overflow-hidden relative"}>
       <div className={isEmbedded ? "w-full h-full relative z-10" : "container mx-auto px-0 md:px-4 lg:px-8 relative z-10"}>
-        <Card className={isEmbedded ? "w-full border-border/50 shadow-sm overflow-hidden relative min-h-[650px] flex flex-col" : "max-w-5xl mx-auto border-border/50 bg-background/50 backdrop-blur-sm shadow-xl overflow-hidden relative min-h-[600px] flex flex-col transition-all duration-300"}>
-          <CardContent className="p-0 flex-grow relative flex flex-col">
+        <Card className={isEmbedded ? "w-full border-0 shadow-none overflow-hidden relative min-h-[calc(100vh-160px)] flex flex-col bg-transparent" : "max-w-5xl mx-auto border-border/50 bg-background/50 backdrop-blur-sm shadow-xl overflow-hidden relative min-h-[600px] flex flex-col transition-all duration-300"}>
+          <CardContent className="p-0 flex-grow relative flex flex-col h-full">
             
             {isLoading && (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm min-h-[400px]">
                 <Loader2 className="h-10 w-10 text-primary animate-spin mb-4" />
                 <p className="text-sm text-muted-foreground font-medium animate-pulse">{t.loading}</p>
               </div>
             )}
 
             {!bookingUrl ? (
-              <div className="flex-grow flex flex-col items-center justify-center p-12 text-center bg-muted/20">
+              <div className="flex-grow flex flex-col items-center justify-center p-12 text-center bg-muted/20 min-h-[400px]">
                 <CalendarClock className="h-16 w-16 text-muted-foreground/30 mb-4" />
                 <h3 className="text-xl font-semibold text-foreground mb-2">Configuration Required</h3>
                 <p className="text-muted-foreground max-w-md">{t.unavailable}</p>
               </div>
             ) : (
-              <div className="w-full h-full flex-grow relative min-h-[650px] md:min-h-[750px] overflow-hidden">
+              <div className="w-full h-full flex-grow relative min-h-[calc(100vh-170px)] overflow-hidden">
                 <iframe
                   src={bookingUrl}
                   width="100%"

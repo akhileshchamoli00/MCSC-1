@@ -33,8 +33,15 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { useUser } from "@/contexts/user-context";
 
 export default function EmployeeChatPage() {
+  const router = useRouter();
+  const { isAdmin, hasPermission, loading: userLoading } = useUser();
+  const canView = isAdmin || hasPermission("chat_client", "view");
+
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConv, setSelectedConv] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -45,6 +52,18 @@ export default function EmployeeChatPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const pathname = usePathname();
+
+  // Authorization Check & Redirect
+  useEffect(() => {
+    if (!userLoading && !canView) {
+      toast.error("Access Denied: You do not have permission to access Client Chat.");
+      if (hasPermission("clients_my", "view")) {
+        router.replace("/business/assigned-orders");
+      } else {
+        router.replace("/business/dashboard");
+      }
+    }
+  }, [userLoading, canView, hasPermission, router]);
 
   // Auto-select conversation from query parameter
   useEffect(() => {
@@ -73,6 +92,7 @@ export default function EmployeeChatPage() {
   const currentUserId = typeof window !== "undefined" ? Number(localStorage.getItem("user_id")) : null;
 
   const fetchConversations = async () => {
+    if (userLoading || !canView) return;
     if (!token) return;
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat/conversations`, {
@@ -95,7 +115,14 @@ export default function EmployeeChatPage() {
     }
   };
 
+  useEffect(() => {
+    if (!userLoading && canView) {
+      fetchConversations();
+    }
+  }, [userLoading, canView]);
+
   const loadMyCompanies = async () => {
+    if (userLoading || !canView) return;
     if (!token) return;
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
@@ -113,7 +140,7 @@ export default function EmployeeChatPage() {
         setMyCompanies(myComps);
       }
     } catch (err) {
-      console.error("Error loading assigned companies:", err);
+      console.error("Error loading client companies:", err);
     }
   };
 
@@ -305,6 +332,15 @@ export default function EmployeeChatPage() {
       setUploading(false);
     }
   };
+
+  if (userLoading || (!canView && !isAdmin)) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground font-medium">Verifying client chat permissions...</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

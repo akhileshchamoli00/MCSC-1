@@ -428,32 +428,68 @@ export default function AccessControlPage() {
   const paginatedAuditLogs = auditLogs.slice(auditLogsStartIndex, auditLogsEndIndex);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto animate-in fade-in duration-500 pb-16">
+    <div className="w-full max-w-none space-y-6 animate-in fade-in duration-500 pb-16">
       
-      {/* Header Banner */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 rounded-2xl border border-primary/10 shadow-sm">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-primary/20 rounded-xl text-primary">
-              <Shield className="h-6 w-6" />
+      {/* Minimalist Stat Ribbon & Tabs Row */}
+      <div className="flex flex-col md:flex-row items-stretch gap-3 w-full">
+        {/* Minimalist Metric Strip - Expanded Horizontally */}
+        <div className="grid grid-cols-2 md:grid-cols-4 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs flex-1 gap-2 sm:gap-0 divide-y md:divide-y-0 md:divide-x divide-border/50">
+          
+          {/* Total Roles */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20 shrink-0">
+              <Shield className="h-4 w-4" />
             </div>
-            <h1 className="text-3xl font-extrabold tracking-tight">Access Control Center</h1>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Total Roles</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{roles.length}</p>
+            </div>
           </div>
-          <p className="text-muted-foreground mt-2 max-w-xl text-sm">
-            Control dynamic system permissions and accessibility for user roles. Adjust visual flags, bulk actions, and view changes instantly.
-          </p>
+
+          {/* Active Role */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/20 shrink-0">
+              <Key className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Active Role</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight truncate">{currentRoleName}</p>
+            </div>
+          </div>
+
+          {/* Modules */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
+              <FolderOpen className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Modules</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{modules.length}</p>
+            </div>
+          </div>
+
+          {/* Audit Logs */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
+              <History className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Audit Logs</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{auditLogs.length}</p>
+            </div>
+          </div>
         </div>
-        
+
         {/* Quick Audit tab trigger */}
-        <div className="flex items-center gap-2">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
-            <TabsList className="bg-muted/80 backdrop-blur-sm border border-border/40">
-              <TabsTrigger value="permissions" className="flex items-center gap-1.5 cursor-pointer">
-                <Key className="w-4 h-4" />
+        <div className="shrink-0 flex items-stretch">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto h-full">
+            <TabsList className="bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 p-1.5 rounded-2xl h-full min-h-[48px] w-full sm:w-auto shadow-xs flex items-center">
+              <TabsTrigger value="permissions" className="rounded-xl px-4 text-xs font-semibold flex items-center gap-1.5 cursor-pointer data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm h-9">
+                <Key className="w-3.5 h-3.5 text-indigo-500" />
                 <span>Permission Matrix</span>
               </TabsTrigger>
-              <TabsTrigger value="audit-logs" className="flex items-center gap-1.5 cursor-pointer">
-                <History className="w-4 h-4" />
+              <TabsTrigger value="audit-logs" className="rounded-xl px-4 text-xs font-semibold flex items-center gap-1.5 cursor-pointer data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm h-9">
+                <History className="w-3.5 h-3.5 text-indigo-500" />
                 <span>Audit Logs</span>
               </TabsTrigger>
             </TabsList>
@@ -463,8 +499,8 @@ export default function AccessControlPage() {
 
       {loadingData ? (
         <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
-          <Loader2 className="h-10 w-10 animate-spin mb-4 text-primary" />
-          <p className="text-lg">Initializing Access Control matrices...</p>
+          <Loader2 className="h-10 w-10 animate-spin mb-4 text-emerald-500" />
+          <p className="text-sm font-medium">Initializing Access Control matrices...</p>
         </div>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -472,27 +508,27 @@ export default function AccessControlPage() {
           <TabsContent value="permissions" className="space-y-6 outline-none">
             
             {/* Top Toolbar Control Card */}
-            <Card className="border-border/40 shadow-sm bg-card/60 backdrop-blur-sm relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-primary/5 rounded-full blur-3xl pointer-events-none -z-10" />
+            <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl relative">
+              <div className="absolute top-0 right-0 w-72 h-72 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none -z-10" />
               <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
                   <span>Role Configuration</span>
                 </CardTitle>
-                <CardDescription>Select a dynamic system role to preview and override access policies.</CardDescription>
+                <CardDescription className="text-xs">Select a dynamic system role to preview and override access policies.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
                   
                   {/* Left: Select box */}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-                    <div className="w-[280px]">
+                    <div className="w-full sm:w-[260px]">
                       <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
-                        <SelectTrigger className="w-full h-11 bg-background/50 border-border/50">
+                        <SelectTrigger className="w-full h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50">
                           <SelectValue placeholder="Select target role" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="rounded-xl border-border/50">
                           {roles.map(role => (
-                            <SelectItem key={role.id} value={role.id.toString()} className="cursor-pointer">
+                            <SelectItem key={role.id} value={role.id.toString()} className="text-xs cursor-pointer">
                               {role.name}
                             </SelectItem>
                           ))}
@@ -503,37 +539,37 @@ export default function AccessControlPage() {
                     {/* Clone dialog trigger */}
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button variant="outline" className="h-11 border-border/50 bg-background/40 hover:bg-muted cursor-pointer">
-                          <Copy className="h-4 w-4 mr-2" /> Clone Permissions
+                        <Button variant="outline" className="h-10 text-xs font-medium rounded-xl border-border/50 bg-background/40 hover:bg-muted cursor-pointer">
+                          <Copy className="h-3.5 w-3.5 mr-2 text-emerald-500" /> Clone Permissions
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-md">
+                      <DialogContent className="sm:max-w-md rounded-2xl border-border/50 bg-background/95 backdrop-blur-xl">
                         <DialogHeader>
-                          <DialogTitle>Clone Access Policies</DialogTitle>
-                          <DialogDescription>
+                          <DialogTitle className="text-lg font-bold">Clone Access Policies</DialogTitle>
+                          <DialogDescription className="text-xs">
                             Copy permissions from another role directly onto <strong className="text-foreground">{currentRoleName}</strong>. This replaces all its current rules.
                           </DialogDescription>
                         </DialogHeader>
                         <div className="py-4">
                           <Select value={cloneSourceId} onValueChange={setCloneSourceId}>
-                            <SelectTrigger className="w-full">
+                            <SelectTrigger className="w-full h-10 text-xs rounded-xl bg-background/70 border-border/50">
                               <SelectValue placeholder="Select source role to copy from" />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="rounded-xl border-border/50">
                               {roles.filter(r => r.id.toString() !== selectedRoleId).map(role => (
-                                <SelectItem key={role.id} value={role.id.toString()} className="cursor-pointer">
+                                <SelectItem key={role.id} value={role.id.toString()} className="text-xs cursor-pointer">
                                   {role.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         </div>
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => setCloneSourceId("")} className="cursor-pointer">
+                        <DialogFooter className="gap-2">
+                          <Button variant="outline" onClick={() => setCloneSourceId("")} className="h-10 text-xs rounded-xl border-border/50 cursor-pointer">
                             Cancel
                           </Button>
-                          <Button onClick={handleClonePermissions} disabled={cloning || !cloneSourceId} className="cursor-pointer">
-                            {cloning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Check className="h-4 w-4 mr-2" />}
+                          <Button onClick={handleClonePermissions} disabled={cloning || !cloneSourceId} className="h-10 text-xs font-bold rounded-xl cursor-pointer">
+                            {cloning ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" /> : <Check className="h-3.5 w-3.5 mr-2" />}
                             Confirm Clone
                           </Button>
                         </DialogFooter>
@@ -545,9 +581,9 @@ export default function AccessControlPage() {
                       variant="destructive" 
                       onClick={handleResetPermissions} 
                       disabled={resetting || !selectedRoleId}
-                      className="h-11 border border-destructive/20 bg-destructive/10 hover:bg-destructive text-destructive hover:text-white transition-all cursor-pointer"
+                      className="h-10 text-xs font-medium rounded-xl cursor-pointer"
                     >
-                      <RotateCcw className="h-4 w-4 mr-2" /> Reset Role
+                      <RotateCcw className="h-3.5 w-3.5 mr-2" /> Reset Role
                     </Button>
                   </div>
 
@@ -556,9 +592,9 @@ export default function AccessControlPage() {
                     <Button 
                       onClick={handleSavePermissions} 
                       disabled={saving || !selectedRoleId} 
-                      className="h-11 shadow-md bg-primary hover:bg-primary/95 text-white transition-transform hover:scale-[1.02] cursor-pointer"
+                      className="h-10 text-xs font-bold rounded-xl shadow-sm cursor-pointer"
                     >
-                      {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                      {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" /> : <Save className="h-3.5 w-3.5 mr-2" />}
                       Save Permissions Matrix
                     </Button>
                   </div>
@@ -569,51 +605,51 @@ export default function AccessControlPage() {
             {/* Matrix Search & Toggle Options */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
               <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/75" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input 
                   placeholder="Filter system modules..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 h-10 border-border/50 bg-card/40 backdrop-blur-sm"
+                  className="pl-9 h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50"
                 />
               </div>
 
               <div className="flex items-center gap-2 justify-end">
-                <Button variant="ghost" size="sm" onClick={expandAll} className="h-9 px-3 text-muted-foreground hover:text-foreground cursor-pointer">
+                <Button variant="ghost" size="sm" onClick={expandAll} className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground cursor-pointer rounded-xl">
                   Expand All
                 </Button>
                 <Separator orientation="vertical" className="h-4" />
-                <Button variant="ghost" size="sm" onClick={collapseAll} className="h-9 px-3 text-muted-foreground hover:text-foreground cursor-pointer">
+                <Button variant="ghost" size="sm" onClick={collapseAll} className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground cursor-pointer rounded-xl">
                   Collapse All
                 </Button>
               </div>
             </div>
 
             {/* Matrix Table */}
-            <Card className="border border-border/30 shadow-md bg-card/30 backdrop-blur-md overflow-hidden">
+            <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
               <div className="overflow-x-auto w-full">
                 <Table className="w-full min-w-[700px]">
-                  <TableHeader className="bg-muted/50 dark:bg-muted/10 border-b border-border/30">
+                  <TableHeader className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="py-4 font-semibold text-foreground text-left pl-6 min-w-[260px]">
+                      <TableHead className="py-3.5 font-semibold text-foreground text-left pl-6 min-w-[260px]">
                         Modules & Sub-Modules
                       </TableHead>
                       {sortedPermissions.map(perm => (
-                        <TableHead key={perm.id} className="py-4 text-center text-xs font-bold text-foreground px-2 min-w-[85px]">
-                          <div className="flex flex-col items-center gap-1.5">
-                            <span className="uppercase tracking-wider text-[11px]">{perm.name}</span>
-                            <div className="flex gap-1">
+                        <TableHead key={perm.id} className="py-3.5 text-center text-[10px] font-bold text-foreground px-2 min-w-[85px]">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="uppercase tracking-wider text-[10px]">{perm.name}</span>
+                            <div className="flex gap-1 text-[9px]">
                               <button 
                                 onClick={() => toggleColumn(perm.id, true)} 
-                                className="text-[10px] text-primary hover:underline hover:text-primary/80 focus:outline-none"
+                                className="text-emerald-600 dark:text-emerald-400 hover:underline font-bold focus:outline-none cursor-pointer"
                                 title={`Grant ${perm.name} for all modules`}
                               >
                                 All
                               </button>
-                              <span className="text-[10px] text-muted-foreground">/</span>
+                              <span className="text-muted-foreground">/</span>
                               <button 
                                 onClick={() => toggleColumn(perm.id, false)} 
-                                className="text-[10px] text-destructive hover:underline hover:text-destructive/80 focus:outline-none"
+                                className="text-rose-600 dark:text-rose-400 hover:underline font-bold focus:outline-none cursor-pointer"
                                 title={`Revoke ${perm.name} from all modules`}
                               >
                                 None
@@ -627,12 +663,12 @@ export default function AccessControlPage() {
                       </TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody className="divide-y divide-border/20">
+                  <TableBody className="divide-y divide-border/20 text-xs">
                     {filteredModulesList.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={sortedPermissions.length + 2} className="text-center py-12 text-muted-foreground">
-                          <ShieldAlert className="w-12 h-12 mx-auto text-muted-foreground/30 mb-2" />
-                          <p className="text-base font-semibold">No modules match your query</p>
+                          <ShieldAlert className="w-10 h-10 mx-auto text-muted-foreground/30 mb-2" />
+                          <p className="text-sm font-semibold">No modules match your query</p>
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -643,54 +679,54 @@ export default function AccessControlPage() {
                         return (
                           <React.Fragment key={module.id}>
                             {/* Parent Module Row */}
-                            <TableRow className="hover:bg-primary/5 transition-colors group/row bg-background/20">
-                              <TableCell className="font-semibold py-4 pl-6 text-foreground">
+                            <TableRow className="hover:bg-muted/40 transition-colors group/row bg-background/20 border-b border-border/30">
+                              <TableCell className="font-semibold py-3 pl-6 text-foreground">
                                 <div className="flex items-center gap-2">
                                   {hasSubs ? (
                                     <button 
                                       onClick={() => toggleExpand(module.id)} 
-                                      className="p-1 hover:bg-muted/80 rounded-lg text-muted-foreground/80 hover:text-foreground transition-all focus:outline-none"
+                                      className="p-1 hover:bg-muted/80 rounded-lg text-muted-foreground/80 hover:text-foreground transition-all focus:outline-none cursor-pointer"
                                     >
-                                      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                      {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                                     </button>
                                   ) : (
-                                    <span className="w-6" />
+                                    <span className="w-5" />
                                   )}
                                   
-                                  <span className="text-slate-400 mr-1 shrink-0">
-                                    {isExpanded ? <FolderOpen className="h-4 w-4 text-primary/60" /> : <Folder className="h-4 w-4 text-muted-foreground/60" />}
+                                  <span className="text-muted-foreground mr-1 shrink-0">
+                                    {isExpanded ? <FolderOpen className="h-4 w-4 text-emerald-500" /> : <Folder className="h-4 w-4 text-muted-foreground" />}
                                   </span>
 
                                   <div className="flex flex-col">
-                                    <span className="text-[14px] leading-tight">{module.name}</span>
-                                    <span className="text-[10px] text-muted-foreground/60 font-mono tracking-tight">{module.code}</span>
+                                    <span className="text-xs font-semibold leading-tight">{module.name}</span>
+                                    <span className="text-[10px] text-muted-foreground font-mono">{module.code}</span>
                                   </div>
                                 </div>
                               </TableCell>
                               
                               {/* Dynamic permission checkboxes */}
                               {sortedPermissions.map(perm => (
-                                <TableCell key={perm.id} className="text-center py-4 px-2">
+                                <TableCell key={perm.id} className="text-center py-3 px-2">
                                   <div className="flex justify-center items-center">
                                     <Checkbox 
                                       checked={isChecked(module.id, perm.id)}
                                       onCheckedChange={(checked) => 
                                         handleCheckboxChange(module.id, perm.id, !!checked)
                                       }
-                                      className="data-[state=checked]:bg-primary cursor-pointer border-muted-foreground/40 hover:border-primary/80"
+                                      className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 border-border/70 rounded-md cursor-pointer"
                                     />
                                   </div>
                                 </TableCell>
                               ))}
 
                               {/* Row shortcuts */}
-                              <TableCell className="text-right py-4 pr-6">
+                              <TableCell className="text-right py-3 pr-6">
                                 <div className="flex justify-end gap-1.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
                                   <Button 
                                     variant="ghost" 
                                     size="sm" 
                                     onClick={() => toggleRow(module, true)} 
-                                    className="h-7 text-[10px] font-bold text-primary hover:text-primary/80 px-2 rounded-md hover:bg-primary/10 cursor-pointer"
+                                    className="h-7 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 px-2 rounded-lg hover:bg-emerald-500/10 cursor-pointer"
                                   >
                                     Enable
                                   </Button>
@@ -698,7 +734,7 @@ export default function AccessControlPage() {
                                     variant="ghost" 
                                     size="sm" 
                                     onClick={() => toggleRow(module, false)} 
-                                    className="h-7 text-[10px] font-bold text-destructive hover:text-destructive/80 px-2 rounded-md hover:bg-destructive/10 cursor-pointer"
+                                    className="h-7 text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 px-2 rounded-lg hover:bg-rose-500/10 cursor-pointer"
                                   >
                                     Disable
                                   </Button>
@@ -708,39 +744,39 @@ export default function AccessControlPage() {
 
                             {/* Sub-module Rows */}
                             {hasSubs && isExpanded && module.sub_modules.map(subMod => (
-                              <TableRow key={subMod.id} className="hover:bg-primary/5 transition-colors group/row border-l-2 border-primary/10">
-                                <TableCell className="py-3 pl-12 text-foreground font-normal">
+                              <TableRow key={subMod.id} className="hover:bg-muted/40 transition-colors group/row border-l-2 border-emerald-500/30 border-b border-border/20">
+                                <TableCell className="py-2.5 pl-12 text-foreground font-normal">
                                   <div className="flex items-center gap-2">
-                                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground/40" />
+                                    <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground/50" />
                                     <div className="flex flex-col">
-                                      <span className="text-[13px] leading-tight font-medium text-foreground/90">{subMod.name}</span>
-                                      <span className="text-[9px] text-muted-foreground/60 font-mono tracking-tight">{subMod.code}</span>
+                                      <span className="text-xs font-medium text-foreground">{subMod.name}</span>
+                                      <span className="text-[10px] text-muted-foreground font-mono">{subMod.code}</span>
                                     </div>
                                   </div>
                                 </TableCell>
 
                                 {/* Dynamic permission checkboxes for sub-module */}
                                 {sortedPermissions.map(perm => (
-                                  <TableCell key={perm.id} className="text-center py-3 px-2">
+                                  <TableCell key={perm.id} className="text-center py-2.5 px-2">
                                     <div className="flex justify-center items-center">
                                       <Checkbox 
                                         checked={isChecked(subMod.id, perm.id)}
                                         onCheckedChange={(checked) => 
                                           handleCheckboxChange(subMod.id, perm.id, !!checked)
                                         }
-                                        className="data-[state=checked]:bg-primary cursor-pointer border-muted-foreground/40 hover:border-primary/80 scale-90"
+                                        className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 border-border/70 rounded-md cursor-pointer scale-90"
                                       />
                                     </div>
                                   </TableCell>
                                 ))}
 
-                                <TableCell className="text-right py-3 pr-6">
+                                <TableCell className="text-right py-2.5 pr-6">
                                   <div className="flex justify-end gap-1.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
                                     <Button 
                                       variant="ghost" 
                                       size="sm" 
                                       onClick={() => toggleRow(subMod, true)} 
-                                      className="h-7 text-[10px] font-bold text-primary hover:text-primary/80 px-2 rounded-md hover:bg-primary/10 cursor-pointer"
+                                      className="h-7 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 px-2 rounded-lg hover:bg-emerald-500/10 cursor-pointer"
                                     >
                                       Enable
                                     </Button>
@@ -748,7 +784,7 @@ export default function AccessControlPage() {
                                       variant="ghost" 
                                       size="sm" 
                                       onClick={() => toggleRow(subMod, false)} 
-                                      className="h-7 text-[10px] font-bold text-destructive hover:text-destructive/80 px-2 rounded-md hover:bg-destructive/10 cursor-pointer"
+                                      className="h-7 text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 px-2 rounded-lg hover:bg-rose-500/10 cursor-pointer"
                                     >
                                       Disable
                                     </Button>
@@ -768,18 +804,18 @@ export default function AccessControlPage() {
 
           {/* AUDIT LOGS TAB CONTENT */}
           <TabsContent value="audit-logs" className="outline-none">
-            <Card className="border border-border/30 bg-card/60 backdrop-blur-md shadow-md">
+            <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
               <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-bold flex items-center gap-2">
-                  <History className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <History className="h-5 w-5 text-emerald-500" />
                   <span>Access Control Audit Trail</span>
                 </CardTitle>
-                <CardDescription>Review historic logging of all roles, assignments, and matrix overrides.</CardDescription>
+                <CardDescription className="text-xs">Review historic logging of all roles, assignments, and matrix overrides.</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto w-full">
                   <Table className="w-full">
-                    <TableHeader className="bg-muted/50 border-b border-border/30">
+                    <TableHeader className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
                       <TableRow>
                         <TableHead className="w-[15%] py-3 pl-6 font-semibold">Log ID</TableHead>
                         <TableHead className="w-[20%] py-3 font-semibold">User / Employee</TableHead>
@@ -787,20 +823,24 @@ export default function AccessControlPage() {
                         <TableHead className="w-[20%] py-3 pr-6 font-semibold text-right">Timestamp</TableHead>
                       </TableRow>
                     </TableHeader>
-                    <TableBody>
+                    <TableBody className="text-xs divide-y divide-border/20">
                       {auditLogs.length === 0 ? (
                         <TableRow>
-                          <td colSpan={4} className="text-center py-12 text-muted-foreground text-sm">
+                          <TableCell colSpan={4} className="text-center py-12 text-muted-foreground text-xs">
                             No permission change logs found.
-                          </td>
+                          </TableCell>
                         </TableRow>
                       ) : (
                         paginatedAuditLogs.map(log => (
-                          <TableRow key={log.id} className="hover:bg-muted/20">
-                            <td className="py-4 pl-6 font-mono text-muted-foreground text-xs">#{log.id}</td>
-                            <td className="py-4 font-semibold text-sm">{log.employee_name}</td>
-                            <td className="py-4 text-muted-foreground text-sm">{log.activity}</td>
-                            <td className="py-4 pr-6 text-right font-mono text-muted-foreground text-xs">
+                          <TableRow key={log.id} className="hover:bg-muted/40 transition-colors">
+                            <TableCell className="py-3 pl-6">
+                              <span className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2.5 py-0.5 rounded-md">
+                                #{log.id}
+                              </span>
+                            </TableCell>
+                            <TableCell className="py-3 font-semibold text-foreground">{log.employee_name}</TableCell>
+                            <TableCell className="py-3 text-muted-foreground">{log.activity}</TableCell>
+                            <TableCell className="py-3 pr-6 text-right font-mono text-muted-foreground text-[11px]">
                               {new Date(log.created_at).toLocaleString("en-US", {
                                 year: "numeric",
                                 month: "short",
@@ -809,7 +849,7 @@ export default function AccessControlPage() {
                                 minute: "2-digit",
                                 second: "2-digit"
                               })}
-                            </td>
+                            </TableCell>
                           </TableRow>
                         ))
                       )}
@@ -818,7 +858,7 @@ export default function AccessControlPage() {
                 </div>
 
                 {auditLogsTotalPages > 1 && (
-                  <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-border/40 bg-muted/10">
                     <div className="text-xs text-muted-foreground">
                       Showing <span className="font-medium text-foreground">{auditLogsStartIndex + 1}</span> to{" "}
                       <span className="font-medium text-foreground">{Math.min(auditLogs.length, auditLogsEndIndex)}</span> of{" "}
@@ -830,7 +870,7 @@ export default function AccessControlPage() {
                         size="sm"
                         onClick={() => setAuditLogsPage(prev => Math.max(1, prev - 1))}
                         disabled={auditLogsPage === 1}
-                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800 animate-none shrink-0"
+                        className="h-8 text-xs rounded-xl bg-background border-border/50 hover:bg-muted shrink-0"
                       >
                         Previous
                       </Button>
@@ -842,7 +882,7 @@ export default function AccessControlPage() {
                         size="sm"
                         onClick={() => setAuditLogsPage(prev => Math.min(auditLogsTotalPages, prev + 1))}
                         disabled={auditLogsPage === auditLogsTotalPages}
-                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800 animate-none shrink-0"
+                        className="h-8 text-xs rounded-xl bg-background border-border/50 hover:bg-muted shrink-0"
                       >
                         Next
                       </Button>

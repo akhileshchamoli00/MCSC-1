@@ -230,106 +230,157 @@ export default function ConsolidatedAttendanceReport() {
     : 0;
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="w-full max-w-none space-y-6 animate-in fade-in duration-500 pb-16">
       
-      {/* Header and Month Controls */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-zinc-950 via-zinc-800 to-zinc-900 dark:from-white dark:via-zinc-200 dark:to-zinc-400 bg-clip-text text-transparent">
-            Consolidated Attendance Report
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Consolidated monthly overview of employee attendance across all departments.
-          </p>
-        </div>
-
-        {/* Date Selector Controls */}
-        <div className="flex items-center gap-2 self-start md:self-auto bg-card border border-border/50 rounded-xl p-1.5 shadow-sm">
-          <Button variant="ghost" size="icon" onClick={handlePrevMonth} className="h-8 w-8 hover:bg-muted/80 rounded-lg">
-            <ArrowLeft className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-          </Button>
-
-          <div className="flex items-center gap-1.5 px-2">
-            <Select
-              value={String(selectedMonth)}
-              onValueChange={(val) => setSelectedMonth(parseInt(val))}
-            >
-              <SelectTrigger className="h-8 w-32 border-none bg-transparent shadow-none hover:bg-muted/50 rounded-lg font-medium text-xs">
-                <SelectValue placeholder="Month" />
-              </SelectTrigger>
-              <SelectContent>
-                {months.map((m) => (
-                  <SelectItem key={m.value} value={String(m.value)} className="text-xs">
-                    {m.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={String(selectedYear)}
-              onValueChange={(val) => setSelectedYear(parseInt(val))}
-            >
-              <SelectTrigger className="h-8 w-24 border-none bg-transparent shadow-none hover:bg-muted/50 rounded-lg font-medium text-xs">
-                <SelectValue placeholder="Year" />
-              </SelectTrigger>
-              <SelectContent>
-                {years.map((y) => (
-                  <SelectItem key={y} value={String(y)} className="text-xs">
-                    {y}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      {/* Minimalist Stat Ribbon & Controls Row */}
+      <div className="flex flex-col md:flex-row items-stretch gap-3 w-full">
+        {/* Minimalist Metric Strip - Expanded Horizontally */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs flex-1 gap-2 sm:gap-0 divide-y md:divide-y-0 md:divide-x divide-border/50">
+          
+          {/* Total Staff */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-500/20 shrink-0">
+              <Users className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Total Staff</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{totalEmployees}</p>
+            </div>
           </div>
 
-          <Button variant="ghost" size="icon" onClick={handleNextMonth} className="h-8 w-8 hover:bg-muted/80 rounded-lg">
-            <ArrowRight className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+          {/* Attendance Rate */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Attendance Rate</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{attendanceRate.toFixed(1)}%</p>
+            </div>
+          </div>
+
+          {/* Late Arrivals */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
+              <Clock className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Late Arrivals</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{overallLate}</p>
+            </div>
+          </div>
+
+          {/* Total Absences */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center border border-rose-500/20 shrink-0">
+              <XCircle className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Total Absences</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{overallAbsent}</p>
+            </div>
+          </div>
+
+          {/* Total Leaves */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20 shrink-0">
+              <CalendarDays className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Total Leaves</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{overallLeave}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Date Selector Controls & Export */}
+        <div className="flex flex-wrap sm:flex-nowrap items-stretch gap-2 shrink-0">
+          <div className="flex items-center gap-1 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-1.5 shadow-xs min-h-[48px]">
+            <Button variant="ghost" size="icon" onClick={handlePrevMonth} className="h-8 w-8 hover:bg-muted rounded-xl cursor-pointer">
+              <ArrowLeft className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+            </Button>
+
+            <div className="flex items-center gap-1 px-1">
+              <Select
+                value={String(selectedMonth)}
+                onValueChange={(val) => setSelectedMonth(parseInt(val))}
+              >
+                <SelectTrigger className="h-8 w-28 border-none bg-transparent shadow-none hover:bg-muted/50 rounded-xl font-semibold text-xs focus:ring-0">
+                  <SelectValue placeholder="Month" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-border/50">
+                  {months.map((m) => (
+                    <SelectItem key={m.value} value={String(m.value)} className="text-xs cursor-pointer">
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={String(selectedYear)}
+                onValueChange={(val) => setSelectedYear(parseInt(val))}
+              >
+                <SelectTrigger className="h-8 w-20 border-none bg-transparent shadow-none hover:bg-muted/50 rounded-xl font-semibold text-xs focus:ring-0">
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-border/50">
+                  {years.map((y) => (
+                    <SelectItem key={y} value={String(y)} className="text-xs cursor-pointer">
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button variant="ghost" size="icon" onClick={handleNextMonth} className="h-8 w-8 hover:bg-muted rounded-xl cursor-pointer">
+              <ArrowRight className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+            </Button>
+          </div>
+
+          <Button 
+            onClick={handleExportCSV} 
+            disabled={!reportData || !reportData.employees || reportData.employees.length === 0}
+            className="h-full min-h-[48px] px-5 text-sm font-bold rounded-2xl gap-2 shadow-sm cursor-pointer shrink-0"
+          >
+            <Download className="w-4 h-4" /> Export CSV
           </Button>
         </div>
-      </div>
-
-      {/* /KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        <KpiCard title="Total Staff" value={totalEmployees} icon={Users} colorTheme="sky" />
-        <KpiCard title="Attendance Rate" value={`${attendanceRate.toFixed(1)}%`} icon={CheckCircle2} colorTheme="emerald" />
-        <KpiCard title="Late Arrivals" value={overallLate} icon={Clock} colorTheme="amber" />
-        <KpiCard title="Total Absences" value={overallAbsent} icon={XCircle} colorTheme="rose" />
-        <KpiCard title="Total Leaves" value={overallLeave} icon={CalendarDays} colorTheme="indigo" />
       </div>
 
       {/* Matrix Table Card */}
       <TooltipProvider delayDuration={150}>
-        <Card className="border-border/50 shadow-sm overflow-hidden bg-card">
-          <CardHeader className="border-b border-border/50 py-3 px-6 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4">
+        <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
+          <CardHeader className="border-b border-border/40 bg-muted/20 py-3.5 px-6 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-1">
-              <CardTitle className="text-base font-bold flex items-center gap-2 whitespace-nowrap">
-                <CalendarDays className="w-5 h-5 text-muted-foreground" />
+              <CardTitle className="text-sm font-bold flex items-center gap-2 whitespace-nowrap">
+                <CalendarDays className="w-4 h-4 text-emerald-500" />
                 Attendance Matrix ({months.find((m) => m.value === selectedMonth)?.label} {selectedYear})
               </CardTitle>
 
               {/* Filters beside the Title */}
               <div className="flex items-center gap-2 max-w-md w-full">
                 <div className="relative flex-1">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <Input
                     placeholder="Search employee..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8 h-8 text-xs bg-background/50"
+                    className="pl-9 h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50"
                   />
                 </div>
 
                 <div className="w-40 sm:w-48">
                   <Select value={selectedDept} onValueChange={setSelectedDept}>
-                    <SelectTrigger className="h-8 text-xs bg-background/50">
+                    <SelectTrigger className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50">
                       <Building2 className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
                       <SelectValue placeholder="All Depts" />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all" className="text-xs">All Departments</SelectItem>
+                    <SelectContent className="rounded-xl border-border/50">
+                      <SelectItem value="all" className="text-xs cursor-pointer">All Departments</SelectItem>
                       {departments.map((dept) => (
-                        <SelectItem key={dept.id} value={String(dept.id)} className="text-xs">
+                        <SelectItem key={dept.id} value={String(dept.id)} className="text-xs cursor-pointer">
                           {dept.name}
                         </SelectItem>
                       ))}
@@ -341,25 +392,25 @@ export default function ConsolidatedAttendanceReport() {
             
             {/* Grid Legend */}
             <div className="hidden xl:flex items-center gap-3.5 text-[11px] font-semibold text-muted-foreground">
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" /> Present (P)
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> Late (L)
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 inline-block" /> Half Day (H)
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" /> Absent (A)
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block" /> Leave (Le)
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-sky-500 inline-block" /> Holiday (Ho)
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-zinc-200 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 inline-block" /> Weekend (We)
               </div>
             </div>
@@ -367,43 +418,43 @@ export default function ConsolidatedAttendanceReport() {
 
           <CardContent className="p-0">
             {loading ? (
-              <div className="p-12 flex flex-col items-center justify-center gap-4">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                <p className="text-xs text-muted-foreground">Loading report records...</p>
+              <div className="p-16 flex flex-col items-center justify-center gap-3">
+                <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-xs text-muted-foreground font-medium">Loading report records...</p>
               </div>
             ) : error ? (
               <div className="p-12 flex flex-col items-center justify-center gap-2 text-rose-500">
                 <AlertCircle className="w-8 h-8" />
                 <p className="text-sm font-semibold">{error}</p>
-                <Button size="sm" variant="outline" onClick={fetchReport} className="mt-2 text-xs">
+                <Button size="sm" variant="outline" onClick={fetchReport} className="mt-2 text-xs rounded-xl border-border/50">
                   Retry
                 </Button>
               </div>
             ) : filteredEmployees.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
-                <Users className="w-8 h-8 text-zinc-300 dark:text-zinc-700" />
-                <p className="text-sm font-medium">No employees found matching the filters.</p>
+              <div className="p-16 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
+                <Users className="w-8 h-8 text-zinc-300 dark:text-zinc-700 opacity-60" />
+                <p className="text-xs font-medium">No employees found matching the filters.</p>
               </div>
             ) : (
               <div className="overflow-x-auto max-w-full">
                 {/* Responsive Matrix Grid */}
                 <table className="w-full text-xs text-left border-collapse">
                   <thead>
-                    <tr className="bg-muted/40 border-b border-border/50">
+                    <tr className="bg-muted/40 border-b border-border/40">
                       {/* Sticky Employee Details Columns */}
-                      <th className="sticky left-0 bg-background/95 backdrop-blur-sm z-20 px-4 py-3 min-w-[200px] border-r border-border/50 font-bold text-muted-foreground uppercase tracking-wider shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                      <th className="sticky left-0 bg-background/95 backdrop-blur-md z-20 px-4 py-3 min-w-[200px] border-r border-border/40 font-bold text-muted-foreground uppercase text-[10px] tracking-wider shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                         Employee
                       </th>
-                      <th className="px-4 py-3 min-w-[50px] border-r border-border/50 text-center font-bold text-muted-foreground uppercase tracking-wider">
+                      <th className="px-4 py-3 min-w-[50px] border-r border-border/40 text-center font-bold text-muted-foreground uppercase text-[10px] tracking-wider">
                         P
                       </th>
-                      <th className="px-4 py-3 min-w-[50px] border-r border-border/50 text-center font-bold text-muted-foreground uppercase tracking-wider">
+                      <th className="px-4 py-3 min-w-[50px] border-r border-border/40 text-center font-bold text-muted-foreground uppercase text-[10px] tracking-wider">
                         L
                       </th>
-                      <th className="px-4 py-3 min-w-[50px] border-r border-border/50 text-center font-bold text-muted-foreground uppercase tracking-wider">
+                      <th className="px-4 py-3 min-w-[50px] border-r border-border/40 text-center font-bold text-muted-foreground uppercase text-[10px] tracking-wider">
                         H
                       </th>
-                      <th className="px-4 py-3 min-w-[50px] border-r border-border/50 text-center font-bold text-muted-foreground uppercase tracking-wider" title="Approved Leaves">
+                      <th className="px-4 py-3 min-w-[50px] border-r border-border/40 text-center font-bold text-muted-foreground uppercase text-[10px] tracking-wider" title="Approved Leaves">
                         Le
                       </th>
                       
@@ -416,25 +467,25 @@ export default function ConsolidatedAttendanceReport() {
                             key={dayNum}
                             className={`px-1 py-2 text-center min-w-[36px] border-r border-border/20 font-bold ${
                               isWeekend 
-                                ? "text-zinc-400 dark:text-zinc-500 bg-zinc-50/50 dark:bg-zinc-900/30" 
+                                ? "text-zinc-400 dark:text-zinc-500 bg-zinc-500/5" 
                                 : "text-muted-foreground"
                             }`}
                           >
                             <span className="block text-[9px] uppercase font-semibold">{dayName}</span>
-                            <span className="block text-xs mt-0.5">{String(dayNum).padStart(2, '0')}</span>
+                            <span className="block text-xs mt-0.5 font-bold">{String(dayNum).padStart(2, '0')}</span>
                           </th>
                         );
                       })}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/40">
+                  <tbody className="divide-y divide-border/20">
                     {filteredEmployees.map((emp: any) => (
-                      <tr key={emp.id} className="hover:bg-muted/10 transition-colors">
+                      <tr key={emp.id} className="hover:bg-muted/30 transition-colors">
                         
                         {/* Sticky Employee Details Cell */}
-                        <td className="sticky left-0 bg-background/95 backdrop-blur-sm z-20 px-4 py-3 border-r border-border/50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                        <td className="sticky left-0 bg-background/95 backdrop-blur-md z-20 px-4 py-3 border-r border-border/40 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                           <div className="flex flex-col">
-                            <span className="font-bold text-foreground truncate max-w-[170px]">
+                            <span className="font-bold text-foreground truncate max-w-[170px] text-xs">
                               {emp.first_name} {emp.last_name}
                             </span>
                             <span className="text-[10px] text-muted-foreground truncate max-w-[170px] mt-0.5 font-medium">
@@ -444,16 +495,16 @@ export default function ConsolidatedAttendanceReport() {
                         </td>
 
                         {/* Summary cells */}
-                        <td className="px-2 py-3 border-r border-border/50 text-center font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50/10">
+                        <td className="px-2 py-3 border-r border-border/40 text-center font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">
                           {emp.summary.present}
                         </td>
-                        <td className="px-2 py-3 border-r border-border/50 text-center font-bold text-amber-600 dark:text-amber-400 bg-amber-50/10">
+                        <td className="px-2 py-3 border-r border-border/40 text-center font-bold text-amber-600 dark:text-amber-400 bg-amber-500/5">
                           {emp.summary.late}
                         </td>
-                        <td className="px-2 py-3 border-r border-border/50 text-center font-bold text-yellow-600 dark:text-yellow-400 bg-yellow-50/10">
+                        <td className="px-2 py-3 border-r border-border/40 text-center font-bold text-yellow-600 dark:text-yellow-400 bg-yellow-500/5">
                           {emp.summary.half_day}
                         </td>
-                        <td className="px-2 py-3 border-r border-border/50 text-center font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50/10">
+                        <td className="px-2 py-3 border-r border-border/40 text-center font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-500/5">
                           {emp.summary.leave}
                         </td>
 
@@ -509,19 +560,19 @@ export default function ConsolidatedAttendanceReport() {
                           return (
                             <td
                               key={day.day}
-                              className={`p-1.5 border-r border-border/20 text-center align-middle`}
+                              className={`p-1 border-r border-border/20 text-center align-middle`}
                             >
                               {status ? (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <button 
-                                      className={`mx-auto flex items-center justify-center rounded-full w-7 h-7 hover:scale-110 active:scale-95 transition-transform duration-200 shadow-sm font-bold text-[10px] cursor-pointer ${cellBg} ${cellText}`}
+                                      className={`mx-auto flex items-center justify-center rounded-full w-6 h-6 hover:scale-110 active:scale-95 transition-transform duration-200 shadow-sm font-bold text-[9px] cursor-pointer ${cellBg} ${cellText}`}
                                     >
                                       {abbreviation}
                                     </button>
                                   </TooltipTrigger>
-                                  <TooltipContent side="top" className="bg-zinc-950 text-white border-none p-3 shadow-xl rounded-xl space-y-1.5 text-xs max-w-[220px]">
-                                    <p className="font-bold text-sky-400 flex items-center gap-1 border-b border-zinc-800 pb-1">
+                                  <TooltipContent side="top" className="bg-zinc-950/95 backdrop-blur-xl text-white border border-border/40 p-3 shadow-2xl rounded-xl space-y-1.5 text-xs max-w-[220px]">
+                                    <p className="font-bold text-emerald-400 flex items-center gap-1 border-b border-zinc-800 pb-1">
                                       <Info className="w-3.5 h-3.5" />
                                       {new Date(day.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                                     </p>
@@ -562,7 +613,7 @@ export default function ConsolidatedAttendanceReport() {
                                   </TooltipContent>
                                 </Tooltip>
                               ) : (
-                                <span className="mx-auto flex items-center justify-center w-7 h-7 text-zinc-300 dark:text-zinc-700 select-none">
+                                <span className="mx-auto flex items-center justify-center w-6 h-6 text-zinc-300 dark:text-zinc-700 select-none">
                                   -
                                 </span>
                               )}

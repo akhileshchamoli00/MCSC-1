@@ -66,22 +66,31 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const setMode = (mode: "hrms" | "business") => {
-    setCurrentModeState(mode);
-    localStorage.setItem("current_mode", mode);
-  };
+  const setMode = React.useCallback((mode: "hrms" | "business") => {
+    setCurrentModeState((prev) => {
+      if (prev !== mode) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("current_mode", mode);
+        }
+        return mode;
+      }
+      return prev;
+    });
+  }, []);
 
-  const setPreferredMode = (mode: "hrms" | "business" | null) => {
+  const setPreferredMode = React.useCallback((mode: "hrms" | "business" | null) => {
     setPreferredModeState(mode);
-    if (mode) {
-      localStorage.setItem("preferred_system", mode);
-    } else {
-      localStorage.removeItem("preferred_system");
+    if (typeof window !== "undefined") {
+      if (mode) {
+        localStorage.setItem("preferred_system", mode);
+      } else {
+        localStorage.removeItem("preferred_system");
+      }
     }
-  };
+  }, []);
 
-  const fetchProfile = async (isBackground = false) => {
-    const token = localStorage.getItem("hrms_token");
+  const fetchProfile = React.useCallback(async (isBackground = false) => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
     if (!token) {
       setProfile(null);
       setIsAdmin(false);
@@ -146,7 +155,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     // 1. Try to load cached session from localStorage to render instantly
@@ -182,7 +191,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     // 2. Fetch fresh details in the background (SWR)
     fetchProfile(hasCache);
-  }, []);
+  }, [fetchProfile]);
 
   // 3. Auto-logout after 30 minutes of user inactivity
   useEffect(() => {
@@ -216,10 +225,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const hasPermission = (moduleCode: string, actionCode: string) => {
+  const hasPermission = React.useCallback((moduleCode: string, actionCode: string) => {
     if (isAdmin) return true;
     return permissions.includes(`${moduleCode}:${actionCode}`) || permissions.includes("*:*");
-  };
+  }, [isAdmin, permissions]);
 
   // Determine allowed modes based on role and permissions
   const roleName = profile?.user?.role?.name || (typeof window !== "undefined" ? localStorage.getItem("user_role") : "") || "";
@@ -265,20 +274,34 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loading, allowedModes, currentMode]);
 
+  const value = React.useMemo(() => ({
+    profile, 
+    isAdmin, 
+    loading, 
+    permissions, 
+    hasPermission, 
+    refreshProfile: fetchProfile,
+    currentMode,
+    setMode,
+    allowedModes,
+    preferredMode,
+    setPreferredMode
+  }), [
+    profile, 
+    isAdmin, 
+    loading, 
+    permissions, 
+    hasPermission, 
+    fetchProfile,
+    currentMode,
+    setMode,
+    allowedModes,
+    preferredMode,
+    setPreferredMode
+  ]);
+
   return (
-    <UserContext.Provider value={{ 
-      profile, 
-      isAdmin, 
-      loading, 
-      permissions, 
-      hasPermission, 
-      refreshProfile: fetchProfile,
-      currentMode,
-      setMode,
-      allowedModes,
-      preferredMode,
-      setPreferredMode
-    }}>
+    <UserContext.Provider value={value}>
       {children}
     </UserContext.Provider>
   );

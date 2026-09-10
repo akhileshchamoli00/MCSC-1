@@ -14,7 +14,10 @@ import {
   Loader2,
   CalendarDays,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Sparkles,
+  Clock,
+  Building2
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -277,58 +280,104 @@ export default function PublicHolidaysPage() {
   const paginatedHolidays = filteredHolidays.slice(startIndex, endIndex);
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Public Holidays</h1>
-          <p className="text-muted-foreground mt-1">Manage national and company public holidays globally.</p>
+    <div className="w-full max-w-none space-y-6 animate-in fade-in duration-500 pb-16">
+      {/* Minimalist Metrics Strip & Action Button Row */}
+      <div className="flex flex-col md:flex-row items-stretch gap-3 w-full">
+        {/* Minimalist Metric Strip - Expanded Horizontally */}
+        <div className="grid grid-cols-2 md:grid-cols-4 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs flex-1 gap-2 sm:gap-0 divide-y md:divide-y-0 md:divide-x divide-border/50">
+          
+          {/* Total Holidays */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center border border-rose-500/20 shrink-0">
+              <CalendarDays className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Total Holidays</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{holidays.length}</p>
+            </div>
+          </div>
+
+          {/* National Days */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">National Days</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{holidays.filter(h => h.holiday_type === "National Holiday").length}</p>
+            </div>
+          </div>
+
+          {/* Joint / Company */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
+              <Building2 className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Joint / Company</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{holidays.filter(h => h.holiday_type === "Joint Leave" || h.holiday_type === "Company Holiday").length}</p>
+            </div>
+          </div>
+
+          {/* Recurring */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
+              <Clock className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Recurring</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{holidays.filter(h => h.recurring).length}</p>
+            </div>
+          </div>
         </div>
-        
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <Button onClick={() => { reset(); setIsAddOpen(true); }} className="gap-2 shadow-lg shadow-primary/20">
-            <Plus className="w-4 h-4" /> Add Holiday
-          </Button>
-        </div>
+
+        {/* Add Holiday Button */}
+        <Button 
+          onClick={() => { reset(); setIsAddOpen(true); }} 
+          className="gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm shrink-0 cursor-pointer"
+        >
+          <Plus className="w-4 h-4" /> Add Holiday
+        </Button>
       </div>
 
-      <div className="bg-card/50 backdrop-blur-xl border border-border/50 rounded-2xl p-6 shadow-sm">
+      <div className="bg-background/50 backdrop-blur-md border border-border/40 rounded-2xl p-6 shadow-sm">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
           <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <Input 
               placeholder="Search holidays..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 bg-background/50 border-border/50 focus:border-primary"
+              className="pl-9 h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50"
             />
           </div>
           
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <Select value={yearFilter} onValueChange={setYearFilter}>
-              <SelectTrigger className="w-[120px] bg-background/50 border-border/50">
+              <SelectTrigger className="w-[120px] h-10 text-xs rounded-xl bg-background/70 border-border/50">
                 <SelectValue placeholder="Year" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Years</SelectItem>
-                <SelectItem value={(new Date().getFullYear() - 1).toString()}>{new Date().getFullYear() - 1}</SelectItem>
-                <SelectItem value={new Date().getFullYear().toString()}>{new Date().getFullYear()}</SelectItem>
-                <SelectItem value={(new Date().getFullYear() + 1).toString()}>{new Date().getFullYear() + 1}</SelectItem>
+              <SelectContent className="rounded-xl border-border/50">
+                <SelectItem value="all" className="text-xs cursor-pointer">All Years</SelectItem>
+                <SelectItem value={(new Date().getFullYear() - 1).toString()} className="text-xs cursor-pointer">{new Date().getFullYear() - 1}</SelectItem>
+                <SelectItem value={new Date().getFullYear().toString()} className="text-xs cursor-pointer">{new Date().getFullYear()}</SelectItem>
+                <SelectItem value={(new Date().getFullYear() + 1).toString()} className="text-xs cursor-pointer">{new Date().getFullYear() + 1}</SelectItem>
               </SelectContent>
             </Select>
 
-            <Tabs value={view} onValueChange={(v: any) => setView(v)} className="w-[120px]">
-              <TabsList className="grid w-full grid-cols-2 h-10">
-                <TabsTrigger value="table"><List className="w-4 h-4" /></TabsTrigger>
-                <TabsTrigger value="calendar"><CalendarIcon className="w-4 h-4" /></TabsTrigger>
+            <Tabs value={view} onValueChange={(v: any) => setView(v)} className="w-[110px]">
+              <TabsList className="grid w-full grid-cols-2 h-10 bg-muted/60 p-1 rounded-xl border border-border/40">
+                <TabsTrigger value="table" className="rounded-lg cursor-pointer"><List className="w-3.5 h-3.5" /></TabsTrigger>
+                <TabsTrigger value="calendar" className="rounded-lg cursor-pointer"><CalendarIcon className="w-3.5 h-3.5" /></TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
         </div>
 
         {loading ? (
-          <div className="py-20 flex flex-col items-center justify-center space-y-4">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            <p className="text-muted-foreground">Loading holidays...</p>
+          <div className="py-20 flex flex-col items-center justify-center space-y-3">
+            <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs text-muted-foreground font-medium">Loading holidays...</p>
           </div>
         ) : (
           <AnimatePresence mode="wait">
@@ -338,87 +387,89 @@ export default function PublicHolidaysPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="rounded-xl border border-border/50 overflow-hidden bg-background/50"
+                className="rounded-2xl border border-border/40 overflow-hidden bg-background/50 backdrop-blur-md"
               >
-                <Table>
-                  <TableHeader className="bg-muted/50">
-                    <TableRow>
-                      <TableHead>Holiday Name</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Day</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Recurring</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredHolidays.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                          No holidays found.
-                        </TableCell>
+                <div className="overflow-x-auto w-full">
+                  <Table className="w-full">
+                    <TableHeader className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="py-3 pl-6">Holiday Name</TableHead>
+                        <TableHead className="py-3">Date</TableHead>
+                        <TableHead className="py-3">Day</TableHead>
+                        <TableHead className="py-3">Type</TableHead>
+                        <TableHead className="py-3">Recurring</TableHead>
+                        <TableHead className="text-right pr-6 py-3">Actions</TableHead>
                       </TableRow>
-                    ) : (
-                      paginatedHolidays.map((holiday) => (
-                        <TableRow key={holiday.id} className="group hover:bg-muted/30 transition-colors">
-                          <TableCell className="font-medium">
-                            {holiday.holiday_name}
-                            {holiday.description && (
-                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{holiday.description}</p>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {new Date(holiday.holiday_date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
-                          </TableCell>
-                          <TableCell>
-                            {new Date(holiday.holiday_date).toLocaleDateString("en-US", { weekday: "long" })}
-                          </TableCell>
-                          <TableCell>
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                              holiday.holiday_type === "National Holiday" 
-                                ? "bg-blue-500/10 text-blue-600 dark:text-blue-400" 
-                                : holiday.holiday_type === "Forced Leave"
-                                  ? "bg-orange-500/10 text-orange-600 dark:text-orange-400"
-                                  : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
-                            }`}>
-                              {holiday.holiday_type}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            {holiday.recurring ? (
-                              <span className="text-emerald-500 font-medium text-xs bg-emerald-500/10 px-2 py-1 rounded-full">Yes (Yearly)</span>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">No</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <span className="sr-only">Open menu</span>
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-40 border-border/50">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => openEdit(holiday)} className="cursor-pointer">
-                                  <Pencil className="mr-2 h-4 w-4" /> Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => openDelete(holiday)} className="text-red-500 focus:text-red-500 cursor-pointer">
-                                  <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                    </TableHeader>
+                    <TableBody className="text-xs divide-y divide-border/20">
+                      {filteredHolidays.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                            No holidays found.
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                      ) : (
+                        paginatedHolidays.map((holiday) => (
+                          <TableRow key={holiday.id} className="group hover:bg-muted/30 transition-colors">
+                            <TableCell className="font-semibold py-3 pl-6 text-foreground">
+                              {holiday.holiday_name}
+                              {holiday.description && (
+                                <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1 font-normal">{holiday.description}</p>
+                              )}
+                            </TableCell>
+                            <TableCell className="py-3 font-mono text-muted-foreground">
+                              {new Date(holiday.holiday_date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                            </TableCell>
+                            <TableCell className="py-3 text-foreground font-medium">
+                              {new Date(holiday.holiday_date).toLocaleDateString("en-US", { weekday: "long" })}
+                            </TableCell>
+                            <TableCell className="py-3">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                                holiday.holiday_type === "National Holiday" 
+                                  ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20" 
+                                  : holiday.holiday_type === "Forced Leave"
+                                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                                    : "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20"
+                              }`}>
+                                {holiday.holiday_type}
+                              </span>
+                            </TableCell>
+                            <TableCell className="py-3">
+                              {holiday.recurring ? (
+                                <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[10px] bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">Yes (Yearly)</span>
+                              ) : (
+                                <span className="text-muted-foreground text-[10px]">No</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right py-3 pr-6">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg hover:bg-muted cursor-pointer">
+                                    <span className="sr-only">Open menu</span>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-40 rounded-xl border-border/50">
+                                  <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => openEdit(holiday)} className="text-xs cursor-pointer">
+                                    <Pencil className="mr-2 h-3.5 w-3.5 text-emerald-500" /> Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => openDelete(holiday)} className="text-xs text-rose-500 focus:text-rose-500 cursor-pointer">
+                                    <Trash2 className="mr-2 h-3.5 w-3.5 text-rose-500" /> Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
 
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-border/40 bg-muted/10">
                     <div className="text-xs text-muted-foreground">
                       Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
                       <span className="font-medium text-foreground">{Math.min(filteredHolidays.length, endIndex)}</span> of{" "}
@@ -430,7 +481,7 @@ export default function PublicHolidaysPage() {
                         size="sm"
                         onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                         disabled={currentPage === 1}
-                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                        className="h-8 text-xs rounded-xl bg-background border-border/50 hover:bg-muted shrink-0"
                       >
                         Previous
                       </Button>
@@ -442,7 +493,7 @@ export default function PublicHolidaysPage() {
                         size="sm"
                         onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                         disabled={currentPage === totalPages}
-                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                        className="h-8 text-xs rounded-xl bg-background border-border/50 hover:bg-muted shrink-0"
                       >
                         Next
                       </Button>
@@ -459,46 +510,46 @@ export default function PublicHolidaysPage() {
                 className="space-y-4"
               >
                 {/* Calendar Navigation Header */}
-                <div className="flex justify-between items-center bg-muted/30 border border-border/50 rounded-xl p-3">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-muted/20 border border-border/40 rounded-2xl p-3.5 sm:px-4">
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={handleGoToday}>Today</Button>
-                    <div className="flex items-center gap-0.5">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrevMonth}>
+                    <Button variant="outline" size="sm" onClick={handleGoToday} className="h-9 text-xs font-semibold rounded-xl border-border/50 cursor-pointer">Today</Button>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl cursor-pointer" onClick={handlePrevMonth}>
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNextMonth}>
+                      <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl cursor-pointer" onClick={handleNextMonth}>
                         <ChevronRight className="h-4 w-4" />
                       </Button>
                     </div>
-                    <span className="text-lg font-semibold text-foreground ml-2">
+                    <span className="text-base font-bold text-foreground ml-2">
                       {monthNames[calMonth]} {calYear}
                     </span>
                   </div>
 
-                  <div className="text-xs text-muted-foreground flex items-center gap-4">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500/20 border border-blue-500/30"></span>
+                  <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-4">
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500/20 border border-blue-500/40"></span>
                       <span>National Holiday</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-orange-500/20 border border-orange-500/30"></span>
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500/20 border border-amber-500/40"></span>
                       <span>Forced Leave</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-purple-500/20 border border-purple-500/30"></span>
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <span className="w-2.5 h-2.5 rounded-full bg-purple-500/20 border border-purple-500/40"></span>
                       <span>Company Holiday</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Days Grid */}
-                <div className="rounded-xl border border-border/50 overflow-hidden bg-background/50">
+                <div className="rounded-2xl border border-border/40 overflow-hidden bg-background/50 backdrop-blur-md shadow-xs">
                   <div className="grid grid-cols-7 border-b border-border/30 bg-muted/30">
                     {weekdayNames.map((day, idx) => (
                       <div 
                         key={day} 
-                        className={`py-2 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground ${
-                          idx === 0 || idx === 6 ? "bg-muted/10" : ""
+                        className={`py-3 text-center text-xs font-bold uppercase tracking-wider text-muted-foreground ${
+                          idx === 0 || idx === 6 ? "bg-muted/10 text-rose-500/80" : ""
                         }`}
                       >
                         {day}
@@ -506,7 +557,7 @@ export default function PublicHolidaysPage() {
                     ))}
                   </div>
 
-                  <div className="grid grid-cols-7 divide-x divide-y divide-border/30">
+                  <div className="grid grid-cols-7 divide-x divide-y divide-border/20">
                     {(() => {
                       const firstDay = new Date(calYear, calMonth, 1);
                       const startDayIdx = firstDay.getDay();
@@ -580,32 +631,32 @@ export default function PublicHolidaysPage() {
                                 }
                               }
                             }}
-                            className={`min-h-[100px] p-2 flex flex-col justify-between transition-colors cursor-pointer hover:bg-muted/10 ${
-                              cell.isCurrentMonth ? "bg-background/20" : "bg-muted/5 opacity-50"
-                            } ${isToday ? "ring-2 ring-primary ring-inset bg-primary/5" : ""}`}
+                            className={`min-h-[140px] xl:min-h-[160px] p-2.5 sm:p-3 flex flex-col justify-between transition-colors cursor-pointer hover:bg-muted/20 ${
+                              cell.isCurrentMonth ? "bg-background/20" : "bg-muted/5 opacity-40"
+                            } ${isToday ? "ring-2 ring-emerald-500 ring-inset bg-emerald-500/5" : ""}`}
                           >
                             <div className="flex justify-between items-start">
-                              <span className={`text-xs font-semibold ${
+                              <span className={`text-sm font-bold ${
                                 cell.isCurrentMonth ? "text-foreground" : "text-muted-foreground"
-                              } ${isToday ? "text-primary" : ""}`}>
+                              } ${isToday ? "text-emerald-600 dark:text-emerald-400" : ""}`}>
                                 {cell.date.getDate()}
                               </span>
                             </div>
 
-                            <div className="space-y-1 mt-2 flex-grow overflow-y-auto max-h-[70px] scrollbar-thin">
+                            <div className="space-y-1.5 mt-2 flex-grow overflow-y-auto max-h-[100px] xl:max-h-[120px] pr-0.5">
                               {cellHolidays.map(h => (
                                 <div 
                                   key={h.id}
-                                  className={`text-[10px] p-1 rounded-lg border leading-tight ${
+                                  className={`text-xs p-1.5 rounded-xl border leading-tight font-semibold shadow-xs ${
                                     h.holiday_type === "National Holiday" 
                                       ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20" 
                                       : h.holiday_type === "Forced Leave"
-                                        ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20"
+                                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
                                         : "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20"
                                   }`}
                                 >
-                                  <div className="font-semibold truncate">{h.holiday_name}</div>
-                                  {h.recurring && <div className="text-[8px] opacity-70 mt-0.5">Yearly</div>}
+                                  <div className="truncate">{h.holiday_name}</div>
+                                  {h.recurring && <div className="text-[9px] opacity-70 mt-0.5 font-normal">Yearly</div>}
                                 </div>
                               ))}
                             </div>
@@ -623,44 +674,45 @@ export default function PublicHolidaysPage() {
 
       {/* ADD DIALOG */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="sm:max-w-[425px] border-border/50 bg-background/95 backdrop-blur-xl">
-          <DialogHeader>
-            <DialogTitle>Add Public Holiday</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="sm:max-w-[440px] rounded-2xl border-border/50 bg-background/95 backdrop-blur-xl shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 shrink-0" />
+          <DialogHeader className="pt-2">
+            <DialogTitle className="text-lg font-bold">Add Public Holiday</DialogTitle>
+            <DialogDescription className="text-xs">
               Create a new public holiday for the organization.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit(onSubmitAdd)} className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="holiday_name">Holiday Name <span className="text-red-500">*</span></Label>
-              <Input id="holiday_name" placeholder="e.g., Eid al-Fitr" {...register("holiday_name")} className="border-border/50 focus:border-primary" />
-              {errors.holiday_name && <p className="text-xs text-red-500">{errors.holiday_name.message}</p>}
+          <form onSubmit={handleSubmit(onSubmitAdd)} className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="holiday_name" className="text-xs font-semibold">Holiday Name <span className="text-destructive">*</span></Label>
+              <Input id="holiday_name" placeholder="e.g., Eid al-Fitr" {...register("holiday_name")} className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50" />
+              {errors.holiday_name && <p className="text-[10px] text-destructive">{errors.holiday_name.message}</p>}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="holiday_date">Date <span className="text-red-500">*</span></Label>
-              <Input id="holiday_date" type="date" {...register("holiday_date")} className="border-border/50 focus:border-primary" />
-              {errors.holiday_date && <p className="text-xs text-red-500">{errors.holiday_date.message}</p>}
+            <div className="space-y-1.5">
+              <Label htmlFor="holiday_date" className="text-xs font-semibold">Date <span className="text-destructive">*</span></Label>
+              <Input id="holiday_date" type="date" {...register("holiday_date")} className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50" />
+              {errors.holiday_date && <p className="text-[10px] text-destructive">{errors.holiday_date.message}</p>}
             </div>
-            <div className="space-y-2">
-              <Label>Type <span className="text-red-500">*</span></Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Type <span className="text-destructive">*</span></Label>
               <Controller
                 name="holiday_type"
                 control={control}
                 render={({ field }) => (
                   <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className="border-border/50">
+                    <SelectTrigger className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="National Holiday">National Holiday</SelectItem>
-                      <SelectItem value="Company Holiday">Company Holiday</SelectItem>
-                      <SelectItem value="Forced Leave">Forced Leave</SelectItem>
+                    <SelectContent className="rounded-xl border-border/50">
+                      <SelectItem value="National Holiday" className="text-xs cursor-pointer">National Holiday</SelectItem>
+                      <SelectItem value="Company Holiday" className="text-xs cursor-pointer">Company Holiday</SelectItem>
+                      <SelectItem value="Forced Leave" className="text-xs cursor-pointer">Forced Leave</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
               />
             </div>
-            <div className="flex items-center space-x-2 pt-2">
+            <div className="flex items-center space-x-2 pt-1">
               <Controller
                 name="recurring"
                 control={control}
@@ -669,28 +721,29 @@ export default function PublicHolidaysPage() {
                     id="recurring" 
                     checked={field.value} 
                     onCheckedChange={field.onChange} 
+                    className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 border-border/70 rounded-md cursor-pointer"
                   />
                 )}
               />
-              <Label htmlFor="recurring" className="font-medium">
+              <Label htmlFor="recurring" className="text-xs font-medium cursor-pointer">
                 Recurring Every Year
               </Label>
             </div>
-            <div className="space-y-2 pt-2">
-              <Label htmlFor="description">Description (Optional)</Label>
+            <div className="space-y-1.5 pt-1">
+              <Label htmlFor="description" className="text-xs font-semibold">Description (Optional)</Label>
               <Textarea 
                 id="description" 
                 placeholder="Add any additional details..." 
-                className="resize-none h-20 border-border/50 focus:border-primary" 
+                className="resize-none h-20 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50" 
                 {...register("description")} 
               />
             </div>
-            <DialogFooter className="pt-4 border-t border-border/30">
-              <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)} disabled={submitting}>
+            <DialogFooter className="pt-3 border-t border-border/40 gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)} disabled={submitting} className="h-10 text-xs rounded-xl border-border/50 cursor-pointer">
                 Cancel
               </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button type="submit" disabled={submitting} className="h-10 text-xs font-bold rounded-xl cursor-pointer">
+                {submitting && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
                 Add Holiday
               </Button>
             </DialogFooter>
@@ -700,42 +753,43 @@ export default function PublicHolidaysPage() {
 
       {/* EDIT DIALOG */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-[425px] border-border/50 bg-background/95 backdrop-blur-xl">
-          <DialogHeader>
-            <DialogTitle>Edit Public Holiday</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="sm:max-w-[440px] rounded-2xl border-border/50 bg-background/95 backdrop-blur-xl shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 shrink-0" />
+          <DialogHeader className="pt-2">
+            <DialogTitle className="text-lg font-bold">Edit Public Holiday</DialogTitle>
+            <DialogDescription className="text-xs">
               Update the details of this public holiday.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit(onSubmitEdit)} className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit_name">Holiday Name <span className="text-red-500">*</span></Label>
-              <Input id="edit_name" {...register("holiday_name")} className="border-border/50 focus:border-primary" />
+          <form onSubmit={handleSubmit(onSubmitEdit)} className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit_name" className="text-xs font-semibold">Holiday Name <span className="text-destructive">*</span></Label>
+              <Input id="edit_name" {...register("holiday_name")} className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit_date">Date <span className="text-red-500">*</span></Label>
-              <Input id="edit_date" type="date" {...register("holiday_date")} className="border-border/50 focus:border-primary" />
+            <div className="space-y-1.5">
+              <Label htmlFor="edit_date" className="text-xs font-semibold">Date <span className="text-destructive">*</span></Label>
+              <Input id="edit_date" type="date" {...register("holiday_date")} className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50" />
             </div>
-            <div className="space-y-2">
-              <Label>Type <span className="text-red-500">*</span></Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Type <span className="text-destructive">*</span></Label>
               <Controller
                 name="holiday_type"
                 control={control}
                 render={({ field }) => (
                   <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className="border-border/50">
+                    <SelectTrigger className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="National Holiday">National Holiday</SelectItem>
-                      <SelectItem value="Company Holiday">Company Holiday</SelectItem>
-                      <SelectItem value="Forced Leave">Forced Leave</SelectItem>
+                    <SelectContent className="rounded-xl border-border/50">
+                      <SelectItem value="National Holiday" className="text-xs cursor-pointer">National Holiday</SelectItem>
+                      <SelectItem value="Company Holiday" className="text-xs cursor-pointer">Company Holiday</SelectItem>
+                      <SelectItem value="Forced Leave" className="text-xs cursor-pointer">Forced Leave</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
               />
             </div>
-            <div className="flex items-center space-x-2 pt-2">
+            <div className="flex items-center space-x-2 pt-1">
               <Controller
                 name="recurring"
                 control={control}
@@ -744,27 +798,28 @@ export default function PublicHolidaysPage() {
                     id="edit_recurring" 
                     checked={field.value} 
                     onCheckedChange={field.onChange} 
+                    className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 border-border/70 rounded-md cursor-pointer"
                   />
                 )}
               />
-              <Label htmlFor="edit_recurring" className="font-medium">
+              <Label htmlFor="edit_recurring" className="text-xs font-medium cursor-pointer">
                 Recurring Every Year
               </Label>
             </div>
-            <div className="space-y-2 pt-2">
-              <Label htmlFor="edit_desc">Description (Optional)</Label>
+            <div className="space-y-1.5 pt-1">
+              <Label htmlFor="edit_desc" className="text-xs font-semibold">Description (Optional)</Label>
               <Textarea 
                 id="edit_desc" 
-                className="resize-none h-20 border-border/50 focus:border-primary" 
+                className="resize-none h-20 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50" 
                 {...register("description")} 
               />
             </div>
-            <DialogFooter className="pt-4 border-t border-border/30">
-              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)} disabled={submitting}>
+            <DialogFooter className="pt-3 border-t border-border/40 gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)} disabled={submitting} className="h-10 text-xs rounded-xl border-border/50 cursor-pointer">
                 Cancel
               </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button type="submit" disabled={submitting} className="h-10 text-xs font-bold rounded-xl cursor-pointer">
+                {submitting && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
                 Save Changes
               </Button>
             </DialogFooter>
@@ -774,22 +829,23 @@ export default function PublicHolidaysPage() {
 
       {/* DELETE DIALOG */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <DialogContent className="sm:max-w-[425px] border-red-500/20 bg-background/95 backdrop-blur-xl">
-          <DialogHeader>
-            <DialogTitle className="text-red-500 flex items-center gap-2">
+        <DialogContent className="sm:max-w-[425px] rounded-2xl border-rose-500/20 bg-background/95 backdrop-blur-xl shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-red-600 shrink-0" />
+          <DialogHeader className="pt-2">
+            <DialogTitle className="text-rose-600 dark:text-rose-400 flex items-center gap-2 font-bold text-lg">
               <AlertTriangle className="w-5 h-5" />
               Delete Holiday
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs">
               Are you sure you want to delete <span className="font-semibold text-foreground">{selectedHoliday?.holiday_name}</span>? This action cannot be undone and may affect future payroll and leave calculations.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="pt-4 mt-2">
-            <Button variant="outline" onClick={() => setIsDeleteOpen(false)} disabled={submitting}>
+          <DialogFooter className="pt-3 border-t border-border/40 gap-2">
+            <Button variant="outline" onClick={() => setIsDeleteOpen(false)} disabled={submitting} className="h-10 text-xs rounded-xl border-border/50 cursor-pointer">
               Cancel
             </Button>
-            <Button variant="destructive" onClick={onDelete} disabled={submitting}>
-              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button variant="destructive" onClick={onDelete} disabled={submitting} className="h-10 text-xs font-bold rounded-xl cursor-pointer">
+              {submitting && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
               Delete
             </Button>
           </DialogFooter>
@@ -798,33 +854,34 @@ export default function PublicHolidaysPage() {
 
       {/* DAY DETAILS DIALOG */}
       <Dialog open={!!selectedHolidayDetails} onOpenChange={(open) => !open && setSelectedHolidayDetails(null)}>
-        <DialogContent className="sm:max-w-[425px] border-border/50 bg-background/95 backdrop-blur-xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold flex items-center gap-2">
-              <CalendarIcon className="w-5 h-5 text-primary" />
+        <DialogContent className="sm:max-w-[440px] rounded-2xl border-border/50 bg-background/95 backdrop-blur-xl shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 shrink-0" />
+          <DialogHeader className="pt-2">
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <CalendarIcon className="w-4 h-4 text-emerald-500" />
               {selectedHolidayDetails && new Date(selectedHolidayDetails.date).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs">
               Holidays scheduled for this day.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-3 py-3">
             {selectedHolidayDetails?.holidays.map(h => (
-              <div key={h.id} className="p-4 rounded-xl border border-border/50 bg-muted/20 space-y-2">
+              <div key={h.id} className="p-3.5 rounded-xl border border-border/40 bg-muted/20 space-y-2">
                 <div className="flex justify-between items-start gap-2">
-                  <h4 className="font-bold text-foreground">{h.holiday_name}</h4>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                  <h4 className="font-bold text-foreground text-xs">{h.holiday_name}</h4>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                     h.holiday_type === "National Holiday" 
-                      ? "bg-blue-500/10 text-blue-600 dark:text-blue-400" 
+                      ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20" 
                       : h.holiday_type === "Forced Leave"
-                        ? "bg-orange-500/10 text-orange-600 dark:text-orange-400"
-                        : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                        : "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20"
                   }`}>
                     {h.holiday_type}
                   </span>
                 </div>
-                {h.description && <p className="text-sm text-muted-foreground">{h.description}</p>}
-                <div className="text-xs text-muted-foreground flex items-center gap-2">
+                {h.description && <p className="text-xs text-muted-foreground">{h.description}</p>}
+                <div className="text-[11px] text-muted-foreground flex items-center gap-2">
                   <span>Recurring: {h.recurring ? "Yes (Yearly)" : "No"}</span>
                 </div>
                 
@@ -841,24 +898,24 @@ export default function PublicHolidaysPage() {
                             <Button 
                               size="sm" 
                               variant="outline" 
-                              className="h-8 gap-1.5" 
+                              className="h-8 text-xs rounded-lg gap-1.5 border-border/50 cursor-pointer" 
                               onClick={() => {
                                 setSelectedHolidayDetails(null);
                                 openEdit(h);
                               }}
                             >
-                              <Pencil className="w-3.5 h-3.5" /> Edit
+                              <Pencil className="w-3 h-3 text-emerald-500" /> Edit
                             </Button>
                             <Button 
                               size="sm" 
-                              variant="destructive" 
-                              className="h-8 gap-1.5" 
+                              variant="outline" 
+                              className="h-8 text-xs rounded-lg gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 cursor-pointer" 
                               onClick={() => {
                                 setSelectedHolidayDetails(null);
                                 openDelete(h);
                               }}
                             >
-                              <Trash2 className="w-3.5 h-3.5" /> Delete
+                              <Trash2 className="w-3 h-3" /> Delete
                             </Button>
                           </div>
                         );
@@ -870,8 +927,8 @@ export default function PublicHolidaysPage() {
               </div>
             ))}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedHolidayDetails(null)}>
+          <DialogFooter className="border-t border-border/40 pt-3">
+            <Button variant="outline" onClick={() => setSelectedHolidayDetails(null)} className="h-10 text-xs rounded-xl border-border/50 cursor-pointer">
               Close
             </Button>
           </DialogFooter>

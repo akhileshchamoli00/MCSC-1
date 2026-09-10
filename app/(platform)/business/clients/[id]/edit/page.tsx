@@ -15,6 +15,8 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
+import { EmailInput } from "@/components/ui/email-input";
 import {
   ArrowLeft,
   Building,
@@ -28,7 +30,10 @@ import {
   Save,
   ShieldAlert,
   ExternalLink,
-  Edit2
+  Edit2,
+  ShieldCheck,
+  Clock,
+  AlertTriangle
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -111,6 +116,19 @@ export default function EditClientPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !clientId) return;
+
+    if (!editForm.email || !isValidEmail(editForm.email)) {
+      setError("Please provide a valid email address (e.g. contact@domain.com).");
+      toast.error("Please provide a valid email address.");
+      return;
+    }
+
+    if (editForm.phone && !isValidPhoneNumber(editForm.phone)) {
+      setError("Please provide a valid phone number (6 to 15 digits).");
+      toast.error("Please provide a valid phone number.");
+      return;
+    }
+
     setSaving(true);
     setError(null);
     setSuccess(null);
@@ -220,18 +238,21 @@ export default function EditClientPage() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto pb-12">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/50 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-4">
         <div className="flex items-center gap-4">
           <Link href="/business/clients">
-            <Button variant="ghost" size="icon" className="rounded-full">
+            <Button variant="ghost" size="icon" className="rounded-xl">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
+          <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 shadow-sm shrink-0 flex items-center justify-center">
+            <User className="h-6 w-6" />
+          </div>
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight">{editForm.contact_person || "Edit Client"}</h1>
               {clientData?.client_code && (
-                <Badge variant="outline" className="font-mono text-sm font-bold bg-primary/10 border-primary/20 text-primary">
+                <Badge variant="outline" className="font-mono text-xs font-bold bg-zinc-100 dark:bg-white/5 border-border/50 text-zinc-800 dark:text-zinc-200 rounded-md">
                   {clientData.client_code}
                 </Badge>
               )}
@@ -249,14 +270,14 @@ export default function EditClientPage() {
           <Button
             variant="outline"
             onClick={handleToggleStatus}
-            className="text-xs"
+            className="text-xs rounded-xl h-10 font-bold"
           >
             {clientData?.status === "ACTIVE" ? "Disable Client Account" : "Activate Client Account"}
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={saving}
-            className="gap-2 font-semibold shadow-md"
+            className="gap-2 font-bold shadow-sm rounded-xl h-10 px-4"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Save Changes
@@ -314,26 +335,22 @@ export default function EditClientPage() {
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium" htmlFor="email">Email Address *</label>
-                    <Input
+                    <EmailInput
                       id="email"
-                      name="email"
-                      type="email"
                       value={editForm.email}
-                      onChange={handleInputChange}
+                      onChange={(val) => setEditForm((prev) => ({ ...prev, email: val }))}
                       required
-                      placeholder="e.g. contact@domain.com"
+                      placeholder="contact@domain.com"
                     />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium" htmlFor="phone">Phone Number</label>
-                    <Input
+                    <PhoneInput
                       id="phone"
-                      name="phone"
-                      type="tel"
                       value={editForm.phone}
-                      onChange={handleInputChange}
-                      placeholder="e.g. +62 812 3456 789"
+                      onChange={(val) => setEditForm((prev) => ({ ...prev, phone: val }))}
+                      placeholder="812 3456 789"
                     />
                   </div>
 
@@ -418,7 +435,7 @@ export default function EditClientPage() {
                   <CardTitle>Associated Corporate Accounts</CardTitle>
                   <CardDescription>Corporate entities managed under this client representative.</CardDescription>
                 </div>
-                <Link href={`/clients/companies/new?client_id=${clientId}`}>
+                <Link href={`/business/clients/companies/new?client_id=${clientId}`}>
                   <Button size="sm" className="gap-2">
                     <Plus className="h-4 w-4" /> Add New Company
                   </Button>
@@ -437,10 +454,27 @@ export default function EditClientPage() {
                       <div key={company.id} className="p-4 rounded-xl border border-border/60 bg-muted/20 space-y-3 hover:border-primary/40 transition-colors">
                         <div className="flex items-start justify-between">
                           <div>
-                            <h4 className="font-bold text-base text-foreground">{company.company_name}</h4>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-bold text-base text-foreground">{company.company_name}</h4>
+                              {company.validation_status === "VALIDATED" && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                  <ShieldCheck className="h-3 w-3" /> Verified
+                                </span>
+                              )}
+                              {company.validation_status === "PENDING_VALIDATION" && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                                  <Clock className="h-3 w-3" /> Pending Review
+                                </span>
+                              )}
+                              {company.validation_status === "NEEDS_REVISION" && (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
+                                  <AlertTriangle className="h-3 w-3" /> Needs Revision
+                                </span>
+                              )}
+                            </div>
                             <span className="font-mono text-xs text-primary font-semibold">Code: {company.company_code}</span>
                           </div>
-                          <Link href={`/clients/companies/${company.id}`}>
+                          <Link href={`/business/clients/companies/${company.id}`}>
                             <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs">
                               <Edit2 className="h-3.5 w-3.5" /> Edit Company
                             </Button>

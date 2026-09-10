@@ -236,317 +236,379 @@ export default function EmployeeProfilePage() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto pb-10">
-      <div className="flex items-center gap-4">
+    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
+      {/* Top Back Action Bar */}
+      <div className="flex items-center justify-between gap-4">
         <Link href="/hrms/employees">
-          <Button variant="ghost" size="icon" className="rounded-full"><ArrowLeft className="h-5 w-5" /></Button>
+          <Button variant="outline" size="sm" className="rounded-xl gap-2 h-9 px-3.5 text-xs font-semibold bg-card/60 backdrop-blur-md border-border/50 shadow-xs hover:bg-muted cursor-pointer">
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to Employees
+          </Button>
         </Link>
-        <h1 className="text-3xl font-bold tracking-tight">Employee Profile</h1>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Summary Card */}
-        <div className="md:col-span-1 space-y-6">
-          <Card className="border-border/50 shadow-sm overflow-hidden sticky top-24">
-            <div className="h-24 bg-primary/10 w-full relative">
-              <Link href={`/hrms/employees/${employee.id}/edit`}>
-                <Button variant="ghost" size="icon" className="absolute top-2 right-2 bg-background/50 backdrop-blur-sm rounded-full h-8 w-8 hover:bg-background/80">
-                  <Edit className="h-4 w-4" />
-                </Button>
-              </Link>
-            </div>
-            <CardContent className="pt-0 relative">
-              <div className="absolute -top-12 left-6 h-24 w-24 rounded-full border-4 border-card bg-primary flex items-center justify-center text-3xl font-bold text-primary-foreground shadow-sm overflow-hidden group">
+        <div className="lg:col-span-4 xl:col-span-3 space-y-6">
+          <Card className="rounded-2xl border-border/40 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md p-5 shadow-sm sticky top-24">
+            <div className="flex flex-col items-start text-left">
+              {/* Profile Photo */}
+              <div className="relative group shrink-0">
                 {employee.profile_photo ? (
-                  <img src={resolveImageUrl(employee.profile_photo)} alt="Profile" className="h-full w-full object-cover" />
+                  <img
+                    src={resolveImageUrl(employee.profile_photo)}
+                    alt={`${employee.first_name} ${employee.last_name}`}
+                    className="h-24 w-24 rounded-2xl object-cover border border-white/10 shadow-md bg-background"
+                  />
                 ) : (
-                  `${employee.first_name?.[0] || ""}${employee.last_name?.[0] || ""}`
+                  <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500 font-bold text-2xl border border-emerald-500/20 shadow-md">
+                    {employee.first_name?.[0] || ""}{employee.last_name?.[0] || ""}
+                  </div>
                 )}
-                
-                {/* Photo Upload Overlay */}
-                <div 
-                  className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
-                  onClick={() => photoInputRef.current?.click()}
-                >
-                  {uploadingPhoto ? <Loader2 className="h-6 w-6 animate-spin text-white" /> : <Camera className="h-6 w-6 text-white" />}
-                </div>
-                <input 
-                  type="file" 
-                  ref={photoInputRef} 
-                  className="hidden" 
-                  accept="image/*" 
-                  onChange={handlePhotoUpload} 
+                <input
+                  type="file"
+                  ref={photoInputRef}
+                  onChange={handlePhotoUpload}
+                  className="hidden"
+                  accept="image/*"
                 />
+                <button
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 rounded-2xl transition-opacity text-white text-xs font-semibold gap-1.5 cursor-pointer"
+                  title="Upload Profile Photo"
+                >
+                  {uploadingPhoto ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-white" />
+                  ) : (
+                    <>
+                      <Camera className="h-4 w-4" /> Change Photo
+                    </>
+                  )}
+                </button>
               </div>
-              <div className="pt-16 space-y-4">
-                <div>
-                  <h2 className="text-xl font-bold">{employee.first_name} {employee.last_name}</h2>
-                  <p className="text-sm font-medium text-primary mt-0.5">{employee.user?.role?.name || "No Designation"}</p>
-                </div>
+
+              {/* Name & Role */}
+              <div className="mt-3.5 min-w-0 w-full">
+                <h2 className="font-bold text-lg text-foreground leading-tight truncate">{employee.first_name} {employee.last_name}</h2>
+                <p className="text-xs text-muted-foreground mt-0.5 font-medium">{employee.job_title || employee.department?.name || "Team Member"}</p>
                 
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant={employee.status === "ACTIVE" ? "default" : "secondary"}>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <Badge variant={employee.status === "ACTIVE" ? "default" : "secondary"} className={employee.status === "ACTIVE" ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-[10px] font-bold" : "text-[10px]"}>
                     {employee.status || "ACTIVE"}
                   </Badge>
-                  <Badge variant="outline">{employee.employee_id_custom || `EMP-${employee.id.toString().padStart(4, '0')}`}</Badge>
-                </div>
-
-                <div className="space-y-3 pt-4 border-t border-border/50 text-sm">
-                  <div className="flex items-center gap-3">
-                    <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-                    {employee.user?.email ? (
-                      <a href={`mailto:${employee.user.email}`} className="hover:underline truncate">{employee.user.email}</a>
-                    ) : (
-                      <span className="text-muted-foreground italic">No email linked</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
-                    {employee.phone ? (
-                      <a href={`tel:${employee.phone}`} className="hover:underline">{employee.phone}</a>
-                    ) : (
-                      <span className="text-muted-foreground italic">No phone listed</span>
-                    )}
-                  </div>
-                  {employee.address && (
-                    <div className="flex items-start gap-3">
-                      <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                      <span className="line-clamp-2">{employee.address}</span>
-                    </div>
-                  )}
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold">
+                    {employee.user?.role?.name || "Employee"}
+                  </span>
                 </div>
               </div>
-            </CardContent>
+
+              {/* Information Strip */}
+              <div className="w-full space-y-2.5 pt-4 border-t border-border/40 text-xs mt-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-7 w-7 rounded-lg bg-muted/60 text-muted-foreground flex items-center justify-center border border-border/50 shrink-0">
+                    <User className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider">Employee ID</p>
+                    <p className="font-mono font-semibold text-foreground text-xs truncate">{employee.employee_id_custom || `EMP-${employee.id.toString().padStart(4, '0')}`}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <div className="h-7 w-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
+                    <Mail className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider">Email Address</p>
+                    <p className="font-medium text-foreground text-xs truncate">{employee.user?.email || "No email linked"}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2.5">
+                  <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
+                    <Phone className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider">Phone</p>
+                    <p className="font-medium text-foreground text-xs truncate">{employee.phone || "No phone listed"}</p>
+                  </div>
+                </div>
+
+                {employee.address && (
+                  <div className="flex items-start gap-2.5">
+                    <div className="h-7 w-7 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/20 shrink-0 mt-0.5">
+                      <MapPin className="h-3.5 w-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider">Address</p>
+                      <p className="font-medium text-foreground text-xs leading-relaxed line-clamp-2">{employee.address}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="w-full pt-3.5 border-t border-border/40 mt-3.5">
+                <Link href={`/hrms/employees/${employee.id}/edit`} className="w-full">
+                  <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs font-semibold rounded-xl h-9 hover:bg-muted cursor-pointer">
+                    <Edit className="h-3.5 w-3.5" /> Edit Employee
+                  </Button>
+                </Link>
+              </div>
+            </div>
           </Card>
         </div>
 
         {/* Right Column: Tabbed Details */}
-        <div className="md:col-span-3 space-y-6">
+        <div className="lg:col-span-8 xl:col-span-9 space-y-5">
           <Tabs defaultValue="personal" className="w-full">
-            <TabsList className="grid grid-cols-3 md:grid-cols-6 mb-4 h-auto sm:h-12 bg-muted/50 p-1 rounded-lg">
-              <TabsTrigger value="personal" className="h-full gap-2 text-sm">
-                <User className="h-4 w-4" /> <span className="hidden lg:inline">Personal</span>
+            <TabsList className="bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 p-1 rounded-2xl h-auto w-fit flex flex-wrap sm:flex-nowrap gap-1 mb-5 shadow-xs">
+              <TabsTrigger value="personal" className="rounded-xl text-xs font-semibold px-3 py-1.5 cursor-pointer data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs flex items-center gap-2">
+                <User className="h-3.5 w-3.5 text-emerald-500" /> Personal
               </TabsTrigger>
-              <TabsTrigger value="employment" className="h-full gap-2 text-sm">
-                <Briefcase className="h-4 w-4" /> <span className="hidden lg:inline">Employment</span>
+              <TabsTrigger value="employment" className="rounded-xl text-xs font-semibold px-3 py-1.5 cursor-pointer data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs flex items-center gap-2">
+                <Briefcase className="h-3.5 w-3.5 text-emerald-500" /> Employment
               </TabsTrigger>
-              <TabsTrigger value="bank" className="h-full gap-2 text-sm">
-                <Landmark className="h-4 w-4" /> <span className="hidden lg:inline">Bank</span>
+              <TabsTrigger value="bank" className="rounded-xl text-xs font-semibold px-3 py-1.5 cursor-pointer data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs flex items-center gap-2">
+                <Landmark className="h-3.5 w-3.5 text-emerald-500" /> Bank
               </TabsTrigger>
-              <TabsTrigger value="documents" className="h-full gap-2 text-sm">
-                <FileText className="h-4 w-4" /> <span className="hidden lg:inline">Documents</span>
+              <TabsTrigger value="documents" className="rounded-xl text-xs font-semibold px-3 py-1.5 cursor-pointer data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs flex items-center gap-2">
+                <FileText className="h-3.5 w-3.5 text-emerald-500" /> Documents
               </TabsTrigger>
-              <TabsTrigger value="assets" className="h-full gap-2 text-sm">
-                <Monitor className="h-4 w-4" /> <span className="hidden lg:inline">Assets</span>
+              <TabsTrigger value="assets" className="rounded-xl text-xs font-semibold px-3 py-1.5 cursor-pointer data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs flex items-center gap-2">
+                <Monitor className="h-3.5 w-3.5 text-emerald-500" /> Assets
               </TabsTrigger>
-              <TabsTrigger value="performance" className="h-full gap-2 text-sm">
-                <Award className="h-4 w-4" /> <span className="hidden lg:inline">Performance</span>
+              <TabsTrigger value="performance" className="rounded-xl text-xs font-semibold px-3 py-1.5 cursor-pointer data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs flex items-center gap-2">
+                <Award className="h-3.5 w-3.5 text-emerald-500" /> Performance
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="personal" className="space-y-4">
-              <Card className="border-border/50 shadow-sm">
-                <CardHeader>
-                  <CardTitle>Personal Details</CardTitle>
+            {/* Tab: Personal */}
+            <TabsContent value="personal" className="space-y-5 mt-0">
+              <Card className="rounded-2xl border-border/40 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md shadow-xs overflow-hidden">
+                <CardHeader className="bg-muted/20 border-b border-border/40 py-3.5 px-5">
+                  <CardTitle className="text-sm font-bold text-foreground">Personal Information</CardTitle>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-4">
+                <CardContent className="p-5 grid grid-cols-2 sm:grid-cols-3 gap-4">
                   <div className="space-y-1">
-                    <div className="text-sm font-medium text-muted-foreground">Full Name</div>
-                    <p className="font-medium">{employee.first_name} {employee.last_name}</p>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Full Name</div>
+                    <p className="font-semibold text-xs sm:text-sm text-foreground">{employee.first_name} {employee.last_name}</p>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-sm font-medium text-muted-foreground">Gender</div>
-                    <p className="font-medium">{employee.gender || "Not specified"}</p>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Gender</div>
+                    <p className="font-semibold text-xs sm:text-sm text-foreground">{employee.gender || "Not specified"}</p>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-sm font-medium text-muted-foreground">Date of Birth</div>
-                    <p className="font-medium">{employee.date_of_birth || "Not specified"}</p>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Date of Birth</div>
+                    <p className="font-semibold text-xs sm:text-sm text-foreground">{employee.date_of_birth || "Not specified"}</p>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-sm font-medium text-muted-foreground">Nationality</div>
-                    <p className="font-medium">{employee.nationality || "Not specified"}</p>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Nationality</div>
+                    <p className="font-semibold text-xs sm:text-sm text-foreground">{employee.nationality || "Not specified"}</p>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-sm font-medium text-muted-foreground">Marital Status</div>
-                    <p className="font-medium">{employee.marital_status || "Not specified"}</p>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Marital Status</div>
+                    <p className="font-semibold text-xs sm:text-sm text-foreground">{employee.marital_status || "Not specified"}</p>
                   </div>
-                  <div className="space-y-1 sm:col-span-2 pt-2 border-t border-border/50">
-                    <div className="text-sm font-medium text-muted-foreground">Emergency Contact</div>
-                    <p className="font-medium">{employee.emergency_contact || "Not provided"}</p>
+                  <div className="space-y-1">
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Emergency Contact</div>
+                    <p className="font-semibold text-xs sm:text-sm text-foreground">{employee.emergency_contact || "Not provided"}</p>
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
 
-            <TabsContent value="employment" className="space-y-4">
-              <Card className="border-border/50 shadow-sm">
-                <CardHeader>
-                  <CardTitle>Employment Information</CardTitle>
+            {/* Tab: Employment */}
+            <TabsContent value="employment" className="space-y-5 mt-0">
+              <Card className="rounded-2xl border-border/40 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md shadow-xs overflow-hidden">
+                <CardHeader className="bg-muted/20 border-b border-border/40 py-3.5 px-5">
+                  <CardTitle className="text-sm font-bold text-foreground">Employment Overview</CardTitle>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-4">
+                <CardContent className="p-5 grid grid-cols-2 sm:grid-cols-3 gap-4">
                   <div className="space-y-1">
-                    <div className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Building className="h-4 w-4" /> Company</div>
-                    <p className="font-medium">{employee.company_name || "MCS Consulting"}</p>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1.5">
+                      <Building className="h-3 w-3 text-emerald-500" /> Company
+                    </div>
+                    <p className="font-semibold text-xs sm:text-sm text-foreground">{employee.company_name || "MCS Consulting"}</p>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Building className="h-4 w-4" /> Department</div>
-                    <p className="font-medium">{employee.department?.name || "None Assigned"}</p>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1.5">
+                      <Building className="h-3 w-3 text-emerald-500" /> Department
+                    </div>
+                    <p className="font-semibold text-xs sm:text-sm text-foreground">{employee.department?.name || "None Assigned"}</p>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Briefcase className="h-4 w-4" /> Designation</div>
-                    <p className="font-medium">{employee.user?.role?.name || "None Assigned"}</p>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1.5">
+                      <Briefcase className="h-3 w-3 text-emerald-500" /> Job Title
+                    </div>
+                    <p className="font-semibold text-xs sm:text-sm text-foreground">{employee.job_title || "Not specified"}</p>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-sm font-medium text-muted-foreground flex items-center gap-2"><User className="h-4 w-4" /> Manager</div>
-                    <p className="font-medium">{employee.manager ? `${employee.manager.first_name} ${employee.manager.last_name}` : "None"}</p>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1.5">
+                      <Briefcase className="h-3 w-3 text-emerald-500" /> System Role
+                    </div>
+                    <p className="font-semibold text-xs sm:text-sm text-foreground">{employee.user?.role?.name || "None Assigned"}</p>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Calendar className="h-4 w-4" /> Hire Date</div>
-                    <p className="font-medium">{employee.hire_date ? new Date(employee.hire_date).toLocaleDateString() : "Unknown"}</p>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1.5">
+                      <Briefcase className="h-3 w-3 text-emerald-500" /> Employment Type
+                    </div>
+                    <p className="font-semibold text-xs sm:text-sm text-foreground">{employee.employment_type || "Not specified"}</p>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Briefcase className="h-4 w-4" /> Type</div>
-                    <p className="font-medium">{employee.employment_type || "N/A"}</p>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1.5">
+                      <User className="h-3 w-3 text-emerald-500" /> Manager
+                    </div>
+                    <p className="font-semibold text-xs sm:text-sm text-foreground">{employee.manager ? `${employee.manager.first_name} ${employee.manager.last_name}` : "None"}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider flex items-center gap-1.5">
+                      <Calendar className="h-3 w-3 text-emerald-500" /> Hire Date
+                    </div>
+                    <p className="font-semibold text-xs sm:text-sm text-foreground">{employee.hire_date ? new Date(employee.hire_date).toLocaleDateString() : "Unknown"}</p>
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
 
-
-            
-            <TabsContent value="bank" className="space-y-4">
-              <Card className="border-border/50 shadow-sm">
-                <CardHeader>
-                  <CardTitle>Bank Account Information</CardTitle>
+            {/* Tab: Bank */}
+            <TabsContent value="bank" className="space-y-5 mt-0">
+              <Card className="rounded-2xl border-border/40 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md shadow-xs overflow-hidden">
+                <CardHeader className="bg-muted/20 border-b border-border/40 py-3.5 px-5">
+                  <CardTitle className="text-sm font-bold text-foreground">Bank Account Information</CardTitle>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-4">
+                <CardContent className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <div className="text-sm font-medium text-muted-foreground">Bank Name</div>
-                    <p className="font-medium text-lg">{employee.bank_name || "Not provided"}</p>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Bank Name</div>
+                    <p className="font-semibold text-sm text-foreground">{employee.bank_name || "Not provided"}</p>
                   </div>
                   <div className="space-y-1">
-                    <div className="text-sm font-medium text-muted-foreground">Account Number</div>
-                    <p className="font-medium text-lg font-mono tracking-wider">{employee.bank_account_number || "Not provided"}</p>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Account Number</div>
+                    <p className="font-mono font-semibold text-sm text-foreground tracking-wider">{employee.bank_account_number || "Not provided"}</p>
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
 
-            <TabsContent value="documents" className="space-y-4">
-              <Card className="border-border/50 shadow-sm">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
+            {/* Tab: Documents */}
+            <TabsContent value="documents" className="space-y-5 mt-0">
+              <Card className="rounded-2xl border-border/40 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md shadow-xs overflow-hidden">
+                <CardHeader className="bg-muted/20 border-b border-border/40 py-3.5 px-5 flex flex-row items-center justify-between">
                   <div>
-                    <CardTitle>Employee Documents</CardTitle>
-                    <CardDescription>Securely store passports, contracts, and tax forms (Max file size: 10MB).</CardDescription>
+                    <CardTitle className="text-sm font-bold text-foreground">Employee Documents</CardTitle>
+                    <CardDescription className="text-xs">Securely store passports, contracts, and tax forms (Max 10MB).</CardDescription>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="p-5 space-y-5">
                   
                   {/* Upload UI */}
-                  <div className="bg-muted/30 border border-border/50 rounded-lg p-4 flex flex-col sm:flex-row items-end gap-4">
-                    <div className="flex-1 space-y-2 w-full">
-                      <label className="text-sm font-medium">Document Type</label>
+                  <div className="bg-card/40 border border-border/50 rounded-2xl p-3.5 flex flex-col sm:flex-row items-end gap-3">
+                    <div className="flex-1 space-y-1.5 w-full">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Document Type</label>
                       <Select value={docType} onValueChange={setDocType}>
-                        <SelectTrigger className="w-full h-10 border border-zinc-300 dark:border-zinc-700 bg-background px-3 py-2 text-sm">
+                        <SelectTrigger className="w-full h-9 rounded-xl border-border/50 bg-background/70 px-3 py-1.5 text-xs font-semibold">
                           <SelectValue placeholder="Document Type" />
                         </SelectTrigger>
-                        <SelectContent position="popper">
-                          <SelectItem value="Contract">Employment Contract</SelectItem>
-                          <SelectItem value="Passport">Passport / ID</SelectItem>
-                          <SelectItem value="Tax">Tax Form</SelectItem>
-                          <SelectItem value="Bank">Bank Form</SelectItem>
-                          <SelectItem value="Other">Other Document</SelectItem>
+                        <SelectContent position="popper" className="rounded-xl border-border/50">
+                          <SelectItem value="Contract" className="text-xs cursor-pointer">Employment Contract</SelectItem>
+                          <SelectItem value="Passport" className="text-xs cursor-pointer">Passport / ID</SelectItem>
+                          <SelectItem value="Tax" className="text-xs cursor-pointer">Tax Form</SelectItem>
+                          <SelectItem value="Bank" className="text-xs cursor-pointer">Bank Form</SelectItem>
+                          <SelectItem value="Other" className="text-xs cursor-pointer">Other Document</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="flex-1 space-y-2 w-full">
+                    <div className="flex-1 space-y-1.5 w-full">
                       <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium">Select File</label>
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Select File</label>
                         <span className="text-[10px] text-muted-foreground">Max 10MB</span>
                       </div>
-                      <Input type="file" ref={fileInputRef} className="cursor-pointer" />
+                      <Input type="file" ref={fileInputRef} className="cursor-pointer rounded-xl bg-background/70 border-border/50 h-9 text-xs" />
                     </div>
-                    <Button onClick={handleFileUpload} disabled={uploadingDoc} className="w-full sm:w-auto flex items-center gap-2">
+                    <Button onClick={handleFileUpload} disabled={uploadingDoc} className="w-full sm:w-auto flex items-center gap-2 rounded-xl h-9 px-4 text-xs font-bold shadow-sm cursor-pointer">
                       {uploadingDoc ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                       Upload
                     </Button>
                   </div>
 
                   {/* Document List */}
-                  <div className="space-y-3">
+                  <div className="space-y-2.5">
                     {documents.length === 0 ? (
-                      <div className="text-center p-8 text-muted-foreground border border-dashed rounded-lg">
-                        <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p>No documents uploaded yet.</p>
+                      <div className="text-center p-6 text-muted-foreground border border-dashed border-border/60 rounded-2xl">
+                        <FileText className="h-7 w-7 mx-auto mb-2 opacity-50 text-emerald-500" />
+                        <p className="text-xs">No documents uploaded yet.</p>
                       </div>
                     ) : (
-                      documents.map(doc => (
-                        <div key={doc.id} className="flex items-center justify-between p-3 border border-border/50 rounded-md hover:bg-muted/30 transition-colors">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                              <FileText className="h-5 w-5" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm">{doc.file_name}</p>
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 rounded-sm">{doc.document_type}</Badge>
-                                <span>{new Date(doc.uploaded_at).toLocaleDateString()}</span>
+                      <div className="divide-y divide-border/40 border border-border/40 rounded-2xl overflow-hidden">
+                        {documents.map(doc => (
+                          <div key={doc.id} className="p-3 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                            <div className="flex items-center gap-3 min-w-0 pr-4">
+                              <div className="h-8 w-8 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center border border-emerald-500/20 shrink-0">
+                                <FileText className="h-3.5 w-3.5" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-bold text-xs text-foreground truncate">{doc.file_name}</p>
+                                <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
+                                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0 rounded-md">{doc.document_type}</Badge>
+                                  <span>{new Date(doc.uploaded_at).toLocaleDateString()}</span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <a href={resolveImageUrl(doc.file_url)} target="_blank" rel="noopener noreferrer">
-                              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary">
-                                <Download className="h-4 w-4" />
+                            <div className="flex items-center gap-1.5">
+                              <a href={resolveImageUrl(doc.file_url)} target="_blank" rel="noopener noreferrer">
+                                <Button variant="ghost" size="icon" className="h-7.5 w-7.5 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer">
+                                  <Download className="h-3.5 w-3.5" />
+                                </Button>
+                              </a>
+                              <Button variant="ghost" size="icon" className="h-7.5 w-7.5 rounded-lg text-red-500 hover:text-red-700 hover:bg-red-500/10 cursor-pointer" onClick={() => setDeletingDocumentId(doc.id)}>
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
-                            </a>
-                            <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20" onClick={() => setDeletingDocumentId(doc.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        ))}
+                      </div>
                     )}
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
             
-            <TabsContent value="assets" className="space-y-4">
-              <Card className="border-border/50 shadow-sm">
-                <CardHeader>
-                  <CardTitle>Assigned Assets</CardTitle>
-                  <CardDescription>Hardware and access cards assigned to this employee.</CardDescription>
+            {/* Tab: Assets */}
+            <TabsContent value="assets" className="space-y-5 mt-0">
+              <Card className="rounded-2xl border-border/40 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md shadow-xs overflow-hidden">
+                <CardHeader className="bg-muted/20 border-b border-border/40 py-3.5 px-5">
+                  <CardTitle className="text-sm font-bold text-foreground">Assigned Assets</CardTitle>
+                  <CardDescription className="text-xs">Hardware and access devices assigned to this employee.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-center p-8 text-muted-foreground border border-dashed rounded-lg">
-                    <Monitor className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>Asset tracking integration active.</p>
+                <CardContent className="p-6">
+                  <div className="text-center p-6 text-muted-foreground border border-dashed border-border/60 rounded-2xl">
+                    <Monitor className="h-7 w-7 mx-auto mb-2 opacity-50 text-emerald-500" />
+                    <p className="text-xs">Asset tracking integration active.</p>
                     <Link href="/hrms/assets">
-                      <Button variant="link" className="mt-2">Go to Assets Module to assign hardware</Button>
+                      <Button variant="link" className="mt-1.5 text-xs font-semibold text-emerald-500">Go to Assets Module to assign hardware</Button>
                     </Link>
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
 
-            <TabsContent value="performance" className="space-y-4">
-              <Card className="border-border/50 shadow-sm">
-                <CardHeader>
-                  <CardTitle>Performance History</CardTitle>
-                  <CardDescription>Past performance cycles, evaluations, and target milestones.</CardDescription>
+            {/* Tab: Performance */}
+            <TabsContent value="performance" className="space-y-5 mt-0">
+              <Card className="rounded-2xl border-border/40 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md shadow-xs overflow-hidden">
+                <CardHeader className="bg-muted/20 border-b border-border/40 py-3.5 px-5">
+                  <CardTitle className="text-sm font-bold text-foreground">Performance History</CardTitle>
+                  <CardDescription className="text-xs">Past performance cycles, evaluations, and target milestones.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="p-5 space-y-3.5">
                   {reviews.length > 0 ? (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {reviews.map((r, idx) => (
-                        <div key={idx} className="p-4 rounded-xl border border-border/40 bg-card/20 space-y-3">
+                        <div key={idx} className="p-3.5 rounded-2xl border border-border/40 bg-card/20 space-y-2.5">
                           <div className="flex items-center justify-between border-b border-border/20 pb-2">
                             <div>
-                              <p className="font-bold text-sm text-foreground">{r.cycle?.name || "Review Cycle"}</p>
+                              <p className="font-bold text-xs sm:text-sm text-foreground">{r.cycle?.name || "Review Cycle"}</p>
                               <p className="text-[10px] text-muted-foreground">Evaluator: {r.reviewer?.email || "Manager"}</p>
                             </div>
-                            <Badge variant="outline" className={`font-bold ${
+                            <Badge variant="outline" className={`font-bold text-[10px] ${
                               r.overall_rating === "Excellent" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
                               r.overall_rating === "Good" ? "bg-blue-500/10 text-blue-500 border-blue-500/20" :
                               r.overall_rating === "Average" ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
@@ -556,28 +618,28 @@ export default function EmployeeProfilePage() {
                             </Badge>
                           </div>
                           
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                             <div>
                               <span className="font-bold text-muted-foreground block mb-0.5 uppercase tracking-wider text-[9px]">Key Strengths</span>
-                              <span className="text-foreground">{r.key_strengths || "N/A"}</span>
+                              <span className="text-foreground text-xs">{r.key_strengths || "N/A"}</span>
                             </div>
                             <div>
                               <span className="font-bold text-muted-foreground block mb-0.5 uppercase tracking-wider text-[9px]">Areas for Improvement</span>
-                              <span className="text-foreground">{r.improvement_areas || "N/A"}</span>
+                              <span className="text-foreground text-xs">{r.improvement_areas || "N/A"}</span>
                             </div>
                           </div>
 
-                          <div className="text-xs pt-2 border-t border-border/10">
+                          <div className="text-xs pt-1.5 border-t border-border/10">
                             <span className="font-bold text-muted-foreground block mb-0.5 uppercase tracking-wider text-[9px]">Manager Comments</span>
-                            <span className="text-foreground italic">"{r.comments || "No general comments listed."}"</span>
+                            <span className="text-foreground text-xs italic">"{r.comments || "No general comments listed."}"</span>
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center p-8 text-muted-foreground border border-dashed rounded-lg">
-                      <Award className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>No evaluation cycles or active performance reviews found for this employee.</p>
+                    <div className="text-center p-6 text-muted-foreground border border-dashed border-border/60 rounded-2xl">
+                      <Award className="h-7 w-7 mx-auto mb-2 opacity-50 text-emerald-500" />
+                      <p className="text-xs">No evaluation cycles or active performance reviews found for this employee.</p>
                     </div>
                   )}
                 </CardContent>

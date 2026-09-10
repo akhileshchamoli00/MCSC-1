@@ -27,6 +27,16 @@ function SelectSystemContent() {
 
   // Auto-redirect if only one mode is allowed
   useEffect(() => {
+    const role = (localStorage.getItem("user_role") || "").toUpperCase();
+    if (role === "MEMBER") {
+      router.push("/member/track-order");
+      return;
+    }
+    if (role === "CLIENT") {
+      router.push("/client/dashboard");
+      return;
+    }
+
     if (!loading) {
       if (allowedModes.length === 1) {
         const target = allowedModes[0];

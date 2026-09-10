@@ -46,7 +46,9 @@ export default function LoginPage() {
     }
     if (localStorage.getItem("hrms_token")) {
       const role = localStorage.getItem("user_role");
-      if (role === "CLIENT") {
+      if (role === "MEMBER") {
+        router.push("/member/track-order");
+      } else if (role === "CLIENT") {
         router.push("/client/dashboard");
       } else {
         const pref = localStorage.getItem("preferred_system");
@@ -166,7 +168,9 @@ export default function LoginPage() {
         const freshPermissions = user.permissions || [];
         localStorage.setItem("hrms_permissions", JSON.stringify(freshPermissions));
 
-        if (roleName === "CLIENT") {
+        if (roleName === "MEMBER") {
+          window.location.href = "/member/track-order";
+        } else if (roleName === "CLIENT") {
           window.location.href = "/client/dashboard";
         } else {
           const email = user.email || "";

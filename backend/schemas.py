@@ -14,6 +14,7 @@ class UserResponse(UserBase):
     is_active: bool
     role_id: Optional[int] = None
     role: Optional['RoleResponse'] = None
+    name: Optional[str] = None
     created_at: datetime
     permissions: List[str] = []
 
@@ -761,6 +762,21 @@ class TimesheetResponse(TimesheetBase):
         from_attributes = True
 
 
+class UserMin(BaseModel):
+    id: int
+    name: Optional[str] = None
+    email: Optional[str] = None
+    employee: Optional[EmployeeSummary] = None
+
+    class Config:
+        from_attributes = True
+
+
+class CompanyValidationRequest(BaseModel):
+    status: str # VALIDATED | NEEDS_REVISION | PENDING_VALIDATION
+    notes: Optional[str] = None
+
+
 class ClientCompanyBase(BaseModel):
     company_name: str
     company_code: Optional[str] = None
@@ -768,6 +784,8 @@ class ClientCompanyBase(BaseModel):
     tax_number: Optional[str] = None
     industry: Optional[str] = None
     status: Optional[str] = "ACTIVE"
+    validation_status: Optional[str] = "PENDING_VALIDATION"
+    validation_notes: Optional[str] = None
     key_contact_person: Optional[str] = None
     key_contact_email: Optional[str] = None
     key_contact_phone: Optional[str] = None
@@ -777,8 +795,31 @@ class ClientCompanyBase(BaseModel):
     notes: Optional[str] = None
     client_id: Optional[int] = None
 
+
 class ClientCompanyCreate(ClientCompanyBase):
     pass
+
+
+class CompanyValidationRequest(BaseModel):
+    status: str
+    notes: Optional[str] = None
+
+class EmployeeUserMin(BaseModel):
+    id: int
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class UserMin(BaseModel):
+    id: int
+    email: str
+    name: Optional[str] = None
+    employee: Optional[EmployeeUserMin] = None
+
+    class Config:
+        from_attributes = True
 
 class ClientMin(BaseModel):
     id: int
@@ -789,12 +830,22 @@ class ClientMin(BaseModel):
     class Config:
         from_attributes = True
 
+
 class ClientCompanyResponse(ClientCompanyBase):
     id: int
     logo_url: Optional[str] = None
+    created_by_user_id: Optional[int] = None
+    validated_by_user_id: Optional[int] = None
+    validated_at: Optional[datetime] = None
+    creator: Optional[UserMin] = None
+    validator: Optional[UserMin] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     client: Optional[ClientMin] = None
+    accurate_customer_id: Optional[str] = None
+    accurate_customer_no: Optional[str] = None
+    accurate_sync_status: Optional[str] = "NOT_SYNCED"
+    accurate_last_synced_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -832,6 +883,7 @@ class ClientOrderCreateRequest(BaseModel):
     consultant_ids: Optional[List[int]] = []
     notes: Optional[str] = None
     order_number: Optional[str] = None
+    status: Optional[str] = None
 
 class ClientOrderItemResponse(BaseModel):
     id: int
@@ -893,6 +945,14 @@ class ClientOrderResponse(BaseModel):
     notary_payment_status: Optional[str] = "UNPAID"
     notary_payment_date: Optional[date] = None
     notary_payment_ref: Optional[str] = None
+    accurate_so_id: Optional[str] = None
+    accurate_so_no: Optional[str] = None
+    accurate_inv_id: Optional[str] = None
+    accurate_inv_no: Optional[str] = None
+    accurate_receipt_no: Optional[str] = None
+    accurate_sync_status: Optional[str] = "NOT_SYNCED"
+    accurate_sync_error: Optional[str] = None
+    accurate_last_synced_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -976,17 +1036,47 @@ class AnnouncementBase(BaseModel):
     title: str
     content: str
     target_role: Optional[str] = "ALL"
+    status: Optional[str] = "PUBLISHED"
+    category: Optional[str] = "GENERAL"
+    priority: Optional[str] = "NORMAL"
+    is_pinned: Optional[bool] = False
+    attachment_url: Optional[str] = None
+    attachment_name: Optional[str] = None
+    published_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
 
 class AnnouncementCreate(AnnouncementBase):
     pass
 
+class AnnouncementUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    target_role: Optional[str] = None
+    status: Optional[str] = None
+    category: Optional[str] = None
+    priority: Optional[str] = None
+    is_pinned: Optional[bool] = None
+    attachment_url: Optional[str] = None
+    attachment_name: Optional[str] = None
+    published_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+
 class AnnouncementResponse(AnnouncementBase):
     id: int
     created_at: datetime
-    created_by: int
+    created_by: Optional[int] = None
+    creator: Optional[UserResponse] = None
 
     class Config:
         from_attributes = True
+
+    @field_validator("attachment_url", mode="after")
+    @classmethod
+    def convert_attachment_url(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            from storage import get_signed_file_url
+            return get_signed_file_url(v, bucket_name="hrms-documents")
+        return v
 
 class ClientOrderUpdate(BaseModel):
     status: Optional[str] = None
@@ -1112,6 +1202,8 @@ class ClientServiceBase(BaseModel):
     partner_a2_discount: Optional[float] = 50.0
     partner_a3_price: Optional[str] = None
     needs_notary: Optional[bool] = False
+    needs_gov_officer: Optional[bool] = False
+    needs_other_vendors: Optional[bool] = False
 
 class ClientServiceCreate(ClientServiceBase):
     pass
@@ -1126,6 +1218,8 @@ class ClientServiceUpdate(BaseModel):
     partner_a2_discount: Optional[float] = None
     partner_a3_price: Optional[str] = None
     needs_notary: Optional[bool] = None
+    needs_gov_officer: Optional[bool] = None
+    needs_other_vendors: Optional[bool] = None
 
 class ClientServiceResponse(ClientServiceBase):
     id: int
@@ -1195,16 +1289,25 @@ class CompanyResponse(CompanyBase):
 
 
 class ClientOrderProgressCreate(BaseModel):
-    message: str
+    message: Optional[str] = ""
+    channel: Optional[str] = "INTERNAL"  # "CLIENT" or "INTERNAL"
+    attachment_url: Optional[str] = None
+    attachment_name: Optional[str] = None
 
 
 class ClientOrderProgressResponse(BaseModel):
     id: int
     order_number: str
     user_id: Optional[int] = None
-    message: str
+    message: Optional[str] = ""
+    channel: str = "INTERNAL"
+    attachment_url: Optional[str] = None
+    attachment_name: Optional[str] = None
     created_at: datetime
     sender_name: Optional[str] = None
+    sender_role: Optional[str] = None
+    sender_avatar: Optional[str] = None
+    is_client: Optional[bool] = False
 
     class Config:
         from_attributes = True
@@ -1232,6 +1335,12 @@ class NotaryBase(BaseModel):
     city: str
     status: str = "ACTIVE"
     notes: Optional[str] = None
+    vendor_type: Optional[str] = "NOTARY"
+    is_notary: Optional[bool] = True
+    is_gov_officer: Optional[bool] = False
+    is_other_vendor: Optional[bool] = False
+    validation_status: Optional[str] = "PENDING_VALIDATION"
+    validation_notes: Optional[str] = None
     
     # Bank & Payout Information
     bank_name: Optional[str] = None
@@ -1247,6 +1356,11 @@ class NotaryCreate(NotaryBase):
 
 class NotaryResponse(NotaryBase):
     id: int
+    created_by_user_id: Optional[int] = None
+    validated_by_user_id: Optional[int] = None
+    validated_at: Optional[datetime] = None
+    creator: Optional[UserMin] = None
+    validator: Optional[UserMin] = None
     created_at: datetime
     updated_at: datetime
     service_fees: List[NotaryServiceFeeResponse] = []
@@ -1298,6 +1412,166 @@ class TeamResponse(TeamBase):
 
     class Config:
         from_attributes = True
+
+
+class MemberBase(BaseModel):
+    full_name: str
+    email: str
+    phone: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    status: Optional[str] = "ACTIVE"
+
+
+class MemberCreate(MemberBase):
+    user_id: int
+
+
+class MemberResponse(MemberBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MemberRegisterRequest(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+    confirm_password: str
+    date_of_birth: Optional[date] = None
+    phone: Optional[str] = None
+    order_number: Optional[str] = None
+
+
+class MemberLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class PublicOrderTrackResponse(BaseModel):
+    order_number: str
+    job_title: str
+    job_id: Optional[str] = None
+    company_name: Optional[str] = None
+    client_name: Optional[str] = None
+    branch_name: Optional[str] = None
+    status: str
+    payment_status: str
+    created_at: datetime
+    progress_percentage: int
+    milestones: List[dict] = []
+    messages: List[ClientOrderProgressResponse] = []
+
+
+class PublicSendMessageRequest(BaseModel):
+    message: str
+    attachment_url: Optional[str] = None
+    attachment_name: Optional[str] = None
+
+
+class AccurateConfigBase(BaseModel):
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+    api_key: Optional[str] = None
+    database_id: Optional[str] = None
+    database_alias: Optional[str] = None
+    default_bank_account_no: Optional[str] = "1101"
+    default_bank_account_name: Optional[str] = "Bank BCA"
+    default_sales_account_no: Optional[str] = "4101"
+    default_ar_account_no: Optional[str] = "1103"
+    default_dp_account_no: Optional[str] = "2102"
+    default_tax_ppn_no: Optional[str] = "PPN 11%"
+    auto_sync_on_proforma: Optional[bool] = True
+    auto_sync_on_payment: Optional[bool] = True
+    auto_sync_on_final_invoice: Optional[bool] = True
+    is_active: Optional[bool] = True
+
+
+class AccurateConfigCreate(AccurateConfigBase):
+    pass
+
+
+class AccurateConfigUpdate(BaseModel):
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+    api_key: Optional[str] = None
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    database_id: Optional[str] = None
+    database_alias: Optional[str] = None
+    default_bank_account_no: Optional[str] = None
+    default_bank_account_name: Optional[str] = None
+    default_sales_account_no: Optional[str] = None
+    default_ar_account_no: Optional[str] = None
+    default_dp_account_no: Optional[str] = None
+    default_tax_ppn_no: Optional[str] = None
+    auto_sync_on_proforma: Optional[bool] = None
+    auto_sync_on_payment: Optional[bool] = None
+    auto_sync_on_final_invoice: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+
+class AccurateConfigResponse(AccurateConfigBase):
+    id: int
+    is_connected: bool = False
+    has_credentials: bool = False
+    token_expires_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AccurateSyncLogResponse(BaseModel):
+    id: int
+    event_type: str
+    status: str
+    reference_id: Optional[str] = None
+    reference_number: Optional[str] = None
+    accurate_doc_no: Optional[str] = None
+    request_payload: Optional[str] = None
+    response_payload: Optional[str] = None
+    error_message: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AccurateTestConnectionRequest(BaseModel):
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+    api_key: Optional[str] = None
+    database_id: Optional[str] = None
+
+
+class AccurateTestConnectionResponse(BaseModel):
+    success: bool
+    message: str
+    database_name: Optional[str] = None
+    databases: Optional[List[dict]] = None
+    error: Optional[str] = None
+
+
+class AccurateManualSyncRequest(BaseModel):
+    order_id: int
+    sync_type: str = "AUTO" # AUTO | CUSTOMER | PROFORMA_SO | SALES_INVOICE | SALES_RECEIPT
+
+
+class AccurateManualSyncResponse(BaseModel):
+    success: bool
+    message: str
+    order_id: int
+    order_number: str
+    accurate_doc_no: Optional[str] = None
+    sync_status: str
+    details: Optional[dict] = None
+
+
 
 
 

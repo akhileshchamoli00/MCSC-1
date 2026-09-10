@@ -19,7 +19,6 @@ import {
   Briefcase
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { KpiCard } from "@/components/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -144,55 +143,79 @@ export default function ClientServicesPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500 w-full max-w-none pb-12">
       
-      {/* Title Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <Link href="/business/clients" className="mt-1">
-            <Button variant="ghost" size="icon" title="Back to Clients">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm shrink-0 flex items-center justify-center">
-            <Briefcase className="h-6 w-6" />
+      {/* Minimalist Metrics Strip & Action Button Row */}
+      <div className="flex flex-col md:flex-row items-stretch gap-3 w-full">
+        {/* Minimalist Metric Strip - Expanded Horizontally */}
+        <div className="grid grid-cols-2 md:grid-cols-4 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs flex-1 gap-2 sm:gap-0 divide-y md:divide-y-0 md:divide-x divide-border/50">
+          
+          {/* Total Services */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
+              <Tag className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Total Services</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{totalServicesCount}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Service Catalog & Base Price</h1>
-            <p className="text-muted-foreground text-sm">
-              Manage client service offerings, job IDs, base prices, and partner tier discount matrices.
-            </p>
+
+          {/* Average Base Price */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
+              <DollarSign className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Avg Base Price</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{formatCurrency(avgBasePrice)}</p>
+            </div>
+          </div>
+
+          {/* Paid Offerings */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/20 shrink-0">
+              <FileText className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Paid Offerings</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{paidServicesCount}</p>
+            </div>
+          </div>
+
+          {/* Max Service Price */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
+              <TrendingUp className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Max Base Price</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{formatCurrency(maxBasePrice)}</p>
+            </div>
           </div>
         </div>
 
+        {/* Add New Service Button */}
         {canCreate && (
-          <Link href="/business/clients/services/new">
-            <Button className="gap-2 font-semibold shadow">
+          <Link href="/business/clients/services/new" className="shrink-0 flex items-stretch">
+            <Button className="gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm">
               <Plus className="h-4 w-4" /> Add New Service
             </Button>
           </Link>
         )}
       </div>
 
-      {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
-        <KpiCard title="Total Services" value={totalServicesCount} icon={Tag} colorTheme="blue" />
-        <KpiCard title="Average Base Price" value={formatCurrency(avgBasePrice)} icon={DollarSign} colorTheme="emerald" />
-        <KpiCard title="Paid Offerings" value={paidServicesCount} icon={FileText} colorTheme="purple" />
-        <KpiCard title="Max Service Price" value={formatCurrency(maxBasePrice)} icon={TrendingUp} colorTheme="amber" />
-      </div>
-
       {/* Main Services Table Card */}
-      <Card className="border-border/50 shadow-sm overflow-hidden bg-card/60 backdrop-blur-md">
-        <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
+      <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
+        <div className="p-4 bg-muted/20 border-b border-border/40 flex flex-col sm:flex-row gap-3 items-center justify-between">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search Job ID, Title or Description..."
-              className="pl-8 h-9 text-xs rounded-lg"
+              className="pl-8 h-9 text-xs rounded-xl bg-background/70 border-border/50"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold">
+          <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold tracking-wider">
             Showing {paginatedServices.length} of {filteredServices.length} offerings
           </span>
         </div>
@@ -211,7 +234,7 @@ export default function ClientServicesPage() {
               <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
+                  <tr className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
                     <th className="p-4 w-12 text-center">No.</th>
                     <th className="p-4">Job ID</th>
                     <th className="p-4">Job Title</th>
@@ -224,23 +247,33 @@ export default function ClientServicesPage() {
                     {(canEdit || canDelete) && <th className="p-4 text-right">Actions</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y divide-border/30">
                   {paginatedServices.map((service, index) => (
-                    <tr key={service.id} className="hover:bg-muted/30 transition-colors">
+                    <tr key={service.id} className="hover:bg-muted/40 transition-colors border-b border-border/30 last:border-0">
                       <td className="p-4 text-center font-mono font-medium text-muted-foreground">
                         #{startIndex + index + 1}
                       </td>
                       <td className="p-4">
-                        <Badge variant="outline" className="font-mono font-bold text-xs bg-primary/5 border-primary/20 text-primary">
+                        <Badge variant="outline" className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2 py-0.5 rounded-md">
                           {service.job_id}
                         </Badge>
                       </td>
                       <td className="p-4 font-bold text-foreground text-sm">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <span>{service.job_title}</span>
                           {service.needs_notary && (
                             <Badge variant="secondary" className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold border-indigo-500/20 text-[9px] px-1.5 py-0.5 shrink-0">
                               NOTARY
+                            </Badge>
+                          )}
+                          {service.needs_gov_officer && (
+                            <Badge variant="secondary" className="bg-sky-500/10 text-sky-600 dark:text-sky-400 font-bold border-sky-500/20 text-[9px] px-1.5 py-0.5 shrink-0">
+                              GOV BODY
+                            </Badge>
+                          )}
+                          {service.needs_other_vendors && (
+                            <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border-emerald-500/20 text-[9px] px-1.5 py-0.5 shrink-0">
+                              OTHER VENDORS
                             </Badge>
                           )}
                         </div>
@@ -325,7 +358,7 @@ export default function ClientServicesPage() {
                     size="sm"
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                     disabled={currentPage === 1}
-                    className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                    className="h-8 text-xs font-bold rounded-lg"
                   >
                     Previous
                   </Button>
@@ -337,7 +370,7 @@ export default function ClientServicesPage() {
                     size="sm"
                     onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                     disabled={currentPage === totalPages}
-                    className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                    className="h-8 text-xs font-bold rounded-lg"
                   >
                     Next
                   </Button>
@@ -361,14 +394,14 @@ export default function ClientServicesPage() {
           <DialogFooter className="mt-4 gap-2">
             <Button 
               variant="outline" 
-              className="rounded-xl h-10 px-4 font-bold border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-foreground transition-colors bg-transparent" 
+              className="rounded-xl h-10 px-4 font-bold" 
               onClick={() => setIsDeleteOpen(false)}
             >
               Cancel
             </Button>
             <Button 
               variant="destructive" 
-              className="rounded-xl h-10 px-4 font-bold bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors" 
+              className="rounded-xl h-10 px-4 font-bold" 
               onClick={handleDeleteSubmit} 
               disabled={saving}
             >

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Edit, Loader2, Coffee, PlusCircle } from "lucide-react";
+import { Edit, Loader2, Coffee, PlusCircle, Search, Users, CheckCircle, Clock, Calendar } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
 export default function LeaveManagementPage() {
@@ -188,79 +188,142 @@ export default function LeaveManagementPage() {
     }
   };
 
+  const totalStaffBalances = balances.length;
+  const totalAnnualBalance = balances.reduce((sum, b) => sum + (Number(b.annual_leave_balance) || 0), 0);
+  const totalAnnualTaken = balances.reduce((sum, b) => sum + (Number(b.annual_leave_taken) || 0), 0);
+  const totalSickTaken = balances.reduce((sum, b) => sum + (Number(b.sick_leave_taken) || 0), 0);
+
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Leave Management</h1>
-        <p className="text-muted-foreground mt-1">Manage and audit employee leave balances.</p>
+    <div className="space-y-6">
+      {/* Minimalist Metrics Strip Row */}
+      <div className="flex flex-col md:flex-row items-stretch gap-3 w-full">
+        {/* Minimalist Metric Strip - Expanded Horizontally */}
+        <div className="grid grid-cols-2 md:grid-cols-4 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs flex-1 gap-2 sm:gap-0 divide-y md:divide-y-0 md:divide-x divide-border/50">
+          
+          {/* Total Staff */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
+              <Users className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Total Staff</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{totalStaffBalances}</p>
+            </div>
+          </div>
+
+          {/* Total Bal. Days */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
+              <Calendar className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Total Bal. Days</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{totalAnnualBalance.toFixed(1)}</p>
+            </div>
+          </div>
+
+          {/* Leave Taken */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
+              <Coffee className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Leave Taken</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{totalAnnualTaken.toFixed(1)}</p>
+            </div>
+          </div>
+
+          {/* Sick Days Taken */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center border border-rose-500/20 shrink-0">
+              <Clock className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Sick Days Taken</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{totalSickTaken.toFixed(1)}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="flex gap-4 mb-6">
-        <Input
-          placeholder="Search employees..."
-          className="max-w-sm"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      {/* Filter / Search Bar */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search employees..."
+            className="pl-9 h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
       </div>
 
-      <Card className="border-border/50 shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Coffee className="h-5 w-5" /> Employee Balances
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      {/* Balances Card Table */}
+      <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border/50">
+              <thead className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Employee Name</th>
-                  <th className="px-4 py-3 font-medium">Annual Leave Bal.</th>
-                  <th className="px-4 py-3 font-medium">Annual Leave Taken</th>
-                  <th className="px-4 py-3 font-medium">Bonus Allocated</th>
-                  <th className="px-4 py-3 font-medium">Sick Leave Taken</th>
-                  <th className="px-4 py-3 font-medium text-right">Actions</th>
+                  <th className="px-5 py-3.5">Employee Name</th>
+                  <th className="px-5 py-3.5">Annual Leave Bal.</th>
+                  <th className="px-5 py-3.5">Annual Leave Taken</th>
+                  <th className="px-5 py-3.5">Bonus Allocated</th>
+                  <th className="px-5 py-3.5">Sick Leave Taken</th>
+                  <th className="px-5 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/50">
+              <tbody className="divide-y divide-border/30">
                 {loading ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
-                      <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-emerald-500" />
                       Loading balances...
                     </td>
                   </tr>
                 ) : filteredBalances.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
-                      No balances found.
+                    <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground text-xs">
+                      No employee balances found.
                     </td>
                   </tr>
                 ) : (
                   paginatedBalances.map((balance) => (
-                    <tr key={balance.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-3 font-medium">
+                    <tr key={balance.id} className="hover:bg-muted/40 transition-colors">
+                      <td className="px-5 py-4 font-semibold text-foreground">
                         {balance.employee ? `${balance.employee.first_name} ${balance.employee.last_name}` : `EMP ID: ${balance.employee_id}`}
                       </td>
-                      <td className="px-4 py-3 font-semibold text-primary">
-                        {balance.annual_leave_balance} Days
+                      <td className="px-5 py-4">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          {balance.annual_leave_balance} Days
+                        </span>
                       </td>
-                      <td className="px-4 py-3 font-semibold text-muted-foreground">
+                      <td className="px-5 py-4 font-medium text-muted-foreground">
                         {balance.annual_leave_taken || 0} Days
                       </td>
-                      <td className="px-4 py-3 font-bold text-emerald-600 dark:text-emerald-400">
+                      <td className="px-5 py-4 font-bold text-emerald-600 dark:text-emerald-400">
                         {balance.bonus_allocated ? `+${balance.bonus_allocated} Days` : "0 Days"}
                       </td>
-                      <td className="px-4 py-3 font-semibold text-muted-foreground">
+                      <td className="px-5 py-4 font-medium text-muted-foreground">
                         {balance.sick_leave_taken || 0} Days
                       </td>
-                      <td className="px-4 py-3 text-right space-x-2">
-                        <Button variant="ghost" size="sm" className="h-8 gap-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:text-emerald-300 dark:hover:bg-emerald-950/20" onClick={() => handleAllocateClick(balance)}>
-                          <PlusCircle className="h-4 w-4" /> Allocate
+                      <td className="px-5 py-4 text-right space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-1.5 text-xs font-semibold rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:text-emerald-300 dark:hover:bg-emerald-950/20"
+                          onClick={() => handleAllocateClick(balance)}
+                        >
+                          <PlusCircle className="h-3.5 w-3.5" /> Allocate
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 gap-2" onClick={() => handleEditClick(balance)}>
-                          <Edit className="h-4 w-4" /> Edit
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-1.5 text-xs font-semibold rounded-lg hover:bg-muted"
+                          onClick={() => handleEditClick(balance)}
+                        >
+                          <Edit className="h-3.5 w-3.5" /> Edit
                         </Button>
                       </td>
                     </tr>
@@ -271,7 +334,7 @@ export default function LeaveManagementPage() {
           </div>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4 border-t border-border/50 bg-transparent mt-4">
+            <div className="flex items-center justify-between px-5 py-4 border-t border-border/40 bg-muted/10">
               <div className="text-xs text-muted-foreground">
                 Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
                 <span className="font-medium text-foreground">{Math.min(filteredBalances.length, endIndex)}</span> of{" "}
@@ -283,7 +346,7 @@ export default function LeaveManagementPage() {
                   size="sm"
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
-                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                  className="h-8 text-xs rounded-lg border-border/50"
                 >
                   Previous
                 </Button>
@@ -295,7 +358,7 @@ export default function LeaveManagementPage() {
                   size="sm"
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                   disabled={currentPage === totalPages}
-                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                  className="h-8 text-xs rounded-lg border-border/50"
                 >
                   Next
                 </Button>
@@ -307,38 +370,35 @@ export default function LeaveManagementPage() {
 
       {/* Allocate Leave Balance Modal */}
       <Dialog open={!!allocatingBalance} onOpenChange={(open) => !open && setAllocatingBalance(null)}>
-        <DialogContent
-          className="sm:max-w-md border border-zinc-200 dark:border-zinc-800 bg-background/95 backdrop-blur-xl shadow-2xl rounded-xl relative overflow-hidden"
-          overlayClassName="backdrop-blur-md bg-black/60"
-        >
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-600" />
-          <DialogHeader className="border-b border-border/50 pb-4">
-            <DialogTitle className="text-xl font-semibold tracking-tight">Allocate Annual Leave Balance</DialogTitle>
+        <DialogContent className="sm:max-w-md border border-border/50 bg-background/95 backdrop-blur-xl shadow-2xl rounded-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
+          <DialogHeader className="border-b border-border/40 pb-4">
+            <DialogTitle className="text-lg font-bold tracking-tight">Allocate Annual Leave Balance</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground mt-1">
               Allocate leave days directly to the employee's annual leave balance. This will show as an addition in their history.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleAllocateSave} className="space-y-4">
-            <div className="space-y-4 py-4">
+          <form onSubmit={handleAllocateSave} className="space-y-4 pt-2">
+            <div className="space-y-4">
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Employee Name</label>
-                <p className="font-semibold mt-1">
+                <p className="font-bold text-foreground mt-1">
                   {allocatingBalance?.employee ? `${allocatingBalance.employee.first_name} ${allocatingBalance.employee.last_name}` : `EMP ID: ${allocatingBalance?.employee_id}`}
                 </p>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Allocation Date</label>
                 <Input
                   type="date"
                   value={allocateForm.allocation_date}
                   onChange={(e) => setAllocateForm({ ...allocateForm, allocation_date: e.target.value })}
                   required
-                  className="mt-1"
+                  className="rounded-xl border-border/50"
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Days to Allocate</label>
                 <Input
                   type="number"
@@ -347,26 +407,26 @@ export default function LeaveManagementPage() {
                   value={allocateForm.amount}
                   onChange={(e) => setAllocateForm({ ...allocateForm, amount: parseFloat(e.target.value) || 0.0 })}
                   required
-                  className="mt-1"
+                  className="rounded-xl border-border/50"
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Reason for Allocation</label>
                 <Textarea
                   value={allocateForm.reason}
                   onChange={(e) => setAllocateForm({ ...allocateForm, reason: e.target.value })}
                   placeholder="e.g. Special recognition bonus leave"
                   required
-                  className="min-h-[100px] mt-1"
+                  className="min-h-[90px] rounded-xl border-border/50 text-xs"
                 />
               </div>
             </div>
-            <DialogFooter className="border-t border-border/50 pt-4 mt-2">
-              <Button type="button" variant="outline" onClick={() => setAllocatingBalance(null)}>
+            <DialogFooter className="border-t border-border/40 pt-4 mt-2">
+              <Button type="button" variant="outline" className="rounded-xl" onClick={() => setAllocatingBalance(null)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={allocating} className="bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-700 dark:hover:bg-emerald-800">
+              <Button type="submit" disabled={allocating} className="rounded-xl">
                 {allocating ? "Allocating..." : "Allocate Leave"}
               </Button>
             </DialogFooter>
@@ -376,21 +436,18 @@ export default function LeaveManagementPage() {
 
       {/* Edit Balance Modal */}
       <Dialog open={!!editingBalance} onOpenChange={(open) => !open && setEditingBalance(null)}>
-        <DialogContent
-          className="sm:max-w-md border border-zinc-200 dark:border-zinc-800 bg-background/95 backdrop-blur-xl shadow-2xl rounded-xl relative overflow-hidden"
-          overlayClassName="backdrop-blur-md bg-black/60"
-        >
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600" />
-          <DialogHeader className="border-b border-border/50 pb-4">
-            <DialogTitle className="text-xl font-semibold tracking-tight">Edit Leave Balance</DialogTitle>
+        <DialogContent className="sm:max-w-md border border-border/50 bg-background/95 backdrop-blur-xl shadow-2xl rounded-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
+          <DialogHeader className="border-b border-border/40 pb-4">
+            <DialogTitle className="text-lg font-bold tracking-tight">Edit Leave Balance</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground mt-1">
               Adjusting balances will create an audit log. A reason is required.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSave} className="space-y-4">
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+          <form onSubmit={handleSave} className="space-y-4 pt-2">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Annual Leave Bal.</label>
                   <Input
                     type="number"
@@ -398,10 +455,10 @@ export default function LeaveManagementPage() {
                     value={editForm.annual_leave_balance}
                     onChange={(e) => setEditForm({ ...editForm, annual_leave_balance: parseFloat(e.target.value) || 0.0 })}
                     required
-                    className="mt-1"
+                    className="rounded-xl border-border/50"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Annual Leave Taken</label>
                   <Input
                     type="number"
@@ -409,12 +466,12 @@ export default function LeaveManagementPage() {
                     value={editForm.annual_leave_taken}
                     onChange={(e) => setEditForm({ ...editForm, annual_leave_taken: parseFloat(e.target.value) || 0.0 })}
                     required
-                    className="mt-1"
+                    className="rounded-xl border-border/50"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Bonus Allocated</label>
                 <Input
                   type="number"
@@ -430,11 +487,11 @@ export default function LeaveManagementPage() {
                     });
                   }}
                   required
-                  className="mt-1"
+                  className="rounded-xl border-border/50"
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Sick Leave Taken</label>
                 <Input
                   type="number"
@@ -442,26 +499,26 @@ export default function LeaveManagementPage() {
                   value={editForm.sick_leave_taken}
                   onChange={(e) => setEditForm({ ...editForm, sick_leave_taken: parseFloat(e.target.value) || 0.0 })}
                   required
-                  className="mt-1"
+                  className="rounded-xl border-border/50"
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Reason for Adjustment</label>
                 <Textarea
                   value={editForm.reason}
                   onChange={(e) => setEditForm({ ...editForm, reason: e.target.value })}
                   placeholder="e.g. New employee allocation"
                   required
-                  className="min-h-[100px] mt-1"
+                  className="min-h-[90px] rounded-xl border-border/50 text-xs"
                 />
               </div>
             </div>
-            <DialogFooter className="border-t border-border/50 pt-4 mt-2">
-              <Button type="button" variant="outline" onClick={() => setEditingBalance(null)}>
+            <DialogFooter className="border-t border-border/40 pt-4 mt-2">
+              <Button type="button" variant="outline" className="rounded-xl" onClick={() => setEditingBalance(null)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={saving}>
+              <Button type="submit" disabled={saving} className="rounded-xl">
                 {saving ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>

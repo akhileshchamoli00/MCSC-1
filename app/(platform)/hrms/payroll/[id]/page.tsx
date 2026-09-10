@@ -217,13 +217,23 @@ export default function PayrollDetailsPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto px-4 w-full">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" onClick={() => router.push("/hrms/payroll")}>
+      <div className="flex items-center gap-3 pb-2 border-b border-border/40">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="rounded-xl border border-border/60 hover:bg-muted" 
+          onClick={() => router.push("/hrms/payroll")}
+          title="Back to Payroll"
+        >
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Payroll Details</h1>
-          <p className="text-muted-foreground mt-1">Review and update payroll records for the selected month.</p>
+          <h2 className="text-lg font-bold tracking-tight">
+            Payroll Details &mdash; {payroll.employee?.first_name} {payroll.employee?.last_name}
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            {getMonthName(payroll.payroll_month)} {payroll.payroll_year} compensation breakdown and deductions.
+          </p>
         </div>
       </div>
 

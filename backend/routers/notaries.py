@@ -1,10 +1,11 @@
 from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from typing import List
+from sqlalchemy.orm import Session, joinedload
+from typing import List, Optional
 
 import models, schemas, auth, database
 from utils.xendit_client import XenditClient
+from routers.clients import validate_and_clean_email, validate_and_clean_phone
 
 router = APIRouter(
     dependencies=[Depends(auth.get_current_user)]
@@ -23,17 +24,32 @@ def is_authorized_admin(user: models.User, db: Session) -> bool:
     return db_role.name.upper() in ["ADMIN", "HR ADMIN", "MANAGEMENT", "HR", "SUPER ADMIN", "SUPERADMIN", "SYSTEM ADMIN"]
 
 def format_notary_response(notary: models.Notary, db: Session) -> dict:
+    v_type = notary.vendor_type or ("GOVERNMENT_OFFICER" if notary.is_gov_officer else ("OTHER_VENDORS" if notary.is_other_vendor else "NOTARY"))
+    is_notary = (v_type == "NOTARY") or bool(notary.is_notary)
+    is_gov = (v_type == "GOVERNMENT_OFFICER") or bool(notary.is_gov_officer)
+    is_other = (v_type == "OTHER_VENDORS") or bool(notary.is_other_vendor)
+
     fees = []
     for sf in notary.service_fees:
-        if sf.service and getattr(sf.service, "needs_notary", False) and sf.fee > 0:
-            title = sf.service.job_title if sf.service else "Unknown Service"
-            fees.append({
-                "id": sf.id,
-                "notary_id": sf.notary_id,
-                "service_id": sf.service_id,
-                "fee": sf.fee,
-                "service_title": title
-            })
+        if sf.service and sf.fee > 0:
+            svc_needs_notary = bool(getattr(sf.service, "needs_notary", False))
+            svc_needs_gov = bool(getattr(sf.service, "needs_gov_officer", False))
+            svc_needs_other = bool(getattr(sf.service, "needs_other_vendors", False))
+
+            is_valid = (
+                (is_notary and svc_needs_notary) or
+                (is_gov and svc_needs_gov) or
+                (is_other and (svc_needs_other or (not svc_needs_notary and not svc_needs_gov)))
+            )
+            if is_valid:
+                title = sf.service.job_title if sf.service else "Unknown Service"
+                fees.append({
+                    "id": sf.id,
+                    "notary_id": sf.notary_id,
+                    "service_id": sf.service_id,
+                    "fee": sf.fee,
+                    "service_title": title
+                })
     
     is_bank_configured = bool(
         notary.bank_name and 
@@ -50,6 +66,17 @@ def format_notary_response(notary: models.Notary, db: Session) -> dict:
         "city": notary.city,
         "status": notary.status,
         "notes": notary.notes,
+        "vendor_type": v_type,
+        "is_notary": is_notary,
+        "is_gov_officer": is_gov,
+        "is_other_vendor": is_other,
+        "validation_status": notary.validation_status or "PENDING_VALIDATION",
+        "created_by_user_id": notary.created_by_user_id,
+        "validated_by_user_id": notary.validated_by_user_id,
+        "validated_at": notary.validated_at,
+        "validation_notes": notary.validation_notes,
+        "creator": notary.creator,
+        "validator": notary.validator,
         "bank_name": notary.bank_name,
         "bank_account_number": notary.bank_account_number,
         "bank_account_holder_name": notary.bank_account_holder_name,
@@ -64,19 +91,27 @@ def format_notary_response(notary: models.Notary, db: Session) -> dict:
 @router.get("", response_model=List[schemas.NotaryResponse])
 def get_all_notaries(db: Session = Depends(database.get_db)):
     """
-    Retrieve all registered notaries.
+    Retrieve all registered notaries / vendors.
     """
-    notaries = db.query(models.Notary).order_by(models.Notary.id.desc()).all()
+    notaries = db.query(models.Notary).options(
+        joinedload(models.Notary.creator).joinedload(models.User.employee),
+        joinedload(models.Notary.validator).joinedload(models.User.employee),
+        joinedload(models.Notary.service_fees).joinedload(models.NotaryServiceFee.service)
+    ).order_by(models.Notary.id.desc()).all()
     return [format_notary_response(n, db) for n in notaries]
 
 @router.get("/{notary_id}", response_model=schemas.NotaryResponse)
 def get_notary_by_id(notary_id: int, db: Session = Depends(database.get_db)):
     """
-    Retrieve a specific notary public by ID.
+    Retrieve a specific notary / vendor by ID.
     """
-    notary = db.query(models.Notary).filter(models.Notary.id == notary_id).first()
+    notary = db.query(models.Notary).options(
+        joinedload(models.Notary.creator).joinedload(models.User.employee),
+        joinedload(models.Notary.validator).joinedload(models.User.employee),
+        joinedload(models.Notary.service_fees).joinedload(models.NotaryServiceFee.service)
+    ).filter(models.Notary.id == notary_id).first()
     if not notary:
-        raise HTTPException(status_code=404, detail="Notary public not found.")
+        raise HTTPException(status_code=404, detail="Vendor / Notary public not found.")
     return format_notary_response(notary, db)
 
 @router.post("", response_model=schemas.NotaryResponse)
@@ -86,22 +121,30 @@ def create_notary(
     current_user: models.User = Depends(auth.get_current_user)
 ):
     """
-    Register a new notary public. (Admin only)
+    Register a new vendor / notary public.
     """
-    if not is_authorized_admin(current_user, db):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators or management can register notaries."
-        )
+    v_type = notary_in.vendor_type or ("GOVERNMENT_OFFICER" if notary_in.is_gov_officer else ("OTHER_VENDORS" if notary_in.is_other_vendor else "NOTARY"))
+    is_notary = (v_type == "NOTARY")
+    is_gov = (v_type == "GOVERNMENT_OFFICER")
+    is_other = (v_type == "OTHER_VENDORS")
+
+    clean_email = validate_and_clean_email(notary_in.email, "Vendor Email", required=False) if notary_in.email else None
+    clean_phone = validate_and_clean_phone(notary_in.phone, "Vendor Phone", required=False) if notary_in.phone else None
 
     db_notary = models.Notary(
         name=notary_in.name,
-        email=notary_in.email,
-        phone=notary_in.phone,
+        email=clean_email,
+        phone=clean_phone,
         address=notary_in.address,
         city=notary_in.city,
         status=notary_in.status,
         notes=notary_in.notes,
+        vendor_type=v_type,
+        is_notary=is_notary,
+        is_gov_officer=is_gov,
+        is_other_vendor=is_other,
+        validation_status="PENDING_VALIDATION",
+        created_by_user_id=current_user.id,
         bank_name=notary_in.bank_name,
         bank_account_number=notary_in.bank_account_number,
         bank_account_holder_name=notary_in.bank_account_holder_name,
@@ -111,9 +154,23 @@ def create_notary(
     db.add(db_notary)
     db.flush()
 
-    valid_service_ids = {
-        s.id for s in db.query(models.ClientService.id).filter(models.ClientService.needs_notary == True).all()
-    }
+    from sqlalchemy import or_, and_
+    service_query = db.query(models.ClientService.id)
+    if is_notary:
+        service_query = service_query.filter(models.ClientService.needs_notary == True)
+    elif is_gov:
+        service_query = service_query.filter(models.ClientService.needs_gov_officer == True)
+    elif is_other:
+        service_query = service_query.filter(
+            or_(
+                models.ClientService.needs_other_vendors == True,
+                and_(
+                    or_(models.ClientService.needs_notary == False, models.ClientService.needs_notary == None),
+                    or_(models.ClientService.needs_gov_officer == False, models.ClientService.needs_gov_officer == None)
+                )
+            )
+        )
+    valid_service_ids = {s.id for s in service_query.all()}
 
     if notary_in.service_fees:
         for sf_in in notary_in.service_fees:
@@ -137,30 +194,56 @@ def update_notary(
     current_user: models.User = Depends(auth.get_current_user)
 ):
     """
-    Update a notary public record. (Admin only)
+    Update a vendor / notary record. (Admin only)
     """
     if not is_authorized_admin(current_user, db):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators or management can update notary records."
+            detail="Only administrators or management can update vendor records."
         )
 
     db_notary = db.query(models.Notary).filter(models.Notary.id == notary_id).first()
     if not db_notary:
         raise HTTPException(
             status_code=404,
-            detail="Notary public not found."
+            detail="Vendor record not found."
         )
 
-    for field, val in notary_in.model_dump(exclude={"service_fees"}).items():
+    dump_data = notary_in.model_dump(exclude={"service_fees"})
+    if "email" in dump_data and dump_data["email"]:
+        dump_data["email"] = validate_and_clean_email(dump_data["email"], "Vendor Email", required=False)
+    if "phone" in dump_data and dump_data["phone"]:
+        dump_data["phone"] = validate_and_clean_phone(dump_data["phone"], "Vendor Phone", required=False)
+
+    for field, val in dump_data.items():
         setattr(db_notary, field, val)
 
-    # Clear old service fees and recreate them for valid notary services only
+    v_type = db_notary.vendor_type or "NOTARY"
+    db_notary.vendor_type = v_type
+    db_notary.is_notary = (v_type == "NOTARY")
+    db_notary.is_gov_officer = (v_type == "GOVERNMENT_OFFICER")
+    db_notary.is_other_vendor = (v_type == "OTHER_VENDORS")
+
+    # Clear old service fees and recreate them for valid vendor services only
     db.query(models.NotaryServiceFee).filter(models.NotaryServiceFee.notary_id == notary_id).delete()
     
-    valid_service_ids = {
-        s.id for s in db.query(models.ClientService.id).filter(models.ClientService.needs_notary == True).all()
-    }
+    from sqlalchemy import or_, and_
+    service_query = db.query(models.ClientService.id)
+    if db_notary.is_notary:
+        service_query = service_query.filter(models.ClientService.needs_notary == True)
+    elif db_notary.is_gov_officer:
+        service_query = service_query.filter(models.ClientService.needs_gov_officer == True)
+    elif db_notary.is_other_vendor:
+        service_query = service_query.filter(
+            or_(
+                models.ClientService.needs_other_vendors == True,
+                and_(
+                    or_(models.ClientService.needs_notary == False, models.ClientService.needs_notary == None),
+                    or_(models.ClientService.needs_gov_officer == False, models.ClientService.needs_gov_officer == None)
+                )
+            )
+        )
+    valid_service_ids = {s.id for s in service_query.all()}
 
     if notary_in.service_fees:
         for sf_in in notary_in.service_fees:
@@ -174,6 +257,45 @@ def update_notary(
 
     db.commit()
     db.refresh(db_notary)
+    return format_notary_response(db_notary, db)
+
+@router.put("/{notary_id}/validate", response_model=schemas.NotaryResponse)
+def validate_notary(
+    notary_id: int,
+    val_data: schemas.CompanyValidationRequest,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Validate or request revision on a vendor / notary profile. (Admin only)
+    """
+    if not is_authorized_admin(current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators or management can validate vendor profiles."
+        )
+
+    db_notary = db.query(models.Notary).options(
+        joinedload(models.Notary.creator).joinedload(models.User.employee),
+        joinedload(models.Notary.validator).joinedload(models.User.employee),
+        joinedload(models.Notary.service_fees).joinedload(models.NotaryServiceFee.service)
+    ).filter(models.Notary.id == notary_id).first()
+    if not db_notary:
+        raise HTTPException(status_code=404, detail="Vendor not found.")
+
+    status_upper = (val_data.status or "").strip().upper()
+    if status_upper not in ["VALIDATED", "NEEDS_REVISION", "PENDING_VALIDATION"]:
+        raise HTTPException(status_code=400, detail="Invalid status. Must be VALIDATED, NEEDS_REVISION, or PENDING_VALIDATION")
+
+    db_notary.validation_status = status_upper
+    db_notary.validation_notes = val_data.notes or None
+    db_notary.validated_by_user_id = current_user.id
+    db_notary.validated_at = datetime.now()
+    db_notary.updated_at = datetime.now()
+
+    db.commit()
+    db.refresh(db_notary)
+
     return format_notary_response(db_notary, db)
 
 @router.delete("/{notary_id}")
@@ -220,10 +342,15 @@ def get_notary_payments_summary(db: Session = Depends(database.get_db), current_
         total_outstanding = total_earned - total_paid
         
         is_bank_configured = bool(n.bank_name and n.bank_account_number and n.bank_account_holder_name)
+        v_type = n.vendor_type or ("GOVERNMENT_OFFICER" if n.is_gov_officer else ("OTHER_VENDORS" if n.is_other_vendor else "NOTARY"))
 
         results.append({
             "notary_id": n.id,
             "notary_name": n.name,
+            "vendor_type": v_type,
+            "is_notary": n.is_notary,
+            "is_gov_officer": n.is_gov_officer,
+            "is_other_vendor": n.is_other_vendor,
             "city": n.city,
             "status": n.status,
             "bank_name": n.bank_name,
@@ -276,11 +403,16 @@ def get_notary_payment_history(notary_id: int, db: Session = Depends(database.ge
         })
         
     is_bank_configured = bool(notary.bank_name and notary.bank_account_number and notary.bank_account_holder_name)
+    v_type = notary.vendor_type or ("GOVERNMENT_OFFICER" if notary.is_gov_officer else ("OTHER_VENDORS" if notary.is_other_vendor else "NOTARY"))
 
     return {
         "notary": {
             "id": notary.id,
             "name": notary.name,
+            "vendor_type": v_type,
+            "is_notary": notary.is_notary,
+            "is_gov_officer": notary.is_gov_officer,
+            "is_other_vendor": notary.is_other_vendor,
             "email": notary.email,
             "phone": notary.phone,
             "city": notary.city,
@@ -450,4 +582,96 @@ def unpay_notary_job(
     
     db.commit()
     return {"detail": "Payment reverted to unpaid successfully"}
+
+
+class SendNotaryVoucherEmailRequest(schemas.BaseModel):
+    recipient_email: Optional[str] = None
+    custom_message: Optional[str] = None
+    pdf_base64: Optional[str] = None
+    pdf_filename: Optional[str] = None
+
+
+@router.post("/payments/{order_item_id}/send-voucher-email")
+def send_notary_voucher_email(
+    order_item_id: int,
+    req: SendNotaryVoucherEmailRequest = None,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Send an official Payment Voucher (Remittance Advice) email to the notary for a settled order item.
+    """
+    if not is_authorized_admin(current_user, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators or management can dispatch payment vouchers."
+        )
+
+    job = db.query(models.ClientOrder).filter(models.ClientOrder.id == order_item_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Order item not found")
+
+    if not job.notary_id:
+        raise HTTPException(status_code=400, detail="No notary assigned to this order item")
+
+    if job.notary_payment_status != "PAID":
+        raise HTTPException(status_code=400, detail="Cannot send payment voucher for an unpaid or unsettled notary job.")
+
+    notary = db.query(models.Notary).filter(models.Notary.id == job.notary_id).first()
+    if not notary:
+        raise HTTPException(status_code=404, detail="Notary record not found")
+
+    target_email = (req.recipient_email if req and req.recipient_email else "").strip() or (notary.email or "")
+    if not target_email:
+        raise HTTPException(status_code=400, detail="No recipient email specified and notary does not have an email on file.")
+
+    from utils.email_service import send_notary_payment_voucher_email
+
+    company_name = "Personal Client Account"
+    if job.company and job.company.company_name:
+        company_name = job.company.company_name
+    elif job.client and job.client.companies:
+        company_name = job.client.companies[0].company_name
+    elif job.client and job.client.contact_person:
+        company_name = job.client.contact_person
+
+    pay_date_str = str(job.notary_payment_date or date.today())
+    payout_ref_str = job.notary_payment_ref or (f"Xendit ID: {job.notary_payout_id}" if job.notary_payout_id else "Settled")
+
+    # Decode PDF base64 if provided
+    pdf_bytes = None
+    if req and req.pdf_base64:
+        import base64
+        try:
+            raw_b64 = req.pdf_base64
+            if "," in raw_b64:
+                raw_b64 = raw_b64.split(",", 1)[1]
+            pdf_bytes = base64.b64decode(raw_b64)
+        except Exception as b64_err:
+            print("Failed to decode PDF base64 payload:", b64_err)
+
+    pdf_filename = (req.pdf_filename if req and req.pdf_filename else f"PV-{job.order_number}.pdf").strip()
+
+    success = send_notary_payment_voucher_email(
+        notary_email=target_email,
+        notary_name=notary.name,
+        order_number=job.order_number,
+        company_name=company_name,
+        job_title=job.job_title,
+        amount=job.notary_fee or 0.0,
+        bank_name=notary.bank_name or "-",
+        bank_account_number=notary.bank_account_number or "-",
+        bank_account_holder_name=notary.bank_account_holder_name or notary.name,
+        payment_date=pay_date_str,
+        payout_ref=payout_ref_str,
+        custom_message=req.custom_message if req else None,
+        pdf_content=pdf_bytes,
+        pdf_filename=pdf_filename
+    )
+
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to send email. Please verify server email credentials.")
+
+    return {"detail": f"Payment voucher successfully emailed to {target_email}!"}
+
 

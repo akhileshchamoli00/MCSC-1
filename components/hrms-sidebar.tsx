@@ -33,7 +33,11 @@ import {
   Building2,
   Briefcase,
   ShoppingBag,
-  Scale
+  Package,
+  Scale,
+  Bell,
+  CreditCard,
+  Receipt
 } from "lucide-react";
 import {
   Tooltip,
@@ -74,12 +78,12 @@ const clientNavModules: NavModule[] = [
     href: "/client/profile"
   },
   {
-    title: "My Consultants",
-    icon: Users,
-    href: "/client/consultants"
+    title: "My Orders",
+    icon: Package,
+    href: "/client/orders"
   },
   {
-    title: "Chat",
+    title: "Order Chat",
     icon: MessageSquare,
     href: "/client/chat"
   },
@@ -116,6 +120,14 @@ const navModules: NavModule[] = [
     href: "/hrms/calendar",
     adminOnly: true,
     moduleCode: "calendar",
+    systemArea: "hrms"
+  },
+  {
+    title: "Announcements",
+    icon: Megaphone,
+    href: "/hrms/announcements",
+    adminOnly: false,
+    moduleCode: "hrms_announcements",
     systemArea: "hrms"
   },
   {
@@ -224,7 +236,7 @@ const navModules: NavModule[] = [
     systemArea: "business"
   },
   {
-    title: "Notaries",
+    title: "Vendors",
     icon: Scale,
     href: "/business/clients/notaries",
     adminOnly: true,
@@ -236,10 +248,19 @@ const navModules: NavModule[] = [
     icon: ShoppingBag,
     systemArea: "business",
     items: [
+      { name: "Pipeline Orders", href: "/business/clients/orders/pipeline", adminOnly: true, moduleCode: "clients_orders_pipeline" },
       { name: "Active Orders", href: "/business/clients/orders", adminOnly: true, moduleCode: "clients_orders_active" },
       { name: "Completed Orders", href: "/business/clients/orders/completed", adminOnly: true, moduleCode: "clients_orders_completed" },
-      { name: "Notary Payment", href: "/business/clients/orders/notary-payments", adminOnly: true, moduleCode: "clients_orders_notary_payments" }
+      { name: "Cancelled Orders", href: "/business/clients/orders/cancelled", adminOnly: true, moduleCode: "clients_orders_cancelled" }
     ]
+  },
+  {
+    title: "Settlements",
+    icon: CreditCard,
+    href: "/business/clients/orders/notary-payments",
+    adminOnly: true,
+    moduleCode: "clients_orders_notary_payments",
+    systemArea: "business"
   },
   {
     title: "Documents",
@@ -250,6 +271,22 @@ const navModules: NavModule[] = [
     systemArea: "business"
   },
   {
+    title: "Announcements",
+    icon: Megaphone,
+    href: "/business/announcements",
+    adminOnly: true,
+    moduleCode: "clients_announcements",
+    systemArea: "business"
+  },
+  {
+    title: "Accurate Online",
+    icon: Receipt,
+    href: "/business/settings/accurate",
+    adminOnly: true,
+    moduleCode: "clients_accurate",
+    systemArea: "business"
+  },
+  {
     title: "Assigned Orders",
     icon: FileCheck,
     href: "/business/assigned-orders",
@@ -257,16 +294,6 @@ const navModules: NavModule[] = [
     employeeOnly: true,
     moduleCode: "clients_my",
     systemArea: "business"
-  },
-  {
-    title: "Chat",
-    icon: MessageSquare,
-    systemArea: "business",
-    items: [
-      { name: "Chat Center", href: "/business/chat-center", adminOnly: true, moduleCode: "chat_center" },
-      { name: "Client Chat", href: "/business/chat", adminOnly: false, employeeOnly: true, moduleCode: "chat_client" },
-      { name: "Assigned Company", href: "/business/chat/assigned-companies", adminOnly: false, moduleCode: "chat_assigned_companies" },
-    ]
   }
 ];
 
@@ -284,22 +311,20 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
   const [role, setRole] = useState("");
-  const { hasPermission, currentMode, setMode, allowedModes } = useUser();
+  const { hasPermission, currentMode, setMode, allowedModes, loading: userLoading } = useUser();
 
-  // Persist state
   useEffect(() => {
+    const r = localStorage.getItem("user_role") || "EMPLOYEE";
+    setRole(r);
+    
     const saved = localStorage.getItem("hrms_sidebar_collapsed");
     if (saved) setIsCollapsed(JSON.parse(saved));
-
-    const savedRole = localStorage.getItem("user_role") || "";
-    setRole(savedRole.toUpperCase());
 
     const savedModules = localStorage.getItem("hrms_expanded_modules");
     if (savedModules) {
       setExpandedModules(JSON.parse(savedModules));
     } else {
-      // Default to all true if first load
-      const activeModules = savedRole.toUpperCase() === "CLIENT" ? clientNavModules : navModules;
+      const activeModules = r.toUpperCase() === "CLIENT" ? clientNavModules : navModules;
       const allTrue = activeModules.reduce((acc, m) => ({ ...acc, [m.title]: true }), {});
       setExpandedModules(allTrue);
     }
@@ -313,7 +338,6 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
 
   const toggleModule = (title: string) => {
     if (isCollapsed) {
-      // If collapsed, auto-expand sidebar when a module is clicked
       toggleSidebar();
     }
     const newMods = { ...expandedModules, [title]: !expandedModules[title] };
@@ -321,7 +345,6 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
     localStorage.setItem("hrms_expanded_modules", JSON.stringify(newMods));
   };
 
-  // Determine if a module is active based on current path
   const isModuleActive = (module: NavModule) => {
     let href = module.href;
     if (module.title === "Dashboard" && role !== "CLIENT") {
@@ -342,7 +365,12 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
       }
       return pathname === href || pathname.startsWith(href + '/');
     }
-    return module.items?.some(item => pathname === item.href || pathname.startsWith(item.href + '/')) ?? false;
+    return module.items?.some(item => {
+      if (item.href === "/business/clients/orders") {
+        return pathname === "/business/clients/orders" || pathname === "/business/clients/orders/new";
+      }
+      return pathname === item.href || pathname.startsWith(item.href + '/');
+    }) ?? false;
   };
 
   const handleLogout = () => {
@@ -362,9 +390,11 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
   };
 
   const sidebarVariants = {
-    expanded: { width: "260px" },
-    collapsed: { width: "80px" },
+    expanded: { width: 260 },
+    collapsed: { width: 80 },
   };
+
+  const isDarkSidebar = true;
 
   return (
     <>
@@ -385,121 +415,139 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
         variants={sidebarVariants}
         initial={isCollapsed ? "collapsed" : "expanded"}
         animate={isCollapsed ? "collapsed" : "expanded"}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className={`fixed md:relative z-50 h-screen bg-white/80 dark:bg-black border-r border-slate-200/50 dark:border-zinc-900 shadow-[4px_0_24px_rgba(0,0,0,0.02)] dark:shadow-[4px_0_24px_rgba(0,0,0,0.2)] flex flex-col transition-transform duration-300 ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-          }`}
+        transition={{ type: "spring", stiffness: 450, damping: 35, mass: 0.6 }}
+        className={`fixed md:relative z-50 h-screen bg-[#0b0c10] dark:bg-[#07090e]/95 dark:backdrop-blur-xl text-zinc-100 border-r border-zinc-800/80 dark:border-zinc-800/60 shadow-[4px_0_30px_rgba(0,0,0,0.5)] dark:shadow-[4px_0_30px_rgba(0,0,0,0.7)] flex flex-col ${
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
       >
         {/* Header / Logo Area */}
         <div 
-          className="h-[104px] flex items-center px-4 shrink-0 border-b border-slate-100 dark:border-zinc-900 relative"
+          className="h-16 flex items-center px-4 shrink-0 border-b border-zinc-800/80 dark:border-zinc-800/60 bg-black/20 dark:bg-black/40 relative overflow-visible"
           onMouseLeave={() => setIsSwitcherOpen(false)}
         >
-          <AnimatePresence mode="wait">
-            {!isCollapsed && (
-              <motion.div 
-                key="expanded-logo"
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: "auto" }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.3 }}
-                className="flex items-center gap-3 w-full p-2 mt-2 overflow-visible"
-              >
-                <div 
-                  className="bg-gradient-to-tr from-primary/20 via-primary/10 to-primary/30 p-[1.5px] rounded-xl transition-all shrink-0 hover:scale-105 cursor-pointer flex items-center justify-center shadow-sm"
-                  onClick={toggleSidebar}
-                >
-                  <div className="bg-white dark:bg-zinc-900 p-1.5 rounded-[11px] flex items-center justify-center">
-                    <img src="/icon.png" alt="MCS Logo" className="w-6 h-6 object-contain" />
-                  </div>
+          <div className="flex items-center gap-2.5 w-full">
+            {/* Logo Icon */}
+            <div 
+              className="bg-gradient-to-tr from-emerald-500/30 via-emerald-500/20 to-teal-500/40 p-[1.5px] rounded-xl transition-transform shrink-0 hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center shadow-sm"
+              onClick={toggleSidebar}
+              title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            >
+              <div className="bg-[#12131a] dark:bg-[#0e111a] border border-white/10 p-1.5 rounded-[10px] flex items-center justify-center">
+                <img src="/icon.png" alt="MCS Logo" className="w-5 h-5 object-contain" />
+              </div>
+            </div>
+            
+            {/* Text & Switcher Area */}
+            <motion.div 
+              initial={false}
+              animate={{ 
+                opacity: isCollapsed ? 0 : 1,
+                width: isCollapsed ? 0 : "auto",
+                pointerEvents: isCollapsed ? "none" : "auto"
+              }}
+              transition={{ duration: 0.15, ease: "easeInOut" }}
+              className="overflow-hidden whitespace-nowrap flex-1 flex flex-col justify-center items-start relative"
+            >
+              {allowedModes && allowedModes.length > 1 && role !== "CLIENT" ? (
+                <>
+                  <span className="text-[8.5px] bg-white/10 text-zinc-300 border border-white/15 px-1.5 py-0 rounded-full tracking-wider uppercase font-bold leading-tight">
+                    Platform
+                  </span>
+                  <button
+                    onClick={() => setIsSwitcherOpen(!isSwitcherOpen)}
+                    className="flex items-center gap-1 text-xs font-bold text-white hover:text-emerald-400 transition-colors mt-0.5"
+                  >
+                    <span>{currentMode === "business" ? "Business" : "HRMS"}</span>
+                    <ChevronDown className="h-3 w-3 opacity-60 shrink-0" />
+                  </button>
+                </>
+              ) : (
+                <div className="flex flex-col whitespace-nowrap">
+                  <span className="font-black text-sm tracking-tight text-white leading-tight">
+                    MCS
+                  </span>
+                  <span className="text-[9px] text-zinc-400 tracking-widest uppercase font-bold mt-0.5">
+                    {role === "CLIENT" ? "Client Portal" : currentMode === "business" ? "Business" : "HRMS"}
+                  </span>
                 </div>
-                
-                {allowedModes && allowedModes.length > 1 && role !== "CLIENT" ? (
-                  <div className="flex flex-col whitespace-nowrap justify-start items-start relative">
-                    <span className="text-[10px] text-muted-foreground/60 tracking-wider uppercase font-bold">
-                      MCS Platform
-                    </span>
-                    <button
-                      onClick={() => setIsSwitcherOpen(!isSwitcherOpen)}
-                      className="flex items-center gap-1 text-sm font-bold text-slate-800 dark:text-slate-100 hover:opacity-85 transition-opacity"
-                    >
-                      {currentMode === "business" ? "Business" : "HRMS"}
-                      <ChevronDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
-                    </button>
-                    
-                    {/* Switcher Dropdown */}
-                    <AnimatePresence>
-                      {isSwitcherOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 5 }}
-                          className="absolute left-0 top-[38px] w-[180px] rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-1.5 shadow-xl z-50 text-[11px]"
-                        >
-                          <button
-                            onClick={() => {
-                              setIsSwitcherOpen(false);
-                              if (currentMode !== "hrms") {
-                                setMode("hrms");
-                                router.push("/hrms/dashboard");
-                              }
-                            }}
-                            className={`flex items-center justify-between w-full p-2 rounded-lg font-bold text-left transition-colors ${currentMode === "hrms" ? "bg-primary/10 text-primary" : "hover:bg-slate-100 dark:hover:bg-zinc-900 text-slate-700 dark:text-slate-300"}`}
-                          >
-                            <span>MCS HRMS Platform</span>
-                            {currentMode === "hrms" && <div className="h-1.5 w-1.5 rounded-full bg-primary" />}
-                          </button>
-                          <button
-                            onClick={() => {
-                              setIsSwitcherOpen(false);
-                              if (currentMode !== "business") {
-                                setMode("business");
-                                router.push("/business/dashboard");
-                              }
-                            }}
-                            className={`flex items-center justify-between w-full p-2 rounded-lg font-bold text-left transition-colors ${currentMode === "business" ? "bg-primary/10 text-primary" : "hover:bg-slate-100 dark:hover:bg-zinc-900 text-slate-700 dark:text-slate-300"}`}
-                          >
-                            <span>MCS Business Platform</span>
-                            {currentMode === "business" && <div className="h-1.5 w-1.5 rounded-full bg-primary" />}
-                          </button>
-                          <div className="border-t border-slate-100 dark:border-zinc-900 my-1" />
-                          <Link
-                            href="/select-system"
-                            onClick={() => setIsSwitcherOpen(false)}
-                            className="flex items-center gap-1.5 w-full p-2 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900 text-[10px] font-semibold"
-                          >
-                            Change Workspace
-                          </Link>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                ) : (
-                  <div className="flex flex-col whitespace-nowrap">
-                    <span className="font-black text-base tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 dark:from-white dark:via-slate-100 dark:to-slate-200 leading-tight">
-                      MCS
-                    </span>
-                    <span className="text-[9px] text-muted-foreground/60 tracking-widest uppercase font-bold mt-0.5">
-                      {role === "CLIENT" ? "Client Portal" : currentMode === "business" ? "Business" : "HRMS"}
-                    </span>
-                  </div>
-                )}
+              )}
+            </motion.div>
+
+            {/* Toggle Button */}
+            {!isCollapsed && (
+              <button
+                onClick={toggleSidebar}
+                className="hidden md:flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 border border-white/10 p-1.5 rounded-lg transition-colors shrink-0 ml-auto"
+                title="Collapse Sidebar"
+              >
+                <PanelLeftClose className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Switcher Dropdown */}
+          <AnimatePresence>
+            {isSwitcherOpen && !isCollapsed && (
+              <motion.div
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 5 }}
+                transition={{ duration: 0.12 }}
+                className="absolute left-10 top-[52px] w-[190px] rounded-xl border border-zinc-800 bg-[#12131a] dark:bg-[#0c0e17] text-zinc-100 shadow-[0_10px_30px_rgba(0,0,0,0.8)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.9)] p-1.5 z-50 text-[11px]"
+              >
+                <button
+                  onClick={() => {
+                    setIsSwitcherOpen(false);
+                    if (currentMode !== "hrms") {
+                      setMode("hrms");
+                      router.push("/hrms/dashboard");
+                    }
+                  }}
+                  className={`flex items-center justify-between w-full p-2 rounded-lg font-bold text-left transition-colors ${
+                    currentMode === "hrms" 
+                      ? "bg-white/15 text-white font-extrabold border border-white/20 shadow-sm" 
+                      : "hover:bg-white/[0.08] text-zinc-300 hover:text-white"
+                  }`}
+                >
+                  <span className="text-white">MCS HRMS Platform</span>
+                  {currentMode === "hrms" && (
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" />
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setIsSwitcherOpen(false);
+                    if (currentMode !== "business") {
+                      setMode("business");
+                      router.push("/business/dashboard");
+                    }
+                  }}
+                  className={`flex items-center justify-between w-full p-2 rounded-lg font-bold text-left transition-colors ${
+                    currentMode === "business" 
+                      ? "bg-white/15 text-white font-extrabold border border-white/20 shadow-sm" 
+                      : "hover:bg-white/[0.08] text-zinc-300 hover:text-white"
+                  }`}
+                >
+                  <span className="text-white">MCS Business Platform</span>
+                  {currentMode === "business" && (
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" />
+                  )}
+                </button>
+                <div className="border-t border-zinc-800 my-1" />
+                <Link
+                  href="/select-system"
+                  onClick={() => setIsSwitcherOpen(false)}
+                  className="flex items-center gap-1.5 w-full p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] text-[10px] font-semibold"
+                >
+                  Change Workspace
+                </Link>
               </motion.div>
             )}
           </AnimatePresence>
-
-          <motion.button 
-            initial={false}
-            animate={{ right: isCollapsed ? 22 : 16 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            onClick={toggleSidebar}
-            className="hidden md:flex items-center justify-center text-slate-400 hover:text-slate-800 hover:bg-slate-100 dark:text-white/40 dark:hover:text-white dark:hover:bg-zinc-900 p-2 rounded-xl transition-colors shrink-0 absolute"
-          >
-            {isCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
-          </motion.button>
         </div>
 
         {/* Navigation List */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-3 space-y-1 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-3 space-y-1.5 scrollbar-hide">
           {(role === "CLIENT" ? clientNavModules : navModules).map((module) => {
             // Filter by active system area (hrms vs business)
             const moduleArea = module.systemArea || "shared";
@@ -542,23 +590,34 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
             // Direct link rendering (no dropdown)
             if (href) {
               return (
-                <div key={module.title} className="flex flex-col mb-1">
+                <div key={module.title} className="flex flex-col mb-0.5">
                   <Tooltip delayDuration={300}>
                     <TooltipTrigger asChild>
                       <Link
                         href={href}
-                        className={`flex items-center justify-between w-full p-2.5 text-sm font-semibold rounded-xl transition-all duration-300 group ${active
-                             ? "bg-primary/10 text-primary dark:bg-zinc-900 dark:text-white shadow-[inset_3px_0_0_0_hsl(var(--primary))]"
-                             : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 dark:text-white/60 dark:hover:text-white dark:hover:bg-zinc-900"
-                           }`}
+                        className={`flex items-center justify-between w-full p-2.5 text-sm font-semibold rounded-xl transition-colors duration-150 group ${
+                          active
+                            ? "bg-white/10 text-white font-bold border border-white/15 shadow-[0_2px_12px_rgba(0,0,0,0.4)]"
+                            : "text-zinc-400 hover:text-white hover:bg-white/[0.07] border border-transparent"
+                        }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                            <module.icon className={`h-[18px] w-[18px] transition-colors ${active ? "text-primary dark:text-white" : "text-slate-400 dark:text-white/40 group-hover:text-slate-800 dark:group-hover:text-white"}`} />
-                          </motion.div>
-                          {!isCollapsed && (
-                            <span className="tracking-tight group-hover:translate-x-[2px] transition-transform duration-200">{module.title}</span>
-                          )}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <module.icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${
+                            active 
+                              ? "text-emerald-400" 
+                              : "text-zinc-400 group-hover:text-white"
+                          }`} />
+                          <motion.span 
+                            initial={false}
+                            animate={{ 
+                              opacity: isCollapsed ? 0 : 1,
+                              width: isCollapsed ? 0 : "auto"
+                            }}
+                            transition={{ duration: 0.15 }}
+                            className="tracking-tight group-hover:translate-x-[2px] transition-transform duration-200 truncate overflow-hidden whitespace-nowrap"
+                          >
+                            {module.title}
+                          </motion.span>
                         </div>
                       </Link>
                     </TooltipTrigger>
@@ -572,28 +631,40 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
             const expanded = expandedModules[module.title] && !isCollapsed;
 
             return (
-              <div key={module.title} className="flex flex-col mb-1">
+              <div key={module.title} className="flex flex-col mb-0.5">
                 <Tooltip delayDuration={300}>
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => toggleModule(module.title)}
-                      className={`flex items-center justify-between w-full p-2.5 text-sm font-semibold rounded-xl transition-all duration-300 group ${active && !expanded
-                          ? "bg-primary/10 text-primary dark:bg-zinc-900 dark:text-white shadow-[inset_3px_0_0_0_hsl(var(--primary))]"
-                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 dark:text-white/60 dark:hover:text-white dark:hover:bg-zinc-900"
-                        }`}
+                      className={`flex items-center justify-between w-full p-2.5 text-sm font-semibold rounded-xl transition-colors duration-150 group ${
+                        active && !expanded
+                          ? "bg-white/10 text-white font-bold border border-white/15 shadow-[0_2px_12px_rgba(0,0,0,0.4)]"
+                          : "text-zinc-400 hover:text-white hover:bg-white/[0.07] border border-transparent"
+                      }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                          <module.icon className={`h-[18px] w-[18px] transition-colors ${active ? "text-primary dark:text-white" : "text-slate-400 dark:text-white/40 group-hover:text-slate-800 dark:group-hover:text-white"}`} />
-                        </motion.div>
-                        {!isCollapsed && (
-                          <span className="tracking-tight group-hover:translate-x-[2px] transition-transform duration-200">{module.title}</span>
-                        )}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <module.icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${
+                          active 
+                            ? "text-emerald-400" 
+                            : "text-zinc-400 group-hover:text-white"
+                        }`} />
+                        <motion.span 
+                          initial={false}
+                          animate={{ 
+                            opacity: isCollapsed ? 0 : 1,
+                            width: isCollapsed ? 0 : "auto"
+                          }}
+                          transition={{ duration: 0.15 }}
+                          className="tracking-tight group-hover:translate-x-[2px] transition-transform duration-200 truncate overflow-hidden whitespace-nowrap"
+                        >
+                          {module.title}
+                        </motion.span>
                       </div>
                       {!isCollapsed && (
                         <motion.div
                           animate={{ rotate: expanded ? 180 : 0 }}
-                          transition={{ duration: 0.2 }}
+                          transition={{ duration: 0.15 }}
+                          className="shrink-0"
                         >
                           <ChevronDown className="h-4 w-4 opacity-50" />
                         </motion.div>
@@ -610,15 +681,13 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2, ease: "easeInOut" }}
+                      transition={{ duration: 0.15, ease: "easeInOut" }}
                       className="overflow-hidden"
                     >
-                      <div className="ml-[18px] pl-4 border-l border-slate-100 dark:border-zinc-900 py-1 mt-1 space-y-1">
+                      <div className="ml-[18px] pl-3.5 border-l border-zinc-800 dark:border-zinc-800/60 py-1 mt-1 space-y-1">
                         {visibleItems.map((item) => {
                           const isSubActive = item.href === "/clients" || item.href === "/business/clients"
                             ? (pathname === "/business/clients" || pathname === "/business/clients/new")
-                            : item.href === "/chat" || item.href === "/business/chat"
-                            ? (pathname === "/business/chat")
                             : item.href === "/business/clients/orders"
                             ? (pathname === "/business/clients/orders" || pathname === "/business/clients/orders/new")
                             : (pathname === item.href || pathname.startsWith(item.href + '/'));
@@ -626,18 +695,20 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
                             <Link
                               key={item.name}
                               href={item.href}
-                              className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-[13px] transition-all duration-200 relative group ${isSubActive
-                                   ? "text-primary dark:text-white font-bold bg-primary/5 dark:bg-zinc-900/50 shadow-[0_1px_2px_rgba(0,0,0,0.01)]"
-                                   : "text-slate-500 hover:text-slate-800 dark:text-white/40 dark:hover:text-white hover:bg-slate-100/40 dark:hover:bg-zinc-900"
-                                 }`}
+                              className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-[13px] transition-colors duration-150 relative group ${
+                                isSubActive
+                                  ? "text-white font-bold bg-white/10 border border-white/20 shadow-[0_2px_10px_rgba(0,0,0,0.4)]"
+                                  : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
+                              }`}
                             >
-                              <span className={`absolute -left-[18px] top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full transition-all ${isSubActive 
-                                  ? "bg-primary dark:bg-primary shadow-[0_0_8px_hsl(var(--primary))] dark:shadow-[0_0_8px_hsl(var(--primary))]" 
+                              <span className={`absolute -left-[18px] top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full transition-all ${
+                                isSubActive 
+                                  ? "bg-emerald-400 shadow-[0_0_8px_#34d399]" 
                                   : "bg-transparent"
-                                }`} />
-                              <span className="group-hover:translate-x-[1px] transition-transform duration-200">{item.name}</span>
+                              }`} />
+                              <span className="group-hover:translate-x-[1px] transition-transform duration-200 truncate">{item.name}</span>
                               {item.badge && (
-                                <span className="bg-primary/10 text-primary dark:bg-zinc-900 dark:text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-white/10 text-white shrink-0">
                                   {item.badge}
                                 </span>
                               )}
@@ -654,20 +725,19 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
 
           {/* Settings / System at bottom of list */}
           {currentMode === "hrms" && (isAdmin || hasPermission("settings", "view")) && (
-            <div className="pt-4 mt-4 border-t border-slate-100 dark:border-zinc-900">
+            <div className="pt-4 mt-4 border-t border-zinc-800 dark:border-zinc-800/60">
               <Tooltip delayDuration={300}>
                 <TooltipTrigger asChild>
                   <Link
                     href="/hrms/settings"
-                    className={`flex items-center gap-3 w-full p-2.5 text-sm font-semibold rounded-xl transition-all duration-300 group ${pathname.startsWith("/hrms/settings")
-                        ? "bg-primary/10 text-primary dark:bg-zinc-900 dark:text-white shadow-[inset_3px_0_0_0_hsl(var(--primary))]"
-                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/60 dark:text-white/60 dark:hover:text-white dark:hover:bg-zinc-900"
-                      }`}
+                    className={`flex items-center gap-3 w-full p-2.5 text-sm font-semibold rounded-xl transition-colors duration-150 group ${
+                      pathname.startsWith("/hrms/settings")
+                        ? "bg-white/10 text-white font-bold border border-white/15 shadow-[0_2px_12px_rgba(0,0,0,0.4)]"
+                        : "text-zinc-400 hover:text-white hover:bg-white/[0.07] border border-transparent"
+                    }`}
                   >
-                    <motion.div whileHover={{ scale: 1.1 }}>
-                      <Settings className={`h-[18px] w-[18px] transition-colors ${pathname.startsWith("/hrms/settings") ? "text-primary dark:text-white" : "text-slate-400 dark:text-white/40 group-hover:text-slate-800 dark:group-hover:text-white"}`} />
-                    </motion.div>
-                    {!isCollapsed && <span className="tracking-tight group-hover:translate-x-[2px] transition-transform duration-200">Settings</span>}
+                    <Settings className={`h-[18px] w-[18px] shrink-0 transition-colors ${pathname.startsWith("/hrms/settings") ? "text-emerald-400" : "text-zinc-400 group-hover:text-white"}`} />
+                    {!isCollapsed && <span className="tracking-tight group-hover:translate-x-[2px] transition-transform duration-200 truncate">Settings</span>}
                   </Link>
                 </TooltipTrigger>
                 {isCollapsed && <TooltipContent side="right" className="font-semibold">Settings</TooltipContent>}
@@ -677,22 +747,20 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
         </div>
 
         {/* Logout Footer */}
-        <div className="p-3 border-t border-slate-100 dark:border-zinc-900 shrink-0">
+        <div className="p-3 border-t border-zinc-800/80 dark:border-zinc-800/60 bg-black/20 dark:bg-black/40 shrink-0">
           <Tooltip delayDuration={300}>
             <TooltipTrigger asChild>
               <button
                 onClick={handleLogout}
-                className={`flex items-center justify-between w-full p-2.5 text-sm font-semibold rounded-xl transition-all duration-300 group text-red-500/80 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400`}
+                className="flex items-center justify-between w-full p-2.5 text-sm font-semibold rounded-xl transition-colors duration-150 group text-rose-400/90 hover:bg-rose-500/10 hover:text-rose-400"
               >
-                <div className="flex items-center gap-3">
-                  <motion.div whileHover={{ scale: 1.1 }}>
-                    <LogOut className="h-[18px] w-[18px]" />
-                  </motion.div>
-                  {!isCollapsed && <span className="tracking-tight group-hover:translate-x-[2px] transition-transform duration-200">Logout</span>}
+                <div className="flex items-center gap-3 min-w-0">
+                  <LogOut className="h-[18px] w-[18px] shrink-0" />
+                  {!isCollapsed && <span className="tracking-tight group-hover:translate-x-[2px] transition-transform duration-200 truncate">Logout</span>}
                 </div>
               </button>
             </TooltipTrigger>
-            {isCollapsed && <TooltipContent side="right" className="font-semibold text-red-500">Logout</TooltipContent>}
+            {isCollapsed && <TooltipContent side="right" className="font-semibold text-rose-400">Logout</TooltipContent>}
           </Tooltip>
         </div>
       </motion.aside>

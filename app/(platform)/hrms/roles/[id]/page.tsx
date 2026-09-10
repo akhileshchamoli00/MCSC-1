@@ -53,14 +53,14 @@ export default function RoleProfilePage() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center gap-4">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Top Back Action Bar */}
+      <div className="flex items-center justify-between gap-4">
         <Link href="/hrms/roles">
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <ArrowLeft className="h-5 w-5" />
+          <Button variant="outline" size="sm" className="rounded-xl gap-2 h-10 px-4 text-xs font-semibold bg-card/60 backdrop-blur-md border-border/50 shadow-xs hover:bg-muted cursor-pointer">
+            <ArrowLeft className="h-4 w-4" /> Back to Roles
           </Button>
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight">Role Details</h1>
       </div>
 
       <div className="max-w-3xl">

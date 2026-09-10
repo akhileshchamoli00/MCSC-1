@@ -14,14 +14,28 @@ SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey-change-me-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 7 days for MVP
 
+import bcrypt
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False)
 
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    if not plain_password or not hashed_password:
+        return False
+    try:
+        password_bytes = plain_password.encode('utf-8')[:72]
+        hash_bytes = hashed_password.encode('utf-8')
+        return bcrypt.checkpw(password_bytes, hash_bytes)
+    except Exception:
+        try:
+            return pwd_context.verify(plain_password, hashed_password)
+        except Exception:
+            return False
 
-def get_password_hash(password):
-    return pwd_context.hash(password)
+def get_password_hash(password: str) -> str:
+    password_bytes = password.encode('utf-8')[:72]
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password_bytes, salt).decode('utf-8')
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -63,6 +77,29 @@ class CachedUser:
                 self.__dict__.update(client_dict)
         self.client = CachedClient(user_dict["client"]) if user_dict.get("client") else None
 
+        class CachedMember:
+            def __init__(self, member_dict):
+                self.__dict__.update(member_dict)
+        self.member = CachedMember(user_dict["member"]) if user_dict.get("member") else None
+
+    @property
+    def name(self) -> str:
+        if self.employee:
+            first = getattr(self.employee, "first_name", "") or ""
+            last = getattr(self.employee, "last_name", "") or ""
+            parts = [p for p in [first, last] if p]
+            if parts:
+                return " ".join(parts).strip()
+        if self.member and getattr(self.member, "full_name", None):
+            return self.member.full_name
+        if self.client and getattr(self.client, "contact_person", None):
+            return self.client.contact_person
+        if self.email and "@" in self.email:
+            prefix = self.email.split("@")[0]
+            clean = " ".join([word.capitalize() for word in prefix.replace(".", " ").replace("_", " ").replace("-", " ").split()])
+            return clean or self.email
+        return self.email or f"User #{self.id}"
+
 # In-memory authentication cache: email -> (user_dict, expiry_timestamp)
 _user_cache = {}
 CACHE_TTL_SECONDS = 30
@@ -77,11 +114,12 @@ def get_cached_user(db: Session, email: str):
         if now < expiry:
             return CachedUser(user_dict)
             
-    # Eagerly load user, role, and employee relationships
+    # Eagerly load user, role, employee, client, and member relationships
     db_user = db.query(models.User).options(
         joinedload(models.User.role),
         joinedload(models.User.employee),
-        joinedload(models.User.client)
+        joinedload(models.User.client),
+        joinedload(models.User.member)
     ).filter(models.User.email == email).first()
     
     if not db_user:
@@ -102,6 +140,14 @@ def get_cached_user(db: Session, email: str):
         mapper = inspect(db_client.__class__)
         for col in mapper.columns:
             client_dict[col.key] = getattr(db_client, col.key)
+
+    db_member = db_user.member
+    member_dict = None
+    if db_member:
+        member_dict = {}
+        mapper = inspect(db_member.__class__)
+        for col in mapper.columns:
+            member_dict[col.key] = getattr(db_member, col.key)
         
     user_dict = {
         "id": db_user.id,
@@ -114,7 +160,8 @@ def get_cached_user(db: Session, email: str):
         "role_description": db_user.role.description if db_user.role else None,
         "role_id_db": db_user.role.id if db_user.role else None,
         "employee": employee_dict,
-        "client": client_dict
+        "client": client_dict,
+        "member": member_dict
     }
     
     _user_cache[email] = (user_dict, now + CACHE_TTL_SECONDS)

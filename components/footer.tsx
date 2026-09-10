@@ -179,6 +179,14 @@ export function Footer() {
               </li>
               <li>
                 <Link
+                  href={`/${language}/track-order`}
+                  className="text-foreground/80 transition-colors hover:text-foreground font-medium text-primary"
+                >
+                  {t.nav.trackOrder}
+                </Link>
+              </li>
+              <li>
+                <Link
                   href={`/${language}/resources/kbli`}
                   className="text-foreground/80 transition-colors hover:text-foreground"
                 >

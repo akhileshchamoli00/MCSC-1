@@ -91,16 +91,13 @@ export default function EditRolePage() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-2xl mx-auto pb-10">
-      <div className="flex items-center gap-4">
+      {/* Top Back Action Bar */}
+      <div className="flex items-center justify-between gap-4">
         <Link href="/hrms/roles">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
+          <Button variant="outline" size="sm" className="rounded-xl gap-2 h-10 px-4 text-xs font-semibold bg-card/60 backdrop-blur-md border-border/50 shadow-xs hover:bg-muted cursor-pointer">
+            <ArrowLeft className="h-4 w-4" /> Back to Roles
           </Button>
         </Link>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Edit Role</h1>
-          <p className="text-muted-foreground mt-1">Update details for the {formData.name || "selected"} role.</p>
-        </div>
       </div>
 
       {error && (

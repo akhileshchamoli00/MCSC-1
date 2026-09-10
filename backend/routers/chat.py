@@ -26,6 +26,8 @@ def is_admin_or_hr(user: models.User) -> bool:
 def is_employee_role(user: models.User) -> bool:
     if not user:
         return False
+    if user.role and user.role.name.upper() in ["CLIENT", "MEMBER"]:
+        return False
     if hasattr(user, "employee") and user.employee is not None:
         return True
     if user.role:

@@ -37,7 +37,9 @@ export default function AddClientServicesPage() {
       partner_a1_discount: "",
       partner_a2_discount: "",
       partner_a3_price: "",
-      needs_notary: false
+      needs_notary: false,
+      needs_gov_officer: false,
+      needs_other_vendors: false
     }
   ]);
   const [initialCount, setInitialCount] = useState(0);
@@ -77,7 +79,9 @@ export default function AddClientServicesPage() {
             partner_a1_discount: "",
             partner_a2_discount: "",
             partner_a3_price: "",
-            needs_notary: false
+            needs_notary: false,
+            needs_gov_officer: false,
+            needs_other_vendors: false
           }
         ]);
       }
@@ -106,7 +110,9 @@ export default function AddClientServicesPage() {
         partner_a1_discount: "",
         partner_a2_discount: "",
         partner_a3_price: "",
-        needs_notary: false
+        needs_notary: false,
+        needs_gov_officer: false,
+        needs_other_vendors: false
       }
     ]);
   };
@@ -161,7 +167,9 @@ export default function AddClientServicesPage() {
         partner_a1_discount: item.partner_a1_discount !== "" ? parseFloat(item.partner_a1_discount) : 40,
         partner_a2_discount: item.partner_a2_discount !== "" ? parseFloat(item.partner_a2_discount) : 50,
         partner_a3_price: item.partner_a3_price || null,
-        needs_notary: item.needs_notary || false
+        needs_notary: item.needs_notary || false,
+        needs_gov_officer: item.needs_gov_officer || false,
+        needs_other_vendors: item.needs_other_vendors || false
       }));
 
       const isBulk = payload.length > 1;
@@ -278,7 +286,7 @@ export default function AddClientServicesPage() {
 
                   {/* Identification Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-                    <div className="sm:col-span-6 space-y-2">
+                    <div className="sm:col-span-8 space-y-2">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Job Title *</label>
                       <Input
                         required
@@ -289,7 +297,7 @@ export default function AddClientServicesPage() {
                       />
                     </div>
 
-                    <div className="sm:col-span-3 space-y-2">
+                    <div className="sm:col-span-4 space-y-2">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Job ID *</label>
                       <Input
                         required
@@ -300,21 +308,59 @@ export default function AddClientServicesPage() {
                       />
                     </div>
 
-                    <div className="sm:col-span-3 space-y-2 flex flex-col justify-end pb-2">
-                      <div className="flex items-center gap-2 h-10">
-                        <input
-                          type="checkbox"
-                          id={`needs-notary-${idx}`}
-                          checked={item.needs_notary || false}
-                          onChange={(e) => handleCreateItemChange(idx, "needs_notary", e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-emerald-600 cursor-pointer"
-                        />
-                        <label 
-                          htmlFor={`needs-notary-${idx}`}
-                          className="text-xs font-bold text-muted-foreground/90 cursor-pointer select-none"
-                        >
-                          Notary Required
-                        </label>
+                    {/* Requirements Checkboxes */}
+                    <div className="sm:col-span-12">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 block mb-2">
+                        Execution & Third-Party Requirements
+                      </label>
+                      <div className="flex flex-wrap items-center gap-6 p-3.5 rounded-xl bg-muted/20 border border-border/40">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`needs-notary-${idx}`}
+                            checked={item.needs_notary || false}
+                            onChange={(e) => handleCreateItemChange(idx, "needs_notary", e.target.checked)}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-emerald-600 cursor-pointer"
+                          />
+                          <label 
+                            htmlFor={`needs-notary-${idx}`}
+                            className="text-xs font-bold text-foreground cursor-pointer select-none"
+                          >
+                            Notary Required
+                          </label>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`needs-gov-officer-${idx}`}
+                            checked={item.needs_gov_officer || false}
+                            onChange={(e) => handleCreateItemChange(idx, "needs_gov_officer", e.target.checked)}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-emerald-600 cursor-pointer"
+                          />
+                          <label 
+                            htmlFor={`needs-gov-officer-${idx}`}
+                            className="text-xs font-bold text-foreground cursor-pointer select-none"
+                          >
+                            Government Body Required
+                          </label>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`needs-other-vendors-${idx}`}
+                            checked={item.needs_other_vendors || false}
+                            onChange={(e) => handleCreateItemChange(idx, "needs_other_vendors", e.target.checked)}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-emerald-600 cursor-pointer"
+                          />
+                          <label 
+                            htmlFor={`needs-other-vendors-${idx}`}
+                            className="text-xs font-bold text-foreground cursor-pointer select-none"
+                          >
+                            Other Vendors Required
+                          </label>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -436,21 +482,21 @@ export default function AddClientServicesPage() {
                 type="button"
                 variant="outline"
                 onClick={handleAddCreateItem}
-                className="w-full sm:w-auto border-dashed border-primary/50 text-primary hover:bg-primary/5 hover:border-primary transition-all gap-2 font-bold px-4 h-10 rounded-xl"
+                className="w-full sm:w-auto gap-2 font-bold px-4 h-10 rounded-xl"
               >
                 <Plus className="h-4 w-4" /> Add Another Service Package
               </Button>
 
               <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
                 <Link href="/business/clients/services">
-                  <Button type="button" variant="outline" className="rounded-xl h-10 px-4 font-bold border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-foreground transition-colors bg-transparent">
+                  <Button type="button" variant="outline" className="rounded-xl h-10 px-4 font-bold">
                     Cancel
                   </Button>
                 </Link>
                 <Button 
                   type="submit" 
                   disabled={saving} 
-                  className="px-6 font-bold shadow-md gap-2 rounded-xl h-10 bg-zinc-900 hover:bg-zinc-100 text-zinc-50 hover:text-zinc-900 border border-zinc-900 dark:bg-zinc-100 dark:hover:bg-zinc-900 dark:text-zinc-950 dark:hover:text-zinc-100 dark:border-zinc-100 transition-all duration-200"
+                  className="px-6 font-bold shadow-md gap-2 rounded-xl h-10"
                 >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                   Save Service Packages

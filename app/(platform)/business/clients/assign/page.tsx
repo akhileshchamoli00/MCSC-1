@@ -9,8 +9,10 @@ import {
   CheckCircle, 
   AlertCircle,
   HelpCircle,
-  Briefcase
+  Briefcase,
+  ArrowLeft
 } from "lucide-react";
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
@@ -158,11 +160,16 @@ export default function AssignConsultants() {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Assign Consultants</h1>
-        <p className="text-muted-foreground text-sm">
-          Map MCS employee accounts as advisors or primary managers to registered clients.
-        </p>
+      <div className="flex items-center gap-3 pb-2 border-b border-border/40">
+        <Link href="/business/clients">
+          <Button variant="ghost" size="icon" className="rounded-xl border border-border/60 hover:bg-muted" title="Back to Partners">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </Link>
+        <div>
+          <h2 className="text-lg font-bold tracking-tight">Assign Account Consultants</h2>
+          <p className="text-xs text-muted-foreground">Select a corporate client to map dedicated consultants and designated primary account managers.</p>
+        </div>
       </div>
 
       {successMsg && (

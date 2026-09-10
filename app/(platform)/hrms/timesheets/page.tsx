@@ -108,10 +108,10 @@ export default function MyTimesheets() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "APPROVED": return "bg-green-500/10 text-green-500 border-green-500/20";
-      case "REJECTED": return "bg-red-500/10 text-red-500 border-red-500/20";
-      case "SUBMITTED": return "bg-blue-500/10 text-blue-500 border-blue-500/20";
-      default: return "bg-orange-500/10 text-orange-500 border-orange-500/20";
+      case "APPROVED": return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold px-2.5 py-0.5 rounded-full";
+      case "REJECTED": return "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 font-bold px-2.5 py-0.5 rounded-full";
+      case "SUBMITTED": return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 font-bold px-2.5 py-0.5 rounded-full";
+      default: return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 font-bold px-2.5 py-0.5 rounded-full";
     }
   };
 
@@ -217,97 +217,120 @@ export default function MyTimesheets() {
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading timesheets...</div>;
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs text-muted-foreground font-medium">Loading timesheets...</p>
+        </div>
+      </div>
+    );
+  }
 
   const totalHours = currentTimesheet?.total_hours || 0;
   const overtimeHours = currentTimesheet?.overtime_hours || 0;
-  const regularHours = totalHours - overtimeHours;
   const isReadOnly = currentTimesheet?.status === "SUBMITTED" || currentTimesheet?.status === "APPROVED";
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative z-10">
+    <div className="space-y-6 max-w-7xl mx-auto animate-in fade-in duration-500 pb-16">
       
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-            My Timesheets
-          </h1>
-          <p className="text-muted-foreground mt-1 text-lg">Log your daily activities and track your hours.</p>
+      {/* Minimalist Metrics Strip & Action Button Row */}
+      <div className="flex flex-col md:flex-row items-stretch gap-3 w-full">
+        {/* Minimalist Metric Strip - Expanded Horizontally */}
+        <div className="grid grid-cols-2 md:grid-cols-4 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs flex-1 gap-2 sm:gap-0 divide-y md:divide-y-0 md:divide-x divide-border/50">
+          
+          {/* Total Hours */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
+              <Clock className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Total Hours</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{totalHours.toFixed(1)}h</p>
+            </div>
+          </div>
+
+          {/* Overtime */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
+              <Clock4 className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Overtime</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{overtimeHours.toFixed(1)}h</p>
+            </div>
+          </div>
+
+          {/* Weekly Status */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 col-span-2 justify-start sm:justify-center">
+            <div className="min-w-0 flex-1 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Weekly Status</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className={getStatusColor(currentTimesheet?.status || "DRAFT")}>
+                    {currentTimesheet?.status || "NO TIMESHEET"}
+                  </span>
+                  {currentTimesheet?.status === "REJECTED" && (
+                    <span className="text-[10px] text-rose-500 flex items-center gap-1 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20 truncate max-w-[150px]">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      {currentTimesheet.comments}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <Button 
+                onClick={handleSubmitTimesheet}
+                disabled={!currentTimesheet || isReadOnly || totalHours === 0}
+                variant={isReadOnly ? "secondary" : "default"}
+                size="sm"
+                className={isReadOnly ? "h-8 text-xs px-3 rounded-xl" : "h-8 text-xs px-3 rounded-xl font-bold shadow-sm cursor-pointer shrink-0"}
+              >
+                {currentTimesheet?.status === "SUBMITTED" ? "Awaiting Approval" : 
+                 currentTimesheet?.status === "APPROVED" ? "Approved" : "Submit Week"}
+              </Button>
+            </div>
+          </div>
         </div>
+
+        {/* Action Button */}
         <Button 
           onClick={() => setIsEntryModalOpen(true)}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-primary/20 transition-all hover:-translate-y-0.5"
+          className="gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm shrink-0 cursor-pointer"
           disabled={isReadOnly}
         >
-          <Plus className="mr-2 h-4 w-4" /> Add Time Entry
+          <Plus className="h-4 w-4" /> Add Time Entry
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard title="Total Hours" value={`${totalHours.toFixed(1)}h`} icon={Clock} colorTheme="sky" />
-        <KpiCard title="Overtime" value={`${overtimeHours.toFixed(1)}h`} icon={Clock4} colorTheme="amber" />
-        <KpiCard
-          title="Current Status"
-          borderClass={
-            currentTimesheet?.status === "APPROVED" ? "bg-emerald-500/80" : 
-            currentTimesheet?.status === "SUBMITTED" ? "bg-indigo-500/80" : 
-            currentTimesheet?.status === "REJECTED" ? "bg-rose-500/80" : "bg-amber-500/80"
-          }
-          className="md:col-span-2"
-        >
-          <div className="flex items-center justify-between gap-4 mt-0.5">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className={`font-semibold px-2 py-0 text-[10px] ${getStatusColor(currentTimesheet?.status || "DRAFT")}`}>
-                {currentTimesheet?.status || "NO TIMESHEET"}
-              </Badge>
-              {currentTimesheet?.status === "REJECTED" && (
-                <span className="text-[10px] text-red-500 flex items-center gap-1 bg-red-500/10 px-1.5 py-0.5 rounded-md">
-                  <AlertCircle className="w-3 h-3" />
-                  {currentTimesheet.comments}
-                </span>
-              )}
-            </div>
-            <Button 
-              onClick={handleSubmitTimesheet}
-              disabled={!currentTimesheet || isReadOnly || totalHours === 0}
-              variant={isReadOnly ? "secondary" : "default"}
-              size="sm"
-              className="h-7 text-xs px-3 shadow-sm active-scale"
-            >
-              {currentTimesheet?.status === "SUBMITTED" ? "Awaiting Approval" : 
-               currentTimesheet?.status === "APPROVED" ? "Approved" : "Submit Timesheet"}
-            </Button>
-          </div>
-        </KpiCard>
-      </div>
-
-      <Card className="border-border/40 bg-card/40 backdrop-blur-sm shadow-sm overflow-hidden">
+      {/* Weekly Entries Card */}
+      <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
         <CardHeader className="border-b border-border/40 bg-muted/20 py-4 flex flex-row items-center justify-between">
-          <CardTitle className="text-lg font-semibold flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-primary" />
-            Weekly Entries
+          <CardTitle className="text-base font-bold flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-emerald-500" />
+            <span>Weekly Entries</span>
           </CardTitle>
-          <div className="flex items-center gap-4">
-            <Button variant="outline" size="sm" onClick={() => setCurrentDate(subWeeks(currentDate, 1))}>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" onClick={() => setCurrentDate(subWeeks(currentDate, 1))} className="h-8 w-8 p-0 rounded-lg border-border/50">
               <ChevronLeft className="w-4 h-4" />
             </Button>
-            <span className="text-sm font-medium">
+            <span className="text-xs font-semibold text-foreground">
               {format(weekStart, "MMM d")} - {format(weekEnd, "MMM d, yyyy")}
             </span>
-            <Button variant="outline" size="sm" onClick={() => setCurrentDate(addWeeks(currentDate, 1))}>
+            <Button variant="outline" size="sm" onClick={() => setCurrentDate(addWeeks(currentDate, 1))} className="h-8 w-8 p-0 rounded-lg border-border/50">
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
         </CardHeader>
-        <div className="divide-y divide-border/40">
+        <div className="divide-y divide-border/20">
           {(!currentTimesheet || currentTimesheet.entries.length === 0) ? (
-            <div className="p-8 text-center flex flex-col items-center">
-              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-                <BriefcaseBusiness className="w-8 h-8 text-muted-foreground opacity-50" />
+            <div className="p-12 text-center flex flex-col items-center">
+              <div className="w-12 h-12 rounded-2xl bg-muted/50 flex items-center justify-center mb-3 text-muted-foreground">
+                <BriefcaseBusiness className="w-6 h-6 opacity-60" />
               </div>
-              <p className="text-muted-foreground">No time entries recorded for this week.</p>
+              <p className="text-xs text-muted-foreground">No time entries recorded for this week.</p>
               {!isReadOnly && (
-                <Button variant="link" className="mt-2 text-primary" onClick={() => setIsEntryModalOpen(true)}>
+                <Button variant="link" className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 font-bold p-0 h-auto cursor-pointer" onClick={() => setIsEntryModalOpen(true)}>
                   Click here to add your first entry
                 </Button>
               )}
@@ -316,23 +339,25 @@ export default function MyTimesheets() {
             currentTimesheet.entries.map((entry: any) => (
               <div key={entry.id} className="p-4 hover:bg-muted/30 transition-colors flex items-center justify-between group">
                 <div className="flex gap-4 items-start">
-                  <div className="bg-primary/10 text-primary font-bold w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 border border-primary/20">
-                    <span className="text-xs font-medium uppercase">{format(parseLocalDate(entry.date), "EEE")}</span>
-                    <span className="text-lg leading-none">{format(parseLocalDate(entry.date), "dd")}</span>
+                  <div className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 border border-emerald-500/20">
+                    <span className="text-[10px] font-medium uppercase">{format(parseLocalDate(entry.date), "EEE")}</span>
+                    <span className="text-base leading-none font-bold">{format(parseLocalDate(entry.date), "dd")}</span>
                   </div>
                   <div>
-                    <h4 className="font-semibold text-foreground flex items-center gap-2">
+                    <h4 className="text-xs font-bold text-foreground flex items-center gap-2">
                       {entry.project?.project_name || "Unknown Project"}
-                      <Badge variant="secondary" className="text-[10px] bg-muted">{entry.task?.task_name}</Badge>
+                      <span className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-[10px] px-2 py-0.5 rounded-md">
+                        {entry.task?.task_name}
+                      </span>
                     </h4>
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{entry.description || "No description provided"}</p>
-                    <div className="flex items-center gap-3 mt-2 text-xs font-medium text-muted-foreground/70">
-                      <span className="flex items-center gap-1 bg-background px-2 py-1 rounded-md border border-border/50">
-                        <Clock className="w-3.5 h-3.5" /> 
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{entry.description || "No description provided"}</p>
+                    <div className="flex items-center gap-2 mt-2 text-[11px] font-medium text-muted-foreground">
+                      <span className="flex items-center gap-1 bg-background/80 px-2 py-0.5 rounded-md border border-border/50">
+                        <Clock className="w-3 h-3 text-emerald-500" /> 
                         {entry.start_time ? format(new Date(entry.start_time), "HH:mm") : "N/A"} - {entry.end_time ? format(new Date(entry.end_time), "HH:mm") : "N/A"}
                       </span>
                       {entry.break_duration > 0 && (
-                        <span className="bg-background px-2 py-1 rounded-md border border-border/50">
+                        <span className="bg-background/80 px-2 py-0.5 rounded-md border border-border/50">
                           {entry.break_duration}m break
                         </span>
                       )}
@@ -340,7 +365,7 @@ export default function MyTimesheets() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xl font-bold text-primary">{entry.total_hours.toFixed(1)}h</p>
+                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{entry.total_hours.toFixed(1)}h</p>
                 </div>
               </div>
             ))
@@ -348,99 +373,101 @@ export default function MyTimesheets() {
         </div>
       </Card>
 
+      {/* Add Time Entry Modal */}
       <Dialog open={isEntryModalOpen} onOpenChange={setIsEntryModalOpen}>
-        <DialogContent className="sm:max-w-[500px] border-border/40 bg-card/95 backdrop-blur-xl shadow-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl">Add Time Entry</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="sm:max-w-[500px] rounded-2xl border-border/50 bg-background/95 backdrop-blur-xl shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 shrink-0" />
+          <DialogHeader className="pt-2">
+            <DialogTitle className="text-lg font-bold">Add Time Entry</DialogTitle>
+            <DialogDescription className="text-xs">
               Record your hours for a specific project and task.
             </DialogDescription>
           </DialogHeader>
           
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label>Date <span className="text-destructive">*</span></Label>
+          <div className="grid gap-4 py-3">
+            <div className="grid gap-1.5">
+              <Label className="text-xs font-semibold">Date <span className="text-destructive">*</span></Label>
               <Input 
                 type="date" 
                 value={newEntry.date} 
                 onChange={(e) => setNewEntry({...newEntry, date: e.target.value})}
-                className="bg-background/50"
+                className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50"
               />
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label>Project <span className="text-destructive">*</span></Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label className="text-xs font-semibold">Project <span className="text-destructive">*</span></Label>
                 <Input
                   placeholder="E.g. Website Redesign"
                   value={newEntry.project_name}
                   onChange={(e) => setNewEntry({...newEntry, project_name: e.target.value})}
-                  className="bg-background/50"
+                  className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50"
                 />
               </div>
-              <div className="grid gap-2">
-                <Label>Task <span className="text-destructive">*</span></Label>
+              <div className="grid gap-1.5">
+                <Label className="text-xs font-semibold">Task <span className="text-destructive">*</span></Label>
                 <Input
                   placeholder="E.g. Frontend Development"
                   value={newEntry.task_name}
                   onChange={(e) => setNewEntry({...newEntry, task_name: e.target.value})}
-                  className="bg-background/50"
+                  className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              <div className="grid gap-2">
-                <Label>Start Time <span className="text-destructive">*</span></Label>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="grid gap-1.5">
+                <Label className="text-xs font-semibold">Start Time <span className="text-destructive">*</span></Label>
                 <Input 
                   type="time" 
                   value={newEntry.start_time} 
                   onChange={(e) => setNewEntry({...newEntry, start_time: e.target.value})}
-                  className="bg-background/50"
+                  className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50"
                 />
               </div>
-              <div className="grid gap-2">
-                <Label>End Time <span className="text-destructive">*</span></Label>
+              <div className="grid gap-1.5">
+                <Label className="text-xs font-semibold">End Time <span className="text-destructive">*</span></Label>
                 <Input 
                   type="time" 
                   value={newEntry.end_time} 
                   onChange={(e) => setNewEntry({...newEntry, end_time: e.target.value})}
-                  className="bg-background/50"
+                  className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50"
                 />
               </div>
-              <div className="grid gap-2">
-                <Label>Break (mins)</Label>
+              <div className="grid gap-1.5">
+                <Label className="text-xs font-semibold">Break (mins)</Label>
                 <Input 
                   type="number" 
                   min="0"
                   value={newEntry.break_duration} 
                   onChange={(e) => setNewEntry({...newEntry, break_duration: parseInt(e.target.value) || 0})}
-                  className="bg-background/50"
+                  className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50"
                 />
               </div>
             </div>
 
-            <div className="grid gap-2">
-              <Label>Description</Label>
+            <div className="grid gap-1.5">
+              <Label className="text-xs font-semibold">Description</Label>
               <Input 
                 placeholder="What did you work on?" 
                 value={newEntry.description} 
                 onChange={(e) => setNewEntry({...newEntry, description: e.target.value})}
-                className="bg-background/50"
+                className="h-10 text-xs rounded-xl bg-background/70 border-border/50 focus:border-emerald-500/50"
               />
             </div>
             
-            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex justify-between items-center mt-2">
-              <span className="text-sm font-medium text-muted-foreground">Calculated Hours:</span>
-              <span className="text-xl font-bold text-primary">
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex justify-between items-center mt-1">
+              <span className="text-xs font-medium text-muted-foreground">Calculated Hours:</span>
+              <span className="text-base font-bold text-emerald-600 dark:text-emerald-400">
                 {calculateHours(newEntry.start_time, newEntry.end_time, newEntry.break_duration).toFixed(2)}h
               </span>
             </div>
           </div>
           
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEntryModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveEntry}>Save Entry</Button>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setIsEntryModalOpen(false)} className="h-10 text-xs rounded-xl border-border/50 cursor-pointer">Cancel</Button>
+            <Button onClick={handleSaveEntry} className="h-10 text-xs font-bold rounded-xl cursor-pointer">Save Entry</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

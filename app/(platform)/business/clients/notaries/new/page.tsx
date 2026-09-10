@@ -13,7 +13,8 @@ import {
   MapPin, 
   FileText,
   Landmark,
-  ArrowRight
+  ArrowRight,
+  AlertCircle
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,8 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
+import { EmailInput } from "@/components/ui/email-input";
 
 export default function NewNotaryPage() {
   const router = useRouter();
@@ -41,6 +44,7 @@ export default function NewNotaryPage() {
     address: "",
     city: "",
     status: "ACTIVE",
+    vendor_type: "", // Mandatory dropdown with no default selection
     notes: "",
     bank_name: "",
     bank_account_number: "",
@@ -84,17 +88,49 @@ export default function NewNotaryPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Filter services dynamically based on the selected vendor type
+  const eligibleServices = services.filter((s) => {
+    if (formData.vendor_type === "NOTARY") return Boolean(s.needs_notary);
+    if (formData.vendor_type === "GOVERNMENT_OFFICER") return Boolean(s.needs_gov_officer);
+    if (formData.vendor_type === "OTHER_VENDORS") {
+      return Boolean(s.needs_other_vendors) || (!s.needs_notary && !s.needs_gov_officer);
+    }
+    return false;
+  });
+
+  const configuredFeesCount = eligibleServices.filter((s) => parseFloat(serviceFees[s.id] || "0") > 0).length;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
+
+    if (!formData.vendor_type) {
+      toast.error("Please select a Vendor Type.");
+      setActiveTab("general");
+      return;
+    }
+
+    if (formData.email && !isValidEmail(formData.email)) {
+      toast.error("Please enter a valid email address (e.g. notary@example.com).");
+      setActiveTab("general");
+      return;
+    }
+
+    if (formData.phone && !isValidPhoneNumber(formData.phone)) {
+      toast.error("Please enter a valid phone number (6 to 15 digits).");
+      setActiveTab("general");
+      return;
+    }
+
     setSaving(true);
     try {
+      const eligibleIds = new Set(eligibleServices.map(s => s.id));
       const feesPayload = Object.entries(serviceFees)
         .map(([sid, val]) => ({
           service_id: parseInt(sid),
           fee: parseFloat(val) || 0.0
         }))
-        .filter(x => x.fee > 0);
+        .filter(x => x.fee > 0 && eligibleIds.has(x.service_id));
 
       const payload = {
         name: formData.name,
@@ -103,6 +139,10 @@ export default function NewNotaryPage() {
         address: formData.address || null,
         city: formData.city,
         status: formData.status,
+        vendor_type: formData.vendor_type,
+        is_notary: formData.vendor_type === "NOTARY",
+        is_gov_officer: formData.vendor_type === "GOVERNMENT_OFFICER",
+        is_other_vendor: formData.vendor_type === "OTHER_VENDORS",
         notes: formData.notes || null,
         bank_name: formData.bank_name || null,
         bank_account_number: formData.bank_account_number || null,
@@ -122,22 +162,19 @@ export default function NewNotaryPage() {
       });
 
       if (res.ok) {
-        toast.success("Notary registered successfully!");
+        toast.success("Vendor registered successfully!");
         router.push("/business/clients/notaries");
       } else {
         const err = await res.json();
-        toast.error(err.detail || "Failed to register notary");
+        toast.error(err.detail || "Failed to register vendor");
       }
     } catch (err) {
       console.error(err);
-      toast.error("Error registering notary");
+      toast.error("Error registering vendor");
     } finally {
       setSaving(false);
     }
   };
-
-  const notaryServices = services.filter((s) => s.needs_notary);
-  const configuredFeesCount = notaryServices.filter((s) => parseFloat(serviceFees[s.id] || "0") > 0).length;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto pb-12">
@@ -153,8 +190,8 @@ export default function NewNotaryPage() {
           <Scale className="h-6 w-6" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Add Notary</h1>
-          <p className="text-muted-foreground mt-1">Register a new licensed notary public to your legal contractor panel list.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Add Vendor</h1>
+          <p className="text-muted-foreground mt-1">Register a new partner vendor / notary public to your panel list.</p>
         </div>
       </div>
 
@@ -173,7 +210,7 @@ export default function NewNotaryPage() {
               }`}
             >
               <Scale className="h-4 w-4" />
-              <span>Notary Public Profile</span>
+              <span>Vendor Profile</span>
             </button>
 
             <button
@@ -210,13 +247,13 @@ export default function NewNotaryPage() {
           
           <CardContent className="p-6 sm:p-8 space-y-6">
             
-            {/* TAB 1: NOTARY PUBLIC PROFILE */}
+            {/* TAB 1: VENDOR PROFILE */}
             {activeTab === "general" && (
               <div className="space-y-5 animate-in fade-in duration-200">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">
-                      Notary Full Name *
+                      Vendor Full Name *
                     </label>
                     <Input
                       required
@@ -245,34 +282,44 @@ export default function NewNotaryPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">
-                      Contact Email
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90 flex items-center gap-1">
+                      Vendor Type <span className="text-destructive">*</span>
                     </label>
-                    <Input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      placeholder="e.g. notary@example.com"
-                      className="h-10 text-sm font-medium bg-background border-border/60 focus:border-primary/50 focus:ring-primary/25 rounded-xl transition-all"
-                    />
+                    <Select 
+                      value={formData.vendor_type} 
+                      onValueChange={(val) => setFormData(prev => ({ ...prev, vendor_type: val }))}
+                    >
+                      <SelectTrigger className={`h-10 rounded-xl bg-background font-medium ${!formData.vendor_type ? "text-muted-foreground border-amber-500/50" : ""}`}>
+                        <SelectValue placeholder="Select Vendor Type..." />
+                      </SelectTrigger>
+                      <SelectContent position="popper" side="bottom" sideOffset={4}>
+                        <SelectItem value="NOTARY" className="font-medium">
+                          <span className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-indigo-500" />
+                            Notary
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="GOVERNMENT_OFFICER" className="font-medium">
+                          <span className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-amber-500" />
+                            Government Body
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="OTHER_VENDORS" className="font-medium">
+                          <span className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-cyan-500" />
+                            Other Vendors
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {!formData.vendor_type && (
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                        Mandatory field. Controls eligible service fee options.
+                      </p>
+                    )}
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">
-                      Contact Phone / WhatsApp
-                    </label>
-                    <Input
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      placeholder="e.g. +62 812 3456 789"
-                      className="h-10 text-sm font-medium bg-background border-border/60 focus:border-primary/50 focus:ring-primary/25 rounded-xl transition-all"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">
                       Panel Status
@@ -284,11 +331,35 @@ export default function NewNotaryPage() {
                       <SelectTrigger className="h-10 rounded-xl bg-background">
                         <SelectValue placeholder="Select Status" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent position="popper" side="bottom" sideOffset={4}>
                         <SelectItem value="ACTIVE">ACTIVE</SelectItem>
                         <SelectItem value="INACTIVE">INACTIVE</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">
+                      Contact Email
+                    </label>
+                    <EmailInput
+                      value={formData.email}
+                      onChange={(val) => setFormData((prev) => ({ ...prev, email: val }))}
+                      placeholder="notary@example.com"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">
+                      Contact Phone / WhatsApp
+                    </label>
+                    <PhoneInput
+                      value={formData.phone}
+                      onChange={(val) => setFormData((prev) => ({ ...prev, phone: val }))}
+                      placeholder="812 3456 789"
+                    />
                   </div>
                 </div>
 
@@ -357,7 +428,7 @@ export default function NewNotaryPage() {
                       <SelectTrigger className="h-10 rounded-xl bg-background">
                         <SelectValue placeholder="Select Destination Bank" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent position="popper" side="bottom" sideOffset={4}>
                         {INDONESIAN_BANKS.map((b) => (
                           <SelectItem key={b.code} value={b.code}>
                             {b.name}
@@ -443,52 +514,101 @@ export default function NewNotaryPage() {
             {activeTab === "fees" && (
               <div className="space-y-4 animate-in fade-in duration-200">
                 <div className="space-y-2">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">
-                    Configure Service-Specific Fees
-                  </label>
-                  <div className="border border-border/50 rounded-xl overflow-hidden bg-background/50">
-                    <div className="max-h-96 overflow-y-auto">
-                      <table className="w-full text-xs text-left">
-                        <thead className="bg-muted/50 text-muted-foreground uppercase font-bold text-[10px] border-b border-border/50 select-none">
-                          <tr>
-                            <th className="p-3">Service Name</th>
-                            <th className="p-3">Service Code</th>
-                            <th className="p-3 w-44 text-right">Notary Fee (IDR)</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/30">
-                          {services.filter((s) => s.needs_notary).map((s) => (
-                            <tr key={s.id} className="hover:bg-muted/10 transition-colors">
-                              <td className="p-3 font-semibold text-foreground">
-                                {s.job_title}
-                                {s.description && (
-                                  <div className="text-[10px] text-muted-foreground font-normal mt-0.5 whitespace-pre-wrap break-words max-w-lg leading-relaxed">
-                                    {s.description}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="p-3 font-mono text-muted-foreground">{s.job_id}</td>
-                              <td className="p-3 text-right">
-                                <div className="relative inline-block w-40">
-                                  <span className="absolute left-2.5 top-2.5 text-[10px] font-mono text-muted-foreground leading-none">Rp</span>
-                                  <Input
-                                    type="number"
-                                    placeholder="0"
-                                    className="h-8 pl-7 text-right font-mono font-bold text-xs rounded-lg bg-background"
-                                    value={serviceFees[s.id] || ""}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setServiceFees(prev => ({ ...prev, [s.id]: val }));
-                                    }}
-                                  />
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">
+                      Configure Service-Specific Fees
+                    </label>
+                    {formData.vendor_type && (
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        Filtering for:{" "}
+                        <span className="font-bold text-foreground">
+                          {formData.vendor_type === "NOTARY" ? "Notary" : formData.vendor_type === "GOVERNMENT_OFFICER" ? "Government Body" : "Other Vendors"}
+                        </span>
+                      </span>
+                    )}
                   </div>
+
+                  {!formData.vendor_type ? (
+                    <div className="p-8 text-center border border-dashed border-border/70 rounded-2xl bg-muted/20 flex flex-col items-center justify-center gap-3">
+                      <Scale className="h-10 w-10 text-muted-foreground/40" />
+                      <div>
+                        <h3 className="text-sm font-bold text-foreground">No Vendor Type Selected</h3>
+                        <p className="text-xs text-muted-foreground mt-1 max-w-md">
+                          Please select a Vendor Type (Notary, Government Body, or Other Vendors) in the <strong>Vendor Profile</strong> tab to view and configure eligible services.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setActiveTab("general")}
+                        className="mt-2 rounded-xl font-bold text-xs"
+                      >
+                        Go to Vendor Profile
+                      </Button>
+                    </div>
+                  ) : eligibleServices.length === 0 ? (
+                    <div className="p-8 text-center border border-dashed border-border/70 rounded-2xl bg-muted/20 flex flex-col items-center justify-center gap-2">
+                      <FileText className="h-8 w-8 text-muted-foreground/40" />
+                      <h3 className="text-sm font-bold text-foreground">No Eligible Services Found</h3>
+                      <p className="text-xs text-muted-foreground max-w-md">
+                        There are currently no catalog services configured with requirement for{" "}
+                        <strong>
+                          {formData.vendor_type === "NOTARY" ? "Notary" : formData.vendor_type === "GOVERNMENT_OFFICER" ? "Government Body" : "Other Vendors"}
+                        </strong>.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="border border-border/50 rounded-xl overflow-hidden bg-background/50">
+                      <div className="max-h-96 overflow-y-auto">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-muted/50 text-muted-foreground uppercase font-bold text-[10px] border-b border-border/50 select-none">
+                            <tr>
+                              <th className="p-3">Service Name</th>
+                              <th className="p-3">Service Code</th>
+                              <th className="p-3 w-44 text-right">
+                                {formData.vendor_type === "NOTARY" 
+                                  ? "Notary Fee (IDR)" 
+                                  : formData.vendor_type === "GOVERNMENT_OFFICER" 
+                                  ? "Gov Body Fee (IDR)" 
+                                  : "Vendor Fee (IDR)"}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/30">
+                            {eligibleServices.map((s) => (
+                              <tr key={s.id} className="hover:bg-muted/10 transition-colors">
+                                <td className="p-3 font-semibold text-foreground">
+                                  {s.job_title}
+                                  {s.description && (
+                                    <div className="text-[10px] text-muted-foreground font-normal mt-0.5 whitespace-pre-wrap break-words max-w-lg leading-relaxed">
+                                      {s.description}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="p-3 font-mono text-muted-foreground">{s.job_id}</td>
+                                <td className="p-3 text-right">
+                                  <div className="relative inline-block w-40">
+                                    <span className="absolute left-2.5 top-2.5 text-[10px] font-mono text-muted-foreground leading-none">Rp</span>
+                                    <Input
+                                      type="number"
+                                      placeholder="0"
+                                      className="h-8 pl-7 text-right font-mono font-bold text-xs rounded-lg bg-background"
+                                      value={serviceFees[s.id] || ""}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setServiceFees(prev => ({ ...prev, [s.id]: val }));
+                                      }}
+                                    />
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -496,7 +616,7 @@ export default function NewNotaryPage() {
             {/* Actions Bar */}
             <div className="flex items-center justify-between pt-6 border-t border-border/40 mt-6">
               <Link href="/business/clients/notaries">
-                <Button type="button" variant="outline" className="rounded-xl h-10 px-5 font-bold border border-zinc-200 dark:border-zinc-800 bg-background hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors">
+                <Button type="button" variant="outline" className="rounded-xl h-10 px-5 font-bold">
                   Cancel
                 </Button>
               </Link>
@@ -506,7 +626,13 @@ export default function NewNotaryPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setActiveTab("bank")}
+                    onClick={() => {
+                      if (!formData.vendor_type) {
+                        toast.error("Please select a Vendor Type first.");
+                        return;
+                      }
+                      setActiveTab("bank");
+                    }}
                     className="rounded-xl h-10 px-4 font-bold"
                   >
                     Next: Bank Account <ArrowRight className="h-4 w-4 ml-1.5" />
@@ -526,10 +652,10 @@ export default function NewNotaryPage() {
                 <Button 
                   type="submit" 
                   disabled={saving} 
-                  className="px-6 font-bold shadow-md gap-2 rounded-xl h-10 bg-zinc-900 hover:bg-zinc-100 text-zinc-50 hover:text-zinc-900 border border-zinc-900 dark:bg-zinc-100 dark:hover:bg-zinc-900 dark:text-zinc-950 dark:hover:text-zinc-100 dark:border-zinc-100 transition-all duration-200"
+                  className="px-6 font-bold shadow-md gap-2 rounded-xl h-10"
                 >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                  Save Notary & Finish
+                  Save Vendor & Finish
                 </Button>
               </div>
             </div>

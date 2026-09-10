@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { 
   ShoppingCart, 
   Loader2, 
@@ -34,9 +34,13 @@ import {
   DialogFooter 
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
+import { EmailInput } from "@/components/ui/email-input";
 
-export default function NewClientOrderPage() {
+function NewClientOrderContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isPipeline = searchParams.get("type") === "pipeline";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -264,12 +268,12 @@ export default function NewClientOrderPage() {
       toast.error("Key Contact Person Name is required");
       return;
     }
-    if (!newCompanyForm.key_contact_email.trim()) {
-      toast.error("Key Contact Email is required");
+    if (!newCompanyForm.key_contact_email.trim() || !isValidEmail(newCompanyForm.key_contact_email)) {
+      toast.error("Please enter a valid key contact email address.");
       return;
     }
-    if (!newCompanyForm.key_contact_phone.trim()) {
-      toast.error("Key Contact Phone is required");
+    if (!newCompanyForm.key_contact_phone.trim() || !isValidPhoneNumber(newCompanyForm.key_contact_phone)) {
+      toast.error("Please enter a valid key contact phone number (6 to 15 digits).");
       return;
     }
     setCreatingCompany(true);
@@ -360,7 +364,8 @@ export default function NewClientOrderPage() {
         billing_company_id: finalBillingCompanyId,
         items: validItems,
         consultant_ids: selectedConsultantIds,
-        notes: notes || null
+        notes: notes || null,
+        status: isPipeline ? "PIPELINE" : undefined
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
@@ -373,8 +378,8 @@ export default function NewClientOrderPage() {
       });
 
       if (res.ok) {
-        toast.success("Client service order issued successfully!");
-        router.push("/business/clients/orders");
+        toast.success(isPipeline ? "Pipeline order created successfully!" : "Client service order issued successfully!");
+        router.push(isPipeline ? "/business/clients/orders/pipeline" : "/business/clients/orders");
       } else {
         const err = await res.json();
         toast.error(err.detail || "Failed to issue new order");
@@ -392,6 +397,12 @@ export default function NewClientOrderPage() {
   };
 
   const orderGrandTotal = orderItems.reduce((acc, curr) => acc + (curr.unit_price || 0), 0);
+  const totalVendorCost = orderItems.reduce((acc, curr) => {
+    if (!curr.notary_id || !curr.service_id) return acc;
+    const vendor = notaries.find((n) => n.id === Number(curr.notary_id));
+    const sf = vendor?.service_fees?.find((f: any) => f.service_id === Number(curr.service_id));
+    return acc + (sf?.fee || 0);
+  }, 0);
 
   if (loading) {
     return (
@@ -407,24 +418,31 @@ export default function NewClientOrderPage() {
       
       {/* Title Header */}
       <div className="flex items-start gap-4">
-        <Link href="/business/clients/orders" className="mt-1">
-          <Button variant="ghost" size="icon">
+        <Link href={isPipeline ? "/business/clients/orders/pipeline" : "/business/clients/orders"} className="mt-1">
+          <Button variant="ghost" size="icon" className="rounded-xl">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm shrink-0 flex items-center justify-center">
+        <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 shadow-sm shrink-0 flex items-center justify-center">
           <ShoppingCart className="h-6 w-6" />
         </div>
         <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Issue New Client Order</h1>
-            <p className="text-muted-foreground mt-1">Configure client partner scope entities, allocate consultant rosters, and build billing line items.</p>
+            <h1 className="text-3xl font-bold tracking-tight">{isPipeline ? "Create Pipeline Order" : "Issue New Client Order"}</h1>
+            <p className="text-muted-foreground mt-1 text-sm">{isPipeline ? "Record a new prospect order in pipeline for third-party sales and team tracking." : "Configure client partner scope entities, allocate consultant rosters, and build billing line items."}</p>
           </div>
-          {orderGrandTotal > 0 && (
-            <Badge variant="outline" className="font-mono text-sm font-bold px-4 py-2 border-emerald-500/20 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 self-start sm:self-auto rounded-xl">
-              Total Order Value: {formatCurrency(orderGrandTotal)}
-            </Badge>
-          )}
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            {orderGrandTotal > 0 && (
+              <Badge variant="outline" className="font-mono text-xs font-bold px-3 py-1.5 border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
+                Total Order Value: {formatCurrency(orderGrandTotal)}
+              </Badge>
+            )}
+            {!isPipeline && totalVendorCost > 0 && (
+              <Badge variant="outline" className="font-mono text-xs font-bold px-3 py-1.5 border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl">
+                Vendor Cost: {formatCurrency(totalVendorCost)}
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
 
@@ -500,11 +518,18 @@ export default function NewClientOrderPage() {
                       {(filterClientId
                         ? companies.filter(c => c.client_id === parseInt(filterClientId))
                         : companies
-                      ).map((comp) => (
-                        <option key={comp.id} value={String(comp.id)}>
-                          {comp.company_name} ({comp.company_code})
-                        </option>
-                      ))}
+                      ).map((comp) => {
+                        const valSuffix = comp.validation_status === "PENDING_VALIDATION" 
+                          ? " • [Pending Validation]" 
+                          : comp.validation_status === "NEEDS_REVISION" 
+                          ? " • [Revision Needed]" 
+                          : "";
+                        return (
+                          <option key={comp.id} value={String(comp.id)}>
+                            {comp.company_name} ({comp.company_code}){valSuffix}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
@@ -555,11 +580,18 @@ export default function NewClientOrderPage() {
                           {(filterClientId
                             ? companies.filter(c => c.client_id === parseInt(filterClientId))
                             : companies
-                          ).map((comp) => (
-                            <option key={comp.id} value={String(comp.id)}>
-                              {comp.company_name} ({comp.company_code})
-                            </option>
-                          ))}
+                          ).map((comp) => {
+                            const valSuffix = comp.validation_status === "PENDING_VALIDATION" 
+                              ? " • [Pending Validation]" 
+                              : comp.validation_status === "NEEDS_REVISION" 
+                              ? " • [Revision Needed]" 
+                              : "";
+                            return (
+                              <option key={comp.id} value={String(comp.id)}>
+                                {comp.company_name} ({comp.company_code}){valSuffix}
+                              </option>
+                            );
+                          })}
                         </select>
                         <p className="text-[10px] text-muted-foreground italic">
                           Proforma and Final invoices will be addressed to and billed under this entity.
@@ -711,12 +743,24 @@ export default function NewClientOrderPage() {
                       </div>
                     )}
 
-                    {/* Notary Selection (Conditional) */}
-                    {item._raw_service?.needs_notary && (
+                    {/* Vendor / Notary Selection (Optional) */}
+                    {(item._raw_service?.needs_notary || item._raw_service?.needs_gov_officer || item._raw_service?.needs_other_vendors) && (
                       <div className="space-y-1 pt-1 animate-in slide-in-from-top-2 duration-200">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Select Notary *</label>
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                          <span>
+                            {item._raw_service?.needs_notary 
+                              ? "Select Notary (Optional)" 
+                              : item._raw_service?.needs_gov_officer 
+                              ? "Select Government Body (Optional)" 
+                              : "Select Vendor (Optional)"}
+                          </span>
+                          {!isPipeline && (
+                            <span className="text-[9px] font-mono text-amber-600 dark:text-amber-400 font-semibold lowercase">
+                              (additional order cost)
+                            </span>
+                          )}
+                        </label>
                         <select
-                          required
                           value={item.notary_id || ""}
                           onChange={(e) => {
                             const val = e.target.value;
@@ -728,18 +772,38 @@ export default function NewClientOrderPage() {
                           }}
                           className="flex h-8.5 w-full rounded-lg border border-border/60 bg-background px-2.5 py-1 text-xs font-medium shadow-xs focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
                         >
-                          <option value="">Choose Notary...</option>
+                          <option value="">
+                            {item._raw_service?.needs_notary 
+                              ? "Choose Notary..." 
+                              : item._raw_service?.needs_gov_officer 
+                              ? "Choose Government Body..." 
+                              : "Choose Vendor..."}
+                          </option>
                           {(() => {
                             const serviceId = Number(item.service_id);
-                            const filtered = notaries.filter((n) => 
-                              n.service_fees && n.service_fees.some((sf: any) => sf.service_id === serviceId)
-                            );
+                            const isNotaryReq = Boolean(item._raw_service?.needs_notary);
+                            const isGovReq = Boolean(item._raw_service?.needs_gov_officer);
+                            const isOtherReq = Boolean(item._raw_service?.needs_other_vendors);
+
+                            const filtered = notaries.filter((n) => {
+                              const hasConfiguredFee = n.service_fees && n.service_fees.some((sf: any) => sf.service_id === serviceId);
+                              if (hasConfiguredFee) return true;
+
+                              if (isGovReq) return n.vendor_type === "GOVERNMENT_OFFICER" || n.is_gov_officer;
+                              if (isOtherReq) return n.vendor_type === "OTHER_VENDORS" || n.is_other_vendor;
+                              if (isNotaryReq) return n.vendor_type === "NOTARY" || n.is_notary || (!n.vendor_type && !n.is_gov_officer && !n.is_other_vendor);
+                              return true;
+                            });
+
                             return filtered.map((n) => {
-                              const serviceFeeObj = n.service_fees.find((sf: any) => sf.service_id === serviceId);
-                              const specificFee = serviceFeeObj ? serviceFeeObj.fee : 0;
+                              const valSuffix = n.validation_status === "PENDING_VALIDATION" 
+                                ? " • [Pending Validation]" 
+                                : n.validation_status === "NEEDS_REVISION" 
+                                ? " • [Revision Needed]" 
+                                : "";
                               return (
                                 <option key={n.id} value={n.id}>
-                                  {n.name} ({n.city} - {formatCurrency(specificFee)})
+                                  {n.name} ({n.city || "General"}){valSuffix}
                                 </option>
                               );
                             });
@@ -748,15 +812,27 @@ export default function NewClientOrderPage() {
                       </div>
                     )}
 
-                    {/* Reflected Price Bar */}
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-muted/40 border border-border/30 font-mono text-[10px]">
-                      <span className="font-bold text-muted-foreground">Price Calculation:</span>
-                      <span className="font-extrabold text-xs text-foreground">
-                        {item.pricing_tier === "PARTNER_A3"
-                          ? `Free Text: ${item.custom_price_text || "Custom"}`
-                          : formatCurrency(item.unit_price)}
-                      </span>
-                    </div>
+                    {/* Reflected Price & Vendor Cost Bar */}
+                    {(() => {
+                      const selectedNotaryId = Number(item.notary_id);
+                      const serviceId = Number(item.service_id);
+                      const selectedVendor = selectedNotaryId ? notaries.find(n => n.id === selectedNotaryId) : null;
+                      const serviceFeeObj = selectedVendor?.service_fees?.find((sf: any) => sf.service_id === serviceId);
+                      const vendorCost = serviceFeeObj?.fee || 0;
+
+                      return (
+                        <div className="flex flex-wrap items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border/30 gap-2 text-[10px] font-mono">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-muted-foreground">Price Calculation:</span>
+                            <span className="font-extrabold text-xs text-foreground">
+                              {item.pricing_tier === "PARTNER_A3"
+                                ? `Free Text: ${item.custom_price_text || "Custom"}`
+                                : formatCurrency(item.unit_price)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                   </div>
                 ))}
@@ -771,42 +847,44 @@ export default function NewClientOrderPage() {
           {/* Unified Roster Allocation & Execution Notes Box */}
           <Card className="border-border/50 shadow-sm bg-card/60 backdrop-blur-md">
             <CardContent className="space-y-4 p-4 pt-4">
-              {/* Roster Allocation */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Roster Allocation</label>
-                <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto p-2 bg-background rounded-lg border border-border/40">
-                  {(() => {
-                    const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
-                    const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
-                    const licensingEmployees = employees.filter((emp) => licensingMemberIds.includes(emp.id));
+              {/* Roster Allocation (Hidden for Pipeline Orders) */}
+              {!isPipeline && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Roster Allocation</label>
+                  <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto p-2 bg-background rounded-lg border border-border/40">
+                    {(() => {
+                      const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
+                      const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
+                      const licensingEmployees = employees.filter((emp) => licensingMemberIds.includes(emp.id));
 
-                    if (licensingEmployees.length === 0) {
-                      return <span className="text-xs text-muted-foreground italic py-2 text-center col-span-3">No licensing consultants</span>;
-                    }
+                      if (licensingEmployees.length === 0) {
+                        return <span className="text-xs text-muted-foreground italic py-2 text-center col-span-3">No licensing consultants</span>;
+                      }
 
-                    return licensingEmployees.map((emp) => {
-                      const isSelected = selectedConsultantIds.includes(emp.id);
-                      return (
-                        <label
-                          key={emp.id}
-                          className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer select-none text-[11px] transition-colors ${isSelected ? "border-primary bg-primary/10 text-primary font-bold shadow-xs" : "border-border/60 hover:bg-muted/40"}`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleConsultantSelect(emp.id)}
-                            className="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary accent-primary"
-                          />
-                          <div className="truncate">
-                            <div className="font-semibold text-foreground truncate">{emp.first_name} {emp.last_name}</div>
-                            <div className="text-[9px] text-muted-foreground truncate">{emp.job_title || "Consultant"}</div>
-                          </div>
-                        </label>
-                      );
-                    });
-                  })()}
+                      return licensingEmployees.map((emp) => {
+                        const isSelected = selectedConsultantIds.includes(emp.id);
+                        return (
+                          <label
+                            key={emp.id}
+                            className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer select-none text-[11px] transition-colors ${isSelected ? "border-primary bg-primary/10 text-primary font-bold shadow-xs" : "border-border/60 hover:bg-muted/40"}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleConsultantSelect(emp.id)}
+                              className="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary accent-primary"
+                            />
+                            <div className="truncate">
+                              <div className="font-semibold text-foreground truncate">{emp.first_name} {emp.last_name}</div>
+                              <div className="text-[9px] text-muted-foreground truncate">{emp.job_title || "Consultant"}</div>
+                            </div>
+                          </label>
+                        );
+                      });
+                    })()}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Notes & Instructions */}
               <div className="space-y-1.5">
@@ -815,7 +893,7 @@ export default function NewClientOrderPage() {
                   name="notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
+                  rows={isPipeline ? 5 : 3}
                   className="flex w-full rounded-lg border border-border/60 bg-background p-2.5 text-xs placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary leading-normal font-semibold transition-all"
                   placeholder="Deliverables schedule, client requests..."
                 />
@@ -825,18 +903,18 @@ export default function NewClientOrderPage() {
 
           {/* Actions Bar */}
           <div className="flex items-center justify-between gap-3 pt-2">
-            <Link href="/business/clients/orders" className="flex-1">
-              <Button type="button" variant="outline" className="w-full rounded-xl h-10 px-4 font-bold border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-foreground transition-colors bg-transparent">
+            <Link href={isPipeline ? "/business/clients/orders/pipeline" : "/business/clients/orders"} className="flex-1">
+              <Button type="button" variant="outline" className="w-full rounded-xl h-10 px-4 font-bold">
                 Cancel
               </Button>
             </Link>
             <Button 
               type="submit" 
               disabled={saving} 
-              className="flex-1 font-bold shadow-md gap-2 rounded-xl h-10 bg-zinc-900 hover:bg-zinc-100 text-zinc-50 hover:text-zinc-900 border border-zinc-900 dark:bg-zinc-100 dark:hover:bg-zinc-900 dark:text-zinc-950 dark:hover:text-zinc-100 dark:border-zinc-100 transition-all duration-200"
+              className="flex-1 font-bold shadow-md gap-2 rounded-xl h-10"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              Issue Order
+              {saving ? "Saving..." : isPipeline ? "Create Pipeline Order" : "Issue Order"}
             </Button>
           </div>
         </div>
@@ -969,13 +1047,11 @@ export default function NewClientOrderPage() {
                     <span>Email Address</span>
                     <span className="text-destructive font-black">*</span>
                   </label>
-                  <Input
+                  <EmailInput
                     required
-                    type="email"
                     value={newCompanyForm.key_contact_email}
-                    onChange={(e) => setNewCompanyForm(prev => ({ ...prev, key_contact_email: e.target.value }))}
+                    onChange={(val) => setNewCompanyForm((prev) => ({ ...prev, key_contact_email: val }))}
                     placeholder="budi@company.co.id"
-                    className="h-10 text-xs font-medium rounded-xl border-border/70 focus-visible:ring-primary/20 bg-background"
                   />
                 </div>
 
@@ -984,12 +1060,11 @@ export default function NewClientOrderPage() {
                     <span>Phone Number</span>
                     <span className="text-destructive font-black">*</span>
                   </label>
-                  <Input
+                  <PhoneInput
                     required
                     value={newCompanyForm.key_contact_phone}
-                    onChange={(e) => setNewCompanyForm(prev => ({ ...prev, key_contact_phone: e.target.value }))}
-                    placeholder="+62 812-3456-7890"
-                    className="h-10 text-xs font-medium rounded-xl border-border/70 focus-visible:ring-primary/20 bg-background font-mono"
+                    onChange={(val) => setNewCompanyForm((prev) => ({ ...prev, key_contact_phone: val }))}
+                    placeholder="812 3456 789"
                   />
                 </div>
               </div>
@@ -1036,14 +1111,14 @@ export default function NewClientOrderPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setIsCreateCompanyOpen(false)}
-                className="h-10 px-5 text-xs font-bold rounded-xl border-border hover:bg-muted"
+                className="h-10 px-5 text-xs font-bold rounded-xl"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={creatingCompany}
-                className="h-10 px-6 text-xs font-bold gap-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                className="h-10 px-6 text-xs font-bold gap-2 rounded-xl"
               >
                 {creatingCompany ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 Save & Select Company
@@ -1053,5 +1128,18 @@ export default function NewClientOrderPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function NewClientOrderPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-64 items-center justify-center gap-3 text-muted-foreground">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm font-medium">Loading form...</p>
+      </div>
+    }>
+      <NewClientOrderContent />
+    </Suspense>
   );
 }

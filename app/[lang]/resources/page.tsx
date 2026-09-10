@@ -32,7 +32,7 @@ export default function ResourcesPage() {
   const cards = [
     {
       title: t.nav.brandClassification,
-      href: "/resources/brand-classification",
+      href: `/${language}/resources/brand-classification`,
       description: {
         en: "Classify your brand according to the international trademark classification system.",
         id: "Klasifikasikan merek Anda sesuai dengan sistem klasifikasi merek internasional.",
@@ -41,7 +41,7 @@ export default function ResourcesPage() {
     },
     {
       title: t.nav.checkApplicationStatus,
-      href: "/resources/check-application-status",
+      href: `/${language}/resources/check-application-status`,
       description: {
         en: "Check the current status of your intellectual property application.",
         id: "Periksa status permohonan kekayaan intelektual Anda saat ini.",
@@ -49,8 +49,17 @@ export default function ResourcesPage() {
       },
     },
     {
+      title: t.nav.trackOrder,
+      href: `/${language}/track-order`,
+      description: {
+        en: "Track your order progress, milestones, and connect directly with assigned consultants in real time.",
+        id: "Lacak progres pesanan, pencapaian, dan terhubung langsung dengan konsultan yang ditugaskan secara real-time.",
+        cn: "实时跟踪您的订单进度、关键节点，并直接与指定的顾问沟通。",
+      },
+    },
+    {
       title: t.nav.kbliDirectory,
-      href: "/resources/kbli",
+      href: `/${language}/resources/kbli`,
       description: {
         en: "Search the official KBLI 2020 business classification codes and risk levels in Indonesia.",
         id: "Cari kode klasifikasi bisnis resmi KBLI 2020 dan tingkat risiko di Indonesia.",
@@ -59,7 +68,7 @@ export default function ResourcesPage() {
     },
     {
       title: "FAQ",
-      href: "/resources/faq",
+      href: `/${language}/resources/faq`,
       description: {
         en: "Find answers to common questions about our services and intellectual property.",
         id: "Temukan jawaban untuk pertanyaan umum tentang layanan dan kekayaan intelektual kami.",

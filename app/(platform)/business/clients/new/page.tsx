@@ -17,6 +17,8 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
+import { EmailInput } from "@/components/ui/email-input";
 
 export default function NewClientPage() {
   const router = useRouter();
@@ -60,6 +62,9 @@ export default function NewClientPage() {
     address: "",
     tax_number: "",
     industry: "",
+    director_name: "",
+    director_email: "",
+    director_contact: "+62",
     company_notes: "",
     notes: "",
     password: "Password123!" // default temporary password
@@ -222,6 +227,20 @@ export default function NewClientPage() {
       return;
     }
 
+    if (!formData.email || !isValidEmail(formData.email)) {
+      setError("Please provide a valid client representative email address (e.g. client@company.com).");
+      setActiveTab("personal");
+      setLoading(false);
+      return;
+    }
+
+    if (formData.phone && !isValidPhoneNumber(formData.phone)) {
+      setError("Please provide a valid personal phone number (6 to 15 digits).");
+      setActiveTab("personal");
+      setLoading(false);
+      return;
+    }
+
     // Filter valid order items
     const validOrderItems = orderItems
       .filter((i) => i.job_title && i.job_title.trim() !== "")
@@ -244,6 +263,9 @@ export default function NewClientPage() {
       address: createCompany ? formData.address : "",
       tax_number: createCompany ? formData.tax_number : "",
       industry: createCompany ? formData.industry : "",
+      director_name: createCompany && formData.director_name.trim() ? formData.director_name.trim() : null,
+      director_email: createCompany && formData.director_email.trim() ? formData.director_email.trim().toLowerCase() : null,
+      director_contact: createCompany && formData.director_contact.trim() && formData.director_contact.trim() !== "+62" ? formData.director_contact.trim() : null,
       company_notes: createCompany ? formData.company_notes : "",
       order_items: validOrderItems
     };
@@ -274,25 +296,28 @@ export default function NewClientPage() {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-6xl mx-auto pb-10">
       <div className="flex items-start gap-4">
         <Link href="/business/clients" className="mt-1">
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" className="rounded-xl">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
+        <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 shadow-sm shrink-0 flex items-center justify-center">
+          <User className="h-6 w-6" />
+        </div>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Add New Client Partner</h1>
-          <p className="text-muted-foreground mt-1">Configure client personal profiles, corporate accounts, service orders, and portal login credentials.</p>
+          <p className="text-muted-foreground mt-1 text-sm">Configure client personal profiles, corporate accounts, service orders, and portal login credentials.</p>
         </div>
       </div>
 
       {error && (
-        <div className="bg-destructive/15 text-destructive text-sm p-4 rounded-md border border-destructive/20">
+        <div className="bg-destructive/15 text-destructive text-sm p-4 rounded-xl border border-destructive/20">
           {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6 h-auto sm:h-12 bg-muted/50 p-1 rounded-lg">
+          <TabsList className="grid w-full grid-cols-4 mb-6 h-auto sm:h-12 bg-muted/50 p-1 rounded-xl">
             <TabsTrigger value="personal" className="h-full gap-2 text-xs sm:text-sm">
               <User className="h-4 w-4" /> <span className="hidden md:inline">Personal Details</span>
             </TabsTrigger>
@@ -375,25 +400,21 @@ export default function NewClientPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium" htmlFor="phone">Personal Phone Number</label>
-                    <Input 
+                    <PhoneInput 
                       id="phone" 
-                      name="phone" 
-                      type="tel"
                       value={formData.phone} 
-                      onChange={handleInputChange} 
-                      placeholder="e.g. +62 812 3456 789" 
+                      onChange={(val) => setFormData((prev) => ({ ...prev, phone: val }))} 
+                      placeholder="812 3456 789" 
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
                     <label className="text-sm font-medium" htmlFor="email">Personal Email Address *</label>
-                    <Input 
+                    <EmailInput 
                       id="email" 
-                      name="email" 
-                      type="email"
                       value={formData.email} 
-                      onChange={handleInputChange} 
+                      onChange={(val) => setFormData((prev) => ({ ...prev, email: val }))} 
                       required 
-                      placeholder="e.g. client@company.com" 
+                      placeholder="client@company.com" 
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
@@ -441,7 +462,18 @@ export default function NewClientPage() {
                 </div>
 
                 {createCompany && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <>
+                    <div className="flex items-center justify-between p-3 rounded-xl border border-primary/20 bg-primary/5 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Building className="h-4 w-4 text-primary shrink-0" />
+                        <span>Client profile contact details are automatically registered as the <strong>Operational Key Contact</strong>.</span>
+                      </div>
+                      <span className="text-[10px] font-semibold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-md whitespace-nowrap">
+                        Auto-syncs to Documents &rarr; Board &amp; Stakeholders
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium" htmlFor="company_name">Company Name *</label>
                       <Input 
@@ -459,11 +491,11 @@ export default function NewClientPage() {
                         id="company_code" 
                         name="company_code" 
                         readOnly
-                        value={(formData as any).company_code || (formData.company_name ? `${(formData.company_name.replace(/[^a-zA-Z]/g, "").charAt(0) || "C").toUpperCase()}${new Date().getFullYear().toString().slice(-2)}${String(nextCompanySeq).padStart(4, "0")}` : "")} 
+                        value={(formData as any).company_code || (formData.company_name ? `A${new Date().getFullYear().toString().slice(-2)}•••• (Auto-generated)` : `A${new Date().getFullYear().toString().slice(-2)}••••`)} 
                         className="bg-muted/40 font-mono font-bold text-foreground"
-                        placeholder="Auto generated e.g. M260001" 
+                        placeholder={`Auto generated e.g. A${new Date().getFullYear().toString().slice(-2)}2675`} 
                       />
-                      <p className="text-[11px] text-muted-foreground">Auto generated running code format: First Char + Year + Running Sequence (e.g. M260001, M260002)</p>
+                      <p className="text-[11px] text-muted-foreground">Auto-generated format: A + 2-digit Year + 4 Random Digits (e.g. A{new Date().getFullYear().toString().slice(-2)}2675). Uniqueness is guaranteed across all companies.</p>
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium" htmlFor="tax_number">Tax Registration Number (NPWP)</label>
@@ -495,6 +527,53 @@ export default function NewClientPage() {
                         placeholder="Full Office Address" 
                       />
                     </div>
+
+                    {/* Director Contact Details (Optional) */}
+                    <div className="md:col-span-2 space-y-3 pt-2">
+                      <div className="flex items-center justify-between pb-1 border-b border-border/30">
+                        <div className="flex items-center gap-2">
+                          <Building className="h-4 w-4 text-primary" />
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">Director Contact Details (Optional)</h4>
+                        </div>
+                        <span className="text-[10px] font-semibold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-md">
+                          Auto-syncs to Documents &rarr; Board &amp; Stakeholders
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">If entered, this director is automatically registered under the company&apos;s Board and Stakeholders records.</p>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1 items-start">
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-foreground" htmlFor="director_name">Director Full Name</label>
+                          <Input 
+                            id="director_name" 
+                            name="director_name" 
+                            value={formData.director_name} 
+                            onChange={handleInputChange} 
+                            placeholder="e.g. Jane Smith" 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-foreground" htmlFor="director_email">Director Email</label>
+                          <Input 
+                            id="director_email" 
+                            name="director_email" 
+                            type="email" 
+                            value={formData.director_email} 
+                            onChange={handleInputChange} 
+                            placeholder="e.g. director@company.com" 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-foreground" htmlFor="director_contact">Director Phone / WhatsApp</label>
+                          <PhoneInput 
+                            id="director_contact"
+                            value={formData.director_contact}
+                            onChange={(val) => setFormData(prev => ({ ...prev, director_contact: val }))}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="space-y-2 md:col-span-2">
                       <label className="text-sm font-medium" htmlFor="company_notes">Company Notes / Remarks</label>
                       <textarea 
@@ -508,7 +587,8 @@ export default function NewClientPage() {
                       />
                     </div>
                   </div>
-                )}
+                </>
+              )}
 
                 <div className="flex justify-between pt-4 border-t border-border/40 mt-6">
                   <Button type="button" variant="outline" onClick={() => setActiveTab("personal")}>
@@ -737,15 +817,13 @@ export default function NewClientPage() {
                 <div className="grid grid-cols-1 gap-4 pt-2">
                   <div className="space-y-2">
                     <label className="text-sm font-medium" htmlFor="login_email">Portal Login Email (Username)</label>
-                    <Input 
+                    <EmailInput 
                       id="login_email" 
-                      name="email" 
-                      type="email" 
                       value={formData.email} 
-                      onChange={handleInputChange} 
+                      onChange={(val) => setFormData((prev) => ({ ...prev, email: val }))} 
                       required={createPortalAccount}
                       disabled={!createPortalAccount}
-                      placeholder={createPortalAccount ? "Portal Login Username Email" : "Disabled (Portal access skipped)"} 
+                      placeholder={createPortalAccount ? "client@company.com" : "Disabled (Portal access skipped)"} 
                     />
                     <p className="text-xs text-muted-foreground">Matches the Personal Email entered in Step 1.</p>
                   </div>

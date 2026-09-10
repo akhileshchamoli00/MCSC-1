@@ -108,12 +108,12 @@ export default function BusinessDashboard() {
   };
 
   const getOrderStatusBadge = (status: string) => {
-    const s = status.toUpperCase();
-    if (s === "COMPLETED") return <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">COMPLETED</Badge>;
-    if (s === "IN_PROGRESS") return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20">IN PROGRESS</Badge>;
-    if (s === "CONFIRMED") return <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20">CONFIRMED</Badge>;
-    if (s === "CANCELLED") return <Badge className="bg-rose-500/10 text-rose-500 border-rose-500/20">CANCELLED</Badge>;
-    return <Badge className="bg-muted text-muted-foreground border-border">DRAFT</Badge>;
+    const s = (status || "").toUpperCase();
+    if (s === "COMPLETED") return <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"><span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-emerald-500" />COMPLETED</span>;
+    if (s === "IN_PROGRESS") return <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/20"><span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-sky-500 animate-pulse" />IN PROGRESS</span>;
+    if (s === "CONFIRMED") return <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/20"><span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-indigo-500" />CONFIRMED</span>;
+    if (s === "CANCELLED") return <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/20"><span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-rose-500" />CANCELLED</span>;
+    return <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-zinc-500/10 dark:bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border-zinc-500/20"><span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-zinc-400" />DRAFT</span>;
   };
 
   if (loading) {
@@ -324,17 +324,17 @@ export default function BusinessDashboard() {
           {/* Side-by-Side Grid Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start w-full">
             {/* Expiring Documents & Permits Card */}
-            <Card className="overflow-hidden border border-border/40 bg-background/60 shadow-sm backdrop-blur-md">
+            <Card className="overflow-hidden border border-border/40 bg-background/50 shadow-sm backdrop-blur-md rounded-2xl">
               <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-border/30 bg-muted/10">
                 <div>
-                  <CardTitle className="text-lg font-bold flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-emerald-500" />
+                  <CardTitle className="text-base font-bold flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-emerald-500" />
                     <span>Expiring Documents & Permits</span>
                   </CardTitle>
-                  <CardDescription>Track validity and expiration of legal corporate files</CardDescription>
+                  <CardDescription className="text-xs">Track validity and expiration of legal corporate files</CardDescription>
                 </div>
                 <Link href="/business/clients/documents">
-                  <Button variant="ghost" size="sm" className="text-xs hover:bg-muted/80 flex items-center gap-1">
+                  <Button variant="ghost" size="sm" className="text-xs hover:bg-muted/80 flex items-center gap-1 rounded-xl">
                     Manage Documents <ArrowUpRight className="h-3 w-3" />
                   </Button>
                 </Link>
@@ -342,12 +342,12 @@ export default function BusinessDashboard() {
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left">
-                    <thead className="text-xs text-muted-foreground uppercase bg-muted/20 border-b border-border/40">
+                    <thead className="text-[10px] text-muted-foreground uppercase bg-muted/30 border-b border-border/40 font-semibold tracking-wider">
                       <tr>
-                        <th className="px-5 py-4 font-semibold">Partner</th>
-                        <th className="px-5 py-4 font-semibold">Company</th>
-                        <th className="px-5 py-4 font-semibold">Document Name</th>
-                        <th className="px-5 py-4 font-semibold text-right">Status / Days Left</th>
+                        <th className="px-5 py-3 font-semibold">Partner</th>
+                        <th className="px-5 py-3 font-semibold">Company</th>
+                        <th className="px-5 py-3 font-semibold">Document Name</th>
+                        <th className="px-5 py-3 font-semibold text-right">Status / Days Left</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/20">
@@ -357,29 +357,29 @@ export default function BusinessDashboard() {
                           const daysLeft = getDaysRemaining(doc.expiry_date);
                           return (
                             <tr key={doc.id} className="hover:bg-muted/20 transition-colors">
-                              <td className="px-5 py-4 font-bold text-foreground">{doc.partner_name || "Individual Client"}</td>
-                              <td className="px-5 py-4 font-semibold text-muted-foreground">{doc.company_name}</td>
-                              <td className="px-5 py-4 whitespace-normal break-words max-w-[200px] leading-normal">
+                              <td className="px-5 py-3.5 font-bold text-foreground">{doc.partner_name || "Individual Client"}</td>
+                              <td className="px-5 py-3.5 font-semibold text-muted-foreground">{doc.company_name}</td>
+                              <td className="px-5 py-3.5 whitespace-normal break-words max-w-[200px] leading-normal">
                                 <div className="font-semibold text-foreground">{doc.file_name}</div>
                                 <div className="text-[10px] text-muted-foreground/80 mt-0.5">{doc.document_type}</div>
                               </td>
-                              <td className="px-5 py-4 text-right font-semibold">
+                              <td className="px-5 py-3.5 text-right font-semibold">
                                 {daysLeft < 0 ? (
-                                  <Badge className="bg-red-500/10 text-red-500 border-red-500/20 font-bold text-[10px]">
+                                  <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20">
                                     EXPIRED ({Math.abs(daysLeft)}d ago)
-                                  </Badge>
+                                  </span>
                                 ) : daysLeft === 0 ? (
-                                  <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 font-bold text-[10px]">
+                                  <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
                                     TODAY
-                                  </Badge>
+                                  </span>
                                 ) : daysLeft <= 30 ? (
-                                  <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 font-bold text-[10px]">
+                                  <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
                                     {daysLeft}d LEFT
-                                  </Badge>
+                                  </span>
                                 ) : (
-                                  <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-bold text-[10px]">
+                                  <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
                                     {daysLeft}d LEFT
-                                  </Badge>
+                                  </span>
                                 )}
                               </td>
                             </tr>
@@ -387,7 +387,7 @@ export default function BusinessDashboard() {
                         })}
                       {expiringDocs.length === 0 && (
                         <tr>
-                          <td colSpan={4} className="px-5 py-8 text-center text-muted-foreground text-sm italic">
+                          <td colSpan={4} className="px-5 py-8 text-center text-muted-foreground text-xs italic">
                             No expiring corporate documents found in workspace database.
                           </td>
                         </tr>
@@ -399,14 +399,14 @@ export default function BusinessDashboard() {
             </Card>
 
             {/* Recent Orders log */}
-            <Card className="overflow-hidden border border-border/40 bg-background/60 shadow-sm backdrop-blur-md">
+            <Card className="overflow-hidden border border-border/40 bg-background/50 shadow-sm backdrop-blur-md rounded-2xl">
               <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-border/30 bg-muted/10">
                 <div>
-                  <CardTitle className="text-lg font-bold">Recent Client Orders</CardTitle>
-                  <CardDescription>Latest services purchased and execution status</CardDescription>
+                  <CardTitle className="text-base font-bold">Recent Client Orders</CardTitle>
+                  <CardDescription className="text-xs">Latest services purchased and execution status</CardDescription>
                 </div>
                 <Link href="/business/clients/orders">
-                  <Button variant="ghost" size="sm" className="text-xs hover:bg-muted/80 flex items-center gap-1">
+                  <Button variant="ghost" size="sm" className="text-xs hover:bg-muted/80 flex items-center gap-1 rounded-xl">
                     Manage Orders <ArrowUpRight className="h-3 w-3" />
                   </Button>
                 </Link>
@@ -414,38 +414,42 @@ export default function BusinessDashboard() {
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left">
-                    <thead className="text-xs text-muted-foreground uppercase bg-muted/20 border-b border-border/40">
+                    <thead className="text-[10px] text-muted-foreground uppercase bg-muted/30 border-b border-border/40 font-semibold tracking-wider">
                       <tr>
-                        <th className="px-5 py-4 font-semibold">Order Number</th>
-                        <th className="px-5 py-4 font-semibold">Representative</th>
-                        <th className="px-5 py-4 font-semibold">Assigned To</th>
-                        <th className="px-5 py-4 font-semibold text-right">Status</th>
+                        <th className="px-5 py-3 font-semibold">Order Number</th>
+                        <th className="px-5 py-3 font-semibold">Representative</th>
+                        <th className="px-5 py-3 font-semibold">Assigned To</th>
+                        <th className="px-5 py-3 font-semibold text-right">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/20">
                       {groupedOrders.slice(0, 5).map((order) => (
                         <tr key={order.order_number} className="hover:bg-muted/20 transition-colors">
-                          <td className="px-5 py-4 font-mono font-bold text-foreground">{order.order_number}</td>
-                          <td className="px-5 py-4 text-muted-foreground font-semibold">{order.client_name || "-"}</td>
-                          <td className="px-5 py-4">
+                          <td className="px-5 py-3.5">
+                            <span className="font-mono font-bold text-xs bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 px-2 py-0.5 rounded-md text-foreground">
+                              {order.order_number}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 text-muted-foreground font-semibold">{order.client_name || "-"}</td>
+                          <td className="px-5 py-3.5">
                             {order.consultants && order.consultants.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
                                 {order.consultants.map((c: any) => (
-                                  <Badge key={c.id} variant="outline" className="bg-primary/5 text-primary border-primary/20 text-[10px] font-medium py-0 px-1.5">
+                                  <span key={c.id} className="bg-primary/10 text-primary border border-primary/20 text-[10px] font-bold py-0.5 px-2 rounded-full">
                                     {c.name}
-                                  </Badge>
+                                  </span>
                                 ))}
                               </div>
                             ) : (
                               <span className="text-muted-foreground/60 italic text-[11px]">Unassigned</span>
                             )}
                           </td>
-                          <td className="px-5 py-4 text-right">{getOrderStatusBadge(order.status)}</td>
+                          <td className="px-5 py-3.5 text-right">{getOrderStatusBadge(order.status)}</td>
                         </tr>
                       ))}
                       {groupedOrders.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="px-5 py-8 text-center text-muted-foreground text-sm italic">
+                          <td colSpan={4} className="px-5 py-8 text-center text-muted-foreground text-xs italic">
                             No client orders found in workspace database.
                           </td>
                         </tr>

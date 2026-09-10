@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PhoneInput, isValidPhoneNumber } from "@/components/ui/phone-input";
 
 export default function EditEmployeePage() {
   const router = useRouter();
@@ -164,6 +165,12 @@ export default function EditEmployeePage() {
     setLoading(true);
     setError(null);
     
+    if (formData.phone && !isValidPhoneNumber(formData.phone)) {
+      setError("Please enter a valid phone number (6 to 15 digits).");
+      setLoading(false);
+      return;
+    }
+
     try {
       const token = localStorage.getItem("hrms_token");
       if (!token) throw new Error("Authentication token not found. Please log in again.");
@@ -316,7 +323,11 @@ export default function EditEmployeePage() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Phone Number</label>
-                <Input name="phone" value={formData.phone} onChange={handleInputChange} type="tel" placeholder="+62 812 3456 7890" />
+                <PhoneInput 
+                  value={formData.phone} 
+                  onChange={(val) => setFormData((prev) => ({ ...prev, phone: val }))} 
+                  placeholder="812 3456 789" 
+                />
               </div>
             </div>
             <div className="space-y-2">

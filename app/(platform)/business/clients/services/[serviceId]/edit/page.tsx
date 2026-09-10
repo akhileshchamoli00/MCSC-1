@@ -44,7 +44,9 @@ export default function EditClientServicePage() {
     partner_a1_discount: "",
     partner_a2_discount: "",
     partner_a3_price: "",
-    needs_notary: false
+    needs_notary: false,
+    needs_gov_officer: false,
+    needs_other_vendors: false
   });
 
   const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
@@ -69,7 +71,9 @@ export default function EditClientServicePage() {
           partner_a1_discount: data.partner_a1_discount !== undefined ? String(data.partner_a1_discount) : "40",
           partner_a2_discount: data.partner_a2_discount !== undefined ? String(data.partner_a2_discount) : "50",
           partner_a3_price: data.partner_a3_price !== null && data.partner_a3_price !== undefined ? String(data.partner_a3_price) : "",
-          needs_notary: data.needs_notary || false
+          needs_notary: data.needs_notary || false,
+          needs_gov_officer: data.needs_gov_officer || false,
+          needs_other_vendors: data.needs_other_vendors || false
         });
       })
       .catch((err) => {
@@ -98,7 +102,9 @@ export default function EditClientServicePage() {
         partner_a1_discount: formData.partner_a1_discount !== "" ? parseFloat(formData.partner_a1_discount) : 40,
         partner_a2_discount: formData.partner_a2_discount !== "" ? parseFloat(formData.partner_a2_discount) : 50,
         partner_a3_price: formData.partner_a3_price ? parseFloat(formData.partner_a3_price) : null,
-        needs_notary: formData.needs_notary
+        needs_notary: formData.needs_notary,
+        needs_gov_officer: formData.needs_gov_officer,
+        needs_other_vendors: formData.needs_other_vendors
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog/${serviceId}`, {
@@ -177,7 +183,7 @@ export default function EditClientServicePage() {
                   </h4>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-                    <div className="sm:col-span-6 space-y-2">
+                    <div className="sm:col-span-8 space-y-2">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Job Title *</label>
                       <Input
                         required
@@ -188,7 +194,7 @@ export default function EditClientServicePage() {
                       />
                     </div>
 
-                    <div className="sm:col-span-3 space-y-2">
+                    <div className="sm:col-span-4 space-y-2">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">Job ID *</label>
                       <Input
                         required
@@ -200,22 +206,62 @@ export default function EditClientServicePage() {
                       />
                     </div>
 
-                    <div className="sm:col-span-3 space-y-2 flex flex-col justify-end pb-2">
-                      <div className="flex items-center gap-2 h-10">
-                        <input
-                          type="checkbox"
-                          id="edit-needs-notary"
-                          name="needs_notary"
-                          checked={formData.needs_notary}
-                          onChange={(e) => setFormData((prev) => ({ ...prev, needs_notary: e.target.checked }))}
-                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-emerald-600 cursor-pointer"
-                        />
-                        <label 
-                          htmlFor="edit-needs-notary"
-                          className="text-xs font-bold text-muted-foreground/90 cursor-pointer select-none"
-                        >
-                          Notary Required
-                        </label>
+                    {/* Requirements Checkboxes */}
+                    <div className="sm:col-span-12">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 block mb-2">
+                        Execution & Third-Party Requirements
+                      </label>
+                      <div className="flex flex-wrap items-center gap-6 p-3.5 rounded-xl bg-muted/20 border border-border/40">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="edit-needs-notary"
+                            name="needs_notary"
+                            checked={formData.needs_notary || false}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, needs_notary: e.target.checked }))}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-emerald-600 cursor-pointer"
+                          />
+                          <label 
+                            htmlFor="edit-needs-notary"
+                            className="text-xs font-bold text-foreground cursor-pointer select-none"
+                          >
+                            Notary Required
+                          </label>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="edit-needs-gov-officer"
+                            name="needs_gov_officer"
+                            checked={formData.needs_gov_officer || false}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, needs_gov_officer: e.target.checked }))}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-emerald-600 cursor-pointer"
+                          />
+                          <label 
+                            htmlFor="edit-needs-gov-officer"
+                            className="text-xs font-bold text-foreground cursor-pointer select-none"
+                          >
+                            Government Body Required
+                          </label>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="edit-needs-other-vendors"
+                            name="needs_other_vendors"
+                            checked={formData.needs_other_vendors || false}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, needs_other_vendors: e.target.checked }))}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-emerald-600 cursor-pointer"
+                          />
+                          <label 
+                            htmlFor="edit-needs-other-vendors"
+                            className="text-xs font-bold text-foreground cursor-pointer select-none"
+                          >
+                            Other Vendors Required
+                          </label>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -337,14 +383,14 @@ export default function EditClientServicePage() {
             {/* Actions Bar */}
             <div className="flex justify-between pt-6 border-t border-border/30 mt-6">
               <Link href="/business/clients/services">
-                <Button type="button" variant="outline" className="rounded-xl h-10 px-4 font-bold border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-foreground transition-colors bg-transparent">
+                <Button type="button" variant="outline" className="rounded-xl h-10 px-4 font-bold">
                   Cancel
                 </Button>
               </Link>
               <Button 
                 type="submit" 
                 disabled={saving} 
-                className="px-6 font-bold shadow-md gap-2 rounded-xl h-10 bg-zinc-900 hover:bg-zinc-100 text-zinc-50 hover:text-zinc-900 border border-zinc-900 dark:bg-zinc-100 dark:hover:bg-zinc-900 dark:text-zinc-950 dark:hover:text-zinc-100 dark:border-zinc-100 transition-all duration-200"
+                className="px-6 font-bold shadow-md gap-2 rounded-xl h-10"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 Save Service Package

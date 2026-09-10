@@ -21,6 +21,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
         '/resources/check-application-status',
         '/resources/kbli',
         '/resources/faq',
+        '/track-order',
         '/announcements',
         '/contact',
         '/privacy-policy',

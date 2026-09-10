@@ -43,6 +43,8 @@ import {
   ExternalLink
 } from "lucide-react";
 import { toast } from "sonner";
+import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
+import { EmailInput } from "@/components/ui/email-input";
 import Link from "next/link";
 import { format, isBefore, differenceInDays } from "date-fns";
 import { DropboxFileManager } from "@/components/dropbox-file-manager";
@@ -344,6 +346,17 @@ export default function CompanyDocumentsManagementPage() {
   const handleAddStakeholder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !newStakeholder.name) return;
+
+    if (newStakeholder.email && !isValidEmail(newStakeholder.email)) {
+      toast.error("Please enter a valid email address (e.g. contact@domain.com).");
+      return;
+    }
+
+    if (newStakeholder.phone && !isValidPhoneNumber(newStakeholder.phone)) {
+      toast.error("Please enter a valid phone number (6 to 15 digits).");
+      return;
+    }
+
     setAddingStakeholder(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}/stakeholders`, {
@@ -826,21 +839,20 @@ export default function CompanyDocumentsManagementPage() {
                   </div>
                   <div className="space-y-1">
                     <label className="text-[11px] font-semibold text-foreground">Phone Number</label>
-                    <Input
-                      placeholder="e.g. +62 812..."
+                    <PhoneInput
+                      placeholder="812 3456 789"
                       value={newStakeholder.phone}
-                      onChange={(e) => setNewStakeholder({ ...newStakeholder, phone: e.target.value })}
-                      className="h-9 text-xs bg-background"
+                      onChange={(val) => setNewStakeholder({ ...newStakeholder, phone: val })}
+                      className="h-9 text-xs"
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[11px] font-semibold text-foreground">Email Address</label>
-                    <Input
-                      type="email"
-                      placeholder="e.g. contact@domain.com"
+                    <EmailInput
+                      placeholder="contact@domain.com"
                       value={newStakeholder.email}
-                      onChange={(e) => setNewStakeholder({ ...newStakeholder, email: e.target.value })}
-                      className="h-9 text-xs bg-background"
+                      onChange={(val) => setNewStakeholder({ ...newStakeholder, email: val })}
+                      className="h-9 text-xs"
                     />
                   </div>
                   <div className="flex items-center gap-2 h-9 pb-1.5 pl-1">
@@ -1172,7 +1184,7 @@ export default function CompanyDocumentsManagementPage() {
 
       {/* Right-to-Left Slide Preview Panel */}
       {previewDoc && (
-        <div className={`fixed top-[104px] bottom-0 right-0 left-0 md:left-[260px] z-30 bg-background/98 backdrop-blur-md p-4 sm:p-6 flex flex-col justify-between overflow-hidden duration-300 border-l border-t border-border shadow-2xl ${isClosingPreview ? "animate-out slide-out-to-right" : "animate-in slide-in-from-right"}`}>
+        <div className={`fixed top-16 bottom-0 right-0 left-0 md:left-[260px] z-30 bg-background/98 backdrop-blur-md p-4 sm:p-6 flex flex-col justify-between overflow-hidden duration-300 border-l border-t border-border shadow-2xl ${isClosingPreview ? "animate-out slide-out-to-right" : "animate-in slide-in-from-right"}`}>
           <div className="max-w-7xl w-full h-full mx-auto flex flex-col justify-between space-y-4">
 
             {/* Top Action Header */}
