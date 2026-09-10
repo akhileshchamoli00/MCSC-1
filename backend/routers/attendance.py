@@ -235,10 +235,17 @@ def request_correction(req: schemas.AttendanceCorrectionCreate, db: Session = De
 # ADMIN ENDPOINTS
 # ==========================================
 
-def is_admin_or_hr(user, db: Session = None) -> bool:
+def is_admin_or_hr(user: models.User, db: Session, perm: str = "view") -> bool:
     if not user:
         return False
-    return True
+    if auth.is_super_admin(user):
+        return True
+    if auth.has_permission(user, "attendance_management", perm, db) or auth.has_permission(user, "reports_attendance", perm, db):
+        return True
+    if not user.role:
+        return False
+    r_name = str(user.role.name).strip().upper()
+    return "ADMIN" in r_name or "HR" in r_name
 
 @router.get("/settings", response_model=schemas.AttendanceSettingsResponse)
 def get_admin_settings(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
@@ -248,7 +255,7 @@ def get_admin_settings(db: Session = Depends(database.get_db), current_user: mod
 
 @router.put("/settings", response_model=schemas.AttendanceSettingsResponse)
 def update_admin_settings(req: schemas.AttendanceSettingsBase, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user, db):
+    if not is_admin_or_hr(current_user, db, "edit"):
         raise HTTPException(status_code=403, detail="Admin access required")
         
     settings = get_settings(db)
@@ -309,7 +316,7 @@ def get_all_attendance(skip: int = 0, limit: int = 100, db: Session = Depends(da
 
 @router.put("/{attendance_id}", response_model=schemas.AttendanceResponse)
 def update_attendance_admin(attendance_id: int, req: schemas.AttendanceUpdateAdmin, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user, db):
+    if not is_admin_or_hr(current_user, db, "edit"):
         raise HTTPException(status_code=403, detail="Admin access required")
         
     attendance = db.query(models.Attendance).filter(models.Attendance.id == attendance_id).first()
@@ -341,7 +348,7 @@ def get_all_corrections(status: Optional[str] = None, db: Session = Depends(data
 
 @router.put("/correction/{correction_id}/approve")
 def approve_correction(correction_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user, db):
+    if not (is_admin_or_hr(current_user, db, "approve") or is_admin_or_hr(current_user, db, "edit")):
         raise HTTPException(status_code=403, detail="Admin access required")
         
     correction = db.query(models.AttendanceCorrection).filter(models.AttendanceCorrection.id == correction_id).first()
@@ -365,7 +372,7 @@ def approve_correction(correction_id: int, db: Session = Depends(database.get_db
 
 @router.put("/correction/{correction_id}/reject")
 def reject_correction(correction_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user, db):
+    if not (is_admin_or_hr(current_user, db, "approve") or is_admin_or_hr(current_user, db, "edit")):
         raise HTTPException(status_code=403, detail="Admin access required")
         
     correction = db.query(models.AttendanceCorrection).filter(models.AttendanceCorrection.id == correction_id).first()

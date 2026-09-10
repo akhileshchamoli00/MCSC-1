@@ -13,17 +13,21 @@ router = APIRouter(
     dependencies=[Depends(auth.get_current_user)]
 )
 
-def is_staff_or_admin(user: models.User) -> bool:
+def is_staff_or_admin(user: models.User, action: str = "view", db: Session = None) -> bool:
     if not user:
         return False
     if auth.is_super_admin(user):
         return True
+    if db:
+        if auth.has_permission(user, "hrms_announcements", action, db) or auth.has_permission(user, "clients_announcements", action, db):
+            return True
     if user.role:
         name = user.role.name.upper()
         if name in ["ADMIN", "SUPER ADMIN", "HR", "MANAGEMENT", "DIRECTOR", "OPERATIONS", "LEGAL", "CONSULTANT"]:
             return True
     if hasattr(user, "employee") and user.employee is not None:
-        return True
+        if action == "view":
+            return True
     return False
 
 @router.get("", response_model=List[schemas.AnnouncementResponse])
@@ -46,7 +50,7 @@ def get_announcements(
         )
         if category and category != "ALL":
             query = query.filter(models.Announcement.category == category)
-    elif is_staff_or_admin(current_user) and (scope == "management" or status is not None):
+    elif is_staff_or_admin(current_user, "view", db) and (scope == "management" or status is not None):
         # Staff/Admins in management studio can filter by status, target_role, and category
         if status and status != "ALL":
             query = query.filter(models.Announcement.status == status)
@@ -76,7 +80,7 @@ def get_announcement(id: int, db: Session = Depends(database.get_db), current_us
         
     role_name = current_user.role.name.upper() if current_user.role else ""
     
-    if is_staff_or_admin(current_user):
+    if is_staff_or_admin(current_user, "view", db):
         return announcement
     elif role_name == "CLIENT":
         if announcement.status == "PUBLISHED" and announcement.target_role in ["ALL", "CLIENT"]:
@@ -149,7 +153,7 @@ def create_announcement(
     db: Session = Depends(database.get_db), 
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    if not is_staff_or_admin(current_user):
+    if not is_staff_or_admin(current_user, "create", db):
         raise HTTPException(status_code=403, detail="Only authorized staff or management can create announcements")
         
     ann_status = (announcement_data.status or "PUBLISHED").upper()
@@ -186,7 +190,7 @@ def update_announcement(
     db: Session = Depends(database.get_db), 
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    if not is_staff_or_admin(current_user):
+    if not is_staff_or_admin(current_user, "edit", db):
         raise HTTPException(status_code=403, detail="Only authorized staff can update announcements")
         
     db_announcement = db.query(models.Announcement).filter(models.Announcement.id == id).first()
@@ -221,7 +225,7 @@ def update_announcement(
 
 @router.patch("/{id}/toggle-pin", response_model=schemas.AnnouncementResponse)
 def toggle_pin_announcement(id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_staff_or_admin(current_user):
+    if not is_staff_or_admin(current_user, "edit", db):
         raise HTTPException(status_code=403, detail="Only authorized staff can pin announcements")
         
     db_announcement = db.query(models.Announcement).filter(models.Announcement.id == id).first()
@@ -235,7 +239,7 @@ def toggle_pin_announcement(id: int, db: Session = Depends(database.get_db), cur
 
 @router.patch("/{id}/publish", response_model=schemas.AnnouncementResponse)
 def publish_announcement(id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_staff_or_admin(current_user):
+    if not is_staff_or_admin(current_user, "edit", db):
         raise HTTPException(status_code=403, detail="Only authorized staff can publish announcements")
         
     db_announcement = db.query(models.Announcement).filter(models.Announcement.id == id).first()
@@ -257,9 +261,10 @@ def publish_announcement(id: int, db: Session = Depends(database.get_db), curren
 @router.post("/upload-attachment")
 async def upload_announcement_attachment(
     file: UploadFile = File(...),
+    db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    if not is_staff_or_admin(current_user):
+    if not is_staff_or_admin(current_user, "create", db):
         raise HTTPException(status_code=403, detail="Only authorized staff can upload attachments")
         
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -277,7 +282,7 @@ async def upload_announcement_attachment(
 
 @router.delete("/{id}")
 def delete_announcement(id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_staff_or_admin(current_user):
+    if not is_staff_or_admin(current_user, "delete", db):
         raise HTTPException(status_code=403, detail="Only authorized staff can delete announcements")
         
     db_announcement = db.query(models.Announcement).filter(models.Announcement.id == id).first()

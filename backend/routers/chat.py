@@ -16,12 +16,19 @@ router = APIRouter(
     tags=["chat"]
 )
 
-def is_admin_or_hr(user: models.User) -> bool:
-    if not user or not user.role:
+def is_admin_or_hr(user: models.User, db: Session = None) -> bool:
+    if not user:
         return False
     if auth.is_super_admin(user):
         return True
-    return user.role.name.upper() == "HR"
+    if db:
+        if auth.has_permission(user, "chat_center", "view", db) or auth.has_permission(user, "chat", "view", db):
+            return True
+    if user.role:
+        name = user.role.name.upper()
+        if name in ["ADMIN", "SUPER ADMIN", "HR"]:
+            return True
+    return False
 
 def is_employee_role(user: models.User) -> bool:
     if not user:
@@ -81,7 +88,7 @@ class ConnectionManager:
             if uid in recipient_user_ids:
                 continue
             user = db.query(models.User).filter(models.User.id == uid).first()
-            if is_admin_or_hr(user):
+            if is_admin_or_hr(user, db):
                 recipient_user_ids.append(uid)
                 
         # Send to everyone in the list
@@ -151,7 +158,7 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
                         
                     # Check authorization
                     is_authorized = False
-                    if is_admin_or_hr(current_user):
+                    if is_admin_or_hr(current_user, db_trans):
                         is_authorized = True
                     elif is_employee_role(current_user) and employee_id and conversation.employee_id == employee_id:
                         is_authorized = True
@@ -204,7 +211,7 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
 def get_conversations(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     role_name = current_user.role.name.upper() if current_user.role else ""
     
-    if is_admin_or_hr(current_user):
+    if is_admin_or_hr(current_user, db):
         return db.query(models.Conversation).all()
         
     elif is_employee_role(current_user):
@@ -236,7 +243,7 @@ def get_conversation_messages(id: int, db: Session = Depends(database.get_db), c
     role_name = current_user.role.name.upper() if current_user.role else ""
     is_authorized = False
     
-    if is_admin_or_hr(current_user):
+    if is_admin_or_hr(current_user, db):
         is_authorized = True
     elif is_employee_role(current_user) and current_user.employee and conversation.employee_id == current_user.employee.id:
         is_authorized = True
@@ -273,7 +280,7 @@ def get_or_create_conversation(payload: dict, db: Session = Depends(database.get
     role_name = current_user.role.name.upper() if current_user.role else ""
     is_authorized = False
     
-    if is_admin_or_hr(current_user):
+    if is_admin_or_hr(current_user, db):
         is_authorized = True
     elif is_employee_role(current_user) and current_user.employee and current_user.employee.id == employee_id:
         is_authorized = True

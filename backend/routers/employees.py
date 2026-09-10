@@ -14,7 +14,9 @@ router = APIRouter(
 )
 
 @router.get("", response_model=List[schemas.EmployeeResponse])
-def get_employees(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db)):
+def get_employees(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "employees_all", "view", db) or (current_user.role and current_user.role.name.upper() not in ["CLIENT", "MEMBER"])):
+        raise HTTPException(status_code=403, detail="Not authorized to view employee directory")
     employees = db.query(models.Employee).order_by(models.Employee.first_name, models.Employee.last_name).offset(skip).limit(limit).all()
     return employees
 
@@ -30,7 +32,10 @@ def get_employee(employee_id: str, db: Session = Depends(database.get_db)):
     return employee
 
 @router.post("", response_model=schemas.EmployeeResponse, status_code=status.HTTP_201_CREATED)
-def create_employee(employee: schemas.EmployeeCreate, background_tasks: BackgroundTasks, db: Session = Depends(database.get_db)):
+def create_employee(employee: schemas.EmployeeCreate, background_tasks: BackgroundTasks, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "employees_all", "create", db)):
+        raise HTTPException(status_code=403, detail="Not authorized to create employees")
+        
     db_employee = db.query(models.Employee).filter(models.Employee.user_id == employee.user_id).first()
     if db_employee:
         raise HTTPException(status_code=400, detail="Employee record already exists for this user")
@@ -95,7 +100,11 @@ def create_employee(employee: schemas.EmployeeCreate, background_tasks: Backgrou
     return new_employee
 
 @router.put("/{employee_id}", response_model=schemas.EmployeeResponse)
-def update_employee(employee_id: int, employee_update: schemas.EmployeeBase, db: Session = Depends(database.get_db)):
+def update_employee(employee_id: int, employee_update: schemas.EmployeeBase, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    is_own_profile = bool(current_user.employee and current_user.employee.id == employee_id)
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "employees_all", "edit", db) or (is_own_profile and auth.has_permission(current_user, "employees_profile", "edit", db))):
+        raise HTTPException(status_code=403, detail="Not authorized to update employee details")
+
     db_employee = db.query(models.Employee).filter(models.Employee.id == employee_id).first()
     if not db_employee:
         raise HTTPException(status_code=404, detail="Employee not found")
@@ -130,7 +139,10 @@ def update_employee(employee_id: int, employee_update: schemas.EmployeeBase, db:
     return db_employee
 
 @router.delete("/{employee_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_employee(employee_id: int, db: Session = Depends(database.get_db)):
+def delete_employee(employee_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "employees_all", "delete", db)):
+        raise HTTPException(status_code=403, detail="Not authorized to delete employee")
+
     db_employee = db.query(models.Employee).filter(models.Employee.id == employee_id).first()
     if not db_employee:
         raise HTTPException(status_code=404, detail="Employee not found")
@@ -149,8 +161,13 @@ async def upload_employee_document(
     employee_id: int, 
     document_type: str = Form(...),
     file: UploadFile = File(...),
-    db: Session = Depends(database.get_db)
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
 ):
+    is_own_profile = bool(current_user.employee and current_user.employee.id == employee_id)
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "employees_all", "edit", db) or (is_own_profile and auth.has_permission(current_user, "employees_profile", "edit", db))):
+        raise HTTPException(status_code=403, detail="Not authorized to upload employee documents")
+
     from storage import upload_file_to_supabase
     employee = db.query(models.Employee).filter(models.Employee.id == employee_id).first()
     if not employee:
@@ -187,8 +204,13 @@ async def upload_employee_document(
 async def upload_employee_photo(
     employee_id: int, 
     file: UploadFile = File(...),
-    db: Session = Depends(database.get_db)
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
 ):
+    is_own_profile = bool(current_user.employee and current_user.employee.id == employee_id)
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "employees_all", "edit", db) or (is_own_profile and auth.has_permission(current_user, "employees_profile", "edit", db))):
+        raise HTTPException(status_code=403, detail="Not authorized to upload employee photo")
+
     from storage import upload_public_file_to_supabase
     from utils.file_sanitizer import validate_and_sanitize_file
 

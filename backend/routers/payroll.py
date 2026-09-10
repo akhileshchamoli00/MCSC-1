@@ -119,7 +119,7 @@ def get_my_payrolls(skip: int = 0, limit: int = 100, db: Session = Depends(datab
 
 @router.get("", response_model=List[schemas.PayrollResponse])
 def get_payrolls(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    is_admin = auth.has_permission(current_user, "payroll_management", "view", db)
+    is_admin = auth.is_super_admin(current_user) or auth.has_permission(current_user, "payroll_management", "view", db)
     if is_admin:
         return db.query(models.Payroll).join(models.Employee).order_by(models.Employee.first_name, models.Employee.last_name).offset(skip).limit(limit).all()
     else:
@@ -150,7 +150,7 @@ def is_payslip_generation_restricted(payroll_month: int, payroll_year: int) -> b
 
 @router.post("/generate")
 def generate_monthly_payroll(req: GeneratePayrollRequest, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not auth.has_permission(current_user, "payroll_management", "create", db):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "payroll_management", "create", db)):
         raise HTTPException(status_code=403, detail="Access denied. Required permission 'payroll_management:create' not granted.")
         
     if is_payslip_generation_restricted(req.month, req.year):
@@ -318,8 +318,8 @@ def generate_monthly_payroll(req: GeneratePayrollRequest, db: Session = Depends(
 
 @router.post("/{id}/generate-payslip")
 def generate_single_payslip(id: int, request: Request, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not auth.is_super_admin(current_user):
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "payroll_management", "edit", db) or auth.has_permission(current_user, "payroll_management", "create", db)):
+        raise HTTPException(status_code=403, detail="Access denied. Required permission 'payroll_management:edit' not granted.")
         
     payroll = db.query(models.Payroll).filter(models.Payroll.id == id).first()
     if not payroll:
@@ -404,8 +404,8 @@ class GenerateAllPayslipsRequest(BaseModel):
 
 @router.post("/generate-all-payslips")
 def generate_all_payslips(req: GenerateAllPayslipsRequest, request: Request, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not auth.is_super_admin(current_user):
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "payroll_management", "edit", db) or auth.has_permission(current_user, "payroll_management", "create", db)):
+        raise HTTPException(status_code=403, detail="Access denied. Required permission 'payroll_management:edit' not granted.")
         
     if is_payslip_generation_restricted(req.month, req.year):
         raise HTTPException(
@@ -492,7 +492,7 @@ def get_payroll(id: int, db: Session = Depends(database.get_db), current_user: m
     if not payroll:
         raise HTTPException(status_code=404, detail="Payroll not found")
         
-    is_admin = auth.is_super_admin(current_user)
+    is_admin = auth.is_super_admin(current_user) or auth.has_permission(current_user, "payroll_management", "view", db)
     if not is_admin:
         if not current_user.employee or payroll.employee_id != current_user.employee.id:
             raise HTTPException(status_code=403, detail="Not authorized")
@@ -503,8 +503,8 @@ def get_payroll(id: int, db: Session = Depends(database.get_db), current_user: m
 
 @router.put("/{id}", response_model=schemas.PayrollResponse)
 def update_payroll(id: int, payroll_update: schemas.PayrollUpdate, request: Request, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not auth.is_super_admin(current_user):
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "payroll_management", "edit", db)):
+        raise HTTPException(status_code=403, detail="Access denied. Required permission 'payroll_management:edit' not granted.")
         
     payroll = db.query(models.Payroll).filter(models.Payroll.id == id).first()
     if not payroll:
@@ -593,7 +593,11 @@ def download_payslip(id: int, request: Request, db: Session = Depends(database.g
     if not payroll:
         raise HTTPException(status_code=404, detail="Payroll not found")
         
-    is_admin = auth.is_super_admin(current_user)
+    is_admin = (
+        auth.is_super_admin(current_user) or 
+        auth.has_permission(current_user, "payroll_management", "download", db) or
+        auth.has_permission(current_user, "payroll_management", "view", db)
+    )
     if not is_admin:
         if not current_user.employee or payroll.employee_id != current_user.employee.id:
             raise HTTPException(status_code=403, detail="Not authorized")
@@ -646,7 +650,7 @@ def resend_payslip_password(id: int, request: Request, db: Session = Depends(dat
     if not payroll:
         raise HTTPException(status_code=404, detail="Payroll not found")
         
-    is_admin = auth.is_super_admin(current_user)
+    is_admin = auth.is_super_admin(current_user) or auth.has_permission(current_user, "payroll_management", "edit", db)
     if not is_admin and (not current_user.employee or payroll.employee_id != current_user.employee.id):
         raise HTTPException(status_code=403, detail="Not authorized")
         
@@ -701,8 +705,8 @@ def resend_payslip_password(id: int, request: Request, db: Session = Depends(dat
 
 @router.post("/{id}/regenerate")
 def regenerate_single_payroll(id: int, request: Request, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not auth.is_super_admin(current_user):
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "payroll_management", "edit", db)):
+        raise HTTPException(status_code=403, detail="Access denied. Required permission 'payroll_management:edit' not granted.")
         
     payroll = db.query(models.Payroll).filter(models.Payroll.id == id).first()
     if not payroll:

@@ -34,21 +34,43 @@ def generate_team_code(name: str, db: Session) -> str:
     return code
 
 @router.get("", response_model=List[schemas.TeamResponse])
-def get_teams(active_only: bool = False, db: Session = Depends(database.get_db)):
+def get_teams(
+    active_only: bool = False, 
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
     query = db.query(models.Team)
     if active_only:
         query = query.filter(models.Team.is_active == True)
     return query.order_by(models.Team.name).all()
 
 @router.get("/{team_id}", response_model=schemas.TeamResponse)
-def get_team(team_id: int, db: Session = Depends(database.get_db)):
+def get_team(
+    team_id: int, 
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
     team = db.query(models.Team).filter(models.Team.id == team_id).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
     return team
 
 @router.post("", response_model=schemas.TeamResponse, status_code=status.HTTP_201_CREATED)
-def create_team(team_data: schemas.TeamCreate, db: Session = Depends(database.get_db)):
+def create_team(
+    team_data: schemas.TeamCreate, 
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if not (
+        auth.is_super_admin(current_user) or 
+        auth.has_permission(current_user, "clients_teams", "create", db) or 
+        auth.has_permission(current_user, "employees_all", "create", db)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Required permission 'clients_teams:create' not granted."
+        )
+
     # Check if team name already exists
     existing = db.query(models.Team).filter(models.Team.name.ilike(team_data.name)).first()
     if existing:
@@ -65,7 +87,22 @@ def create_team(team_data: schemas.TeamCreate, db: Session = Depends(database.ge
     return db_team
 
 @router.put("/{team_id}", response_model=schemas.TeamResponse)
-def update_team(team_id: int, team_data: schemas.TeamUpdate, db: Session = Depends(database.get_db)):
+def update_team(
+    team_id: int, 
+    team_data: schemas.TeamUpdate, 
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if not (
+        auth.is_super_admin(current_user) or 
+        auth.has_permission(current_user, "clients_teams", "edit", db) or 
+        auth.has_permission(current_user, "employees_all", "edit", db)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Required permission 'clients_teams:edit' not granted."
+        )
+
     db_team = db.query(models.Team).filter(models.Team.id == team_id).first()
     if not db_team:
         raise HTTPException(status_code=404, detail="Team not found")
@@ -87,7 +124,22 @@ def update_team(team_id: int, team_data: schemas.TeamUpdate, db: Session = Depen
     return db_team
 
 @router.post("/{team_id}/members", response_model=schemas.TeamResponse)
-def assign_team_members(team_id: int, member_data: schemas.TeamMemberAssign, db: Session = Depends(database.get_db)):
+def assign_team_members(
+    team_id: int, 
+    member_data: schemas.TeamMemberAssign, 
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if not (
+        auth.is_super_admin(current_user) or 
+        auth.has_permission(current_user, "clients_teams", "edit", db) or 
+        auth.has_permission(current_user, "employees_all", "edit", db)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Required permission 'clients_teams:edit' not granted."
+        )
+
     db_team = db.query(models.Team).filter(models.Team.id == team_id).first()
     if not db_team:
         raise HTTPException(status_code=404, detail="Team not found")
@@ -101,7 +153,21 @@ def assign_team_members(team_id: int, member_data: schemas.TeamMemberAssign, db:
     return db_team
 
 @router.delete("/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_team(team_id: int, db: Session = Depends(database.get_db)):
+def delete_team(
+    team_id: int, 
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if not (
+        auth.is_super_admin(current_user) or 
+        auth.has_permission(current_user, "clients_teams", "delete", db) or 
+        auth.has_permission(current_user, "employees_all", "delete", db)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Required permission 'clients_teams:delete' not granted."
+        )
+
     db_team = db.query(models.Team).filter(models.Team.id == team_id).first()
     if not db_team:
         raise HTTPException(status_code=404, detail="Team not found")

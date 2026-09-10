@@ -26,6 +26,12 @@ def get_accurate_config(
     """
     Retrieve current Accurate Online integration configuration and connectivity status.
     """
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_accurate", "view", db)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Required permission 'clients_accurate:view' not granted."
+        )
+
     client = AccurateClient(db)
     config = client.config
 
@@ -70,6 +76,11 @@ def update_accurate_config(
     """
     Save or update Accurate Online OAuth credentials and default Chart of Accounts mapping.
     """
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_accurate", "edit", db)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Required permission 'clients_accurate:edit' not granted."
+        )
     client = AccurateClient(db)
     config = client.config
 
@@ -162,6 +173,11 @@ def get_auth_url(
     """
     Generates the Accurate OAuth 2.0 authorization URL for connecting company account.
     """
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_accurate", "edit", db)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Required permission 'clients_accurate:edit' not granted."
+        )
     client = AccurateClient(db)
     if not redirect_uri:
         # Default to backend callback or frontend callback url
@@ -224,6 +240,15 @@ def test_connection(
     """
     Tests live connection to Accurate Online API and discovers company databases.
     """
+    if not (
+        auth.is_super_admin(current_user) or
+        auth.has_permission(current_user, "clients_accurate", "view", db) or
+        auth.has_permission(current_user, "clients_accurate", "edit", db)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Required permission 'clients_accurate:view' not granted."
+        )
     client = AccurateClient(db)
     res = client.test_connection()
     return schemas.AccurateTestConnectionResponse(
@@ -243,6 +268,11 @@ def get_databases(
     """
     Lists available Accurate Online databases for the authenticated account.
     """
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_accurate", "view", db)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Required permission 'clients_accurate:view' not granted."
+        )
     client = AccurateClient(db)
     databases = client.get_databases()
     return {"success": True, "databases": databases}
@@ -258,6 +288,11 @@ def select_database(
     """
     Sets the active Accurate Online company database.
     """
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_accurate", "edit", db)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Required permission 'clients_accurate:edit' not granted."
+        )
     client = AccurateClient(db)
     config = client.config
     if not config:
@@ -289,6 +324,11 @@ def get_sync_logs(
     """
     Returns audit logs of all Accurate synchronization requests, responses, and errors.
     """
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_accurate", "view", db)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Required permission 'clients_accurate:view' not granted."
+        )
     query = db.query(models.AccurateSyncLog)
     if status:
         query = query.filter(models.AccurateSyncLog.status == status.upper())
@@ -306,6 +346,21 @@ def sync_order_manually(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
+    """
+    Manually triggers on-demand sync for an order (e.g. retry after downtime or backfill).
+    Automatically determines whether to sync Customer, Proforma SO, Sales Invoice, or Sales Receipt.
+    Accepts either integer ID or order number string (e.g. MCSX-260002).
+    """
+    if not (
+        auth.is_super_admin(current_user) or
+        auth.has_permission(current_user, "clients_accurate", "edit", db) or
+        auth.has_permission(current_user, "clients_orders_active", "edit", db) or
+        auth.has_permission(current_user, "clients_orders", "edit", db)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Required permission to sync Accurate orders not granted."
+        )
     """
     Manually triggers on-demand sync for an order (e.g. retry after downtime or backfill).
     Automatically determines whether to sync Customer, Proforma SO, Sales Invoice, or Sales Receipt.

@@ -11,19 +11,42 @@ router = APIRouter(
 )
 
 @router.get("", response_model=List[schemas.DepartmentResponse])
-def get_departments(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db)):
+def get_departments(
+    skip: int = 0, 
+    limit: int = 100, 
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
     departments = db.query(models.Department).order_by(models.Department.name).offset(skip).limit(limit).all()
     return departments
 
 @router.get("/{department_id}", response_model=schemas.DepartmentResponse)
-def get_department(department_id: int, db: Session = Depends(database.get_db)):
+def get_department(
+    department_id: int, 
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
     department = db.query(models.Department).filter(models.Department.id == department_id).first()
     if not department:
         raise HTTPException(status_code=404, detail="Department not found")
     return department
 
 @router.post("", response_model=schemas.DepartmentResponse, status_code=status.HTTP_201_CREATED)
-def create_department(department: schemas.DepartmentCreate, db: Session = Depends(database.get_db)):
+def create_department(
+    department: schemas.DepartmentCreate, 
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if not (
+        auth.is_super_admin(current_user) or 
+        auth.has_permission(current_user, "employees_all", "create", db) or
+        auth.has_permission(current_user, "employees_all", "edit", db)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Required permission to create departments not granted."
+        )
+
     db_department = db.query(models.Department).filter(models.Department.name == department.name).first()
     if db_department:
         raise HTTPException(status_code=400, detail="Department already exists")

@@ -9,24 +9,46 @@ router = APIRouter(
     dependencies=[Depends(auth.get_current_user)]
 )
 
-async def require_admin(current_user: models.User = Depends(auth.get_current_user)):
-    if not auth.is_super_admin(current_user):
+def require_access_control_view(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    if not (
+        auth.is_super_admin(current_user) or
+        auth.has_permission(current_user, "access_control_matrix", "view", db) or
+        auth.has_permission(current_user, "access_control", "view", db)
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied. Administrator permissions required."
+            detail="Access denied. Required permission 'access_control_matrix:view' not granted."
         )
     return current_user
 
-@router.get("/modules", response_model=List[schemas.ModuleResponse], dependencies=[Depends(require_admin)])
+def require_access_control_edit(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    if not (
+        auth.is_super_admin(current_user) or
+        auth.has_permission(current_user, "access_control_matrix", "edit", db) or
+        auth.has_permission(current_user, "access_control", "edit", db)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Required permission 'access_control_matrix:edit' not granted."
+        )
+    return current_user
+
+@router.get("/modules", response_model=List[schemas.ModuleResponse], dependencies=[Depends(require_access_control_view)])
 def get_modules(db: Session = Depends(database.get_db)):
     root_modules = db.query(models.Module).filter(models.Module.parent_id == None).all()
     return root_modules
 
-@router.get("/permissions", response_model=List[schemas.PermissionResponse], dependencies=[Depends(require_admin)])
+@router.get("/permissions", response_model=List[schemas.PermissionResponse], dependencies=[Depends(require_access_control_view)])
 def get_permissions(db: Session = Depends(database.get_db)):
     return db.query(models.Permission).all()
 
-@router.get("/role-permissions/{role_id}", response_model=List[schemas.RolePermissionResponse], dependencies=[Depends(require_admin)])
+@router.get("/role-permissions/{role_id}", response_model=List[schemas.RolePermissionResponse], dependencies=[Depends(require_access_control_view)])
 def get_role_permissions(role_id: int, db: Session = Depends(database.get_db)):
     role = db.query(models.Role).filter(models.Role.id == role_id).first()
     if not role:
@@ -36,7 +58,7 @@ def get_role_permissions(role_id: int, db: Session = Depends(database.get_db)):
 class RolePermissionsUpdate(schemas.BaseModel):
     permissions: List[schemas.RolePermissionBase]
 
-@router.post("/role-permissions/{role_id}", dependencies=[Depends(require_admin)])
+@router.post("/role-permissions/{role_id}", dependencies=[Depends(require_access_control_edit)])
 def update_role_permissions(
     role_id: int, 
     payload: RolePermissionsUpdate, 
@@ -72,7 +94,7 @@ class ClonePermissionsRequest(schemas.BaseModel):
     from_role_id: int
     to_role_id: int
 
-@router.post("/clone-permissions", dependencies=[Depends(require_admin)])
+@router.post("/clone-permissions", dependencies=[Depends(require_access_control_edit)])
 def clone_permissions(
     payload: ClonePermissionsRequest,
     current_user: models.User = Depends(auth.get_current_user),
@@ -104,7 +126,7 @@ def clone_permissions(
     db.commit()
     return {"message": "Permissions cloned successfully", "count": len(src_perms)}
 
-@router.post("/reset-permissions/{role_id}", dependencies=[Depends(require_admin)])
+@router.post("/reset-permissions/{role_id}", dependencies=[Depends(require_access_control_edit)])
 def reset_role_permissions(
     role_id: int,
     current_user: models.User = Depends(auth.get_current_user),
@@ -177,7 +199,7 @@ def reset_role_permissions(
     return {"message": "Permissions reset successfully"}
 
 
-@router.get("/audit-logs", dependencies=[Depends(require_admin)])
+@router.get("/audit-logs", dependencies=[Depends(require_access_control_view)])
 def get_permission_audit_logs(db: Session = Depends(database.get_db)):
     logs = db.query(models.AuditLog)\
         .filter(models.AuditLog.activity.like("Permission Change:%"))\

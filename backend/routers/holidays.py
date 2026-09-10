@@ -40,11 +40,8 @@ def create_public_holiday(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    # Only Admin or HR
-    is_admin = auth.is_super_admin(current_user)
-    is_hr = current_user.role and current_user.role.name.upper() == "HR"
-    if not (is_admin or is_hr):
-        raise HTTPException(status_code=403, detail="Not authorized")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "public_holidays", "create", db)):
+        raise HTTPException(status_code=403, detail="Not authorized to create public holidays")
 
     existing = db.query(models.PublicHoliday).filter(models.PublicHoliday.holiday_date == holiday.holiday_date).first()
     if existing:
@@ -105,11 +102,8 @@ def update_public_holiday(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    # Only Admin or HR
-    is_admin = auth.is_super_admin(current_user)
-    is_hr = current_user.role and current_user.role.name.upper() == "HR"
-    if not (is_admin or is_hr):
-        raise HTTPException(status_code=403, detail="Not authorized")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "public_holidays", "edit", db)):
+        raise HTTPException(status_code=403, detail="Not authorized to update public holidays")
 
     db_holiday = db.query(models.PublicHoliday).filter(models.PublicHoliday.id == id).first()
     if not db_holiday:
@@ -197,11 +191,8 @@ def delete_public_holiday(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    # Only Admin or HR
-    is_admin = auth.is_super_admin(current_user)
-    is_hr = current_user.role and current_user.role.name.upper() == "HR"
-    if not (is_admin or is_hr):
-        raise HTTPException(status_code=403, detail="Not authorized")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "public_holidays", "delete", db)):
+        raise HTTPException(status_code=403, detail="Not authorized to delete public holidays")
 
     db_holiday = db.query(models.PublicHoliday).filter(models.PublicHoliday.id == id).first()
     if not db_holiday:
