@@ -11,17 +11,20 @@ router = APIRouter(
     dependencies=[Depends(auth.get_current_user)]
 )
 
-def is_authorized_admin(user: models.User, db: Session) -> bool:
+def is_authorized_admin(user: models.User, db: Session, perm: str = "view") -> bool:
     if not user:
         return False
     if auth.is_super_admin(user):
+        return True
+    if auth.has_permission(user, "clients_notaries", perm, db):
         return True
     if not user.role_id:
         return False
     db_role = db.query(models.Role).filter(models.Role.id == user.role_id).first()
     if not db_role:
         return False
-    return db_role.name.upper() in ["ADMIN", "HR ADMIN", "MANAGEMENT", "HR", "SUPER ADMIN", "SUPERADMIN", "SYSTEM ADMIN"]
+    r_name = db_role.name.upper()
+    return "ADMIN" in r_name or "HR" in r_name or r_name in ["ADMIN", "HR ADMIN", "MANAGEMENT", "HR", "SUPER ADMIN", "SUPERADMIN", "SYSTEM ADMIN"]
 
 def format_notary_response(notary: models.Notary, db: Session) -> dict:
     v_type = notary.vendor_type or ("GOVERNMENT_OFFICER" if notary.is_gov_officer else ("OTHER_VENDORS" if notary.is_other_vendor else "NOTARY"))

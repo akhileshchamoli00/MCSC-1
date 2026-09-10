@@ -211,6 +211,8 @@ def is_admin_or_hr(user: models.User) -> bool:
     if not user.role:
         return False
     role_name = str(user.role.name).strip().upper()
+    if "ADMIN" in role_name or "HR" in role_name or "DIRECTOR" in role_name:
+        return True
     return role_name in ["HR", "HR ADMIN", "HR EXECUTIVE", "ADMIN", "SUPER ADMIN", "SUPERADMIN", "SYSTEM ADMIN"]
 
 def is_employee_role(user: models.User) -> bool:
@@ -268,7 +270,7 @@ def get_clients(db: Session = Depends(database.get_db), current_user: models.Use
         joinedload(models.Client.user)
     )
     
-    if is_admin_or_hr(current_user):
+    if auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_all", "view", db) or is_admin_or_hr(current_user):
         return base_query.order_by(models.Client.contact_person).all()
     elif role_name == "CLIENT":
         client_id = current_user.client.id if current_user.client else None
@@ -525,8 +527,8 @@ def get_client_orders(db: Session = Depends(database.get_db), current_user: mode
 
 @router.post("/orders", response_model=List[schemas.ClientOrderResponse], status_code=status.HTTP_201_CREATED)
 def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admin or HR can create client orders")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders", "create", db) or auth.has_permission(current_user, "clients_orders_pipeline", "create", db) or auth.has_permission(current_user, "clients_orders_active", "create", db) or is_admin_or_hr(current_user) or is_employee_role(current_user)):
+        raise HTTPException(status_code=403, detail="Not authorized to create client orders")
         
     target_client_id = order_req.client_id
     target_company_id = order_req.company_id
@@ -621,8 +623,8 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
 @router.post("/orders/group/{order_number}/move-to-active")
 @router.post("/orders/{order_number}/move-to-active")
 def move_pipeline_order_to_active(order_number: str, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admin or HR can move pipeline orders to active")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders_pipeline", "edit", db) or auth.has_permission(current_user, "clients_orders_active", "create", db) or auth.has_permission(current_user, "clients_orders", "edit", db) or is_admin_or_hr(current_user) or is_employee_role(current_user)):
+        raise HTTPException(status_code=403, detail="Not authorized to move pipeline orders to active")
         
     orders = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
     if not orders:
@@ -655,8 +657,8 @@ def cancel_order_group(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admin or HR can cancel orders")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders_cancelled", "edit", db) or auth.has_permission(current_user, "clients_orders_active", "edit", db) or auth.has_permission(current_user, "clients_orders", "edit", db) or is_admin_or_hr(current_user)):
+        raise HTTPException(status_code=403, detail="Not authorized to cancel orders")
         
     orders = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
     if not orders:
@@ -689,8 +691,8 @@ def reopen_order_group(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admin or HR can reopen cancelled orders")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders_active", "edit", db) or auth.has_permission(current_user, "clients_orders", "edit", db) or is_admin_or_hr(current_user)):
+        raise HTTPException(status_code=403, detail="Not authorized to reopen cancelled orders")
         
     orders = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
     if not orders:
@@ -717,8 +719,8 @@ def reopen_order_group(
 
 @router.delete("/orders/group/{order_number}")
 def delete_order_group(order_number: str, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admin or HR can delete orders")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders", "delete", db) or auth.has_permission(current_user, "clients_orders_pipeline", "delete", db) or auth.has_permission(current_user, "clients_orders_active", "delete", db) or auth.has_permission(current_user, "clients_orders_completed", "delete", db) or auth.has_permission(current_user, "clients_orders_cancelled", "delete", db) or is_admin_or_hr(current_user)):
+        raise HTTPException(status_code=403, detail="Not authorized to delete orders")
         
     orders = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
     if not orders:
@@ -739,8 +741,8 @@ def delete_order_group(order_number: str, db: Session = Depends(database.get_db)
 
 @router.delete("/orders/{id:int}")
 def delete_client_order(id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admin or HR can delete orders")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders", "delete", db) or auth.has_permission(current_user, "clients_orders_pipeline", "delete", db) or auth.has_permission(current_user, "clients_orders_active", "delete", db) or auth.has_permission(current_user, "clients_orders_completed", "delete", db) or auth.has_permission(current_user, "clients_orders_cancelled", "delete", db) or is_admin_or_hr(current_user)):
+        raise HTTPException(status_code=403, detail="Not authorized to delete orders")
         
     db_order = db.query(models.ClientOrder).filter(models.ClientOrder.id == id).first()
     if not db_order:
@@ -766,7 +768,7 @@ def get_client(id: int, db: Session = Depends(database.get_db), current_user: mo
         raise HTTPException(status_code=404, detail="Client not found")
         
     role_name = current_user.role.name.upper() if current_user.role else ""
-    if is_admin_or_hr(current_user) or is_client_themselves(current_user, id):
+    if auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_all", "view", db) or is_admin_or_hr(current_user) or is_client_themselves(current_user, id):
         return client
     elif is_employee_role(current_user):
         # Check if employee is assigned to any company under this client
@@ -782,8 +784,8 @@ def get_client(id: int, db: Session = Depends(database.get_db), current_user: mo
 
 @router.post("", response_model=schemas.ClientResponse, status_code=status.HTTP_201_CREATED)
 def create_client(client_data: schemas.ClientCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admin or HR can create clients")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_all", "create", db) or is_admin_or_hr(current_user)):
+        raise HTTPException(status_code=403, detail="Not authorized to create clients")
 
     client_email = validate_and_clean_email(client_data.email, "Personal Email", required=True)
     client_phone = validate_and_clean_phone(client_data.phone, "Personal Phone", required=False)
@@ -1089,8 +1091,8 @@ def get_company_stakeholders(company_id: int, db: Session = Depends(database.get
 
 @router.post("/companies/{company_id}/stakeholders", response_model=schemas.CompanyStakeholderResponse, status_code=status.HTTP_201_CREATED)
 def create_company_stakeholder(company_id: int, stakeholder_data: schemas.CompanyStakeholderCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admin or HR can manage company stakeholders")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_company", "edit", db) or auth.has_permission(current_user, "clients_documents", "create", db) or is_admin_or_hr(current_user) or is_client_themselves_for_company(current_user, company_id, db)):
+        raise HTTPException(status_code=403, detail="Not authorized to manage company stakeholders")
         
     comp = db.query(models.ClientCompany).filter(models.ClientCompany.id == company_id).first()
     if not comp:
@@ -1129,8 +1131,8 @@ def create_company_stakeholder(company_id: int, stakeholder_data: schemas.Compan
 
 @router.delete("/companies/stakeholders/{id}")
 def delete_company_stakeholder(id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admin or HR can delete stakeholders")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_company", "delete", db) or auth.has_permission(current_user, "clients_company", "edit", db) or auth.has_permission(current_user, "clients_documents", "delete", db) or is_admin_or_hr(current_user)):
+        raise HTTPException(status_code=403, detail="Not authorized to delete stakeholders")
         
     stk = db.query(models.CompanyStakeholder).filter(models.CompanyStakeholder.id == id).first()
     if not stk:
@@ -1164,8 +1166,8 @@ def delete_company_stakeholder(id: int, db: Session = Depends(database.get_db), 
 
 @router.put("/companies/stakeholders/{id}", response_model=schemas.CompanyStakeholderResponse)
 def update_company_stakeholder(id: int, stakeholder_data: schemas.CompanyStakeholderCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admin or HR can update company stakeholders")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_company", "edit", db) or auth.has_permission(current_user, "clients_documents", "edit", db) or is_admin_or_hr(current_user)):
+        raise HTTPException(status_code=403, detail="Not authorized to update company stakeholders")
         
     stk = db.query(models.CompanyStakeholder).filter(models.CompanyStakeholder.id == id).first()
     if not stk:
@@ -1232,7 +1234,7 @@ def update_client(id: int, client_update: schemas.ClientBase, db: Session = Depe
     if not db_client:
         raise HTTPException(status_code=404, detail="Client not found")
         
-    if not (is_admin_or_hr(current_user) or is_client_themselves(current_user, id)):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_all", "edit", db) or is_admin_or_hr(current_user) or is_client_themselves(current_user, id)):
         raise HTTPException(status_code=403, detail="Not authorized to update this client")
         
     update_data = client_update.model_dump(exclude_unset=True) if hasattr(client_update, "model_dump") else client_update.dict(exclude_unset=True)
@@ -1260,8 +1262,8 @@ def update_client(id: int, client_update: schemas.ClientBase, db: Session = Depe
 
 @router.put("/{id:int}/status", response_model=schemas.ClientResponse)
 def update_client_status(id: int, status_str: str, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admin or HR can change client status")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_all", "edit", db) or is_admin_or_hr(current_user)):
+        raise HTTPException(status_code=403, detail="Not authorized to change client status")
         
     db_client = db.query(models.Client).filter(models.Client.id == id).first()
     if not db_client:
@@ -1282,8 +1284,8 @@ def update_client_status(id: int, status_str: str, db: Session = Depends(databas
 
 @router.put("/{id:int}/password")
 def reset_client_password(id: int, password_data: schemas.ClientPasswordReset, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admin or HR can reset client passwords")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_all", "edit", db) or is_admin_or_hr(current_user)):
+        raise HTTPException(status_code=403, detail="Not authorized to reset client passwords")
         
     db_client = db.query(models.Client).filter(models.Client.id == id).first()
     if not db_client:
@@ -1340,7 +1342,7 @@ def get_all_client_companies(db: Session = Depends(database.get_db), current_use
 
 @router.post("/companies/standalone", response_model=schemas.ClientCompanyResponse)
 def create_standalone_client_company(company_data: schemas.ClientCompanyCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not (is_admin_or_hr(current_user) or is_employee_role(current_user)):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_company", "create", db) or is_admin_or_hr(current_user) or is_employee_role(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized to create standalone companies")
         
     if not company_data.key_contact_person or not str(company_data.key_contact_person).strip():
@@ -1402,7 +1404,7 @@ def create_standalone_client_company(company_data: schemas.ClientCompanyCreate, 
 
 @router.post("/{id:int}/companies", response_model=schemas.ClientCompanyResponse)
 def create_client_company(id: int, company_data: schemas.ClientCompanyCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not (is_admin_or_hr(current_user) or is_employee_role(current_user) or is_client_themselves(current_user, id)):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_company", "create", db) or is_admin_or_hr(current_user) or is_employee_role(current_user) or is_client_themselves(current_user, id)):
         raise HTTPException(status_code=403, detail="Not authorized to create companies for this client")
 
     if not company_data.key_contact_person or not str(company_data.key_contact_person).strip():
@@ -1478,8 +1480,8 @@ def validate_client_company(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admins or Authorized Staff can validate company profiles")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_company", "approve", db) or auth.has_permission(current_user, "clients_company", "edit", db) or is_admin_or_hr(current_user)):
+        raise HTTPException(status_code=403, detail="Not authorized to validate company profiles")
 
     db_company = db.query(models.ClientCompany).options(
         joinedload(models.ClientCompany.client),
@@ -1569,8 +1571,8 @@ def send_company_welcome_email_manual(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admins or Authorized Staff can send company invitation emails")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_company", "edit", db) or auth.has_permission(current_user, "clients_company", "approve", db) or is_admin_or_hr(current_user)):
+        raise HTTPException(status_code=403, detail="Not authorized to send company invitation emails")
 
     db_company = db.query(models.ClientCompany).options(
         joinedload(models.ClientCompany.client)
@@ -1636,7 +1638,7 @@ def update_client_company(company_id: int, company_update: schemas.ClientCompany
     if not db_company:
         raise HTTPException(status_code=404, detail="Company not found")
         
-    if not (is_admin_or_hr(current_user) or is_employee_role(current_user) or is_client_themselves_for_company(current_user, company_id, db)):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_company", "edit", db) or is_admin_or_hr(current_user) or is_employee_role(current_user) or is_client_themselves_for_company(current_user, company_id, db)):
         raise HTTPException(status_code=403, detail="Not authorized to update this company")
         
     if company_update.company_code:
@@ -1694,7 +1696,7 @@ def upload_company_logo(company_id: int, file: UploadFile = File(...), db: Sessi
     if not db_company:
         raise HTTPException(status_code=404, detail="Company not found")
         
-    if not (is_admin_or_hr(current_user) or is_employee_role(current_user) or is_client_themselves_for_company(current_user, company_id, db)):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_company", "edit", db) or is_admin_or_hr(current_user) or is_employee_role(current_user) or is_client_themselves_for_company(current_user, company_id, db)):
         raise HTTPException(status_code=403, detail="Not authorized to change logo")
         
     if file.content_type not in ["image/png", "image/jpeg", "image/jpg"]:
@@ -1716,7 +1718,7 @@ def upload_company_logo(company_id: int, file: UploadFile = File(...), db: Sessi
 
 @router.delete("/companies/{company_id}")
 def delete_client_company(company_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_company", "delete", db) or is_admin_or_hr(current_user)):
         raise HTTPException(status_code=403, detail="Only Admin or HR can delete companies")
         
     db_company = db.query(models.ClientCompany).filter(models.ClientCompany.id == company_id).first()
@@ -1779,8 +1781,8 @@ def delete_client_company(company_id: int, db: Session = Depends(database.get_db
 
 @router.post("/companies/{company_id}/assign")
 def assign_consultants(company_id: int, payload: schemas.AssignConsultantsRequest, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not is_admin_or_hr(current_user):
-        raise HTTPException(status_code=403, detail="Only Admin or HR can assign consultants")
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_teams", "edit", db) or auth.has_permission(current_user, "clients_teams", "create", db) or is_admin_or_hr(current_user)):
+        raise HTTPException(status_code=403, detail="Not authorized to assign consultants")
         
     company = db.query(models.ClientCompany).filter(models.ClientCompany.id == company_id).first()
     if not company:
@@ -1811,7 +1813,7 @@ def get_company_consultants(company_id: int, db: Session = Depends(database.get_
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
         
-    if not (is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client_themselves_for_company(current_user, company_id, db)):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_teams", "view", db) or auth.has_permission(current_user, "clients_company", "view", db) or is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client_themselves_for_company(current_user, company_id, db)):
         raise HTTPException(status_code=403, detail="Not authorized to view consultants for this company")
         
     assignments = db.query(models.ClientConsultant).filter(models.ClientConsultant.company_id == company_id).all()
@@ -1850,7 +1852,7 @@ def upload_client_document(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
         
-    if not (is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client_themselves_for_company(current_user, company_id, db)):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_documents", "create", db) or is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client_themselves_for_company(current_user, company_id, db)):
         raise HTTPException(status_code=403, detail="Not authorized to upload documents for this company")
         
     if not file:
@@ -1963,7 +1965,7 @@ async def preview_client_document(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
         
-    if not (is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client_themselves_for_company(current_user, company_id, db)):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_documents", "view", db) or is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client_themselves_for_company(current_user, company_id, db)):
         raise HTTPException(status_code=403, detail="Not authorized to preview documents for this company")
         
     db_doc = db.query(models.ClientDocument).filter(
@@ -2065,7 +2067,7 @@ def update_client_document(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
         
-    if not (is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client_themselves_for_company(current_user, company_id, db)):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_documents", "edit", db) or is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client_themselves_for_company(current_user, company_id, db)):
         raise HTTPException(status_code=403, detail="Not authorized to edit documents for this company")
         
     db_doc = db.query(models.ClientDocument).filter(models.ClientDocument.id == document_id, models.ClientDocument.company_id == company_id).first()
@@ -2146,7 +2148,7 @@ def delete_client_document(
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
         
-    if not (is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client_themselves_for_company(current_user, company_id, db)):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_documents", "delete", db) or is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client_themselves_for_company(current_user, company_id, db)):
         raise HTTPException(status_code=403, detail="Not authorized to delete documents for this company")
         
     db_doc = db.query(models.ClientDocument).filter(models.ClientDocument.id == document_id, models.ClientDocument.company_id == company_id).first()
@@ -2325,7 +2327,7 @@ def get_client_documents(company_id: int, db: Session = Depends(database.get_db)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
         
-    if not (is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client_themselves_for_company(current_user, company_id, db)):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_documents", "view", db) or is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client_themselves_for_company(current_user, company_id, db)):
         raise HTTPException(status_code=403, detail="Not authorized to view documents for this company")
         
     return db.query(models.ClientDocument).filter(models.ClientDocument.company_id == company_id).all()
@@ -3047,7 +3049,7 @@ def finalize_order_invoice(
         raise HTTPException(status_code=404, detail="Company not found for these orders")
         
     # Check permissions
-    if not is_admin_or_hr(current_user):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders_pipeline", "edit", db) or auth.has_permission(current_user, "clients_orders_active", "edit", db) or auth.has_permission(current_user, "clients_orders_notary_payments", "edit", db) or is_admin_or_hr(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized to finalize invoices for this order")
         
     company_code = company.company_code or f"comp_{company.id}"
@@ -3149,7 +3151,7 @@ def finalize_order_final_invoice(
         raise HTTPException(status_code=404, detail="Company not found for these orders")
         
     # Check permissions
-    if not is_admin_or_hr(current_user):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders_active", "edit", db) or auth.has_permission(current_user, "clients_orders_completed", "edit", db) or auth.has_permission(current_user, "clients_orders_notary_payments", "edit", db) or is_admin_or_hr(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized to finalize invoices for this order")
         
     company_code = company.company_code or f"comp_{company.id}"
@@ -3237,7 +3239,7 @@ def get_expiring_documents(
     current_user: models.User = Depends(auth.get_current_user)
 ):
     role_name = current_user.role.name.upper() if current_user.role else ""
-    if not (is_admin_or_hr(current_user) or is_employee_role(current_user)):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_documents", "view", db) or is_admin_or_hr(current_user) or is_employee_role(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized to view expiring documents")
         
     docs = db.query(models.ClientDocument).options(

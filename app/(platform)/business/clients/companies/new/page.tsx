@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { PhoneInput, isValidPhoneNumber } from "@/components/ui/phone-input";
 import { toast } from "sonner";
+import { useUser } from "@/contexts/user-context";
 
 export const isValidEmail = (email: string): boolean => {
   if (!email || !email.trim()) return false;
@@ -28,12 +29,22 @@ export default function NewCompanyPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlClientId = searchParams ? searchParams.get("client_id") : null;
+  const { isAdmin, hasPermission, loading: userLoading } = useUser();
+  const canCreate = isAdmin || hasPermission("clients_company", "create");
+
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
   const [loadingClients, setLoadingClients] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("company");
   const [selectedClientId, setSelectedClientId] = useState<string>(urlClientId || "");
+
+  useEffect(() => {
+    if (!userLoading && !canCreate) {
+      toast.error("Access Denied: You do not have permission to register companies.");
+      router.replace("/business/clients/companies");
+    }
+  }, [userLoading, canCreate, router]);
 
   const [formData, setFormData] = useState({
     company_name: "",

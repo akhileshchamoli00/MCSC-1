@@ -69,6 +69,9 @@ export default function CompaniesDirectory() {
   const router = useRouter();
   const { isAdmin, hasPermission, loading: userLoading } = useUser();
   const canView = isAdmin || hasPermission("clients_company", "view");
+  const canCreate = isAdmin || hasPermission("clients_company", "create");
+  const canEdit = isAdmin || hasPermission("clients_company", "edit");
+  const canDelete = isAdmin || hasPermission("clients_company", "delete");
 
   const [clients, setClients] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
@@ -340,11 +343,13 @@ export default function CompaniesDirectory() {
         </div>
 
         {/* Add New Company Button */}
-        <Link href="/business/clients/companies/new" className="shrink-0 flex items-stretch">
-          <Button className="gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm">
-            <Plus className="h-4 w-4" /> Add New Company
-          </Button>
-        </Link>
+        {canCreate && (
+          <Link href="/business/clients/companies/new" className="shrink-0 flex items-stretch">
+            <Button className="gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm">
+              <Plus className="h-4 w-4" /> Add New Company
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Notifications */}
@@ -618,28 +623,32 @@ export default function CompaniesDirectory() {
                                 </Button>
                               </Link>
                             )}
-                            <Link href={`/business/clients/companies/${company.id}`}>
+                            {canEdit && (
+                              <Link href={`/business/clients/companies/${company.id}`}>
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="h-7 w-7 text-muted-foreground rounded-lg"
+                                  title="Edit Company"
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </Link>
+                            )}
+                            {canDelete && (
                               <Button 
                                 size="icon" 
                                 variant="ghost" 
-                                className="h-7 w-7 text-muted-foreground rounded-lg"
-                                title="Edit Company"
+                                className="h-7 w-7 text-muted-foreground hover:!bg-destructive hover:!text-white rounded-lg"
+                                title="Delete Company"
+                                onClick={() => {
+                                  setCompanyToDelete(company);
+                                  setIsDeleteOpen(true);
+                                }}
                               >
-                                <Edit2 className="h-3.5 w-3.5" />
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
-                            </Link>
-                            <Button 
-                              size="icon" 
-                              variant="ghost" 
-                              className="h-7 w-7 text-muted-foreground hover:!bg-destructive hover:!text-white rounded-lg"
-                              title="Delete Company"
-                              onClick={() => {
-                                setCompanyToDelete(company);
-                                setIsDeleteOpen(true);
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                            )}
                           </div>
                         </td>
                       </tr>

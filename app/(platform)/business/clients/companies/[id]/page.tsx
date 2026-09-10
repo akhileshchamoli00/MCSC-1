@@ -43,6 +43,7 @@ import {
 import { PhoneInput, isValidPhoneNumber } from "@/components/ui/phone-input";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useUser } from "@/contexts/user-context";
 
 export const isValidEmail = (email: string): boolean => {
   if (!email || !email.trim()) return false;
@@ -72,6 +73,12 @@ export default function CompanyDetailPage() {
   const params = useParams();
   const router = useRouter();
   const companyId = params?.id ? parseInt(params.id as string) : null;
+  const { isAdmin, hasPermission, profile, loading: userLoading } = useUser();
+  const isClient = profile?.role?.name?.toUpperCase() === "CLIENT";
+  const canView = isAdmin || hasPermission("clients_company", "view");
+  const canEdit = isAdmin || hasPermission("clients_company", "edit");
+  const canDelete = isAdmin || hasPermission("clients_company", "delete");
+  const canValidate = isAdmin || hasPermission("clients_company", "approve") || hasPermission("clients_company", "edit");
 
   const [company, setCompany] = useState<any>(null);
   const [clients, setClients] = useState<any[]>([]);
@@ -81,6 +88,13 @@ export default function CompanyDetailPage() {
   const [activeTab, setActiveTab] = useState("company");
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (!userLoading && !canView && !isAdmin) {
+      toast.error("Access Denied: You do not have permission to view this company.");
+      router.replace("/business/clients/companies");
+    }
+  }, [userLoading, canView, isAdmin, router]);
 
   // Send Invitation / Welcome Email State
   const [isSendEmailOpen, setIsSendEmailOpen] = useState(false);
@@ -462,14 +476,16 @@ export default function CompanyDetailPage() {
             </Button>
           )}
 
-          <Button
-            type="button"
-            variant="outline"
-            className="border-destructive/40 text-destructive hover:!bg-destructive hover:!text-white text-xs font-semibold gap-1.5 h-9 rounded-xl transition-all"
-            onClick={() => setIsDeleteOpen(true)}
-          >
-            <Trash2 className="h-4 w-4" /> Delete Company
-          </Button>
+          {canDelete && (
+            <Button
+              type="button"
+              variant="outline"
+              className="border-destructive/40 text-destructive hover:!bg-destructive hover:!text-white text-xs font-semibold gap-1.5 h-9 rounded-xl transition-all"
+              onClick={() => setIsDeleteOpen(true)}
+            >
+              <Trash2 className="h-4 w-4" /> Delete Company
+            </Button>
+          )}
         </div>
       </div>
 
