@@ -71,7 +71,7 @@ class AccurateClient:
         if not self.config or not self.config.client_id:
             raise ValueError("Accurate Client ID is not configured. Please save API credentials first.")
         
-        scope = "customer_view customer_save item_view item_save sales_order_view sales_order_save sales_invoice_view sales_invoice_save sales_receipt_view sales_receipt_save glaccount_view"
+        scope = "customer_view customer_save item_view item_save sales_order_view sales_order_save sales_invoice_view sales_invoice_save sales_receipt_view sales_receipt_save glaccount_view project_view project_save"
         return (
             f"{ACCURATE_OAUTH_HOST}/oauth/authorize"
             f"?client_id={self.config.client_id}"
@@ -305,9 +305,95 @@ class AccurateClient:
                     results = data.get("d", [])
                     if len(results) > 0:
                         return results[0]
-            return None
         except Exception as e:
             print(f"Customer lookup on Accurate failed: {e}")
+            return None
+
+    def find_sales_order(self, query: str) -> Optional[Dict[str, Any]]:
+        """
+        Searches Accurate Sales Orders by Order Number or Keywords.
+        """
+        token = self.get_valid_access_token()
+        db_id = self.config.database_id if self.config else None
+        if not token or not db_id or not query:
+            return None
+
+        url = f"{ACCURATE_API_HOST}/api/sales-order/list.do"
+        headers = self._get_headers()
+        params = {
+            "fields": "id,number,transDate,description,totalAmount",
+            "filter.keywords.val": query.strip()
+        }
+
+        try:
+            resp = requests.get(url, headers=headers, params=params, timeout=15)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("s") and data.get("d"):
+                    results = data.get("d", [])
+                    if len(results) > 0:
+                        return results[0]
+            return None
+        except Exception as e:
+            print(f"Sales order lookup on Accurate failed: {e}")
+            return None
+
+    def find_sales_invoice(self, query: str) -> Optional[Dict[str, Any]]:
+        """
+        Searches Accurate Sales Invoices by Invoice Number, Order Number, or Keywords.
+        """
+        token = self.get_valid_access_token()
+        db_id = self.config.database_id if self.config else None
+        if not token or not db_id or not query:
+            return None
+
+        url = f"{ACCURATE_API_HOST}/api/sales-invoice/list.do"
+        headers = self._get_headers()
+        params = {
+            "fields": "id,number,transDate,description,totalAmount,primeOwing,status",
+            "filter.keywords.val": query.strip()
+        }
+
+        try:
+            resp = requests.get(url, headers=headers, params=params, timeout=15)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("s") and data.get("d"):
+                    results = data.get("d", [])
+                    if len(results) > 0:
+                        return results[0]
+            return None
+        except Exception as e:
+            print(f"Sales invoice lookup on Accurate failed: {e}")
+            return None
+
+    def find_sales_receipt(self, query: str) -> Optional[Dict[str, Any]]:
+        """
+        Searches Accurate Sales Receipts by Receipt Number, Order Number, or Keywords.
+        """
+        token = self.get_valid_access_token()
+        db_id = self.config.database_id if self.config else None
+        if not token or not db_id or not query:
+            return None
+
+        url = f"{ACCURATE_API_HOST}/api/sales-receipt/list.do"
+        headers = self._get_headers()
+        params = {
+            "fields": "id,number,transDate,description,chequeAmount",
+            "filter.keywords.val": query.strip()
+        }
+
+        try:
+            resp = requests.get(url, headers=headers, params=params, timeout=15)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("s") and data.get("d"):
+                    results = data.get("d", [])
+                    if len(results) > 0:
+                        return results[0]
+            return None
+        except Exception as e:
+            print(f"Sales receipt lookup on Accurate failed: {e}")
             return None
 
     def sync_customer(self, company: models.ClientCompany) -> Dict[str, Any]:
@@ -470,6 +556,57 @@ class AccurateClient:
 
         return "Jasa"
 
+    def ensure_project(self, project_no: str, project_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """
+        Ensures a Project master record exists in Accurate Online for project tracking.
+        1. Checks if project with this code or name already exists in Accurate.
+        2. If not found, creates it via /api/project/save.do.
+        """
+        if not project_no:
+            return None
+
+        token = self.get_valid_access_token()
+        db_id = self.config.database_id if self.config else None
+        if not token or not db_id:
+            return None
+
+        headers = self._get_headers()
+        clean_no = project_no.strip()
+        clean_name = (project_name or project_no).strip()
+
+        # 1. Lookup existing project
+        url_list = f"{ACCURATE_API_HOST}/api/project/list.do"
+        try:
+            resp = requests.get(url_list, headers=headers, params={"fields": "id,name,no,projectNo", "filter.keywords.val": clean_no}, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("s") and data.get("d"):
+                    for p in data.get("d", []):
+                        p_code = (p.get("no") or p.get("projectNo") or "").strip().lower()
+                        p_n = (p.get("name") or "").strip().lower()
+                        if p_code == clean_no.lower() or p_n == clean_name.lower():
+                            return p
+        except Exception as e:
+            print(f"Lookup project '{clean_no}' on Accurate failed: {e}")
+
+        # 2. If not found, create new project in Accurate
+        url_save = f"{ACCURATE_API_HOST}/api/project/save.do"
+        payload = {
+            "no": clean_no,
+            "projectNo": clean_no,
+            "name": clean_name
+        }
+        try:
+            resp = requests.post(url_save, json=payload, headers=headers, timeout=15)
+            res_data = resp.json()
+            if res_data.get("s"):
+                d_val = res_data.get("r") or res_data.get("d")
+                return d_val
+        except Exception as e:
+            print(f"Create project '{clean_no}' on Accurate failed: {e}")
+
+        return None
+
     def _extract_doc_info(self, res_data: dict, fallback_no: str) -> Tuple[Optional[str], str]:
         """
         Extracts document ID and document number from Accurate Online API responses.
@@ -497,24 +634,44 @@ class AccurateClient:
         """
         Creates a Sales Order (Pesanan Penjualan) in Accurate for the Proforma Invoice (e.g. 50% DP).
         Aggregates all service items in the order group into a single Sales Order with multiple detailItem rows.
-        Includes idempotency guard to prevent duplicate Sales Orders.
+        Maps each item's Project (Proyek) to the Order ID (e.g. MCSX-260003).
+        Includes multi-tier idempotency guard to prevent duplicate Sales Orders.
         """
         if not order:
             return {"success": False, "error": "Order not found"}
-
-        # Idempotency Guard: return existing if already created
-        if order.accurate_so_no and order.accurate_sync_status in ["SO_CREATED", "INV_CREATED", "PAID"]:
-            return {
-                "success": True,
-                "accurate_so_no": order.accurate_so_no,
-                "message": f"Sales Order {order.accurate_so_no} already exists",
-                "already_synced": True
-            }
 
         # Query all items belonging to this order group
         target_orders = self.db.query(models.ClientOrder).filter(
             models.ClientOrder.order_number == order.order_number
         ).order_by(models.ClientOrder.id.asc()).all() if order.order_number else [order]
+
+        # Tier 1 Idempotency Guard: Check if order or any sibling in this order group already has accurate_so_no
+        existing_so_no = order.accurate_so_no
+        existing_so_id = order.accurate_so_id
+        if not existing_so_no:
+            for o in target_orders:
+                if o.accurate_so_no:
+                    existing_so_no = o.accurate_so_no
+                    existing_so_id = o.accurate_so_id
+                    break
+
+        if existing_so_no:
+            # Sync across all items in the group if missing
+            needs_commit = False
+            for ord_item in target_orders:
+                if not ord_item.accurate_so_no:
+                    ord_item.accurate_so_no = existing_so_no
+                    ord_item.accurate_so_id = existing_so_id
+                    needs_commit = True
+            if needs_commit:
+                self.db.commit()
+
+            return {
+                "success": True,
+                "accurate_so_no": existing_so_no,
+                "message": f"Sales Order {existing_so_no} already exists",
+                "already_synced": True
+            }
 
         company = order.billing_company or order.company
         if company and (not company.accurate_customer_no or company.accurate_sync_status == "NOT_SYNCED"):
@@ -525,6 +682,9 @@ class AccurateClient:
         today_str = datetime.now().strftime("%d/%m/%Y")
         order_num = order.order_number or f"ORD-{order.id}"
 
+        token = self.get_valid_access_token()
+        db_id = self.config.database_id if self.config else None
+
         detail_items = []
         item_titles = []
         for itm in target_orders:
@@ -532,12 +692,19 @@ class AccurateClient:
             itm_price = float(itm.unit_price if itm.unit_price is not None else (itm.total_amount or 0.0))
             if itm.job_title:
                 item_titles.append(itm.job_title)
+            
+            project_code = itm.order_number or order.order_number or f"ORD-{itm.id}"
+            if token and db_id and project_code:
+                self.ensure_project(project_code, project_code)
+
             detail_items.append({
                 "itemNo": item_no,
                 "unitPrice": itm_price,
                 "quantity": 1,
                 "detailNotes": itm.job_title or itm.job_id or "",
-                "tax1Name": self.config.default_tax_ppn_no if self.config else "PPN 11%"
+                "tax1Name": self.config.default_tax_ppn_no if self.config else "PPN 11%",
+                "projectNo": project_code,
+                "projectName": project_code
             })
 
         desc_services = ", ".join(item_titles) if item_titles else (order.job_title or "")
@@ -549,9 +716,6 @@ class AccurateClient:
             "description": description_text[:200],
             "detailItem": detail_items
         }
-
-        token = self.get_valid_access_token()
-        db_id = self.config.database_id if self.config else None
 
         if token and db_id:
             url = f"{ACCURATE_API_HOST}/api/sales-order/save.do"
@@ -638,24 +802,44 @@ class AccurateClient:
         """
         Creates an official Sales Invoice (Faktur Penjualan) in Accurate.
         Aggregates all service items in the order group into a single Sales Invoice with multiple detailItem rows.
-        Includes idempotency guard to prevent duplicate Invoices.
+        Maps each item's Project (Proyek) to the Order ID (e.g. MCSX-260003).
+        Includes multi-tier idempotency guard to prevent duplicate Invoices.
         """
         if not order:
             return {"success": False, "error": "Order not found"}
-
-        # Idempotency Guard: return existing if already created
-        if order.accurate_inv_no and order.accurate_sync_status in ["INV_CREATED", "PAID"]:
-            return {
-                "success": True,
-                "accurate_inv_no": order.accurate_inv_no,
-                "message": f"Sales Invoice {order.accurate_inv_no} already exists",
-                "already_synced": True
-            }
 
         # Query all items belonging to this order group
         target_orders = self.db.query(models.ClientOrder).filter(
             models.ClientOrder.order_number == order.order_number
         ).order_by(models.ClientOrder.id.asc()).all() if order.order_number else [order]
+
+        # Tier 1 Idempotency Guard: Check if order or any sibling in this order group already has accurate_inv_no
+        existing_inv_no = order.accurate_inv_no
+        existing_inv_id = order.accurate_inv_id
+        if not existing_inv_no:
+            for o in target_orders:
+                if o.accurate_inv_no:
+                    existing_inv_no = o.accurate_inv_no
+                    existing_inv_id = o.accurate_inv_id
+                    break
+
+        if existing_inv_no:
+            # Sync across all items in the group if missing
+            needs_commit = False
+            for ord_item in target_orders:
+                if not ord_item.accurate_inv_no:
+                    ord_item.accurate_inv_no = existing_inv_no
+                    ord_item.accurate_inv_id = existing_inv_id
+                    needs_commit = True
+            if needs_commit:
+                self.db.commit()
+
+            return {
+                "success": True,
+                "accurate_inv_no": existing_inv_no,
+                "message": f"Sales Invoice {existing_inv_no} already exists",
+                "already_synced": True
+            }
 
         company = order.billing_company or order.company
         if company and (not company.accurate_customer_no or company.accurate_sync_status == "NOT_SYNCED"):
@@ -665,26 +849,50 @@ class AccurateClient:
         today_str = datetime.now().strftime("%d/%m/%Y")
         order_num = order.order_number or f"ORD-{order.id}"
 
+        token = self.get_valid_access_token()
+        db_id = self.config.database_id if self.config else None
+
+        # Check if Proforma DP was already billed / invoiced
+        proforma_pct = order.proforma_stage_percent or 50
+        has_proforma_dp = bool(
+            order.accurate_sync_status in ["PROFORMA_PAID", "PAID"] or 
+            any(o.accurate_sync_status == "PROFORMA_PAID" for o in target_orders) or 
+            (order.payment_status in ["PARTIALLY_PAID", "PAID"]) or
+            (order.proforma_paid_amount and float(order.proforma_paid_amount) > 0)
+        )
+        final_pct_ratio = (100.0 - float(proforma_pct)) / 100.0 if has_proforma_dp else 1.0
+
         detail_items = []
         item_titles = []
         for itm in target_orders:
             item_no = self._resolve_item_no(itm.job_id, itm.job_title)
-            itm_price = float(itm.unit_price if itm.unit_price is not None else (itm.total_amount or 0.0))
+            full_price = float(itm.unit_price if itm.unit_price is not None else (itm.total_amount or 0.0))
+            itm_price = round(full_price * final_pct_ratio, 2)
             if itm.job_title:
                 item_titles.append(itm.job_title)
+            
+            project_code = itm.order_number or order.order_number or f"ORD-{itm.id}"
+            if token and db_id and project_code:
+                self.ensure_project(project_code, project_code)
+
             item_entry = {
                 "itemNo": item_no,
                 "unitPrice": itm_price,
                 "quantity": 1,
                 "detailNotes": itm.job_title or itm.job_id or "",
-                "tax1Name": self.config.default_tax_ppn_no if self.config else "PPN 11%"
+                "tax1Name": self.config.default_tax_ppn_no if self.config else "PPN 11%",
+                "projectNo": project_code,
+                "projectName": project_code
             }
             if order.accurate_so_no:
                 item_entry["salesOrderNumber"] = order.accurate_so_no
             detail_items.append(item_entry)
 
         desc_services = ", ".join(item_titles) if item_titles else (order.job_title or "")
-        description_text = f"Final Invoice for Order {order_num} - {desc_services}"
+        if has_proforma_dp:
+            description_text = f"Final Invoice (Balance {100 - proforma_pct}%) for Order {order_num} - {desc_services}"
+        else:
+            description_text = f"Final Invoice for Order {order_num} - {desc_services}"
 
         payload = {
             "customerNo": customer_no,
@@ -696,9 +904,6 @@ class AccurateClient:
         # If SO exists, link to Sales Order at root
         if order.accurate_so_no:
             payload["salesOrderNumber"] = order.accurate_so_no
-
-        token = self.get_valid_access_token()
-        db_id = self.config.database_id if self.config else None
 
         if token and db_id:
             url = f"{ACCURATE_API_HOST}/api/sales-invoice/save.do"
@@ -793,8 +998,10 @@ class AccurateClient:
         """
         Creates a Sales Receipt (Penerimaan Penjualan) in Accurate to record incoming client payment
         and deposits into the bank ledger.
-        Supports both Proforma Down Payment (e.g. 50%) and Final Balance Payment (e.g. 50%).
-        Dynamically checks remaining invoice balance (primeOwing) to ensure exact settlement.
+        - If the order is in Proforma / Down Payment stage (not yet final-invoiced):
+          Records Proforma payment in MCSC while keeping the Sales Order Active and In Progress in Accurate Online.
+        - If the order has a Final Sales Invoice:
+          Records receipt against the Final Sales Invoice (order.accurate_inv_no).
         """
         if not order:
             return {"success": False, "error": "Order not found"}
@@ -811,153 +1018,297 @@ class AccurateClient:
         customer_no = company.accurate_customer_no if (company and company.accurate_customer_no) else (f"CUST-{order.client_id}" if order.client_id else "CUST-DEFAULT")
         today_str = datetime.now().strftime("%d/%m/%Y")
         order_num = order.order_number or f"ORD-{order.id}"
+        bank_no = self._resolve_bank_no()
 
-        # If Accurate invoice not yet created, create invoice first so payment can be applied
-        if not order.accurate_inv_no:
-            inv_res = self.create_sales_invoice(order)
-            if not inv_res.get("success"):
-                return {"success": False, "error": f"Failed to create sales invoice prior to receipt: {inv_res.get('error')}"}
+        is_final_invoice_phase = bool(order.is_final_invoice_finalized or order.invoice_number or order.payment_status in ["FINAL_PAID", "FULLY_PAID"])
 
         token = self.get_valid_access_token()
         db_id = self.config.database_id if self.config else None
 
-        if token and db_id:
-            headers = self._get_headers()
-            prime_owing = float(payment_amount or 0.0)
-            inv_status = None
+        # Check if this order or any item in the order group already has a receipt recorded
+        existing_receipt_no = order.accurate_receipt_no
+        if not existing_receipt_no:
+            for o in target_orders:
+                if o.accurate_receipt_no:
+                    existing_receipt_no = o.accurate_receipt_no
+                    break
 
-            # Check remaining unpaid balance on the invoice directly from Accurate Online
-            try:
-                inv_resp = requests.get(
-                    f"{ACCURATE_API_HOST}/api/sales-invoice/detail.do",
-                    headers=headers,
-                    params={"number": order.accurate_inv_no},
-                    timeout=15
-                )
-                if inv_resp.status_code == 200:
-                    inv_data = inv_resp.json()
-                    if inv_data.get("s") and inv_data.get("d"):
-                        inv_obj = inv_data["d"]
-                        prime_owing = float(inv_obj.get("primeOwing") if inv_obj.get("primeOwing") is not None else payment_amount)
-                        inv_status = inv_obj.get("statusName") or inv_obj.get("status")
-            except Exception as check_err:
-                print(f"Warning: could not fetch invoice primeOwing: {check_err}")
+        # Case A: Final Invoice Phase -> apply to Sales Invoice
+        if is_final_invoice_phase:
+            if not order.accurate_inv_no:
+                inv_res = self.create_sales_invoice(order)
+                if not inv_res.get("success"):
+                    return {"success": False, "error": f"Failed to create sales invoice prior to receipt: {inv_res.get('error')}"}
 
-            # If invoice is already fully paid in Accurate Online, return success idempotently
-            if (inv_status and str(inv_status).lower() in ["lunas", "paid"]) or prime_owing <= 0:
+            # If already fully synced and paid locally, return existing receipt
+            if existing_receipt_no and order.accurate_sync_status == "PAID":
+                # Ensure all siblings share the receipt number
+                needs_commit = False
                 for ord_item in target_orders:
+                    if not ord_item.accurate_receipt_no:
+                        ord_item.accurate_receipt_no = existing_receipt_no
+                        needs_commit = True
+                if needs_commit:
+                    self.db.commit()
+
+                return {
+                    "success": True,
+                    "accurate_receipt_no": existing_receipt_no,
+                    "message": f"Sales Receipt {existing_receipt_no} already recorded for Invoice {order.accurate_inv_no}",
+                    "already_synced": True
+                }
+
+            if token and db_id:
+                headers = self._get_headers()
+                prime_owing = float(payment_amount or 0.0)
+                inv_status = None
+
+                try:
+                    inv_resp = requests.get(
+                        f"{ACCURATE_API_HOST}/api/sales-invoice/detail.do",
+                        headers=headers,
+                        params={"number": order.accurate_inv_no},
+                        timeout=15
+                    )
+                    if inv_resp.status_code == 200:
+                        inv_data = inv_resp.json()
+                        if inv_data.get("s") and inv_data.get("d"):
+                            inv_obj = inv_data["d"]
+                            if isinstance(inv_obj, dict):
+                                prime_owing = float(inv_obj.get("primeOwing") if inv_obj.get("primeOwing") is not None else payment_amount)
+                                inv_status = inv_obj.get("statusName") or inv_obj.get("status")
+                except Exception as check_err:
+                    print(f"Warning: could not fetch invoice primeOwing: {check_err}")
+
+                if (inv_status and str(inv_status).lower() in ["lunas", "paid"]) or prime_owing <= 0:
+                    for ord_item in target_orders:
+                        ord_item.accurate_sync_status = "PAID"
+                        ord_item.accurate_sync_error = None
+                    self.db.commit()
+                    return {
+                        "success": True,
+                        "accurate_receipt_no": existing_receipt_no or order.accurate_receipt_no,
+                        "message": f"Invoice {order.accurate_inv_no} is already fully paid in Accurate Online",
+                        "already_synced": True
+                    }
+
+                actual_payment_amount = min(float(payment_amount), prime_owing) if payment_amount > 0 else prime_owing
+                if actual_payment_amount <= 0:
+                    return {
+                        "success": True,
+                        "accurate_receipt_no": existing_receipt_no or order.accurate_receipt_no,
+                        "message": "No remaining balance to pay",
+                        "already_synced": True
+                    }
+
+                payload = {
+                    "customerNo": customer_no,
+                    "transDate": today_str,
+                    "bankNo": bank_no,
+                    "chequeAmount": actual_payment_amount,
+                    "description": f"Payment received for Order {order_num} via {payment_method}",
+                    "detailInvoice": [
+                        {
+                            "invoiceNo": order.accurate_inv_no,
+                            "paymentAmount": actual_payment_amount
+                        }
+                    ]
+                }
+                url = f"{ACCURATE_API_HOST}/api/sales-receipt/save.do"
+                try:
+                    resp = requests.post(url, json=payload, headers=headers, timeout=25)
+                    res_data = resp.json()
+                    if res_data.get("s"):
+                        fallback_no = f"CR.{datetime.now().strftime('%y%m')}.{order.id:04d}"
+                        doc_id, doc_no = self._extract_doc_info(res_data, fallback_no)
+
+                        is_now_fully_paid = (prime_owing - actual_payment_amount) <= 100.0
+                        new_sync_status = "PAID" if is_now_fully_paid else "PARTIALLY_PAID"
+
+                        for ord_item in target_orders:
+                            if ord_item.accurate_receipt_no and doc_no not in ord_item.accurate_receipt_no:
+                                ord_item.accurate_receipt_no = f"{ord_item.accurate_receipt_no}, {doc_no}"
+                            else:
+                                ord_item.accurate_receipt_no = doc_no
+                            ord_item.accurate_sync_status = new_sync_status
+                            ord_item.accurate_sync_error = None
+                            ord_item.accurate_last_synced_at = datetime.now(timezone.utc)
+                        self.db.commit()
+
+                        self.log_sync(
+                            event_type="SALES_RECEIPT",
+                            status="SUCCESS",
+                            reference_id=str(order.id),
+                            reference_number=order_num,
+                            accurate_doc_no=doc_no,
+                            request_payload=payload,
+                            response_payload=res_data
+                        )
+                        return {"success": True, "accurate_receipt_no": doc_no, "data": res_data}
+                    else:
+                        err = str(res_data.get("d") or "Accurate Receipt creation failed")
+                        self.log_sync(
+                            event_type="SALES_RECEIPT",
+                            status="FAILED",
+                            reference_id=str(order.id),
+                            reference_number=order_num,
+                            request_payload=payload,
+                            error_message=err,
+                            response_payload=res_data
+                        )
+                        return {"success": False, "error": err}
+                except Exception as e:
+                    return {"success": False, "error": str(e)}
+            else:
+                # Simulation mode
+                mock_cr_no = existing_receipt_no or f"CR.{datetime.now().strftime('%y%m')}.{order.id:04d}"
+                for ord_item in target_orders:
+                    ord_item.accurate_receipt_no = mock_cr_no
                     ord_item.accurate_sync_status = "PAID"
                     ord_item.accurate_sync_error = None
+                    ord_item.accurate_last_synced_at = datetime.now(timezone.utc)
                 self.db.commit()
-                return {
-                    "success": True,
-                    "accurate_receipt_no": order.accurate_receipt_no,
-                    "message": f"Invoice {order.accurate_inv_no} is already fully paid in Accurate Online",
-                    "already_synced": True
-                }
+                return {"success": True, "accurate_receipt_no": mock_cr_no, "simulated": True}
 
-            # Determine receipt amount to apply
-            actual_payment_amount = min(float(payment_amount), prime_owing) if payment_amount > 0 else prime_owing
-            if actual_payment_amount <= 0:
-                return {
-                    "success": True,
-                    "accurate_receipt_no": order.accurate_receipt_no,
-                    "message": "No remaining balance to pay",
-                    "already_synced": True
-                }
-
-            bank_no = self._resolve_bank_no()
-
-            payload = {
-                "customerNo": customer_no,
-                "transDate": today_str,
-                "bankNo": bank_no,
-                "chequeAmount": actual_payment_amount,
-                "description": f"Payment received for Order {order_num} via {payment_method}",
-                "detailInvoice": [
-                    {
-                        "invoiceNo": order.accurate_inv_no,
-                        "paymentAmount": actual_payment_amount
-                    }
-                ]
-            }
-
-            url = f"{ACCURATE_API_HOST}/api/sales-receipt/save.do"
-            try:
-                resp = requests.post(url, json=payload, headers=headers, timeout=25)
-                res_data = resp.json()
-                if res_data.get("s"):
-                    fallback_no = f"CR.{datetime.now().strftime('%y%m')}.{order.id:04d}"
-                    doc_id, doc_no = self._extract_doc_info(res_data, fallback_no)
-
-                    is_now_fully_paid = (prime_owing - actual_payment_amount) <= 100.0
-                    new_sync_status = "PAID" if is_now_fully_paid else "PARTIALLY_PAID"
-
-                    for ord_item in target_orders:
-                        if ord_item.accurate_receipt_no and doc_no not in ord_item.accurate_receipt_no:
-                            ord_item.accurate_receipt_no = f"{ord_item.accurate_receipt_no}, {doc_no}"
-                        else:
-                            ord_item.accurate_receipt_no = doc_no
-                        ord_item.accurate_sync_status = new_sync_status
-                        ord_item.accurate_sync_error = None
-                        ord_item.accurate_last_synced_at = datetime.now(timezone.utc)
-                    self.db.commit()
-
-                    self.log_sync(
-                        event_type="SALES_RECEIPT",
-                        status="SUCCESS",
-                        reference_id=str(order.id),
-                        reference_number=order_num,
-                        accurate_doc_no=doc_no,
-                        request_payload=payload,
-                        response_payload=res_data
-                    )
-                    return {"success": True, "accurate_receipt_no": doc_no, "data": res_data}
-                else:
-                    err = str(res_data.get("d") or "Accurate Receipt creation failed")
-                    for ord_item in target_orders:
-                        ord_item.accurate_sync_error = err
-                    self.db.commit()
-                    self.log_sync(
-                        event_type="SALES_RECEIPT",
-                        status="FAILED",
-                        reference_id=str(order.id),
-                        reference_number=order_num,
-                        request_payload=payload,
-                        error_message=err,
-                        response_payload=res_data
-                    )
-                    return {"success": False, "error": err}
-            except Exception as e:
-                for ord_item in target_orders:
-                    ord_item.accurate_sync_error = str(e)
-                self.db.commit()
-                self.log_sync(
-                    event_type="SALES_RECEIPT",
-                    status="FAILED",
-                    reference_id=str(order.id),
-                    reference_number=order_num,
-                    request_payload=payload,
-                    error_message=str(e)
-                )
-                return {"success": False, "error": str(e)}
+        # Case B: Proforma / Down Payment Phase -> Generate Proforma DP Invoice & Sales Receipt in Accurate
         else:
-            # Standalone Local Simulation
-            mock_cr_no = f"CR.{datetime.now().strftime('%y%m')}.{order.id:04d}"
+            # Idempotency Guard: prevent duplicate DP receipts if receipt already exists across any item in the group
+            if existing_receipt_no:
+                needs_commit = False
+                for ord_item in target_orders:
+                    if not ord_item.accurate_receipt_no:
+                        ord_item.accurate_receipt_no = existing_receipt_no
+                        needs_commit = True
+                    if ord_item.accurate_sync_status != "PROFORMA_PAID":
+                        ord_item.accurate_sync_status = "PROFORMA_PAID"
+                        needs_commit = True
+                if needs_commit:
+                    self.db.commit()
+
+                return {
+                    "success": True,
+                    "accurate_receipt_no": existing_receipt_no,
+                    "accurate_so_no": order.accurate_so_no,
+                    "message": f"Proforma Down Payment Receipt {existing_receipt_no} already exists.",
+                    "already_synced": True
+                }
+
+            if not order.accurate_so_no:
+                so_res = self.create_sales_order_proforma(order)
+                if not so_res.get("success"):
+                    return {"success": False, "error": f"Failed to create sales order: {so_res.get('error')}"}
+
+            if token and db_id:
+                headers = self._get_headers()
+                
+                # 1. Create a Proforma DP Invoice in Accurate Online (isolated DP line so SO stays in progress)
+                inv_payload = {
+                    "customerNo": customer_no,
+                    "transDate": today_str,
+                    "description": f"Proforma Invoice ({order.proforma_stage_percent or 50}% DP) for Order {order_num}",
+                    "detailItem": [
+                        {
+                            "itemNo": "Jasa",
+                            "unitPrice": float(payment_amount),
+                            "quantity": 1,
+                            "detailNotes": f"Down Payment ({order.proforma_stage_percent or 50}%) for Order {order_num}",
+                            "tax1Name": self.config.default_tax_ppn_no if self.config else "PPN 11%",
+                            "projectNo": order_num,
+                            "projectName": order_num
+                        }
+                    ]
+                }
+                
+                dp_inv_no = None
+                try:
+                    inv_url = f"{ACCURATE_API_HOST}/api/sales-invoice/save.do"
+                    inv_resp = requests.post(inv_url, json=inv_payload, headers=headers, timeout=25)
+                    inv_data = inv_resp.json()
+                    if inv_data.get("s"):
+                        _, dp_inv_no = self._extract_doc_info(inv_data, f"INV-DP.{order.id:04d}")
+                except Exception as inv_err:
+                    print(f"Warning: Proforma DP invoice creation error: {inv_err}")
+
+                # 2. If Proforma DP invoice was created, generate Sales Receipt against it
+                if dp_inv_no:
+                    rcpt_payload = {
+                        "customerNo": customer_no,
+                        "transDate": today_str,
+                        "bankNo": bank_no,
+                        "chequeAmount": float(payment_amount),
+                        "description": f"Proforma DP ({order.proforma_stage_percent or 50}%) for Order {order_num} via {payment_method}",
+                        "detailInvoice": [
+                            {
+                                "invoiceNo": dp_inv_no,
+                                "paymentAmount": float(payment_amount)
+                            }
+                        ]
+                    }
+                    try:
+                        rcpt_url = f"{ACCURATE_API_HOST}/api/sales-receipt/save.do"
+                        rcpt_resp = requests.post(rcpt_url, json=rcpt_payload, headers=headers, timeout=25)
+                        rcpt_data = rcpt_resp.json()
+                        if rcpt_data.get("s"):
+                            fallback_no = f"CR.{datetime.now().strftime('%y%m')}.{order.id:04d}"
+                            doc_id, doc_no = self._extract_doc_info(rcpt_data, fallback_no)
+                            for ord_item in target_orders:
+                                ord_item.accurate_receipt_no = doc_no
+                                ord_item.accurate_sync_status = "PROFORMA_PAID"
+                                ord_item.accurate_sync_error = None
+                                ord_item.accurate_last_synced_at = datetime.now(timezone.utc)
+                            self.db.commit()
+
+                            self.log_sync(
+                                event_type="SALES_RECEIPT_PROFORMA",
+                                status="SUCCESS",
+                                reference_id=str(order.id),
+                                reference_number=order_num,
+                                accurate_doc_no=doc_no,
+                                request_payload=rcpt_payload,
+                                response_payload=rcpt_data
+                            )
+                            return {
+                                "success": True,
+                                "accurate_receipt_no": doc_no,
+                                "accurate_so_no": order.accurate_so_no,
+                                "proforma_inv_no": dp_inv_no,
+                                "message": f"Proforma Down Payment Receipt {doc_no} generated successfully in Accurate Online.",
+                                "data": rcpt_data
+                            }
+                    except Exception as rcpt_err:
+                        print(f"Warning: Sales receipt against DP invoice error: {rcpt_err}")
+
+            # Simulation fallback or fallback if DP invoice creation was skipped
+            mock_cr_no = existing_receipt_no or f"CR.{datetime.now().strftime('%y%m')}.{order.id:04d}"
             for ord_item in target_orders:
                 ord_item.accurate_receipt_no = mock_cr_no
-                ord_item.accurate_sync_status = "PAID"
+                ord_item.accurate_sync_status = "PROFORMA_PAID"
                 ord_item.accurate_sync_error = None
                 ord_item.accurate_last_synced_at = datetime.now(timezone.utc)
             self.db.commit()
 
             self.log_sync(
-                event_type="SALES_RECEIPT",
+                event_type="PROFORMA_PAYMENT",
                 status="SUCCESS",
                 reference_id=str(order.id),
                 reference_number=order_num,
-                accurate_doc_no=mock_cr_no,
-                request_payload={"customerNo": customer_no, "paymentAmount": payment_amount},
-                response_payload={"simulated": True, "receipt_no": mock_cr_no}
+                accurate_doc_no=order.accurate_so_no,
+                request_payload={
+                    "customerNo": customer_no,
+                    "salesOrderNumber": order.accurate_so_no,
+                    "paymentAmount": float(payment_amount),
+                    "paymentMethod": payment_method
+                },
+                response_payload={
+                    "message": "Proforma Down Payment recorded successfully. Sales Order remains Active and In Progress in Accurate Online.",
+                    "accurate_so_no": order.accurate_so_no,
+                    "receipt_no": mock_cr_no
+                }
             )
-            return {"success": True, "accurate_receipt_no": mock_cr_no, "simulated": True}
+            return {
+                "success": True,
+                "accurate_receipt_no": mock_cr_no,
+                "accurate_so_no": order.accurate_so_no,
+                "message": "Proforma Down Payment recorded successfully. Sales Order remains Active and In Progress.",
+                "proforma_paid": True
+            }

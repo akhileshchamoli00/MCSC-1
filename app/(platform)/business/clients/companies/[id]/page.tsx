@@ -18,7 +18,8 @@ import {
   Check,
   X,
   Trash2,
-  Mail
+  Mail,
+  MailCheck
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -119,6 +120,11 @@ export default function CompanyDetailPage() {
       }
 
       toast.success(`Invitation & Welcome email successfully sent to ${data.recipient_email}!`);
+      setCompany((prev: any) => prev ? {
+        ...prev,
+        invitation_sent_at: data.invitation_sent_at || new Date().toISOString(),
+        invitation_sent_to: data.recipient_email
+      } : prev);
       setIsSendEmailOpen(false);
     } catch (err: any) {
       toast.error(err.message || "Error sending invitation email");
@@ -458,11 +464,27 @@ export default function CompanyDetailPage() {
             <Button
               type="button"
               variant="outline"
-              className="text-xs font-bold gap-1.5 h-9 rounded-xl"
+              className={`text-xs font-bold gap-1.5 h-9 rounded-xl transition-colors ${
+                company?.invitation_sent_at
+                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20"
+                  : ""
+              }`}
               onClick={() => setIsSendEmailOpen(true)}
-              title="Send Official Welcome Email & ID Card"
+              title={
+                company?.invitation_sent_at
+                  ? `Official Welcome & ID Card email sent on ${new Date(company.invitation_sent_at).toLocaleDateString()} to ${company.invitation_sent_to || company.key_contact_email} — Click to Resend`
+                  : "Send Official Welcome Email & ID Card"
+              }
             >
-              <Mail className="h-4 w-4" /> Send Invitation Email
+              {company?.invitation_sent_at ? (
+                <>
+                  <MailCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Resend Invitation Email
+                </>
+              ) : (
+                <>
+                  <Mail className="h-4 w-4" /> Send Invitation Email
+                </>
+              )}
             </Button>
           ) : (
             <Button
@@ -509,14 +531,22 @@ export default function CompanyDetailPage() {
               {valStatus === "VALIDATED" ? <ShieldCheck className="h-5 w-5" /> : valStatus === "NEEDS_REVISION" ? <AlertTriangle className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
             </div>
             <div className="space-y-0.5">
-              <h3 className="font-bold text-sm flex items-center gap-2">
-                {valStatus === "VALIDATED" 
-                  ? "Verified Company Profile" 
-                  : valStatus === "NEEDS_REVISION"
-                  ? "Profile Revision Requested"
-                  : "Company Profile Pending Admin Validation"
-                }
-              </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-sm">
+                  {valStatus === "VALIDATED" 
+                    ? "Verified Company Profile" 
+                    : valStatus === "NEEDS_REVISION"
+                    ? "Profile Revision Requested"
+                    : "Company Profile Pending Admin Validation"
+                  }
+                </h3>
+                {company?.invitation_sent_at && (
+                  <Badge variant="outline" className="text-[10px] font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 flex items-center gap-1">
+                    <MailCheck className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                    <span>Invitation Sent {new Date(company.invitation_sent_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                  </Badge>
+                )}
+              </div>
               <p className="text-xs opacity-90 leading-relaxed">
                 {valStatus === "VALIDATED" ? (
                   <>Validated by <strong>{formatUserName(company.validator, "Admin")}</strong> on {company.validated_at ? new Date(company.validated_at).toLocaleDateString() : "Record"}. All legal credentials and key contacts are confirmed.</>
@@ -998,6 +1028,17 @@ export default function CompanyDetailPage() {
                 </div>
               </div>
 
+              {company.invitation_sent_at && (
+                <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-[11px] text-sky-900 dark:text-sky-300 space-y-1">
+                  <p className="font-bold flex items-center gap-1 text-sky-700 dark:text-sky-300">
+                    <MailCheck className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" /> Invitation Previously Dispatched
+                  </p>
+                  <p className="leading-relaxed">
+                    An official invitation email was already sent to this company on <strong>{new Date(company.invitation_sent_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</strong> ({company.invitation_sent_to || company.key_contact_email}). Sending now will deliver a fresh copy.
+                  </p>
+                </div>
+              )}
+
               {valStatus !== "VALIDATED" && (
                 <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-700 dark:text-rose-400 space-y-1">
                   <p className="font-bold flex items-center gap-1">
@@ -1009,7 +1050,7 @@ export default function CompanyDetailPage() {
                 </div>
               )}
 
-              {valStatus === "VALIDATED" && (
+              {valStatus === "VALIDATED" && !company.invitation_sent_at && (
                 <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-700 dark:text-emerald-400 space-y-1">
                   <p className="font-bold flex items-center gap-1">
                     <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Verified Corporate Profile
@@ -1043,6 +1084,10 @@ export default function CompanyDetailPage() {
               {sendingEmail ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending Email...
+                </>
+              ) : company?.invitation_sent_at ? (
+                <>
+                  <MailCheck className="h-3.5 w-3.5" /> Resend Invitation Email
                 </>
               ) : (
                 <>

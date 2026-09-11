@@ -230,13 +230,36 @@ def is_employee_role(user: models.User) -> bool:
             return True
     return False
 
+def parse_consultant_ids(c_ids: Any) -> List[int]:
+    if not c_ids:
+        return []
+    if isinstance(c_ids, str):
+        try:
+            parsed = json.loads(c_ids)
+        except Exception:
+            parsed = [int(x.strip()) for x in c_ids.split(",") if x.strip().isdigit()]
+    elif isinstance(c_ids, list):
+        parsed = c_ids
+    else:
+        return []
+    return [int(x) for x in parsed if str(x).isdigit()]
+
 def is_assigned_employee_to_company(user: models.User, company_id: int, db: Session) -> bool:
-    if is_employee_role(user):
+    if is_employee_role(user) and getattr(user, "employee", None):
+        # 1. Check direct company consultant assignment
         assignment = db.query(models.ClientConsultant).filter(
             models.ClientConsultant.company_id == company_id,
             models.ClientConsultant.employee_id == user.employee.id
         ).first()
-        return assignment is not None
+        if assignment is not None:
+            return True
+
+        # 2. Check assignment to any order belonging to this company
+        company_orders = db.query(models.ClientOrder).filter(models.ClientOrder.company_id == company_id).all()
+        for ord_obj in company_orders:
+            c_ids = parse_consultant_ids(ord_obj.consultant_ids)
+            if user.employee.id in c_ids:
+                return True
     return False
 
 def is_client_themselves(user: models.User, client_id: int, db: Optional[Session] = None) -> bool:
@@ -328,19 +351,6 @@ def get_clients(db: Session = Depends(database.get_db), current_user: models.Use
         return base_query.filter(models.Client.id.in_(client_ids)).order_by(models.Client.contact_person).all()
     return []
 
-def parse_consultant_ids(c_ids: Any) -> List[int]:
-    if not c_ids:
-        return []
-    if isinstance(c_ids, str):
-        try:
-            parsed = json.loads(c_ids)
-        except Exception:
-            parsed = [int(x.strip()) for x in c_ids.split(",") if x.strip().isdigit()]
-    elif isinstance(c_ids, list):
-        parsed = c_ids
-    else:
-        return []
-    return [int(x) for x in parsed if str(x).isdigit()]
 
 def build_consultants_cache(db: Session, orders: List[models.ClientOrder]) -> dict:
     all_emp_ids = set()
@@ -947,10 +957,12 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
     if order_update.status:
         update_order_group_status(db, orders_in_group, order_update.status, current_user.id)
         
-    if is_admin_hr:
+    can_manage_finance = is_admin_hr or auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders_active", "edit", db) or auth.has_permission(current_user, "clients_orders", "edit", db)
+    if can_manage_finance:
         if order_update.payment_status:
             old_pay_status = db_order.payment_status
-            db_order.payment_status = order_update.payment_status
+            for ord_item in orders_in_group:
+                ord_item.payment_status = order_update.payment_status
             if order_update.payment_status in ["PARTIALLY_PAID", "PAID"]:
                 if db_order.status in ["DRAFT", "PROFORMA_GENERATED", "WAITING_ON_CLIENT"]:
                     target_status = "CONFIRMED"
@@ -959,7 +971,7 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
                     update_order_group_status(db, orders_in_group, target_status, current_user.id)
                 
                 # Accurate Online Sales Receipt sync trigger
-                if old_pay_status != order_update.payment_status:
+                if old_pay_status != order_update.payment_status or any(o.accurate_sync_status != "PROFORMA_PAID" for o in orders_in_group):
                     try:
                         from utils.accurate_client import AccurateClient
                         acc_client = AccurateClient(db)
@@ -1554,6 +1566,10 @@ def validate_client_company(
 
             threading.Thread(target=_send_bg_welcome, daemon=True).start()
 
+            db_company.invitation_sent_at = datetime.now()
+            db_company.invitation_sent_to = clean_rec_email
+            db.commit()
+
             log_activity(
                 db,
                 "COMPANY_WELCOME_EMAIL_SENT",
@@ -1615,6 +1631,11 @@ def send_company_welcome_email_manual(
     if not success:
         raise HTTPException(status_code=500, detail="Failed to deliver invitation email via SMTP. Please verify system email credentials.")
 
+    now = datetime.now()
+    db_company.invitation_sent_at = now
+    db_company.invitation_sent_to = clean_target_email
+    db.commit()
+
     log_activity(
         db,
         "COMPANY_WELCOME_EMAIL_SENT",
@@ -1629,7 +1650,9 @@ def send_company_welcome_email_manual(
         "message": f"Invitation & Welcome email successfully sent to {clean_target_email}",
         "recipient_email": clean_target_email,
         "recipient_name": target_name,
-        "company_code": db_company.company_code
+        "company_code": db_company.company_code,
+        "invitation_sent_at": now.isoformat(),
+        "invitation_sent_to": clean_target_email
     }
 
 @router.put("/companies/{company_id}", response_model=schemas.ClientCompanyResponse)
@@ -2327,10 +2350,26 @@ def get_client_documents(company_id: int, db: Session = Depends(database.get_db)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
         
-    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_documents", "view", db) or is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client_themselves_for_company(current_user, company_id, db)):
+    is_client = is_client_themselves_for_company(current_user, company_id, db)
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_documents", "view", db) or is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client):
         raise HTTPException(status_code=403, detail="Not authorized to view documents for this company")
         
-    return db.query(models.ClientDocument).filter(models.ClientDocument.company_id == company_id).all()
+    query = db.query(models.ClientDocument).filter(models.ClientDocument.company_id == company_id)
+    
+    can_view_invoices = (
+        auth.is_super_admin(current_user) 
+        or is_client 
+        or auth.has_permission(current_user, "clients_documents_invoices", "view", db)
+        or auth.has_permission(current_user, "clients_documents_invoices", "download", db)
+    )
+    if not can_view_invoices:
+        query = query.filter(
+            ~models.ClientDocument.document_type.ilike("%invoice%"),
+            ~models.ClientDocument.document_path.ilike("%/invoice/%"),
+            ~models.ClientDocument.file_name.ilike("%invoice%")
+        )
+        
+    return query.all()
 
 
 def check_order_authorization_for_chat(user: models.User, order_number: str, db: Session) -> bool:
@@ -3268,19 +3307,54 @@ def get_expiring_documents(
     return res
 
 
+class SendInvoiceEmailPayload(BaseModel):
+    recipient_email: Optional[str] = None
+    recipient_phone: Optional[str] = None
+    send_email: Optional[bool] = True
+    send_whatsapp: Optional[bool] = True
+    additional_recipients: Optional[List[str]] = None
+
+def parse_additional_recipients(val: Any) -> List[str]:
+    if not val:
+        return []
+    result = []
+    if isinstance(val, str):
+        for p in val.split(","):
+            p_clean = p.strip()
+            if p_clean and "@" in p_clean:
+                result.append(p_clean)
+    elif isinstance(val, (list, tuple, set)):
+        for item in val:
+            if isinstance(item, str):
+                for p in item.split(","):
+                    p_clean = p.strip()
+                    if p_clean and "@" in p_clean:
+                        result.append(p_clean)
+    # Remove duplicates preserving order
+    return list(dict.fromkeys(result))
+
+
 @router.post("/orders/{order_number}/send-invoice-email", response_model=List[schemas.ClientOrderResponse])
 def send_order_invoice_email(
     order_number: str,
     invoice_type: str,
+    payload: Optional[SendInvoiceEmailPayload] = None,
     recipient_email: Optional[str] = Query(None),
     recipient_phone: Optional[str] = Query(None),
     send_email: bool = Query(True),
     send_whatsapp: bool = Query(True),
+    additional_recipients: Optional[str] = Query(None),
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    if not send_email and not send_whatsapp:
+    eff_send_email = payload.send_email if (payload and payload.send_email is not None) else send_email
+    eff_send_whatsapp = payload.send_whatsapp if (payload and payload.send_whatsapp is not None) else send_whatsapp
+
+    if not eff_send_email and not eff_send_whatsapp:
         raise HTTPException(status_code=400, detail="Please select at least one delivery channel (Email or WhatsApp).")
+
+    raw_addl = (payload.additional_recipients if (payload and payload.additional_recipients) else None) or additional_recipients
+    cleaned_additional = parse_additional_recipients(raw_addl)
 
     first_order = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).first()
     if not first_order:
@@ -3331,18 +3405,21 @@ def send_order_invoice_email(
     else:
         raise HTTPException(status_code=400, detail="Invoice URL format is unsupported")
 
-    final_recipient_email = recipient_email or company.key_contact_email or (company.client.email if company.client else None) or (first_order.client.email if first_order.client else "")
-    final_recipient_phone = recipient_phone or company.key_contact_phone or (company.client.phone_number if company.client else None) or (first_order.client.phone_number if first_order.client else "")
+    eff_recipient_email = (payload.recipient_email if payload and payload.recipient_email else recipient_email)
+    eff_recipient_phone = (payload.recipient_phone if payload and payload.recipient_phone else recipient_phone)
+
+    final_recipient_email = eff_recipient_email or company.key_contact_email or (company.client.email if company.client else None) or (first_order.client.email if first_order.client else "")
+    final_recipient_phone = eff_recipient_phone or company.key_contact_phone or (company.client.phone_number if company.client else None) or (first_order.client.phone_number if first_order.client else "")
     recipient_name = company.key_contact_person or (company.client.contact_person if company.client else None) or (first_order.client.contact_person if first_order.client else "")
 
-    if send_email:
+    if eff_send_email:
         if not final_recipient_email or not str(final_recipient_email).strip():
             raise HTTPException(status_code=400, detail="Recipient email address is required when sending email invoice.")
         final_recipient_email = validate_and_clean_email(final_recipient_email, "Recipient Email", required=True)
     elif final_recipient_email:
         final_recipient_email = validate_and_clean_email(final_recipient_email, "Recipient Email", required=False)
 
-    if send_whatsapp:
+    if eff_send_whatsapp:
         if not final_recipient_phone or not str(final_recipient_phone).strip():
             raise HTTPException(status_code=400, detail="Recipient WhatsApp phone number is required when sending WhatsApp notification.")
         final_recipient_phone = validate_and_clean_phone(final_recipient_phone, "Recipient WhatsApp Phone", required=True)
@@ -3404,8 +3481,8 @@ def send_order_invoice_email(
 
     db.commit()
 
-    # 1. Send Email with PDF Attachment
-    if send_email and final_recipient_email:
+    # 1. Send Email with PDF Attachment and CC Recipients
+    if eff_send_email and final_recipient_email:
         from utils.email_service import send_invoice_attachment_email
         send_invoice_attachment_email(
             recipient_email=final_recipient_email,
@@ -3413,11 +3490,12 @@ def send_order_invoice_email(
             invoice_type=invoice_type,
             pdf_content=pdf_content,
             pdf_filename=doc.file_name,
-            payment_url=payment_url
+            payment_url=payment_url,
+            cc_emails=cleaned_additional
         )
 
     # 2. Send WhatsApp Notification & PDF Document via Meta Cloud API
-    if send_whatsapp and final_recipient_phone:
+    if eff_send_whatsapp and final_recipient_phone:
         try:
             from utils.whatsapp_service import send_whatsapp_invoice_notification
             formatted_charge = f"IDR {int(charge_amount):,}".replace(",", ".")
@@ -3444,12 +3522,32 @@ def send_order_invoice_email(
         except Exception as wa_err:
             print("Warning: Failed to send WhatsApp invoice notification:", wa_err)
 
-    # Log activity
-    channel_desc = "Email & WhatsApp" if (send_email and send_whatsapp) else ("Email" if send_email else "WhatsApp")
+    # Update dispatch tracking on orders in group
+    now = datetime.now()
+    target_dest = final_recipient_email if eff_send_email else final_recipient_phone
+    channel_code = "BOTH" if (eff_send_email and eff_send_whatsapp) else ("EMAIL" if eff_send_email else "WHATSAPP")
+
+    for item in orders_in_group:
+        item.last_invoice_sent_at = now
+        item.last_invoice_sent_to = target_dest
+        item.invoice_delivery_channel = channel_code
+        if invoice_type == "proforma":
+            item.proforma_sent_at = now
+            item.proforma_sent_to = target_dest
+        elif invoice_type == "final":
+            item.final_invoice_sent_at = now
+            item.final_invoice_sent_to = target_dest
+
+    db.commit()
+
+    channel_desc = "Email & WhatsApp" if (eff_send_email and eff_send_whatsapp) else ("Email" if eff_send_email else "WhatsApp")
     details_str = []
-    if send_email and final_recipient_email:
-        details_str.append(f"Email: {final_recipient_email}")
-    if send_whatsapp and final_recipient_phone:
+    if eff_send_email and final_recipient_email:
+        email_str = f"Email: {final_recipient_email}"
+        if cleaned_additional:
+            email_str += f" (CC: {', '.join(cleaned_additional)})"
+        details_str.append(email_str)
+    if eff_send_whatsapp and final_recipient_phone:
         details_str.append(f"WhatsApp: {final_recipient_phone}")
 
     log_activity(
@@ -3656,14 +3754,15 @@ def process_xendit_invoice_payment(db: Session, payload: dict) -> dict:
         else:
             db.commit()
 
-            # Ensure receipt is recorded even if payment was previously marked
-            try:
-                from utils.accurate_client import AccurateClient
-                acc_client = AccurateClient(db)
-                if acc_client.config and acc_client.config.auto_sync_on_payment:
-                    acc_client.create_sales_receipt(first_order, payment_amount=parsed_paid_amount, payment_method="Xendit")
-            except Exception as acc_err:
-                print(f"Warning: Accurate payment receipt sync error: {acc_err}")
+            # Ensure receipt is recorded only if not already synced to Accurate
+            if first_order.accurate_sync_status not in ["PROFORMA_PAID", "PAID"] and not first_order.accurate_receipt_no:
+                try:
+                    from utils.accurate_client import AccurateClient
+                    acc_client = AccurateClient(db)
+                    if acc_client.config and acc_client.config.auto_sync_on_payment:
+                        acc_client.create_sales_receipt(first_order, payment_amount=parsed_paid_amount, payment_method="Xendit")
+                except Exception as acc_err:
+                    print(f"Warning: Accurate payment receipt sync error: {acc_err}")
 
             return {
                 "status": "success",
@@ -3703,8 +3802,8 @@ def sync_order_payment(orderNumber: str, db: Session = Depends(database.get_db),
 
 def find_order_final_documents(db: Session, order_number: str, company: models.ClientCompany):
     """
-    Locates deliverable / final documents for an order by checking both:
-    1. Database ClientDocument records for this order_number.
+    Locates deliverable / final documents for an order by checking:
+    1. Database ClientDocument records associated with this order_number (non-invoice, non-chat files).
     2. Dropbox order folders (/Clients/{company_code}/{order_number}/Final Documents/ etc.).
     Returns a list of dicts: [{'file_name': str, 'file_url': str, 'size': int, 'source': str, 'document_type': str}]
     """
@@ -3724,12 +3823,17 @@ def find_order_final_documents(db: Session, order_number: str, company: models.C
         desc = (d.description or "").strip().lower()
         fname = d.file_name or ""
         
+        # Exclude invoices and internal chat uploads
+        is_invoice = "invoice" in dtype or "proforma" in furl or "invoice" in furl
+        is_chat_upload = dtype == "chat_upload" or "client shared docs" in dtype
+        
+        # Match explicit final docs or any deliverable tagged with this order
         is_final = (
-            "final" in dtype or "deliver" in dtype or 
-            "/final" in furl or "/deliver" in furl or
-            ("final" in desc and "proforma" not in desc and "invoice" not in desc)
+            ("final" in dtype or "deliver" in dtype or "/final" in furl or "/deliver" in furl or "final" in desc) or
+            (not is_invoice and not is_chat_upload)
         )
-        if is_final and fname:
+        
+        if is_final and not is_invoice and fname:
             key = fname.lower()
             if key not in docs_map:
                 docs_map[key] = {
@@ -3741,36 +3845,33 @@ def find_order_final_documents(db: Session, order_number: str, company: models.C
                     "source": "database"
                 }
 
-    # 2. Check Dropbox Final Documents folders
-    try:
-        from utils.dropbox_client import list_folder
-        candidate_folders = [
-            f"/Clients/{company_code}/{order_folder}/Final Documents",
-            f"/Clients/{company_code}/{order_folder}/Final_Documents",
-            f"/Clients/{company_code}/{order_folder}/Final Docs",
-            f"/Clients/{company_code}/{order_folder}/Final docs",
-            f"/Clients/{company_code}/{order_folder}/Deliverables",
-            f"/Clients/{company_code}/{order_folder}/Deliverable"
-        ]
-        
-        for folder_path in candidate_folders:
-            res = list_folder(folder_path)
-            if res.get("success") and res.get("items"):
-                for item in res["items"]:
-                    if item.get("type") == "file":
-                        fname = item.get("name")
-                        key = fname.lower()
-                        if key not in docs_map:
-                            docs_map[key] = {
-                                "id": None,
-                                "file_name": fname,
-                                "file_url": item.get("path_display") or item.get("path_lower"),
-                                "size": item.get("size", 0),
-                                "document_type": "Final Document",
-                                "source": "dropbox"
-                            }
-    except Exception as e:
-        print(f"Warning: Dropbox folder scan for final docs encountered: {e}")
+    # 2. Check Dropbox Final Documents folders only if no database records were found
+    if not docs_map:
+        try:
+            from utils.dropbox_client import list_folder
+            candidate_folders = [
+                f"/Clients/{company_code}/{order_folder}/Final Documents",
+                f"/Clients/{company_code}/{order_folder}/Final Docs"
+            ]
+            
+            for folder_path in candidate_folders:
+                res = list_folder(folder_path)
+                if res.get("success") and res.get("items"):
+                    for item in res["items"]:
+                        if item.get("type") == "file":
+                            fname = item.get("name")
+                            key = fname.lower()
+                            if key not in docs_map:
+                                docs_map[key] = {
+                                    "id": None,
+                                    "file_name": fname,
+                                    "file_url": item.get("path_display") or item.get("path_lower"),
+                                    "size": item.get("size", 0),
+                                    "document_type": "Final Document",
+                                    "source": "dropbox"
+                                }
+        except Exception as e:
+            print(f"Warning: Dropbox folder scan for final docs encountered: {e}")
 
     return list(docs_map.values())
 
@@ -3837,6 +3938,7 @@ class SendFinalDocumentsPayload(BaseModel):
     recipient_email: Optional[str] = None
     recipient_name: Optional[str] = None
     custom_message: Optional[str] = None
+    additional_recipients: Optional[List[str]] = None
 
 
 @router.post("/orders/{order_number}/send-final-documents", response_model=List[schemas.ClientOrderResponse])
@@ -3846,12 +3948,16 @@ def send_order_final_documents(
     recipient_email: Optional[str] = Query(None),
     recipient_name: Optional[str] = Query(None),
     custom_message: Optional[str] = Query(None),
+    additional_recipients: Optional[str] = Query(None),
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
     final_recipient_email = (payload.recipient_email if payload and payload.recipient_email else recipient_email)
     final_recipient_name = (payload.recipient_name if payload and payload.recipient_name else recipient_name)
     final_custom_message = (payload.custom_message if payload and payload.custom_message else custom_message)
+
+    raw_addl = (payload.additional_recipients if (payload and payload.additional_recipients) else None) or additional_recipients
+    cleaned_additional = parse_additional_recipients(raw_addl)
 
     orders_in_group = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
     if not orders_in_group:
@@ -3953,7 +4059,7 @@ def send_order_final_documents(
     clean_comp_name = re.sub(r'[/\\?%*:|"<> ]', '_', target_comp.company_name or "Client")
     zip_filename = f"{clean_comp_name}_{order_number}_Final_Documents.zip"
 
-    # Dispatch email with password-protected encrypted ZIP archive
+    # Dispatch email with password-protected encrypted ZIP archive and CC recipients
     from utils.email_service import send_final_documents_email
     email_sent = send_final_documents_email(
         recipient_email=final_recipient_email.strip(),
@@ -3965,7 +4071,8 @@ def send_order_final_documents(
         company_code=comp_code,
         tax_number=tax_id,
         zip_password=zip_password,
-        zip_filename=zip_filename
+        zip_filename=zip_filename,
+        cc_emails=cleaned_additional
     )
 
     if not email_sent:
@@ -3977,9 +4084,24 @@ def send_order_final_documents(
     
     if not is_resend_docs:
         update_order_group_status(db, orders_in_group, "SOFT_COPY_DELIVERED", current_user.id)
+
+    now = datetime.now()
+    for item in orders_in_group:
+        item.deliverables_sent_at = now
+        item.deliverables_sent_to = final_recipient_email.strip()
+
     db.commit()
 
     # Log activity
+    cc_log = f" (CC: {', '.join(cleaned_additional)})" if cleaned_additional else ""
+    log_activity(
+        db,
+        "FINAL_DOCUMENTS_DISPATCHED",
+        f"Delivered {len(attachments)} final documents in encrypted ZIP archive to {final_recipient_email}{cc_log} for order {order_number}",
+        client_id=effective_company.client_id,
+        company_id=effective_company.id,
+        user_id=current_user.id
+    )
     log_activity(
         db,
         "DOCUMENTS_SENT",

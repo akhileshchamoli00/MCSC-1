@@ -532,12 +532,6 @@ export default function EditClientOrderPage() {
   };
 
   const editItemsTotal = (editForm.items || []).reduce((acc, curr) => acc + (curr.unit_price || 0), 0);
-  const editVendorTotal = (editForm.items || []).reduce((acc, curr) => {
-    if (!curr.notary_id || !curr.service_id) return acc;
-    const vendor = notaries.find((n) => n.id === Number(curr.notary_id));
-    const sf = vendor?.service_fees?.find((f: any) => f.service_id === Number(curr.service_id));
-    return acc + (sf?.fee || 0);
-  }, 0);
   const canEditItems = editForm.payment_status === "UNPAID" && (editForm.status === "DRAFT" || editForm.status === "PIPELINE");
 
   if (loading) {
@@ -834,11 +828,6 @@ export default function EditClientOrderPage() {
                                 ? "Select Government Body (Optional)" 
                                 : "Select Vendor (Optional)"}
                             </span>
-                            {!isPipelineOrder && (
-                              <span className="text-[9px] font-mono text-amber-600 dark:text-amber-400 font-semibold lowercase">
-                                (additional order cost)
-                              </span>
-                            )}
                           </label>
                           <select
                             disabled={!canEditItems}
@@ -893,27 +882,17 @@ export default function EditClientOrderPage() {
                         </div>
                       )}
 
-                      {/* Reflected Price & Vendor Cost Bar */}
-                      {(() => {
-                        const selectedNotaryId = Number(item.notary_id);
-                        const serviceId = Number(item.service_id);
-                        const selectedVendor = selectedNotaryId ? notaries.find(n => n.id === selectedNotaryId) : null;
-                        const serviceFeeObj = selectedVendor?.service_fees?.find((sf: any) => sf.service_id === serviceId);
-                        const vendorCost = serviceFeeObj?.fee || 0;
-
-                        return (
-                          <div className="flex flex-wrap items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border/30 gap-2 text-[10px] font-mono">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-muted-foreground">Price Calculation:</span>
-                              <span className="font-extrabold text-xs text-foreground">
-                                {item.pricing_tier === "PARTNER_A3"
-                                  ? `Free Text: ${item.custom_price_text || "Custom"}`
-                                  : formatCurrency(item.unit_price)}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })()}
+                      {/* Reflected Price Bar */}
+                      <div className="flex flex-wrap items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border/30 gap-2 text-[10px] font-mono">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-muted-foreground">Price Calculation:</span>
+                          <span className="font-extrabold text-xs text-foreground">
+                            {item.pricing_tier === "PARTNER_A3"
+                              ? `Free Text: ${item.custom_price_text || "Custom"}`
+                              : formatCurrency(item.unit_price)}
+                          </span>
+                        </div>
+                      </div>
 
                     </div>
                   ))}

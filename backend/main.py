@@ -116,24 +116,12 @@ async def startup_event():
     from notification_manager import manager
     manager.loop = asyncio.get_running_loop()
     
-    # Run migrations check on startup
+    # Run migrations check and RBAC seed on startup
     from utils.apply_migrations import run_migrations
     try:
         run_migrations()
     except Exception as e:
         print(f"Error running database schema updates: {e}")
-
-
-    # Seed RBAC tables on startup
-    from database import SessionLocal
-    from utils.seed_rbac import seed_rbac_data
-    db = SessionLocal()
-    try:
-        seed_rbac_data(db)
-    except Exception as e:
-        print(f"Error seeding RBAC data: {e}")
-    finally:
-        db.close()
 
 @app.get("/api/health")
 def health_check():

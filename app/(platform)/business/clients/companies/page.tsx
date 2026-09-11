@@ -19,7 +19,8 @@ import {
   ShieldCheck,
   Clock,
   AlertTriangle,
-  Trash2
+  Trash2,
+  MailCheck
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -127,6 +128,11 @@ export default function CompaniesDirectory() {
       }
 
       toast.success(`Invitation & Welcome email successfully sent to ${data.recipient_email}!`);
+      setCompanies(prev => prev.map(c => c.id === company.id ? { 
+        ...c, 
+        invitation_sent_at: data.invitation_sent_at || new Date().toISOString(), 
+        invitation_sent_to: data.recipient_email 
+      } : c));
       setIsSendEmailOpen(false);
       setCompanyToSendEmail(null);
     } catch (err: any) {
@@ -539,6 +545,28 @@ export default function CompaniesDirectory() {
                                   <span>{company.key_contact_phone}</span>
                                 </div>
                               )}
+                              {company.invitation_sent_at ? (
+                                <div className="pt-1">
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[9px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 flex items-center gap-1 w-fit"
+                                    title={`Official invitation email sent on ${new Date(company.invitation_sent_at).toLocaleDateString()} to ${company.invitation_sent_to || company.key_contact_email}`}
+                                  >
+                                    <MailCheck className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400" />
+                                    <span>Invited {new Date(company.invitation_sent_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                                  </Badge>
+                                </div>
+                              ) : company.validation_status === "VALIDATED" ? (
+                                <div className="pt-1">
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[9px] font-medium text-muted-foreground/70 border-dashed border-border/60 flex items-center gap-1 w-fit"
+                                  >
+                                    <Mail className="h-2.5 w-2.5 opacity-40" />
+                                    <span>No Invite Sent</span>
+                                  </Badge>
+                                </div>
+                              ) : null}
                             </>
                           ) : (
                             <span className="text-muted-foreground italic font-normal text-xs">Not configured</span>
@@ -590,14 +618,26 @@ export default function CompaniesDirectory() {
                               <Button 
                                 size="icon" 
                                 variant="ghost" 
-                                className="h-7 w-7 text-muted-foreground rounded-lg"
-                                title="Send Official Invitation & Verified ID Card Email"
+                                className={`h-7 w-7 rounded-lg transition-colors ${
+                                  company.invitation_sent_at
+                                    ? "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15"
+                                    : "text-muted-foreground hover:bg-muted"
+                                }`}
+                                title={
+                                  company.invitation_sent_at
+                                    ? `Official Invitation sent on ${new Date(company.invitation_sent_at).toLocaleDateString()} to ${company.invitation_sent_to || company.key_contact_email} — Click to Resend`
+                                    : "Send Official Invitation & Verified ID Card Email"
+                                }
                                 onClick={() => {
                                   setCompanyToSendEmail(company);
                                   setIsSendEmailOpen(true);
                                 }}
                               >
-                                <Mail className="h-3.5 w-3.5" />
+                                {company.invitation_sent_at ? (
+                                  <MailCheck className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Mail className="h-3.5 w-3.5" />
+                                )}
                               </Button>
                             ) : (
                               <Button 
@@ -777,6 +817,17 @@ export default function CompaniesDirectory() {
                 </div>
               </div>
 
+              {companyToSendEmail.invitation_sent_at && (
+                <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-[11px] text-sky-900 dark:text-sky-300 space-y-1">
+                  <p className="font-bold flex items-center gap-1 text-sky-700 dark:text-sky-300">
+                    <MailCheck className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" /> Invitation Previously Dispatched
+                  </p>
+                  <p className="leading-relaxed">
+                    An official invitation email was already sent to this company on <strong>{new Date(companyToSendEmail.invitation_sent_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</strong> ({companyToSendEmail.invitation_sent_to || companyToSendEmail.key_contact_email}). Sending now will deliver a fresh copy.
+                  </p>
+                </div>
+              )}
+
               {companyToSendEmail.validation_status !== "VALIDATED" && (
                 <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-700 dark:text-rose-400 space-y-1">
                   <p className="font-bold flex items-center gap-1">
@@ -788,7 +839,7 @@ export default function CompaniesDirectory() {
                 </div>
               )}
 
-              {companyToSendEmail.validation_status === "VALIDATED" && (
+              {companyToSendEmail.validation_status === "VALIDATED" && !companyToSendEmail.invitation_sent_at && (
                 <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-700 dark:text-emerald-400 space-y-1">
                   <p className="font-bold flex items-center gap-1">
                     <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Verified Corporate Profile
@@ -822,6 +873,10 @@ export default function CompaniesDirectory() {
               {sendingEmail ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending Email...
+                </>
+              ) : companyToSendEmail?.invitation_sent_at ? (
+                <>
+                  <MailCheck className="h-3.5 w-3.5" /> Resend Invitation Email
                 </>
               ) : (
                 <>

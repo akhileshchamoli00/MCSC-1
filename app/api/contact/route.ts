@@ -12,30 +12,44 @@ export async function POST(req: Request) {
       )
     }
 
-    const gmailUser = process.env.GMAIL_USER
-    const gmailAppPassword = process.env.GMAIL_APP_PASSWORD
+    const smtpHost = process.env.SMTP_HOST || process.env.SES_SMTP_HOST
+    const smtpPort = parseInt(process.env.SMTP_PORT || process.env.SES_SMTP_PORT || "587", 10)
+    const smtpUser = process.env.SMTP_USER || process.env.SES_SMTP_USER || process.env.GMAIL_USER
+    const smtpPassword = (process.env.SMTP_PASSWORD || process.env.SES_SMTP_PASSWORD || process.env.GMAIL_APP_PASSWORD || "").replace(/\s+/g, "")
+    const senderEmail = process.env.SENDER_EMAIL || smtpUser || "admin@mcsc.co.id"
+    const senderName = process.env.SENDER_NAME || "MCS Consulting"
 
-    if (!gmailUser || !gmailAppPassword) {
+    if (!smtpUser || !smtpPassword) {
       return NextResponse.json(
-        { error: "Gmail credentials not set up. Please add GMAIL_USER and GMAIL_APP_PASSWORD in .env.local" },
+        { error: "Email credentials not configured. Please add SMTP_USER & SMTP_PASSWORD (or GMAIL_USER & GMAIL_APP_PASSWORD) in .env.local" },
         { status: 500 }
       )
     }
 
-    // Configure Nodemailer Gmail SMTP transporter
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: gmailUser,
-        pass: gmailAppPassword,
-      },
-    })
+    // Configure Nodemailer transporter (Amazon SES / Custom SMTP or Gmail)
+    const transporter = (smtpHost && smtpHost !== "smtp.gmail.com")
+      ? nodemailer.createTransport({
+          host: smtpHost,
+          port: smtpPort,
+          secure: smtpPort === 465,
+          auth: {
+            user: smtpUser,
+            pass: smtpPassword,
+          },
+        })
+      : nodemailer.createTransport({
+          service: "gmail",
+          auth: {
+            user: smtpUser,
+            pass: smtpPassword,
+          },
+        })
 
     // Setup email payload
     const mailOptions = {
-      from: `"MCS Lead Form" <${gmailUser}>`,
-      to: "admin@mcsc.co.id", // Delivered to your target testing mailbox
-      replyTo: email,                 // Allows replying directly to the customer
+      from: `"${senderName} Lead Form" <${senderEmail}>`,
+      to: "admin@mcsc.co.id", // Delivered to target mailbox
+      replyTo: email,         // Allows replying directly to the customer
       subject: `🔥 New Contact Lead from ${name}`,
       html: `
         <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; padding: 32px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
@@ -68,7 +82,7 @@ export async function POST(req: Request) {
 
           <p style="font-size: 11px; color: #94a3b8; margin-top: 32px; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 16px; line-height: 1.5;">
             This lead was securely generated from the MCS Consulting Contact page.<br/>
-            Powered by Gmail SMTP.
+            Delivered via ${smtpHost && smtpHost.includes("amazonaws.com") ? "Amazon SES" : "MCS Mail Dispatcher"}.
           </p>
         </div>
       `,

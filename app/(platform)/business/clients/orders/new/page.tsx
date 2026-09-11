@@ -397,12 +397,6 @@ function NewClientOrderContent() {
   };
 
   const orderGrandTotal = orderItems.reduce((acc, curr) => acc + (curr.unit_price || 0), 0);
-  const totalVendorCost = orderItems.reduce((acc, curr) => {
-    if (!curr.notary_id || !curr.service_id) return acc;
-    const vendor = notaries.find((n) => n.id === Number(curr.notary_id));
-    const sf = vendor?.service_fees?.find((f: any) => f.service_id === Number(curr.service_id));
-    return acc + (sf?.fee || 0);
-  }, 0);
 
   if (loading) {
     return (
@@ -435,11 +429,6 @@ function NewClientOrderContent() {
             {orderGrandTotal > 0 && (
               <Badge variant="outline" className="font-mono text-xs font-bold px-3 py-1.5 border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl">
                 Total Order Value: {formatCurrency(orderGrandTotal)}
-              </Badge>
-            )}
-            {!isPipeline && totalVendorCost > 0 && (
-              <Badge variant="outline" className="font-mono text-xs font-bold px-3 py-1.5 border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl">
-                Vendor Cost: {formatCurrency(totalVendorCost)}
               </Badge>
             )}
           </div>
@@ -754,11 +743,6 @@ function NewClientOrderContent() {
                               ? "Select Government Body (Optional)" 
                               : "Select Vendor (Optional)"}
                           </span>
-                          {!isPipeline && (
-                            <span className="text-[9px] font-mono text-amber-600 dark:text-amber-400 font-semibold lowercase">
-                              (additional order cost)
-                            </span>
-                          )}
                         </label>
                         <select
                           value={item.notary_id || ""}
@@ -812,27 +796,17 @@ function NewClientOrderContent() {
                       </div>
                     )}
 
-                    {/* Reflected Price & Vendor Cost Bar */}
-                    {(() => {
-                      const selectedNotaryId = Number(item.notary_id);
-                      const serviceId = Number(item.service_id);
-                      const selectedVendor = selectedNotaryId ? notaries.find(n => n.id === selectedNotaryId) : null;
-                      const serviceFeeObj = selectedVendor?.service_fees?.find((sf: any) => sf.service_id === serviceId);
-                      const vendorCost = serviceFeeObj?.fee || 0;
-
-                      return (
-                        <div className="flex flex-wrap items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border/30 gap-2 text-[10px] font-mono">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-muted-foreground">Price Calculation:</span>
-                            <span className="font-extrabold text-xs text-foreground">
-                              {item.pricing_tier === "PARTNER_A3"
-                                ? `Free Text: ${item.custom_price_text || "Custom"}`
-                                : formatCurrency(item.unit_price)}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })()}
+                    {/* Reflected Price Bar */}
+                    <div className="flex flex-wrap items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border/30 gap-2 text-[10px] font-mono">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-muted-foreground">Price Calculation:</span>
+                        <span className="font-extrabold text-xs text-foreground">
+                          {item.pricing_tier === "PARTNER_A3"
+                            ? `Free Text: ${item.custom_price_text || "Custom"}`
+                            : formatCurrency(item.unit_price)}
+                        </span>
+                      </div>
+                    </div>
 
                   </div>
                 ))}

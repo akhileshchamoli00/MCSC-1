@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timezone
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Body, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -342,7 +342,7 @@ def get_sync_logs(
 @router.post("/sync-order/{order_id_or_number}", response_model=schemas.AccurateManualSyncResponse)
 def sync_order_manually(
     order_id_or_number: str,
-    payload: Optional[schemas.AccurateManualSyncRequest] = None,
+    payload: Optional[schemas.AccurateManualSyncRequest] = Body(default=None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
@@ -419,13 +419,17 @@ def sync_order_manually(
     if sync_type == "SALES_INVOICE" or (sync_type == "AUTO" and (order.invoice_number or order.is_final_invoice_finalized)):
         inv_res = client.create_sales_invoice(order)
         if inv_res.get("success"):
-            # If already paid, also sync receipt
-            if order.payment_status in ["PAID", "FINAL_PAID", "FULLY_PAID"]:
+            # If already paid, also sync receipt (only if receipt not already created or sync_status != PAID)
+            is_order_paid = any(o.payment_status in ["PAID", "FINAL_PAID", "FULLY_PAID"] for o in target_orders)
+            if is_order_paid and order.accurate_sync_status != "PAID":
                 client.create_sales_receipt(order, payment_amount=group_total)
+
+            already_msg = f"Sales Invoice {order.accurate_inv_no} is already synchronized with Accurate Online"
+            new_msg = f"Sales Invoice {order.accurate_inv_no} successfully synced to Accurate Online"
 
             return schemas.AccurateManualSyncResponse(
                 success=True,
-                message="Sales Invoice successfully synced to Accurate Online",
+                message=already_msg if inv_res.get("already_synced") else new_msg,
                 order_id=order.id,
                 order_number=order_num,
                 accurate_doc_no=order.accurate_inv_no,
@@ -446,17 +450,21 @@ def sync_order_manually(
     # If Proforma exists or default AUTO
     so_res = client.create_sales_order_proforma(order)
     if so_res.get("success"):
-        # If proforma is paid, sync receipt
-        if order.payment_status in ["PROFORMA_PAID", "PAID", "PARTIALLY_PAID"]:
+        # If any item in the order group is paid / proforma paid, sync receipt only if not already recorded
+        has_proforma_payment = any(o.payment_status in ["PROFORMA_PAID", "PAID", "PARTIALLY_PAID"] for o in target_orders)
+        if has_proforma_payment and not order.accurate_receipt_no:
             dp_amount = round((group_total * proforma_pct) / 100.0) if group_total else 0.0
             client.create_sales_receipt(order, payment_amount=dp_amount)
 
+        already_msg = f"Sales Order {order.accurate_so_no} is already synchronized with Accurate Online"
+        new_msg = f"Sales Order (Proforma) {order.accurate_so_no} successfully synced to Accurate Online"
+
         return schemas.AccurateManualSyncResponse(
             success=True,
-            message="Sales Order (Proforma) successfully synced to Accurate Online",
+            message=already_msg if so_res.get("already_synced") else new_msg,
             order_id=order.id,
             order_number=order_num,
-            accurate_doc_no=order.accurate_so_no,
+            accurate_doc_no=order.accurate_receipt_no or order.accurate_so_no,
             sync_status=order.accurate_sync_status or "SO_CREATED",
             details=so_res
         )

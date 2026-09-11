@@ -49,7 +49,8 @@ import {
   Paperclip,
   FileCheck,
   AlertCircle,
-  Clock
+  Clock,
+  MailCheck
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -61,6 +62,7 @@ import domToImage from "dom-to-image";
 import { jsPDF } from "jspdf";
 import { motion, AnimatePresence } from "framer-motion";
 import { DualOrderChatDialog } from "@/components/dual-order-chat-dialog";
+import { StakeholderRecipientsSelector } from "@/components/stakeholder-recipients-selector";
 import { useUser } from "@/contexts/user-context";
 
 export default function ClientOrdersPage() {
@@ -103,26 +105,20 @@ export default function ClientOrdersPage() {
   // Email & WhatsApp Invoice Confirmation Modal State
   const [isEmailConfirmOpen, setIsEmailConfirmOpen] = useState(false);
   const [emailConfirmType, setEmailConfirmType] = useState<'proforma' | 'final' | null>(null);
-  const [emailConfirmAddress, setEmailConfirmAddress] = useState("");
   const [emailConfirmPhone, setEmailConfirmPhone] = useState("");
   const [invoiceDeliveryChannel, setInvoiceDeliveryChannel] = useState<'both' | 'email' | 'whatsapp'>('both');
-  const [usePrimaryInvoiceContact, setUsePrimaryInvoiceContact] = useState(true);
-  const [primaryInvoiceEmail, setPrimaryInvoiceEmail] = useState("");
-  const [primaryInvoicePhone, setPrimaryInvoicePhone] = useState("");
+  const [selectedInvoiceEmails, setSelectedInvoiceEmails] = useState<string[]>([]);
 
   // Send Final Documents Modal States
   const [isSendDocsModalOpen, setIsSendDocsModalOpen] = useState(false);
   const [sendDocsOrder, setSendDocsOrder] = useState<any>(null);
-  const [sendDocsEmail, setSendDocsEmail] = useState("");
+  const [selectedDocsEmails, setSelectedDocsEmails] = useState<string[]>([]);
   const [sendDocsRecipientName, setSendDocsRecipientName] = useState("");
   const [sendDocsCustomMessage, setSendDocsCustomMessage] = useState("");
   const [sendDocsDocuments, setSendDocsDocuments] = useState<any[]>([]);
   const [sendDocsZipInfo, setSendDocsZipInfo] = useState<any>(null);
   const [fetchingDocsLoading, setFetchingDocsLoading] = useState(false);
   const [sendingDocsLoading, setSendingDocsLoading] = useState(false);
-  const [usePrimaryDocsContact, setUsePrimaryDocsContact] = useState(true);
-  const [primaryDocsEmail, setPrimaryDocsEmail] = useState("");
-  const [primaryDocsRecipientName, setPrimaryDocsRecipientName] = useState("");
 
   // Mentions / Tagging States
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -544,7 +540,25 @@ export default function ClientOrdersPage() {
         is_proforma_finalized: ord.is_proforma_finalized || false,
         proforma_stage_percent: ord.proforma_stage_percent || 50,
         proforma_paid_amount: ord.proforma_paid_amount != null ? ord.proforma_paid_amount : null,
-        is_final_invoice_finalized: ord.is_final_invoice_finalized || false
+        is_final_invoice_finalized: ord.is_final_invoice_finalized || false,
+        proforma_sent_at: ord.proforma_sent_at || null,
+        proforma_sent_to: ord.proforma_sent_to || null,
+        final_invoice_sent_at: ord.final_invoice_sent_at || null,
+        final_invoice_sent_to: ord.final_invoice_sent_to || null,
+        last_invoice_sent_at: ord.last_invoice_sent_at || null,
+        last_invoice_sent_to: ord.last_invoice_sent_to || null,
+        invoice_delivery_channel: ord.invoice_delivery_channel || null,
+        deliverables_sent_at: ord.deliverables_sent_at || null,
+        deliverables_sent_to: ord.deliverables_sent_to || null,
+        accurate_so_no: ord.accurate_so_no || null,
+        accurate_so_id: ord.accurate_so_id || null,
+        accurate_inv_no: ord.accurate_inv_no || null,
+        accurate_inv_id: ord.accurate_inv_id || null,
+        accurate_receipt_no: ord.accurate_receipt_no || null,
+        accurate_sync_status: ord.accurate_sync_status || "NOT_SYNCED",
+        accurate_sync_error: ord.accurate_sync_error || null,
+        accurate_last_synced_at: ord.accurate_last_synced_at || null,
+        payment_link: ord.payment_link || null
       });
     }
     const group = groupedOrdersMap.get(key);
@@ -564,6 +578,27 @@ export default function ClientOrdersPage() {
     if (ord.is_final_invoice_finalized) {
       group.is_final_invoice_finalized = true;
     }
+
+    if (ord.proforma_sent_at) group.proforma_sent_at = ord.proforma_sent_at;
+    if (ord.proforma_sent_to) group.proforma_sent_to = ord.proforma_sent_to;
+    if (ord.final_invoice_sent_at) group.final_invoice_sent_at = ord.final_invoice_sent_at;
+    if (ord.final_invoice_sent_to) group.final_invoice_sent_to = ord.final_invoice_sent_to;
+    if (ord.last_invoice_sent_at) group.last_invoice_sent_at = ord.last_invoice_sent_at;
+    if (ord.last_invoice_sent_to) group.last_invoice_sent_to = ord.last_invoice_sent_to;
+    if (ord.invoice_delivery_channel) group.invoice_delivery_channel = ord.invoice_delivery_channel;
+    if (ord.deliverables_sent_at) group.deliverables_sent_at = ord.deliverables_sent_at;
+    if (ord.deliverables_sent_to) group.deliverables_sent_to = ord.deliverables_sent_to;
+
+    if (ord.accurate_so_no) group.accurate_so_no = ord.accurate_so_no;
+    if (ord.accurate_so_id) group.accurate_so_id = ord.accurate_so_id;
+    if (ord.accurate_inv_no) group.accurate_inv_no = ord.accurate_inv_no;
+    if (ord.accurate_inv_id) group.accurate_inv_id = ord.accurate_inv_id;
+    if (ord.accurate_receipt_no) group.accurate_receipt_no = ord.accurate_receipt_no;
+    if (ord.accurate_sync_status && ord.accurate_sync_status !== "NOT_SYNCED") {
+      group.accurate_sync_status = ord.accurate_sync_status;
+    }
+    if (ord.accurate_sync_error) group.accurate_sync_error = ord.accurate_sync_error;
+    if (ord.payment_link) group.payment_link = ord.payment_link;
 
     if (ord.consultants && ord.consultants.length > 0) {
       const existingIds = new Set(group.consultants.map((c: any) => c.id));
@@ -1032,11 +1067,8 @@ export default function ClientOrdersPage() {
     const targetEmail = companyObj?.key_contact_email || targetCompanyObj?.key_contact_email || clientObj?.email || "";
     const targetPhone = companyObj?.key_contact_phone || targetCompanyObj?.key_contact_phone || clientObj?.phone || clientObj?.phone_number || "";
 
-    setPrimaryInvoiceEmail(targetEmail);
-    setPrimaryInvoicePhone(targetPhone);
-    setUsePrimaryInvoiceContact(true);
     setEmailConfirmType(invoiceType);
-    setEmailConfirmAddress(targetEmail);
+    setSelectedInvoiceEmails(targetEmail ? [targetEmail.trim()] : []);
     setEmailConfirmPhone(targetPhone);
     setInvoiceDeliveryChannel('both');
     setIsEmailConfirmOpen(true);
@@ -1049,8 +1081,8 @@ export default function ClientOrdersPage() {
     const isWhatsAppActive = invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'whatsapp';
 
     if (isEmailActive) {
-      if (!emailConfirmAddress.trim() || !isValidEmail(emailConfirmAddress)) {
-        toast.error("Please enter a valid recipient email address (e.g. client@company.com).");
+      if (selectedInvoiceEmails.length === 0) {
+        toast.error("Please select at least one registered recipient email address from the contacts list.");
         return;
       }
     }
@@ -1070,7 +1102,14 @@ export default function ClientOrdersPage() {
     setIsEmailConfirmOpen(false);
     const activeToken = localStorage.getItem("hrms_token");
     try {
-      const url = `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/send-invoice-email?invoice_type=${emailConfirmType}&recipient_email=${encodeURIComponent(emailConfirmAddress.trim())}&recipient_phone=${encodeURIComponent(emailConfirmPhone.trim())}&send_email=${isEmailActive}&send_whatsapp=${isWhatsAppActive}`;
+      const primaryEmail = selectedInvoiceEmails[0] || "";
+      const additionalEmails = selectedInvoiceEmails.slice(1);
+
+      let url = `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/send-invoice-email?invoice_type=${emailConfirmType}&recipient_email=${encodeURIComponent(primaryEmail.trim())}&recipient_phone=${encodeURIComponent(emailConfirmPhone.trim())}&send_email=${isEmailActive}&send_whatsapp=${isWhatsAppActive}`;
+      if (isEmailActive && additionalEmails.length > 0) {
+        url += `&additional_recipients=${encodeURIComponent(additionalEmails.join(","))}`;
+      }
+
       const res = await fetch(url, {
         method: "POST",
         headers: {
@@ -1085,10 +1124,11 @@ export default function ClientOrdersPage() {
 
         toast.success(`Successfully dispatched ${emailConfirmType} invoice ${channelLabel}!`);
 
-        // Update selectedOrderGroup status with the actual status returned from the backend
+        // Update selectedOrderGroup and orders state with the actual status returned from the backend
         if (updatedOrders && updatedOrders.length > 0) {
           const firstUpdated = updatedOrders[0];
           setSelectedOrderGroup((prev: any) => prev ? { ...prev, ...firstUpdated, status: firstUpdated.status } : null);
+          setOrders(prev => prev.map(ord => ord.order_number === selectedOrderGroup.order_number ? { ...ord, ...firstUpdated, status: firstUpdated.status } : ord));
         }
         // Refresh full list
         fetchData();
@@ -1130,7 +1170,7 @@ export default function ClientOrdersPage() {
     } finally {
       setSendingEmail(false);
       setEmailConfirmType(null);
-      setEmailConfirmAddress("");
+      setSelectedInvoiceEmails([]);
       setEmailConfirmPhone("");
       setInvoiceDeliveryChannel('both');
     }
@@ -1140,7 +1180,6 @@ export default function ClientOrdersPage() {
     if (!orderGroup) return;
     setSendDocsOrder(orderGroup);
     setSendDocsCustomMessage("");
-    setUsePrimaryDocsContact(true);
     setIsSendDocsModalOpen(true);
 
     // Initial email resolution from cached companies & clients
@@ -1152,9 +1191,7 @@ export default function ClientOrdersPage() {
     const initialEmail = companyObj?.key_contact_email || targetCompanyObj?.key_contact_email || clientObj?.email || "";
     const initialName = companyObj?.key_contact_person || targetCompanyObj?.key_contact_person || clientObj?.contact_person || orderGroup.company_name || "";
 
-    setPrimaryDocsEmail(initialEmail);
-    setPrimaryDocsRecipientName(initialName);
-    setSendDocsEmail(initialEmail);
+    setSelectedDocsEmails(initialEmail ? [initialEmail.trim()] : []);
     setSendDocsRecipientName(initialName);
     setSendDocsDocuments([]);
     setFetchingDocsLoading(true);
@@ -1174,11 +1211,9 @@ export default function ClientOrdersPage() {
           target_tax_number: data.target_tax_number,
         });
         if (data.recipient_email && !initialEmail) {
-          setPrimaryDocsEmail(data.recipient_email);
-          setSendDocsEmail(data.recipient_email);
+          setSelectedDocsEmails([data.recipient_email.trim()]);
         }
         if (data.recipient_name && !initialName) {
-          setPrimaryDocsRecipientName(data.recipient_name);
           setSendDocsRecipientName(data.recipient_name);
         }
       }
@@ -1190,14 +1225,16 @@ export default function ClientOrdersPage() {
   };
 
   const executeSendFinalDocs = async () => {
-    if (!sendDocsOrder || !sendDocsEmail.trim() || !isValidEmail(sendDocsEmail)) {
-      toast.error("Please enter a valid recipient email address (e.g. client@company.com).");
+    if (!sendDocsOrder || selectedDocsEmails.length === 0) {
+      toast.error("Please select at least one registered company contact email recipient.");
       return;
     }
 
     setSendingDocsLoading(true);
     const activeToken = localStorage.getItem("hrms_token");
-    const toastId = toast.loading(`Dispatching final documents to ${sendDocsEmail}...`);
+    const primaryEmail = selectedDocsEmails[0];
+    const additionalRecipients = selectedDocsEmails.slice(1);
+    const toastId = toast.loading(`Dispatching final documents to ${primaryEmail}...`);
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${sendDocsOrder.order_number}/send-final-documents`, {
@@ -1207,9 +1244,10 @@ export default function ClientOrdersPage() {
           "Authorization": `Bearer ${activeToken}`
         },
         body: JSON.stringify({
-          recipient_email: sendDocsEmail.trim(),
-          recipient_name: sendDocsRecipientName.trim() || undefined,
-          custom_message: sendDocsCustomMessage.trim() || undefined
+          recipient_email: primaryEmail.trim(),
+          recipient_name: sendDocsRecipientName.trim() || sendDocsOrder.company_name || "Valued Client",
+          custom_message: sendDocsCustomMessage.trim(),
+          additional_recipients: additionalRecipients
         })
       });
 
@@ -1220,7 +1258,7 @@ export default function ClientOrdersPage() {
         } catch (jsonErr) {
           console.warn("Could not parse response JSON:", jsonErr);
         }
-        toast.success(`Final documents successfully delivered to ${sendDocsEmail}!`, { id: toastId });
+        toast.success(`Final documents successfully delivered to ${primaryEmail}!`, { id: toastId });
         setIsSendDocsModalOpen(false);
 
         // Update local state with the actual status returned from the backend
@@ -1592,7 +1630,7 @@ export default function ClientOrdersPage() {
         <div className="flex flex-col md:flex-row items-stretch gap-3 w-full">
           {/* Minimalist Metric Strip - Expanded Horizontally */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs flex-1 gap-2 sm:gap-0 divide-y sm:divide-y-0 sm:divide-x divide-border/50">
-            
+
             {/* Total Orders */}
             <div className="flex items-center gap-3 px-2 sm:px-3 py-1.5 md:py-0 justify-start sm:justify-center">
               <div className="h-9 w-9 rounded-xl bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/20 shrink-0">
@@ -1793,6 +1831,39 @@ export default function ClientOrdersPage() {
                               <Badge className={`${getPaymentStatusColor(ord.payment_status)} font-bold font-mono border text-[11px]`}>
                                 {ord.payment_status || "UNPAID"}
                               </Badge>
+
+                              {/* Service Payment / Invoice Email Dispatch Status Marker */}
+                              {ord.last_invoice_sent_at ? (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[9px] font-mono font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30 flex items-center gap-1 mt-0.5"
+                                  title={`Invoice dispatched ${ord.invoice_delivery_channel === 'BOTH' ? 'via Email & WhatsApp' : ord.invoice_delivery_channel === 'WHATSAPP' ? 'via WhatsApp' : 'via Email'} on ${formatDate(ord.last_invoice_sent_at)} to ${ord.last_invoice_sent_to || 'client'}`}
+                                >
+                                  <MailCheck className="h-2.5 w-2.5 text-sky-600 dark:text-sky-400" />
+                                  <span>{ord.final_invoice_sent_at ? "Final Inv Sent" : "Proforma Sent"}</span>
+                                </Badge>
+                              ) : (ord.is_proforma_finalized || ord.is_final_invoice_finalized) ? (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[9px] font-mono font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 flex items-center gap-1 mt-0.5"
+                                  title="Invoice PDF finalized in storage, but email has not yet been sent to client"
+                                >
+                                  <Clock className="h-2.5 w-2.5 text-amber-600" />
+                                  <span>Inv Unsent</span>
+                                </Badge>
+                              ) : null}
+
+                              {/* Deliverables Dispatched Indicator */}
+                              {ord.deliverables_sent_at && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[9px] font-mono font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 flex items-center gap-1 mt-0.5"
+                                  title={`Final documents delivered to ${ord.deliverables_sent_to || 'client'} on ${formatDate(ord.deliverables_sent_at)}`}
+                                >
+                                  <FileCheck className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400" />
+                                  <span>Docs Sent</span>
+                                </Badge>
+                              )}
                               {isPaymentActionVisible(ord) && (
                                 <div className="flex flex-col gap-1 w-full">
                                   <Button
@@ -2787,16 +2858,22 @@ export default function ClientOrdersPage() {
                       Finalize Invoice
                     </Button>
                   )}
+                  {selectedOrderGroup.proforma_sent_at && (
+                    <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 gap-1.5 px-3 py-1.5 text-xs font-bold font-mono" title={`Proforma invoice dispatched on ${formatDate(selectedOrderGroup.proforma_sent_at)} to ${selectedOrderGroup.proforma_sent_to || 'client'}`}>
+                      <MailCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Dispatched {formatDate(selectedOrderGroup.proforma_sent_at)}
+                    </Badge>
+                  )}
                   {selectedOrderGroup.is_proforma_finalized && (
                     <Button
                       onClick={() => handleSendInvoiceEmail('proforma')}
                       disabled={sendingEmail}
                       size="sm"
                       variant="outline"
-                      className="gap-2 font-bold text-xs h-8 px-4"
+                      className={`gap-2 font-bold text-xs h-8 px-4 ${selectedOrderGroup.proforma_sent_at ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20" : ""
+                        }`}
                     >
-                      {sendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                      Send Proforma
+                      {sendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : selectedOrderGroup.proforma_sent_at ? <MailCheck className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+                      {selectedOrderGroup.proforma_sent_at ? "Resend Proforma" : "Send Proforma"}
                     </Button>
                   )}
                   <Button
@@ -3058,16 +3135,22 @@ export default function ClientOrdersPage() {
                       Finalize Invoice
                     </Button>
                   )}
+                  {selectedOrderGroup.final_invoice_sent_at && (
+                    <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 gap-1.5 px-3 py-1.5 text-xs font-bold font-mono" title={`Final invoice dispatched on ${formatDate(selectedOrderGroup.final_invoice_sent_at)} to ${selectedOrderGroup.final_invoice_sent_to || 'client'}`}>
+                      <MailCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Dispatched {formatDate(selectedOrderGroup.final_invoice_sent_at)}
+                    </Badge>
+                  )}
                   {selectedOrderGroup.is_final_invoice_finalized && (
                     <Button
                       onClick={() => handleSendInvoiceEmail('final')}
                       disabled={sendingEmail}
                       size="sm"
                       variant="outline"
-                      className="gap-2 font-bold text-xs h-8 px-4"
+                      className={`gap-2 font-bold text-xs h-8 px-4 ${selectedOrderGroup.final_invoice_sent_at ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20" : ""
+                        }`}
                     >
-                      {sendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                      Send Invoice
+                      {sendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : selectedOrderGroup.final_invoice_sent_at ? <MailCheck className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+                      {selectedOrderGroup.final_invoice_sent_at ? "Resend Invoice" : "Send Invoice"}
                     </Button>
                   )}
                   <Button
@@ -3309,15 +3392,15 @@ export default function ClientOrdersPage() {
         <DialogContent className="sm:max-w-2xl md:max-w-3xl w-[94vw] p-0 bg-background border border-border text-foreground rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden">
           {/* Header */}
           <div className={`p-6 sm:p-7 pb-5 border-b border-border/60 ${emailConfirmType === 'final'
-              ? 'bg-gradient-to-r from-emerald-500/15 via-emerald-500/5 to-transparent dark:from-emerald-950/50 dark:via-emerald-950/20'
-              : 'bg-gradient-to-r from-primary/15 via-primary/5 to-transparent dark:from-primary/30 dark:via-primary/10'
+            ? 'bg-gradient-to-r from-emerald-500/15 via-emerald-500/5 to-transparent dark:from-emerald-950/50 dark:via-emerald-950/20'
+            : 'bg-gradient-to-r from-primary/15 via-primary/5 to-transparent dark:from-primary/30 dark:via-primary/10'
             }`}>
             <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
               <DialogTitle className={`text-xl sm:text-2xl font-bold flex items-center gap-3 ${emailConfirmType === 'final' ? 'text-emerald-600 dark:text-emerald-400' : 'text-primary'
                 }`}>
                 <div className={`h-10 w-10 rounded-2xl flex items-center justify-center border shadow-xs shrink-0 ${emailConfirmType === 'final'
-                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                    : 'bg-primary/15 border-primary/30 text-primary'
+                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-primary/15 border-primary/30 text-primary'
                   }`}>
                   <Mail className="h-5 w-5" />
                 </div>
@@ -3325,8 +3408,8 @@ export default function ClientOrdersPage() {
               </DialogTitle>
               {selectedOrderGroup && (
                 <Badge variant="outline" className={`font-mono text-xs sm:text-sm font-bold px-3 py-1 ${emailConfirmType === 'final'
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
-                    : 'bg-primary/10 border-primary/30 text-primary'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-primary/10 border-primary/30 text-primary'
                   }`}>
                   {selectedOrderGroup.order_number}
                 </Badge>
@@ -3373,44 +3456,6 @@ export default function ClientOrdersPage() {
           </div>
 
           <div className="p-6 sm:p-8 space-y-6 max-h-[70vh] overflow-y-auto">
-            {/* Primary Contact Details Checkbox Option */}
-            <label className={`flex items-start gap-3.5 p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer select-none ${usePrimaryInvoiceContact
-                ? "bg-primary/5 dark:bg-primary/10 border-primary/40 shadow-xs ring-1 ring-primary/20"
-                : "bg-muted/30 border-border hover:bg-muted/50"
-              }`}>
-              <input
-                type="checkbox"
-                checked={usePrimaryInvoiceContact}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setUsePrimaryInvoiceContact(checked);
-                  if (checked) {
-                    setEmailConfirmAddress(primaryInvoiceEmail);
-                    setEmailConfirmPhone(primaryInvoicePhone);
-                  }
-                }}
-                className="h-4 w-4 rounded mt-1 text-primary focus:ring-primary border-border cursor-pointer"
-              />
-              <div className="flex-1 min-w-0 space-y-1">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-bold text-foreground leading-tight">
-                    Send to the primary contact details
-                  </span>
-                  <span className={`text-[10px] sm:text-xs font-mono font-semibold px-2 py-0.5 rounded-lg border ${usePrimaryInvoiceContact
-                      ? "bg-primary/15 border-primary/30 text-primary"
-                      : "bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400"
-                    }`}>
-                    {usePrimaryInvoiceContact ? "🔒 Locked (Primary Details)" : "✏️ Custom Recipient"}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {usePrimaryInvoiceContact
-                    ? "Fields are automatically locked to the registered company primary contact info. Uncheck to specify an alternative recipient."
-                    : "Primary contact lock is disabled. You can now edit the recipient email address and WhatsApp mobile number below."}
-                </p>
-              </div>
-            </label>
-
             {/* Delivery Channel Selector */}
             <div className="space-y-2.5">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
@@ -3424,8 +3469,8 @@ export default function ClientOrdersPage() {
                   type="button"
                   onClick={() => setInvoiceDeliveryChannel('both')}
                   className={`flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-2xl border text-center transition-all cursor-pointer select-none gap-1.5 ${invoiceDeliveryChannel === 'both'
-                      ? 'bg-primary text-primary-foreground border-primary font-bold shadow-md ring-2 ring-primary/40'
-                      : 'bg-zinc-100 dark:bg-black dark:border-white/40 text-zinc-700 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-900 dark:hover:border-white font-medium'
+                    ? 'bg-primary text-primary-foreground border-primary font-bold shadow-md ring-2 ring-primary/40'
+                    : 'bg-zinc-100 dark:bg-black dark:border-white/40 text-zinc-700 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-900 dark:hover:border-white font-medium'
                     }`}
                 >
                   <div className="flex items-center gap-1.5">
@@ -3441,8 +3486,8 @@ export default function ClientOrdersPage() {
                   type="button"
                   onClick={() => setInvoiceDeliveryChannel('email')}
                   className={`flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-2xl border text-center transition-all cursor-pointer select-none gap-1.5 ${invoiceDeliveryChannel === 'email'
-                      ? 'bg-sky-600 text-white border-sky-600 font-bold shadow-md ring-2 ring-sky-500/40'
-                      : 'bg-zinc-100 dark:bg-black dark:border-white/40 text-zinc-700 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-900 dark:hover:border-white font-medium'
+                    ? 'bg-sky-600 text-white border-sky-600 font-bold shadow-md ring-2 ring-sky-500/40'
+                    : 'bg-zinc-100 dark:bg-black dark:border-white/40 text-zinc-700 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-900 dark:hover:border-white font-medium'
                     }`}
                 >
                   <Mail className="h-4 w-4 mb-0.5" />
@@ -3454,8 +3499,8 @@ export default function ClientOrdersPage() {
                   type="button"
                   onClick={() => setInvoiceDeliveryChannel('whatsapp')}
                   className={`flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-2xl border text-center transition-all cursor-pointer select-none gap-1.5 ${invoiceDeliveryChannel === 'whatsapp'
-                      ? 'bg-emerald-600 text-white border-emerald-600 font-bold shadow-md ring-2 ring-emerald-500/40'
-                      : 'bg-zinc-100 dark:bg-black dark:border-white/40 text-zinc-700 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-900 dark:hover:border-white font-medium'
+                    ? 'bg-emerald-600 text-white border-emerald-600 font-bold shadow-md ring-2 ring-emerald-500/40'
+                    : 'bg-zinc-100 dark:bg-black dark:border-white/40 text-zinc-700 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-900 dark:hover:border-white font-medium'
                     }`}
                 >
                   <Phone className="h-4 w-4 mb-0.5" />
@@ -3465,74 +3510,54 @@ export default function ClientOrdersPage() {
               </div>
             </div>
 
-            {/* Email Address & WhatsApp Phone Fields Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-              {/* Email Address Field */}
-              <div className={`space-y-2 transition-opacity ${invoiceDeliveryChannel === 'whatsapp' ? 'opacity-40' : 'opacity-100'
-                }`}>
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                    Recipient Email {invoiceDeliveryChannel !== 'whatsapp' && <span className="text-destructive">*</span>}
-                  </span>
-                  {invoiceDeliveryChannel === 'whatsapp' ? (
-                    <span className="text-[10px] text-muted-foreground italic">
-                      (Optional)
-                    </span>
-                  ) : usePrimaryInvoiceContact ? (
-                    <span className="text-[10px] text-muted-foreground/80 flex items-center gap-1 font-normal">
-                      <Lock className="h-2.5 w-2.5" /> Read-only
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-primary flex items-center gap-1 font-semibold">
-                      <Unlock className="h-2.5 w-2.5" /> Editable
-                    </span>
-                  )}
-                </label>
-                <EmailInput
-                  placeholder="client@company.com"
-                  value={emailConfirmAddress}
-                  disabled={usePrimaryInvoiceContact || invoiceDeliveryChannel === 'whatsapp'}
-                  required={invoiceDeliveryChannel !== 'whatsapp'}
-                  onChange={(val) => setEmailConfirmAddress(val)}
-                  className="h-10 text-xs sm:text-sm"
-                />
-              </div>
+            {/* Email Recipients Section (Only for Email or Both) */}
+            {(invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'email') && selectedOrderGroup && (
+              <StakeholderRecipientsSelector
+                companyId={selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id}
+                selectedEmails={selectedInvoiceEmails}
+                onChange={(emails) => setSelectedInvoiceEmails(emails)}
+                fallbackContact={{
+                  name: companies.find((c: any) => c.id === (selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id))?.key_contact_person || selectedOrderGroup.client_name,
+                  email: companies.find((c: any) => c.id === (selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id))?.key_contact_email,
+                  phone: companies.find((c: any) => c.id === (selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id))?.key_contact_phone,
+                  role: "Primary Contact"
+                }}
+                accentColor={emailConfirmType === 'final' ? 'emerald' : 'primary'}
+                title="Invoice Email Recipients"
+                subtitle="The invoice PDF will be emailed directly to the selected registered company contacts."
+              />
+            )}
 
-              {/* WhatsApp Phone Field */}
-              <div className={`space-y-2 transition-opacity ${invoiceDeliveryChannel === 'email' ? 'opacity-40' : 'opacity-100'
-                }`}>
+            {/* WhatsApp Mobile Number Field (Only for WhatsApp or Both) */}
+            {(invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'whatsapp') && (
+              <div className="space-y-2 bg-muted/30 p-4 rounded-2xl border border-border/60">
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                    WhatsApp Mobile Number {invoiceDeliveryChannel !== 'email' && <span className="text-destructive">*</span>}
+                    <Phone className="h-3.5 w-3.5 text-emerald-600" />
+                    WhatsApp Mobile Number <span className="text-destructive">*</span>
                   </span>
-                  {invoiceDeliveryChannel === 'email' ? (
-                    <span className="text-[10px] text-muted-foreground italic">
-                      (Optional)
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                      Meta Cloud API
-                    </span>
-                  )}
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                    Meta Cloud API
+                  </span>
                 </label>
                 <PhoneInput
                   placeholder="812 3456 789"
                   value={emailConfirmPhone}
-                  disabled={usePrimaryInvoiceContact || invoiceDeliveryChannel === 'email'}
-                  required={invoiceDeliveryChannel !== 'email'}
+                  required
                   onChange={(val) => setEmailConfirmPhone(val)}
                 />
+                <p className="text-[11px] text-muted-foreground">
+                  The client will receive an automated WhatsApp notification with invoice PDF attachment and payment link.
+                </p>
               </div>
-            </div>
+            )}
 
             {/* Channel Info Card */}
             <div className={`p-4 sm:p-5 rounded-2xl border text-xs sm:text-sm transition-colors ${invoiceDeliveryChannel === 'both'
-                ? 'border-primary/30 bg-primary/5 dark:bg-primary/10 text-foreground'
-                : invoiceDeliveryChannel === 'email'
-                  ? 'border-sky-500/30 bg-sky-500/10 dark:bg-sky-950/20 text-sky-950 dark:text-sky-200'
-                  : 'border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-200'
+              ? 'border-primary/30 bg-primary/5 dark:bg-primary/10 text-foreground'
+              : invoiceDeliveryChannel === 'email'
+                ? 'border-sky-500/30 bg-sky-500/10 dark:bg-sky-950/20 text-sky-950 dark:text-sky-200'
+                : 'border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-200'
               }`}>
               <div className="flex items-center gap-2.5 font-bold text-xs sm:text-sm mb-1">
                 {invoiceDeliveryChannel === 'both' ? (
@@ -3569,7 +3594,7 @@ export default function ClientOrdersPage() {
               onClick={() => {
                 setIsEmailConfirmOpen(false);
                 setEmailConfirmType(null);
-                setEmailConfirmAddress("");
+                setSelectedInvoiceEmails([]);
                 setEmailConfirmPhone("");
                 setInvoiceDeliveryChannel('both');
               }}
@@ -3582,13 +3607,12 @@ export default function ClientOrdersPage() {
               onClick={executeSendInvoiceEmail}
               disabled={
                 sendingEmail ||
-                (invoiceDeliveryChannel === 'both' && (!emailConfirmAddress.trim() || !isValidEmail(emailConfirmAddress) || !emailConfirmPhone.trim() || !isValidPhoneNumber(emailConfirmPhone))) ||
-                (invoiceDeliveryChannel === 'email' && (!emailConfirmAddress.trim() || !isValidEmail(emailConfirmAddress))) ||
-                (invoiceDeliveryChannel === 'whatsapp' && (!emailConfirmPhone.trim() || !isValidPhoneNumber(emailConfirmPhone)))
+                ((invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'email') && selectedInvoiceEmails.length === 0) ||
+                ((invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'whatsapp') && (!emailConfirmPhone.trim() || !isValidPhoneNumber(emailConfirmPhone)))
               }
               className={`text-xs sm:text-sm font-bold h-10 sm:h-11 px-6 shadow-md gap-2 rounded-xl disabled:opacity-40 disabled:bg-zinc-300 dark:disabled:bg-zinc-800 disabled:text-zinc-500 ${emailConfirmType === 'final'
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500'
-                  : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500'
+                : 'bg-primary hover:bg-primary/90 text-primary-foreground'
                 }`}
             >
               {sendingEmail ? (
@@ -3657,114 +3681,41 @@ export default function ClientOrdersPage() {
           </div>
 
           <div className="p-6 sm:p-8 space-y-6 max-h-[70vh] overflow-y-auto">
-            {/* Primary Contact Details Checkbox Option */}
-            <label className={`flex items-start gap-3.5 p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer select-none ${usePrimaryDocsContact
-                ? "bg-sky-500/5 dark:bg-sky-950/20 border-sky-500/40 shadow-xs ring-1 ring-sky-500/20"
-                : "bg-muted/30 border-border hover:bg-muted/50"
-              }`}>
-              <input
-                type="checkbox"
-                checked={usePrimaryDocsContact}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setUsePrimaryDocsContact(checked);
-                  if (checked) {
-                    setSendDocsEmail(primaryDocsEmail);
-                    setSendDocsRecipientName(primaryDocsRecipientName);
+            {/* Stakeholder Recipients Selection */}
+            {sendDocsOrder && (
+              <StakeholderRecipientsSelector
+                companyId={sendDocsOrder.billing_company_id || sendDocsOrder.company_id}
+                selectedEmails={selectedDocsEmails}
+                onChange={(emails, primaryStk) => {
+                  setSelectedDocsEmails(emails);
+                  if (primaryStk?.name) {
+                    setSendDocsRecipientName(primaryStk.name);
                   }
                 }}
-                className="h-4 w-4 rounded mt-1 text-sky-600 focus:ring-sky-500 border-border cursor-pointer"
+                fallbackContact={{
+                  name: companies.find((c: any) => c.id === (sendDocsOrder.billing_company_id || sendDocsOrder.company_id))?.key_contact_person || sendDocsOrder.client_name,
+                  email: companies.find((c: any) => c.id === (sendDocsOrder.billing_company_id || sendDocsOrder.company_id))?.key_contact_email,
+                  phone: companies.find((c: any) => c.id === (sendDocsOrder.billing_company_id || sendDocsOrder.company_id))?.key_contact_phone,
+                  role: "Primary Contact"
+                }}
+                accentColor="sky"
+                title="Deliverables Email Recipients"
+                subtitle="Password-protected final documents will be dispatched exclusively to the selected registered company contacts."
               />
-              <div className="flex-1 min-w-0 space-y-1">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-bold text-foreground leading-tight">
-                    Send to the primary contact details
-                  </span>
-                  <span className={`text-[10px] sm:text-xs font-mono font-semibold px-2 py-0.5 rounded-lg border ${usePrimaryDocsContact
-                      ? "bg-sky-500/15 border-sky-500/30 text-sky-600 dark:text-sky-400"
-                      : "bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400"
-                    }`}>
-                    {usePrimaryDocsContact ? "🔒 Locked (Primary Contact)" : "✏️ Custom Recipient"}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {usePrimaryDocsContact
-                    ? "Fields are automatically locked to registered primary contact info. Uncheck to customize recipient email or contact person."
-                    : "Primary lock disabled. You can specify a custom recipient email address and contact person below."}
-                </p>
-              </div>
-            </label>
+            )}
 
-            {/* Recipient Information Form Section */}
-            <div className="space-y-4 bg-muted/40 dark:bg-zinc-900/40 p-5 sm:p-6 rounded-2xl border border-border/60">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
-                {/* Recipient Email */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                      Recipient Email Address <span className="text-destructive">*</span>
-                    </span>
-                    {usePrimaryDocsContact ? (
-                      <span className="text-[10px] text-muted-foreground/80 flex items-center gap-1 font-normal">
-                        <Lock className="h-2.5 w-2.5" /> Read-only
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-sky-600 dark:text-sky-400 flex items-center gap-1 font-semibold">
-                        <Unlock className="h-2.5 w-2.5" /> Editable
-                      </span>
-                    )}
-                  </label>
-                  <EmailInput
-                    placeholder="client@company.com"
-                    value={sendDocsEmail}
-                    disabled={usePrimaryDocsContact}
-                    onChange={(val) => setSendDocsEmail(val)}
-                    className="h-10 text-xs sm:text-sm"
-                  />
-                </div>
-
-                {/* Recipient Name */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                    <span>Recipient Contact Name</span>
-                    {usePrimaryDocsContact ? (
-                      <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                        <Lock className="h-2.5 w-2.5" /> Locked
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-sky-600 font-semibold flex items-center gap-1">
-                        <Unlock className="h-2.5 w-2.5" /> Editable
-                      </span>
-                    )}
-                  </label>
-                  <Input
-                    type="text"
-                    disabled={usePrimaryDocsContact}
-                    placeholder="Contact Person"
-                    value={sendDocsRecipientName}
-                    onChange={(e) => setSendDocsRecipientName(e.target.value)}
-                    className={`h-10 text-xs sm:text-sm rounded-xl ${usePrimaryDocsContact
-                        ? "bg-muted/70 cursor-not-allowed opacity-90 select-none border-border/50"
-                        : "bg-background border-zinc-300 dark:border-zinc-700"
-                      }`}
-                  />
-                </div>
-              </div>
-
-              {/* Optional Custom Message Note */}
-              <div className="space-y-2 pt-1">
-                <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                  Optional Delivery Note / Custom Message
-                </label>
-                <Input
-                  type="text"
-                  placeholder="e.g. Please find the legalized articles of association and official deed documents attached..."
-                  value={sendDocsCustomMessage}
-                  onChange={(e) => setSendDocsCustomMessage(e.target.value)}
-                  className="h-10 text-xs sm:text-sm bg-background border-zinc-300 dark:border-zinc-700 rounded-xl"
-                />
-              </div>
+            {/* Optional Custom Message Note */}
+            <div className="space-y-2 bg-muted/30 p-4 rounded-2xl border border-border/60">
+              <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                Optional Delivery Note / Custom Message
+              </label>
+              <Input
+                type="text"
+                placeholder="e.g. Please find the legalized articles of association and official deed documents attached..."
+                value={sendDocsCustomMessage}
+                onChange={(e) => setSendDocsCustomMessage(e.target.value)}
+                className="h-10 text-xs sm:text-sm bg-background border-zinc-300 dark:border-zinc-700 rounded-xl"
+              />
             </div>
 
             {/* Security & Password-Protected ZIP Details Card */}
@@ -3855,7 +3806,7 @@ export default function ClientOrdersPage() {
             <Button
               type="button"
               onClick={executeSendFinalDocs}
-              disabled={sendingDocsLoading || fetchingDocsLoading || !sendDocsEmail.trim() || !isValidEmail(sendDocsEmail) || sendDocsDocuments.length === 0}
+              disabled={sendingDocsLoading || fetchingDocsLoading || selectedDocsEmails.length === 0 || sendDocsDocuments.length === 0}
               className="text-xs sm:text-sm font-bold h-10 sm:h-11 px-6 bg-sky-600 hover:bg-sky-700 text-white shadow-md gap-2 rounded-xl disabled:opacity-40 disabled:bg-zinc-300 dark:disabled:bg-zinc-800 disabled:text-zinc-500"
             >
               {sendingDocsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

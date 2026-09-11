@@ -123,14 +123,6 @@ const navModules: NavModule[] = [
     systemArea: "hrms"
   },
   {
-    title: "Announcements",
-    icon: Megaphone,
-    href: "/hrms/announcements",
-    adminOnly: false,
-    moduleCode: "hrms_announcements",
-    systemArea: "hrms"
-  },
-  {
     title: "Employee",
     icon: Users,
     systemArea: "hrms",
@@ -212,6 +204,14 @@ const navModules: NavModule[] = [
     ]
   },
   {
+    title: "Announcements",
+    icon: Megaphone,
+    href: "/hrms/announcements",
+    adminOnly: false,
+    moduleCode: "hrms_announcements",
+    systemArea: "hrms"
+  },
+  {
     title: "Partners",
     icon: Users,
     href: "/business/clients",
@@ -238,13 +238,14 @@ const navModules: NavModule[] = [
   {
     title: "Vendors",
     icon: Scale,
-    href: "/business/clients/notaries",
-    adminOnly: true,
-    moduleCode: "clients_notaries",
-    systemArea: "business"
+    systemArea: "business",
+    items: [
+      { name: "Vendor Directory", href: "/business/clients/notaries", adminOnly: true, moduleCode: "clients_notaries" },
+      { name: "Vendor Settlements", href: "/business/clients/orders/notary-payments", adminOnly: true, moduleCode: "clients_orders_notary_payments" }
+    ]
   },
   {
-    title: "Orders",
+    title: "Order Management",
     icon: ShoppingBag,
     systemArea: "business",
     items: [
@@ -255,27 +256,11 @@ const navModules: NavModule[] = [
     ]
   },
   {
-    title: "Settlements",
-    icon: CreditCard,
-    href: "/business/clients/orders/notary-payments",
-    adminOnly: true,
-    moduleCode: "clients_orders_notary_payments",
-    systemArea: "business"
-  },
-  {
     title: "Documents",
     icon: FileText,
     href: "/business/clients/documents",
     adminOnly: true,
     moduleCode: "clients_documents",
-    systemArea: "business"
-  },
-  {
-    title: "Announcements",
-    icon: Megaphone,
-    href: "/business/announcements",
-    adminOnly: true,
-    moduleCode: "clients_announcements",
     systemArea: "business"
   },
   {
@@ -293,6 +278,14 @@ const navModules: NavModule[] = [
     adminOnly: false,
     employeeOnly: true,
     moduleCode: "clients_my",
+    systemArea: "business"
+  },
+  {
+    title: "Announcements",
+    icon: Megaphone,
+    href: "/business/announcements",
+    adminOnly: true,
+    moduleCode: "clients_announcements",
     systemArea: "business"
   }
 ];

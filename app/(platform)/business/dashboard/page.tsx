@@ -18,7 +18,8 @@ import Link from "next/link";
 export default function BusinessDashboard() {
   const { resolvedTheme } = useTheme();
   const glowColor = resolvedTheme === "dark" ? "16, 185, 129" : "148, 163, 184"; // emerald glow for business
-  const { profile } = useUser();
+  const { profile, isAdmin, hasPermission } = useUser();
+  const canAccessServicesCatalog = isAdmin || hasPermission("clients_services", "view") || hasPermission("clients_services", "read");
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -222,7 +223,8 @@ export default function BusinessDashboard() {
 
   const filteredCatalog = catalog.filter(c => 
     (c.job_title || "").toLowerCase().includes(catalogSearch.toLowerCase()) ||
-    (c.pricing_tier || "").toLowerCase().includes(catalogSearch.toLowerCase())
+    (c.job_id || "").toLowerCase().includes(catalogSearch.toLowerCase()) ||
+    (c.description || "").toLowerCase().includes(catalogSearch.toLowerCase())
   );
 
   return (
@@ -465,39 +467,71 @@ export default function BusinessDashboard() {
 
       {activeTab === "catalog" && (
         <div className="space-y-6 animate-in fade-in duration-500">
-          <div className="flex items-center gap-3 bg-card/40 backdrop-blur-xl p-4 rounded-xl border border-border/40 shadow-sm">
+          <div className="flex items-center justify-between gap-3 bg-card/40 backdrop-blur-xl p-4 rounded-xl border border-border/40 shadow-sm flex-wrap">
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search catalog services or tiers..."
+                placeholder="Search catalog services, Job ID, or keywords..."
                 className="pl-8 h-9 text-xs"
                 value={catalogSearch}
                 onChange={(e) => setCatalogSearch(e.target.value)}
               />
             </div>
-            {catalogSearch && (
-              <Button size="sm" variant="ghost" className="text-xs" onClick={() => setCatalogSearch("")}>
-                Clear
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {catalogSearch && (
+                <Button size="sm" variant="ghost" className="text-xs h-9" onClick={() => setCatalogSearch("")}>
+                  Clear
+                </Button>
+              )}
+              {canAccessServicesCatalog && (
+                <Link href="/business/clients/services">
+                  <Button size="sm" variant="outline" className="text-xs h-9 font-semibold gap-1.5 border-border/60">
+                    <Briefcase className="h-3.5 w-3.5 text-emerald-500" />
+                    Manage Catalog & Price List
+                  </Button>
+                </Link>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredCatalog.map((item) => (
-              <div key={item.id} className="p-4 rounded-xl border border-border/50 bg-card/60 backdrop-blur-md shadow-sm hover:shadow-md transition-all duration-300 hover:border-emerald-500/20 flex flex-col justify-between">
+              <div key={item.id} className="p-4 rounded-xl border border-border/50 bg-card/60 backdrop-blur-md shadow-sm hover:shadow-md transition-all duration-300 hover:border-emerald-500/20 flex flex-col justify-between group">
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge variant="outline" className="font-mono font-bold text-[10px] bg-emerald-500/5 border-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5">
-                      Tier: {item.pricing_tier}
+                  <div className="flex items-center justify-between mb-2.5 gap-2">
+                    <Badge variant="outline" className="font-mono font-bold text-xs bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-200 px-2.5 py-0.5 rounded-md">
+                      {item.job_id || `JOB-${item.id}`}
                     </Badge>
-                    <span className="font-mono font-semibold text-[10px] text-muted-foreground">ID: {item.id}</span>
                   </div>
-                  <h3 className="font-bold text-foreground text-sm leading-tight mb-1">{item.job_title}</h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 mb-4">{item.description || "No description available."}</p>
+                  <h3 className="font-bold text-foreground text-sm leading-snug mb-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                    {item.job_title}
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap mb-4">
+                    {item.description || "No description available."}
+                  </p>
                 </div>
-                <div className="flex items-center justify-between border-t border-border/20 pt-3">
-                  <span className="text-[10px] text-muted-foreground font-semibold">Service Group</span>
-                  <span className="text-[11px] font-bold text-foreground">{item.service_line_item || "Consulting"}</span>
+
+                <div className="border-t border-border/20 pt-3 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {item.needs_notary && (
+                      <Badge variant="secondary" className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold border-indigo-500/20 text-[9px] px-1.5 py-0.5">
+                        NOTARY
+                      </Badge>
+                    )}
+                    {item.needs_gov_officer && (
+                      <Badge variant="secondary" className="bg-sky-500/10 text-sky-600 dark:text-sky-400 font-bold border-sky-500/20 text-[9px] px-1.5 py-0.5">
+                        GOV BODY
+                      </Badge>
+                    )}
+                    {item.needs_other_vendors && (
+                      <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border-emerald-500/20 text-[9px] px-1.5 py-0.5">
+                        VENDORS
+                      </Badge>
+                    )}
+                    {!item.needs_notary && !item.needs_gov_officer && !item.needs_other_vendors && (
+                      <span className="text-[10px] text-muted-foreground font-semibold">Standard Service</span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

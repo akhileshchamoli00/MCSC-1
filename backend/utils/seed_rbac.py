@@ -71,14 +71,16 @@ def seed_rbac_data(db: Session):
         {"name": "Companies", "code": "clients_company", "system_area": "business", "submodules": []},
         {"name": "Assigned Orders", "code": "clients_my", "system_area": "business", "submodules": []},
         {"name": "Services", "code": "clients_services", "system_area": "business", "submodules": []},
-        {"name": "Orders", "code": "clients_orders", "system_area": "business", "submodules": [
+        {"name": "Order Management", "code": "clients_orders", "system_area": "business", "submodules": [
             {"name": "Pipeline Orders", "code": "clients_orders_pipeline"},
             {"name": "Active Orders", "code": "clients_orders_active"},
             {"name": "Completed Orders", "code": "clients_orders_completed"},
             {"name": "Cancelled Orders", "code": "clients_orders_cancelled"},
             {"name": "Settlements", "code": "clients_orders_notary_payments"},
         ]},
-        {"name": "Documents", "code": "clients_documents", "system_area": "business", "submodules": []},
+        {"name": "Documents", "code": "clients_documents", "system_area": "business", "submodules": [
+            {"name": "Invoice Folders & Files", "code": "clients_documents_invoices"},
+        ]},
         {"name": "Client Announcements", "code": "clients_announcements", "system_area": "business", "submodules": []},
         {"name": "Accurate Online", "code": "clients_accurate", "system_area": "business", "submodules": []},
         {"name": "Teams", "code": "clients_teams", "system_area": "business", "submodules": []},

@@ -14,16 +14,20 @@ if backend_env.exists():
     load_dotenv(dotenv_path=backend_env, override=True)
 load_dotenv(override=True)
 
-def send_smtp_email(msg: MIMEMultipart, recipient_email: str, description: str = "email") -> bool:
+from typing import Optional, List, Union
+
+def send_smtp_email(msg: MIMEMultipart, recipient_email: str, description: str = "email", cc_emails: Optional[List[str]] = None) -> bool:
     """
-    Sends an outbound email via configured SMTP (reads GMAIL_USER & GMAIL_APP_PASSWORD directly from .env.local).
+    Sends an outbound email via configured SMTP (Amazon SES or Gmail / Custom SMTP).
+    Reads SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SENDER_EMAIL from environment.
+    Supports optional CC recipients.
     """
     if root_env.exists():
         load_dotenv(dotenv_path=root_env, override=True)
     if backend_env.exists():
         load_dotenv(dotenv_path=backend_env, override=True)
 
-    sender_email = os.getenv("SENDER_EMAIL") or os.getenv("GMAIL_USER") or "admin@mcsc.co.id"
+    sender_email = os.getenv("SENDER_EMAIL") or os.getenv("SMTP_USER") or os.getenv("GMAIL_USER") or "admin@mcsc.co.id"
     sender_name = os.getenv("SENDER_NAME", "PT Mandiri Cipta Solusi")
 
     if not msg.get("From"):
@@ -31,33 +35,48 @@ def send_smtp_email(msg: MIMEMultipart, recipient_email: str, description: str =
 
     msg["To"] = recipient_email
 
-    host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    port = int(os.getenv("SMTP_PORT", "587"))
-    user = os.getenv("GMAIL_USER") or os.getenv("SMTP_USER")
-    password = (os.getenv("GMAIL_APP_PASSWORD") or os.getenv("SMTP_PASSWORD") or "").replace(" ", "")
+    clean_cc_list = []
+    if cc_emails:
+        for cc in cc_emails:
+            if not cc or not str(cc).strip():
+                continue
+            cleaned = str(cc).strip()
+            if cleaned.lower() != recipient_email.strip().lower() and cleaned.lower() not in [c.lower() for c in clean_cc_list]:
+                clean_cc_list.append(cleaned)
+        if clean_cc_list:
+            msg["Cc"] = ", ".join(clean_cc_list)
+
+    host = os.getenv("SMTP_HOST") or os.getenv("SES_SMTP_HOST") or "smtp.gmail.com"
+    port = int(os.getenv("SMTP_PORT") or os.getenv("SES_SMTP_PORT") or "587")
+    user = os.getenv("SMTP_USER") or os.getenv("SES_SMTP_USER") or os.getenv("GMAIL_USER")
+    password = (os.getenv("SMTP_PASSWORD") or os.getenv("SES_SMTP_PASSWORD") or os.getenv("GMAIL_APP_PASSWORD") or "").replace(" ", "")
 
     if not host or not user or not password:
-        print(f"WARNING: SMTP credentials (GMAIL_USER / GMAIL_APP_PASSWORD) not found in .env.local. Failed to send {description} to {recipient_email}.")
+        print(f"WARNING: SMTP credentials (SMTP_USER / SMTP_PASSWORD or GMAIL_USER / GMAIL_APP_PASSWORD) not found. Failed to send {description} to {recipient_email}.")
         return False
 
+    is_ses = "amazonaws.com" in host.lower()
+    provider_label = "Amazon SES" if is_ses else f"SMTP ({host})"
+
+    cc_log = f" (CC: {', '.join(clean_cc_list)})" if clean_cc_list else ""
     try:
-        print(f"[SMTP ({host}:{port})] Sending {description} to {recipient_email} from {sender_email}...")
+        print(f"[{provider_label} ({host}:{port})] Sending {description} to {recipient_email}{cc_log} from {sender_email}...")
         if port == 465:
-            with smtplib.SMTP_SSL(host, port, timeout=25) as server:
+            with smtplib.SMTP_SSL(host, port, timeout=90) as server:
                 server.login(user, password)
                 server.send_message(msg)
         else:
-            with smtplib.SMTP(host, port, timeout=25) as server:
+            with smtplib.SMTP(host, port, timeout=90) as server:
                 server.ehlo()
                 server.starttls()
                 server.ehlo()
                 server.login(user, password)
                 server.send_message(msg)
 
-        print(f"[SMTP ({host})] SUCCESS: Successfully delivered {description} to {recipient_email}")
+        print(f"[{provider_label}] SUCCESS: Successfully delivered {description} to {recipient_email}{cc_log}")
         return True
     except Exception as e:
-        print(f"[SMTP ({host})] FAILED to send {description} to {recipient_email}: {str(e)}")
+        print(f"[{provider_label}] FAILED to send {description} to {recipient_email}{cc_log}: {str(e)}")
         return False
 
 def send_welcome_email(employee_email: str, employee_name: str, password: str):
@@ -173,9 +192,9 @@ MCS Consulting HRMS
     return send_smtp_email(msg, employee_email, "password reset email")
 
 
-def send_invoice_attachment_email(recipient_email: str, recipient_name: str, invoice_type: str, pdf_content: bytes, pdf_filename: str, payment_url: str = None):
+def send_invoice_attachment_email(recipient_email: str, recipient_name: str, invoice_type: str, pdf_content: bytes, pdf_filename: str, payment_url: str = None, cc_emails: Optional[List[str]] = None):
     """
-    Send finalized proforma or final invoice attachment to a client, with an optional payment checkout URL.
+    Send finalized proforma or final invoice attachment to a client, with an optional payment checkout URL and CC recipients.
     """
 
 
@@ -407,7 +426,7 @@ def send_invoice_attachment_email(recipient_email: str, recipient_name: str, inv
                 logo_data = f.read()
                 msg_image = MIMEImage(logo_data)
                 msg_image.add_header('Content-ID', '<msc_logo>')
-                msg_image.add_header('Content-Disposition', 'inline', filename="logo.png")
+                msg_image.add_header('Content-Disposition', 'inline')
                 msg.attach(msg_image)
         except Exception as img_err:
             print("Failed to attach logo inline:", img_err)
@@ -418,7 +437,7 @@ def send_invoice_attachment_email(recipient_email: str, recipient_name: str, inv
         part['Content-Disposition'] = f'attachment; filename="{pdf_filename}"'
         msg.attach(part)
 
-    return send_smtp_email(msg, recipient_email, f"{invoice_type} invoice email")
+    return send_smtp_email(msg, recipient_email, f"{invoice_type} invoice email", cc_emails=cc_emails)
 
 
 def send_notary_payment_voucher_email(
@@ -653,7 +672,7 @@ PT Mandiri Cipta Solusi (MCS Consulting)
                 logo_data = f.read()
                 msg_image = MIMEImage(logo_data)
                 msg_image.add_header('Content-ID', '<msc_logo>')
-                msg_image.add_header('Content-Disposition', 'inline', filename="logo.png")
+                msg_image.add_header('Content-Disposition', 'inline')
                 msg.attach(msg_image)
         except Exception as img_err:
             print("Failed to attach logo inline:", img_err)
@@ -870,7 +889,8 @@ def send_final_documents_email(
     company_code: str = None,
     tax_number: str = None,
     zip_password: str = None,
-    zip_filename: str = None
+    zip_filename: str = None,
+    cc_emails: Optional[List[str]] = None
 ):
     """
     Send official delivery email with all final deliverable documents packaged into a simple,
@@ -1193,7 +1213,7 @@ www.mcsc.co.id
                 logo_data = f.read()
                 msg_image = MIMEImage(logo_data)
                 msg_image.add_header('Content-ID', '<msc_logo>')
-                msg_image.add_header('Content-Disposition', 'inline', filename="logo.png")
+                msg_image.add_header('Content-Disposition', 'inline')
                 msg.attach(msg_image)
         except Exception as img_err:
             print("Failed to attach logo inline:", img_err)
@@ -1205,7 +1225,7 @@ www.mcsc.co.id
         zip_part.add_header('Content-Disposition', 'attachment', filename=final_zip_name)
         msg.attach(zip_part)
 
-    return send_smtp_email(msg, recipient_email, f"encrypted final documents ZIP ({doc_count} files) for order {order_number}")
+    return send_smtp_email(msg, recipient_email, f"encrypted final documents ZIP ({doc_count} files) for order {order_number}", cc_emails=cc_emails)
 
 
 def send_company_welcome_verified_email(
@@ -1705,24 +1725,10 @@ www.mcsc.co.id
                 logo_data = f.read()
                 msg_image = MIMEImage(logo_data)
                 msg_image.add_header('Content-ID', '<msc_logo>')
-                msg_image.add_header('Content-Disposition', 'inline', filename="logo.png")
+                msg_image.add_header('Content-Disposition', 'inline')
                 msg.attach(msg_image)
         except Exception as img_err:
             print("Failed to attach logo inline:", img_err)
-
-    # Attach MCSC Card Dark Logo inline (<msc_card_logo>)
-    logo_dark_path = os.path.join(base_dir, "public", "logo-dark.png")
-    if os.path.exists(logo_dark_path):
-        from email.mime.image import MIMEImage
-        try:
-            with open(logo_dark_path, "rb") as f:
-                logo_dark_data = f.read()
-                msg_card_image = MIMEImage(logo_dark_data)
-                msg_card_image.add_header('Content-ID', '<msc_card_logo>')
-                msg_card_image.add_header('Content-Disposition', 'inline', filename="logo-dark.png")
-                msg.attach(msg_card_image)
-        except Exception as img_err:
-            print("Failed to attach dark logo inline:", img_err)
 
     # Attach MCSC Monogram Icon inline (<msc_icon_logo>)
     icon_path = os.path.join(base_dir, "public", "icon.png")
@@ -1733,7 +1739,7 @@ www.mcsc.co.id
                 icon_data = f.read()
                 msg_icon_image = MIMEImage(icon_data)
                 msg_icon_image.add_header('Content-ID', '<msc_icon_logo>')
-                msg_icon_image.add_header('Content-Disposition', 'inline', filename="icon.png")
+                msg_icon_image.add_header('Content-Disposition', 'inline')
                 msg.attach(msg_icon_image)
         except Exception as img_err:
             print("Failed to attach icon inline:", img_err)

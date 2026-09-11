@@ -34,7 +34,9 @@ import {
   X,
   FileCheck,
   Building,
-  FileDown
+  FileDown,
+  Lock,
+  MailCheck
 } from "lucide-react";
 import { toast } from "sonner";
 import { isValidEmail } from "@/components/ui/phone-input";
@@ -317,7 +319,8 @@ function NotaryPaymentsContent() {
   // Open Email Confirmation Modal
   const handleOpenEmailModal = () => {
     if (!selectedVoucherJob) return;
-    setEmailRecipient(selectedNotary?.email || "");
+    const vendorEmail = (selectedNotary?.email || "").trim();
+    setEmailRecipient(vendorEmail);
     setEmailCustomNote("");
     setEmailModalOpen(true);
   };
@@ -325,8 +328,9 @@ function NotaryPaymentsContent() {
   // Execute Send Email
   const handleSendVoucherEmail = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedVoucherJob || !emailRecipient || !isValidEmail(emailRecipient)) {
-      toast.error("Please provide a valid recipient email address (e.g. vendor@example.com).");
+    const vendorEmail = (selectedNotary?.email || "").trim();
+    if (!selectedVoucherJob || !vendorEmail || !isValidEmail(vendorEmail)) {
+      toast.error(`Vendor '${selectedNotary?.name || "Selected Vendor"}' does not have a valid registered email address on file. Please update the vendor profile in the Vendors directory.`);
       return;
     }
 
@@ -407,6 +411,20 @@ function NotaryPaymentsContent() {
         const data = await res.json();
         toast.success(data.detail || "Payment voucher email sent successfully!", { id: toastId });
         setEmailModalOpen(false);
+
+        // Update local jobs and selected job with dispatch tracking
+        if (data.notary_voucher_sent_at) {
+          setSelectedVoucherJob((prev: any) => prev ? {
+            ...prev,
+            notary_voucher_sent_at: data.notary_voucher_sent_at,
+            notary_voucher_sent_to: data.notary_voucher_sent_to || vendorEmail
+          } : null);
+          setJobs((prev: any[]) => prev.map((j) => j.id === selectedVoucherJob.id ? {
+            ...j,
+            notary_voucher_sent_at: data.notary_voucher_sent_at,
+            notary_voucher_sent_to: data.notary_voucher_sent_to || vendorEmail
+          } : j));
+        }
       } else {
         const err = await res.json();
         toast.error(err.detail || "Failed to send payment voucher email", { id: toastId });
@@ -864,6 +882,16 @@ function NotaryPaymentsContent() {
                                     <span>{j.notary_payment_ref}</span>
                                   </div>
                                 )}
+                                {j.notary_voucher_sent_at && (
+                                  <Badge
+                                    variant="outline"
+                                    className="bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30 text-[9px] font-mono flex items-center gap-1 mt-1"
+                                    title={`Voucher emailed to ${j.notary_voucher_sent_to || 'vendor'} on ${new Date(j.notary_voucher_sent_at).toLocaleDateString()}`}
+                                  >
+                                    <MailCheck className="h-2.5 w-2.5 text-sky-600 dark:text-sky-400" />
+                                    <span>Voucher Sent</span>
+                                  </Badge>
+                                )}
                               </div>
                             ) : (
                               <span className="text-muted-foreground/30 font-medium italic">-</span>
@@ -1121,6 +1149,11 @@ function NotaryPaymentsContent() {
                 </div>
 
                 <div className="flex items-center gap-2.5">
+                  {selectedVoucherJob?.notary_voucher_sent_at && (
+                    <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 gap-1.5 px-3 py-1.5 text-xs font-bold font-mono" title={`Voucher dispatched on ${new Date(selectedVoucherJob.notary_voucher_sent_at).toLocaleDateString()} to ${selectedVoucherJob.notary_voucher_sent_to || 'vendor'}`}>
+                      <MailCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Dispatched {new Date(selectedVoucherJob.notary_voucher_sent_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </Badge>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -1144,10 +1177,17 @@ function NotaryPaymentsContent() {
                   <Button
                     size="sm"
                     onClick={handleOpenEmailModal}
-                    className="font-bold gap-1.5"
+                    variant={selectedVoucherJob?.notary_voucher_sent_at ? "outline" : "default"}
+                    className={`font-bold gap-1.5 ${
+                      selectedVoucherJob?.notary_voucher_sent_at ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20" : ""
+                    }`}
                   >
-                    <Mail className="h-4 w-4" />
-                    <span>Send Email</span>
+                    {selectedVoucherJob?.notary_voucher_sent_at ? (
+                      <MailCheck className="h-4 w-4" />
+                    ) : (
+                      <Mail className="h-4 w-4" />
+                    )}
+                    <span>{selectedVoucherJob?.notary_voucher_sent_at ? "Resend Email" : "Send Email"}</span>
                   </Button>
 
                   <Button
@@ -1365,17 +1405,52 @@ function NotaryPaymentsContent() {
             </DialogHeader>
 
             <div className="space-y-4 py-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Recipient Email Address <span className="text-rose-500">*</span>
-                </label>
-                <EmailInput 
-                  required
-                  value={emailRecipient}
-                  onChange={(val) => setEmailRecipient(val)}
-                  placeholder="vendor@example.com"
-                />
-              </div>
+              {/* Prior dispatch notice if previously sent */}
+              {selectedVoucherJob?.notary_voucher_sent_at && (
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2.5">
+                  <MailCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    A payment voucher was previously emailed on <strong>{new Date(selectedVoucherJob.notary_voucher_sent_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</strong> to <strong>{selectedVoucherJob.notary_voucher_sent_to || selectedNotary?.email}</strong>. Sending now will deliver a fresh copy.
+                  </div>
+                </div>
+              )}
+
+              {/* Locked recipient email display */}
+              {selectedNotary?.email ? (
+                <div className="p-3.5 bg-muted/40 border border-border/80 rounded-xl space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Lock className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                      Locked Recipient Email
+                    </span>
+                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-[10px] font-semibold py-0 px-2">
+                      Registered Vendor Email
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <Mail className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span className="font-mono font-bold text-sm text-foreground break-all">
+                      {selectedNotary.email}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground pt-0.5">
+                    Locked to prevent errors. Payment vouchers can only be dispatched to the verified email address registered on this vendor's profile.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 text-amber-800 dark:text-amber-300 text-xs">
+                  <div className="flex items-center gap-2 font-bold text-sm text-amber-700 dark:text-amber-400">
+                    <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                    No Registered Email on File
+                  </div>
+                  <p>
+                    Vendor <strong>{selectedNotary?.name}</strong> does not have an email address registered in the system.
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Please add an email address in the Vendors directory before dispatching payment vouchers.
+                  </p>
+                </div>
+              )}
 
               <div className="p-3 bg-muted/30 border rounded-xl text-xs space-y-1.5">
                 <div className="flex justify-between">
@@ -1418,11 +1493,20 @@ function NotaryPaymentsContent() {
               <Button type="button" variant="outline" onClick={() => setEmailModalOpen(false)} disabled={sendingEmail}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={sendingEmail} className="font-bold gap-2">
+              <Button 
+                type="submit" 
+                disabled={sendingEmail || !selectedNotary?.email} 
+                className={`font-bold gap-2 ${selectedVoucherJob?.notary_voucher_sent_at ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}`}
+              >
                 {sendingEmail ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Sending Email...
+                  </>
+                ) : selectedVoucherJob?.notary_voucher_sent_at ? (
+                  <>
+                    <MailCheck className="h-4 w-4" />
+                    Resend Voucher Email
                   </>
                 ) : (
                   <>

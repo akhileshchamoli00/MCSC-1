@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
@@ -402,6 +402,8 @@ def get_notary_payment_history(notary_id: int, db: Session = Depends(database.ge
             "notary_payment_date": j.notary_payment_date.isoformat() if j.notary_payment_date else None,
             "notary_payment_ref": j.notary_payment_ref,
             "notary_payout_id": j.notary_payout_id,
+            "notary_voucher_sent_at": j.notary_voucher_sent_at.isoformat() if j.notary_voucher_sent_at else None,
+            "notary_voucher_sent_to": j.notary_voucher_sent_to,
             "created_at": j.created_at.isoformat() if j.created_at else None
         })
         
@@ -624,9 +626,13 @@ def send_notary_voucher_email(
     if not notary:
         raise HTTPException(status_code=404, detail="Notary record not found")
 
-    target_email = (req.recipient_email if req and req.recipient_email else "").strip() or (notary.email or "")
+    # Strictly lock email dispatch to the registered vendor email on file
+    target_email = (notary.email or "").strip()
     if not target_email:
-        raise HTTPException(status_code=400, detail="No recipient email specified and notary does not have an email on file.")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Vendor '{notary.name}' does not have a registered email address on file. Please update the vendor profile in the Vendors directory."
+        )
 
     from utils.email_service import send_notary_payment_voucher_email
 
@@ -675,6 +681,15 @@ def send_notary_voucher_email(
     if not success:
         raise HTTPException(status_code=500, detail="Failed to send email. Please verify server email credentials.")
 
-    return {"detail": f"Payment voucher successfully emailed to {target_email}!"}
+    now = datetime.now(timezone.utc)
+    job.notary_voucher_sent_at = now
+    job.notary_voucher_sent_to = target_email
+    db.commit()
+
+    return {
+        "detail": f"Payment voucher successfully emailed to {target_email}!",
+        "notary_voucher_sent_at": now.isoformat(),
+        "notary_voucher_sent_to": target_email
+    }
 
 

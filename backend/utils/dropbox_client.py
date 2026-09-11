@@ -5,20 +5,28 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+_dbx_client = None
+
 def get_dropbox_client():
+    global _dbx_client
+    if _dbx_client is not None:
+        return _dbx_client
+
     refresh_token = os.getenv("DROPBOX_REFRESH_TOKEN")
     app_key = os.getenv("DROPBOX_APP_KEY")
     app_secret = os.getenv("DROPBOX_APP_SECRET")
     access_token = os.getenv("DROPBOX_ACCESS_TOKEN")
     
     if refresh_token and app_key and app_secret:
-        return dropbox.Dropbox(
+        _dbx_client = dropbox.Dropbox(
             oauth2_refresh_token=refresh_token,
             app_key=app_key,
             app_secret=app_secret
         )
+        return _dbx_client
     elif access_token:
-        return dropbox.Dropbox(access_token)
+        _dbx_client = dropbox.Dropbox(access_token)
+        return _dbx_client
     else:
         raise ValueError("Dropbox credentials (DROPBOX_REFRESH_TOKEN, DROPBOX_APP_KEY, DROPBOX_APP_SECRET) not found in environment")
 

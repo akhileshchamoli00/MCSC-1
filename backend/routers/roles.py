@@ -11,6 +11,7 @@ router = APIRouter(
 )
 
 @router.get("", response_model=List[schemas.RoleResponse])
+@router.get("/", response_model=List[schemas.RoleResponse], include_in_schema=False)
 def get_roles(
     skip: int = 0, 
     limit: int = 100, 
@@ -30,7 +31,7 @@ def get_roles(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied. Required permission 'roles_list:view' or 'access_control_matrix:view' not granted."
         )
-    roles = db.query(models.Role).order_by(models.Role.name).offset(skip).limit(limit).all()
+    roles = db.query(models.Role).order_by(models.Role.id.asc()).offset(skip).limit(limit).all()
     return roles
 
 @router.get("/{role_id}", response_model=schemas.RoleResponse)

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { 
   FileText, 
   Search, 
@@ -34,10 +35,19 @@ import { toast } from "sonner";
 import { useUser } from "@/contexts/user-context";
 
 export default function ClientServicesPage() {
-  const { isAdmin, hasPermission } = useUser();
+  const router = useRouter();
+  const { isAdmin, hasPermission, loading: userLoading } = useUser();
+  const canView = isAdmin || hasPermission("clients_services", "view") || hasPermission("clients_services", "read");
   const canCreate = isAdmin || hasPermission("clients_services", "create");
   const canEdit = isAdmin || hasPermission("clients_services", "edit");
   const canDelete = isAdmin || hasPermission("clients_services", "delete");
+
+  useEffect(() => {
+    if (!userLoading && !canView) {
+      toast.error("You do not have permission to view the service catalog & price list.");
+      router.push("/business/dashboard");
+    }
+  }, [userLoading, canView, router]);
 
   const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -122,11 +132,11 @@ export default function ClientServicesPage() {
     return "IDR " + new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(val);
   };
 
-  if (loading) {
+  if (loading || userLoading || !canView) {
     return (
       <div className="flex h-64 items-center justify-center gap-3 text-muted-foreground">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm font-medium">Loading service catalog & price list...</p>
+        <p className="text-sm font-medium">Verifying authorization & loading catalog...</p>
       </div>
     );
   }

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Shield, Plus, Loader2, Eye, Edit, ShieldCheck, Users, Lock } from "lucide-react";
+import { Shield, Plus, Loader2, Edit, ShieldCheck, Users, Lock } from "lucide-react";
 import { useState, useEffect } from "react";
 
 export default function RolesPage() {
@@ -16,7 +16,8 @@ export default function RolesPage() {
     const fetchRoles = async () => {
       try {
         const token = localStorage.getItem("hrms_token");
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/roles/`, {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+        const res = await fetch(`${apiUrl}/api/roles`, {
           headers: {
             "Authorization": `Bearer ${token}`
           }
@@ -27,7 +28,8 @@ export default function RolesPage() {
         }
         
         const data = await res.json();
-        setRoles(data);
+        const sortedRoles = Array.isArray(data) ? [...data].sort((a: any, b: any) => (Number(a.id) || 0) - (Number(b.id) || 0)) : [];
+        setRoles(sortedRoles);
       } catch (err) {
         console.error("Error fetching roles:", err);
         setError("Could not load roles.");
@@ -70,7 +72,7 @@ export default function RolesPage() {
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Admin Tiers</p>
-              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{roles.filter(r => (r.name || "").toLowerCase().includes("admin")).length}</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{roles.filter(r => ["admin", "super admin", "superadmin"].includes((r.name || "").trim().toLowerCase())).length}</p>
             </div>
           </div>
 
@@ -81,7 +83,7 @@ export default function RolesPage() {
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Staff Roles</p>
-              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{roles.filter(r => !(r.name || "").toLowerCase().includes("admin")).length}</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{roles.filter(r => !["admin", "super admin", "superadmin"].includes((r.name || "").trim().toLowerCase())).length}</p>
             </div>
           </div>
 
@@ -111,10 +113,10 @@ export default function RolesPage() {
             <table className="w-full text-sm text-left">
               <thead className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
                 <tr>
-                  <th className="px-5 py-3.5">Role ID</th>
-                  <th className="px-5 py-3.5">Role Name</th>
-                  <th className="px-5 py-3.5">Description</th>
-                  <th className="px-5 py-3.5 text-right">Actions</th>
+                  <th className="px-5 py-3.5 w-24">Role ID</th>
+                  <th className="px-5 py-3.5 w-48">Role Name</th>
+                  <th className="px-5 py-3.5">Access Scope & Description</th>
+                  <th className="px-5 py-3.5 w-28 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/30">
@@ -141,26 +143,30 @@ export default function RolesPage() {
                 ) : (
                   paginatedRoles.map((role) => (
                     <tr key={role.id} className="hover:bg-muted/40 transition-colors">
-                      <td className="px-5 py-4">
-                        <span className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2.5 py-0.5 rounded-md inline-block">
+                      <td className="px-5 py-4 align-top">
+                        <span className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2.5 py-1 rounded-md inline-block">
                           #{role.id}
                         </span>
                       </td>
-                      <td className="px-5 py-4 font-semibold text-foreground">
-                        {role.name}
+                      <td className="px-5 py-4 align-top font-semibold text-foreground text-sm">
+                        <div className="flex flex-col gap-1">
+                          <span>{role.name}</span>
+                          {["admin", "super admin", "superadmin"].includes((role.name || "").trim().toLowerCase()) && (
+                            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full w-fit">
+                              Admin Tier
+                            </span>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-5 py-4 text-muted-foreground text-xs">
-                        {role.description || "No description provided."}
+                      <td className="px-5 py-4 align-top text-muted-foreground text-xs leading-relaxed">
+                        <p className="font-normal text-zinc-700 dark:text-zinc-300">
+                          {role.description || "No description provided."}
+                        </p>
                       </td>
-                      <td className="px-5 py-4 text-right space-x-1.5">
-                        <Link href={`/roles/${role.id}`}>
-                          <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs font-semibold rounded-lg">
-                            <Eye className="h-3.5 w-3.5" /> View
-                          </Button>
-                        </Link>
-                        <Link href={`/roles/${role.id}/edit`}>
-                          <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs font-semibold rounded-lg">
-                            <Edit className="h-3.5 w-3.5" /> Edit
+                      <td className="px-5 py-4 align-top text-right">
+                        <Link href={`/hrms/roles/${role.id}/edit`}>
+                          <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs font-semibold rounded-lg hover:bg-muted text-foreground">
+                            <Edit className="h-3.5 w-3.5 text-emerald-500" /> Edit
                           </Button>
                         </Link>
                       </td>

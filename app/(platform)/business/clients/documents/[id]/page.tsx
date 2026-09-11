@@ -451,7 +451,18 @@ export default function CompanyDocumentsManagementPage() {
       if (role === "CLIENT") {
         router.push("/client/dashboard");
       } else {
-        router.push("/business/clients/documents");
+        try {
+          const cachedPerms = typeof window !== "undefined" ? localStorage.getItem("hrms_permissions") : null;
+          const perms: string[] = cachedPerms ? JSON.parse(cachedPerms) : [];
+          const hasDocsView = perms.includes("clients_documents:view") || perms.includes("*:*");
+          if (hasDocsView) {
+            router.push("/business/clients/documents");
+          } else {
+            router.push("/business/assigned-orders");
+          }
+        } catch {
+          router.push("/business/assigned-orders");
+        }
       }
     }
   };

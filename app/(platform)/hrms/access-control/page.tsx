@@ -119,10 +119,11 @@ export default function AccessControlPage() {
         }
 
         const rolesData = await rolesRes.json();
+        const sortedRoles = Array.isArray(rolesData) ? [...rolesData].sort((a: any, b: any) => (Number(a.id) || 0) - (Number(b.id) || 0)) : [];
         const modulesData = await modulesRes.json();
         const permsData = await permsRes.json();
 
-        setRoles(rolesData);
+        setRoles(sortedRoles);
         setModules(modulesData);
         setPermissions(permsData);
 
@@ -134,8 +135,8 @@ export default function AccessControlPage() {
         setExpandedModules(initialExpanded);
 
         // Auto-select first role if available
-        if (rolesData.length > 0) {
-          setSelectedRoleId(rolesData[0].id.toString());
+        if (sortedRoles.length > 0) {
+          setSelectedRoleId(sortedRoles[0].id.toString());
         }
       } catch (err) {
         console.error(err);

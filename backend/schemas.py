@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, List
+from typing import Optional, List, Union
 from datetime import datetime, date
 
 class UserBase(BaseModel):
@@ -846,6 +846,8 @@ class ClientCompanyResponse(ClientCompanyBase):
     accurate_customer_no: Optional[str] = None
     accurate_sync_status: Optional[str] = "NOT_SYNCED"
     accurate_last_synced_at: Optional[datetime] = None
+    invitation_sent_at: Optional[datetime] = None
+    invitation_sent_to: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -953,6 +955,17 @@ class ClientOrderResponse(BaseModel):
     accurate_sync_status: Optional[str] = "NOT_SYNCED"
     accurate_sync_error: Optional[str] = None
     accurate_last_synced_at: Optional[datetime] = None
+    proforma_sent_at: Optional[datetime] = None
+    proforma_sent_to: Optional[str] = None
+    final_invoice_sent_at: Optional[datetime] = None
+    final_invoice_sent_to: Optional[str] = None
+    last_invoice_sent_at: Optional[datetime] = None
+    last_invoice_sent_to: Optional[str] = None
+    invoice_delivery_channel: Optional[str] = None
+    deliverables_sent_at: Optional[datetime] = None
+    deliverables_sent_to: Optional[str] = None
+    notary_voucher_sent_at: Optional[datetime] = None
+    notary_voucher_sent_to: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -1558,8 +1571,8 @@ class AccurateTestConnectionResponse(BaseModel):
 
 
 class AccurateManualSyncRequest(BaseModel):
-    order_id: int
-    sync_type: str = "AUTO" # AUTO | CUSTOMER | PROFORMA_SO | SALES_INVOICE | SALES_RECEIPT
+    order_id: Optional[Union[int, str]] = None
+    sync_type: Optional[str] = "AUTO" # AUTO | CUSTOMER | PROFORMA_SO | SALES_INVOICE | SALES_RECEIPT
 
 
 class AccurateManualSyncResponse(BaseModel):

@@ -402,20 +402,74 @@ def run_migrations():
                    OR message ILIKE 'Final documents (%have been emailed to client%'
                    OR message ILIKE 'Amount Received / Proforma Paid manually updated%'
             """))
-            # Ensure all messages from client users are channel='CLIENT'
-            conn.execute(text("""
-                UPDATE client_order_progress
-                SET channel = 'CLIENT'
-                WHERE user_id IN (
-                    SELECT u.id FROM users u
-                    JOIN roles r ON u.role_id = r.id
-                    WHERE UPPER(r.name) = 'CLIENT'
-                )
-            """))
             conn.commit()
             print("Updated client messages and automated lifecycle & payment status messages to channel='CLIENT'.")
         except Exception as e:
             conn.rollback()
+
+        # Add invitation tracking columns to client_companies
+        for col, col_type in [("invitation_sent_at", "TIMESTAMP"), ("invitation_sent_to", "VARCHAR(255)")]:
+            try:
+                conn.execute(text(f"ALTER TABLE client_companies ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                print(f"Added column '{col}' to 'client_companies' table.")
+            except Exception as e:
+                conn.rollback()
+                handle_migration_error(col, "client_companies", e)
+
+        # Add invoice and deliverables dispatch tracking columns to client_orders
+        order_dispatch_cols = [
+            ("proforma_sent_at", "TIMESTAMP"),
+            ("proforma_sent_to", "VARCHAR(255)"),
+            ("final_invoice_sent_at", "TIMESTAMP"),
+            ("final_invoice_sent_to", "VARCHAR(255)"),
+            ("last_invoice_sent_at", "TIMESTAMP"),
+            ("last_invoice_sent_to", "VARCHAR(255)"),
+            ("invoice_delivery_channel", "VARCHAR(50)"),
+            ("deliverables_sent_at", "TIMESTAMP"),
+            ("deliverables_sent_to", "VARCHAR(255)"),
+            ("notary_voucher_sent_at", "TIMESTAMP"),
+            ("notary_voucher_sent_to", "VARCHAR(255)")
+        ]
+        for col, col_type in order_dispatch_cols:
+            try:
+                conn.execute(text(f"ALTER TABLE client_orders ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                print(f"Added column '{col}' to 'client_orders' table.")
+            except Exception as e:
+                conn.rollback()
+                handle_migration_error(col, "client_orders", e)
+
+    # Update RBAC permissions and role access descriptions
+    try:
+        from database import SessionLocal
+        from utils.seed_rbac import seed_rbac_data
+        import models
+        with SessionLocal() as db_session:
+            seed_rbac_data(db_session)
+            
+            # Ensure Order Management module name is updated in DB
+            order_mod = db_session.query(models.Module).filter(models.Module.code == "clients_orders").first()
+            if order_mod:
+                order_mod.name = "Order Management"
+                
+            role_descriptions = {
+                1: ("Super Admin", "Full unrestricted access across all platform modules: HRMS, Business & Client Operations, End-to-End Order Management, Finance, User Management, Access Control Matrix, and System Settings."),
+                6: ("Employee", "Self-Service HRMS & Assigned Orders: Attendance check-in/out, Timesheets submission, Leave requests, Personal Payslips, Employee Profile, Assigned Client Orders view, and Company Chat."),
+                14: ("ADMIN", "System & Order Administration: Comprehensive management of HRMS modules, Employee records, Payroll processing, Leave approvals, Business Operations, Full Order Management & Pipelines, and Platform Configurations."),
+                16: ("CLIENT", "Client Portal & Order Tracking: View registered company profile, track placed Client Orders in real-time, inspect milestone progress & deliverables, download invoices, and communicate via Client Chat."),
+                20: ("Employee Admin", "Business Operations & HRMS Oversight: Full management (View, Create, Edit, Delete) of Client Services, Client Companies, and Documents & Invoices. Includes administrative oversight of Attendance Management and Asset Management, plus HRMS Self-Service access (Profile, Attendance, Timesheets, Leaves, Payslips, Assets)."),
+                21: ("MEMBER", "Public Portal & Service Ordering: Browse corporate services catalog, submit online service applications, request consultations, and track submitted service orders."),
+                22: ("Processing Team", "Order Management & Assigned Orders: Access to Business Platform for Order Management (view), full management of Assigned Client Orders (create, view, edit, delete), Order Documents & Invoices (create, edit, delete), and Client Chat. Includes HRMS Self-Service access for Attendance, Timesheets, Leaves, Payslips, Profile, and Assets.")
+            }
+            
+            for r_id, (r_name, r_desc) in role_descriptions.items():
+                db_role = db_session.query(models.Role).filter((models.Role.id == r_id) | (models.Role.name == r_name) | (models.Role.name == "Order Management Team")).first()
+                if db_role:
+                    db_role.description = r_desc
+            db_session.commit()
+    except Exception as e:
+        print(f"Error updating role descriptions in migrations: {e}")
 
     print("Migration check complete.")
 

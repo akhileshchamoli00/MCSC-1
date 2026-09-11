@@ -532,6 +532,10 @@ class ClientCompany(Base):
     accurate_sync_status = Column(String, default="NOT_SYNCED") # NOT_SYNCED, SYNCED, FAILED
     accurate_last_synced_at = Column(DateTime(timezone=True), nullable=True)
     
+    # Invitation Tracking
+    invitation_sent_at = Column(DateTime(timezone=True), nullable=True)
+    invitation_sent_to = Column(String, nullable=True)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
@@ -772,6 +776,19 @@ class ClientOrder(Base):
     accurate_sync_status = Column(String, default="NOT_SYNCED") # NOT_SYNCED, SO_CREATED, INV_CREATED, PAID, FAILED
     accurate_sync_error = Column(String, nullable=True)
     accurate_last_synced_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Invoice & Deliverables Email Dispatch Tracking
+    proforma_sent_at = Column(DateTime(timezone=True), nullable=True)
+    proforma_sent_to = Column(String, nullable=True)
+    final_invoice_sent_at = Column(DateTime(timezone=True), nullable=True)
+    final_invoice_sent_to = Column(String, nullable=True)
+    last_invoice_sent_at = Column(DateTime(timezone=True), nullable=True)
+    last_invoice_sent_to = Column(String, nullable=True)
+    invoice_delivery_channel = Column(String, nullable=True)
+    deliverables_sent_at = Column(DateTime(timezone=True), nullable=True)
+    deliverables_sent_to = Column(String, nullable=True)
+    notary_voucher_sent_at = Column(DateTime(timezone=True), nullable=True)
+    notary_voucher_sent_to = Column(String, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
