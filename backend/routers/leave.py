@@ -326,8 +326,8 @@ def delete_leave_request(request_id: int, db: Session = Depends(database.get_db)
         db.add(audit)
 
     if leave_req.attachment_url:
-        from storage import delete_file_from_supabase
-        delete_file_from_supabase(leave_req.attachment_url, "hrms-documents")
+        from storage import delete_file
+        delete_file(leave_req.attachment_url, "hrms-documents")
 
     db.delete(leave_req)
     db.commit()
@@ -730,7 +730,7 @@ async def upload_leave_attachment(id: int, file: UploadFile = File(...), db: Ses
     if not leave_req:
         raise HTTPException(status_code=404, detail="Leave request not found or not owned by user")
     
-    from storage import upload_file_to_supabase
+    from storage import upload_file
     from utils.file_sanitizer import validate_and_sanitize_file
     
     file_bytes = await file.read()
@@ -744,7 +744,7 @@ async def upload_leave_attachment(id: int, file: UploadFile = File(...), db: Ses
         strip_exif=True
     )
         
-    file_url = upload_file_to_supabase(sanitized_bytes, f"medcert_{secure_filename}", "hrms-documents")
+    file_url = upload_file(sanitized_bytes, f"medcert_{secure_filename}", "hrms-documents")
     
     leave_req.attachment_url = file_url
     db.commit()

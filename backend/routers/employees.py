@@ -168,7 +168,7 @@ async def upload_employee_document(
     if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "employees_all", "edit", db) or (is_own_profile and auth.has_permission(current_user, "employees_profile", "edit", db))):
         raise HTTPException(status_code=403, detail="Not authorized to upload employee documents")
 
-    from storage import upload_file_to_supabase
+    from storage import upload_file
     employee = db.query(models.Employee).filter(models.Employee.id == employee_id).first()
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
@@ -186,7 +186,7 @@ async def upload_employee_document(
     new_filename = f"{emp_name_clean}_{timestamp}_{orig_name_clean}.{file_ext}" if file_ext else f"{emp_name_clean}_{timestamp}_{orig_name_clean}"
 
     file_bytes = await file.read()
-    file_url = upload_file_to_supabase(file_bytes, new_filename, "hrms-documents")
+    file_url = upload_file(file_bytes, new_filename, "hrms-documents")
     
     new_doc = models.EmployeeDocument(
         employee_id=employee_id,
@@ -211,7 +211,7 @@ async def upload_employee_photo(
     if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "employees_all", "edit", db) or (is_own_profile and auth.has_permission(current_user, "employees_profile", "edit", db))):
         raise HTTPException(status_code=403, detail="Not authorized to upload employee photo")
 
-    from storage import upload_public_file_to_supabase
+    from storage import upload_public_file
     from utils.file_sanitizer import validate_and_sanitize_file
 
     employee = db.query(models.Employee).filter(models.Employee.id == employee_id).first()
@@ -226,7 +226,7 @@ async def upload_employee_photo(
         strip_exif=True
     )
     
-    file_url = upload_public_file_to_supabase(sanitized_bytes, f"photo_{secure_filename}", "profile-photos")
+    file_url = upload_public_file(sanitized_bytes, f"photo_{secure_filename}", "profile-photos")
     employee.profile_photo = file_url
     
     db.commit()
@@ -246,9 +246,9 @@ def delete_employee_document(employee_id: int, document_id: int, db: Session = D
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
         
-    from storage import delete_file_from_supabase
+    from storage import delete_file
     if doc.file_url:
-        delete_file_from_supabase(doc.file_url, "hrms-documents")
+        delete_file(doc.file_url, "hrms-documents")
         
     db.delete(doc)
     db.commit()

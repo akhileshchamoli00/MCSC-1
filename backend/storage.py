@@ -1,119 +1,91 @@
 import os
 import uuid
+import shutil
 from dotenv import load_dotenv
-from supabase import create_client, Client
 
-# Load environment variables from .env.local
+# Load environment variables from .env.local / .env
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env.local'))
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+# Persistent upload directory outside the codebase on AWS, or local uploads in development
+DEFAULT_UPLOAD_DIR = "/var/data/mcsc/uploads" if os.name != "nt" and os.path.exists("/var/data") else os.path.join(os.path.dirname(__file__), "uploads")
+UPLOAD_DIR = os.environ.get("UPLOAD_DIR", DEFAULT_UPLOAD_DIR)
 
-# Initialize the Supabase client if credentials exist
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-else:
-    supabase = None
-
-def upload_file_to_supabase(file_bytes: bytes, filename: str, bucket_name: str = "hrms-documents") -> str:
-    """
-    Uploads a file (bytes) to Supabase Storage and returns its signed URL or public URL.
-    """
-    if not supabase:
-        print("Warning: SUPABASE_URL or SUPABASE_KEY is missing. Cannot upload to Supabase.")
-        return f"/uploads/{filename}"
-
-    # Use the provided filename as it's already sanitized and unique
-    unique_filename = filename
-    
+# Ensure base upload directories exist
+for subfolder in [
+    "profile-photos",
+    "logos",
+    "documents",
+    "hrms-documents",
+    "client-documents",
+    "client_documents",
+    "chat_attachments",
+]:
     try:
-        # Upload the file to the specified bucket
-        supabase.storage.from_(bucket_name).upload(
-            path=unique_filename,
-            file=file_bytes,
-            file_options={"content-type": "application/octet-stream"}
-        )
-        # Return stored path directly (signed URL will be generated dynamically on read)
-        return unique_filename
-    except Exception as e:
-        print(f"Error uploading to Supabase: {e}")
-        raise e
+        os.makedirs(os.path.join(UPLOAD_DIR, subfolder), exist_ok=True)
+    except Exception:
+        pass
 
-def upload_public_file_to_supabase(file_bytes: bytes, filename: str, bucket_name: str = "profile-photos") -> str:
+
+def save_file_locally(file_bytes: bytes, filename: str, subfolder: str = "documents") -> str:
     """
-    Uploads a public asset (e.g. profile photo or logo) to Supabase Public Bucket and returns permanent public URL.
+    Saves binary content to the persistent disk storage outside the code repository.
+    Returns the public web URL path: `/uploads/<subfolder>/<filename>`.
     """
-    if not supabase:
-        print("Warning: SUPABASE_URL or SUPABASE_KEY is missing. Cannot upload to Supabase.")
-        return f"/uploads/{filename}"
+    target_dir = os.path.join(UPLOAD_DIR, subfolder)
+    os.makedirs(target_dir, exist_ok=True)
+    file_path = os.path.join(target_dir, filename)
+    with open(file_path, "wb") as f:
+        f.write(file_bytes)
+    return f"/uploads/{subfolder}/{filename}"
 
-    try:
-        supabase.storage.from_(bucket_name).upload(
-            path=filename,
-            file=file_bytes,
-            file_options={"content-type": "image/jpeg"}
-        )
-        return supabase.storage.from_(bucket_name).get_public_url(filename)
-    except Exception as e:
-        print(f"Error uploading public file to Supabase: {e}")
-        try:
-            return supabase.storage.from_(bucket_name).get_public_url(filename)
-        except Exception:
-            raise e
 
-def get_signed_file_url(file_url_or_path: str, bucket_name: str = "hrms-documents", expires_in: int = 900) -> str:
+def upload_file(file_bytes: bytes, filename: str, bucket_name: str = "hrms-documents") -> str:
     """
-    Generates a temporary signed URL (valid for `expires_in` seconds, default 15 min / 900s)
-    for private bucket files.
+    Uploads a file directly to persistent disk storage.
     """
-    if not supabase or not file_url_or_path:
-        return file_url_or_path or ""
+    return save_file_locally(file_bytes, filename, bucket_name)
 
-    if (file_url_or_path.startswith("/uploads/") or 
-        "/profile-photos/" in file_url_or_path or 
-        "/object/public/" in file_url_or_path or 
-        bucket_name == "profile-photos"):
-        return file_url_or_path
 
-    try:
-        # Extract relative path inside bucket if full URL is passed
-        file_path = file_url_or_path
-        if f"/{bucket_name}/" in file_url_or_path:
-            file_path = file_url_or_path.split(f"/{bucket_name}/")[-1].split("?")[0]
-        elif file_url_or_path.startswith("http"):
-            file_path = file_url_or_path.split("/")[-1].split("?")[0]
-
-        res = supabase.storage.from_(bucket_name).create_signed_url(file_path, expires_in)
-        if isinstance(res, dict):
-            return res.get("signedUrl") or res.get("signed_url") or file_url_or_path
-        elif hasattr(res, "signed_url"):
-            return getattr(res, "signed_url")
-        elif hasattr(res, "get"):
-            return res.get("signedUrl") or res.get("signed_url") or file_url_or_path
-        return file_url_or_path
-    except Exception as e:
-        err_str = str(e)
-        if "Object not found" not in err_str and "404" not in err_str:
-            print(f"Error generating signed URL: {e}")
-        return file_url_or_path
-
-def delete_file_from_supabase(file_url: str, bucket_name: str = "hrms-documents") -> bool:
+def upload_public_file(file_bytes: bytes, filename: str, bucket_name: str = "profile-photos") -> str:
     """
-    Deletes a file from Supabase Storage given its URL or file path.
+    Uploads a public asset (e.g. profile photo or company logo) directly to persistent disk storage.
     """
-    if not supabase or not file_url:
-        print("Warning: Missing Supabase credentials or file_url.")
+    return save_file_locally(file_bytes, filename, bucket_name)
+
+
+def get_file_url(file_url_or_path: str, bucket_name: str = "hrms-documents", expires_in: int = 900) -> str:
+    """
+    Returns the URL path for accessing the file.
+    """
+    if not file_url_or_path:
+        return ""
+    return file_url_or_path
+
+
+def delete_file(file_url: str, bucket_name: str = "hrms-documents") -> bool:
+    """
+    Deletes a file from persistent disk storage.
+    """
+    if not file_url:
         return False
 
-    try:
-        if f"/{bucket_name}/" in file_url:
-            file_path = file_url.split(f"/{bucket_name}/")[-1].split("?")[0]
-            supabase.storage.from_(bucket_name).remove([file_path])
-            return True
-        elif not file_url.startswith("http"):
-            supabase.storage.from_(bucket_name).remove([file_url.split("?")[0]])
-            return True
-        return False
-    except Exception as e:
-        print(f"Error deleting from Supabase: {e}")
-        return False
+    if file_url.startswith("/uploads/"):
+        rel_path = file_url.replace("/uploads/", "")
+        local_path = os.path.join(UPLOAD_DIR, rel_path)
+        if os.path.exists(local_path):
+            try:
+                os.remove(local_path)
+                return True
+            except Exception as e:
+                print(f"Error removing local file {local_path}: {e}")
+                return False
+    return False
+
+
+# Legacy function aliases for seamless backward compatibility across routers
+upload_file_to_supabase = upload_file
+upload_public_file_to_supabase = upload_public_file
+get_signed_file_url = get_file_url
+delete_file_from_supabase = delete_file
+

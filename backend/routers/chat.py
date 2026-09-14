@@ -312,9 +312,9 @@ def get_or_create_conversation(payload: dict, db: Session = Depends(database.get
 
 @router.post("/upload")
 async def upload_chat_attachment(file: UploadFile = File(...), db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    from storage import upload_file_to_supabase
+    from storage import upload_file
     
     file_bytes = await file.read()
-    file_url = upload_file_to_supabase(file_bytes, file.filename, "hrms-documents")
+    file_url = upload_file(file_bytes, file.filename, "chat_attachments")
         
     return {"attachment_url": file_url, "filename": file.filename}

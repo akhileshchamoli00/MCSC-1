@@ -5,7 +5,7 @@ from datetime import datetime
 import re
 
 import models, schemas, auth, database
-from storage import upload_file_to_supabase
+from storage import upload_file
 
 router = APIRouter(
     prefix="/api/announcements",
@@ -273,7 +273,7 @@ async def upload_announcement_attachment(
     stored_filename = f"announcement_{timestamp}_{clean_name}"
     
     file_bytes = await file.read()
-    file_url = upload_file_to_supabase(file_bytes, stored_filename, "hrms-documents")
+    file_url = upload_file(file_bytes, stored_filename, "hrms-documents")
     
     return {
         "file_url": file_url,

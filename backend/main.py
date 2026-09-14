@@ -21,9 +21,9 @@ async def add_security_headers(request: Request, call_next):
         "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com data:; "
-        "img-src 'self' data: blob: https://*.supabase.co https://*.google.com; "
+        "img-src 'self' data: blob: https://*.google.com; "
         "frame-src 'self' https://calendar.google.com https://*.google.com https://*.google.co.id; "
-        "connect-src 'self' https://*.supabase.co wss://*.supabase.co http://127.0.0.1:8000 http://localhost:8000 https://*; "
+        "connect-src 'self' http://127.0.0.1:8000 http://localhost:8000 https://*; "
         "frame-ancestors 'self'; "
         "object-src 'none'; "
         "base-uri 'self';"
@@ -64,13 +64,11 @@ app.include_router(teams.router)
 app.include_router(webhooks.router)
 app.include_router(accurate.router)
 
-# Mount uploads directory
+# Mount persistent uploads directory (located outside git code directory on AWS)
 import os
-os.makedirs("uploads/documents", exist_ok=True)
-os.makedirs("uploads/logos", exist_ok=True)
-os.makedirs("uploads/client_documents", exist_ok=True)
-os.makedirs("uploads/chat_attachments", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+from storage import UPLOAD_DIR
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,

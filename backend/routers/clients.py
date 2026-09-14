@@ -10,7 +10,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 
 import models, schemas, auth, database
-from storage import upload_file_to_supabase, delete_file_from_supabase
+from storage import upload_file, delete_file
 
 from sqlalchemy import func
 
