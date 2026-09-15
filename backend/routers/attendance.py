@@ -65,18 +65,49 @@ def recalculate_attendance(attendance: models.Attendance):
 # EMPLOYEE ENDPOINTS
 # ==========================================
 
+def get_client_ip(request: Request) -> str:
+    """
+    Extracts the genuine client public IP address through multiple reverse proxy hops (Nginx, Next.js).
+    Filters out internal loopback/proxy IPs (127.0.0.1, ::1).
+    """
+    # 1. Check X-Real-IP first
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip and real_ip.strip():
+        ip = real_ip.strip().replace("::ffff:", "")
+        if ip not in ("127.0.0.1", "::1", "localhost"):
+            return ip
+
+    # 2. Check X-Forwarded-For (comma-separated list of proxy hops)
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        ips = [i.strip().replace("::ffff:", "") for i in forwarded.split(",") if i.strip()]
+        for ip in ips:
+            if ip not in ("127.0.0.1", "::1", "localhost"):
+                return ip
+        # If all were loopback, return the first one
+        if ips:
+            return ips[0]
+
+    # 3. Direct client host fallback
+    if request.client and request.client.host:
+        ip = request.client.host.replace("::ffff:", "")
+        if ip == "::1":
+            return "127.0.0.1"
+        return ip
+
+    return "127.0.0.1"
+
+
 def validate_ip(request: Request, settings):
     if settings.allowed_ip_address and settings.allowed_ip_address.strip():
-        forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            client_ip = forwarded.split(",")[0].strip()
-        else:
-            client_ip = request.client.host
-            
-        print(f"DEBUG IP VALIDATION: Headers={request.headers}, client_ip={client_ip}, allowed={settings.allowed_ip_address}")
-        
+        client_ip = get_client_ip(request)
+
         allowed_ips = [ip.strip() for ip in settings.allowed_ip_address.split(",") if ip.strip()]
         
+        # If localhost is explicitly allowed or 127.0.0.1 is in list
+        if client_ip in ("127.0.0.1", "localhost") and any(ip in ["127.0.0.1", "localhost", "0.0.0.0"] for ip in allowed_ips):
+            return
+
         is_allowed = False
         import ipaddress
         try:
@@ -87,7 +118,10 @@ def validate_ip(request: Request, settings):
                         is_allowed = True
                         break
                 else:
-                    if client_ip == allowed:
+                    norm_allowed = allowed.replace("::ffff:", "")
+                    if norm_allowed in ("::1", "localhost"):
+                        norm_allowed = "127.0.0.1"
+                    if client_ip == norm_allowed:
                         is_allowed = True
                         break
         except ValueError:
