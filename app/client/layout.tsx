@@ -59,15 +59,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const [errorState, setErrorState] = useState(false);
 
   const fetchProfile = async () => {
-    const token = localStorage.getItem("hrms_token");
     const role = (localStorage.getItem("user_role") || "").toUpperCase();
-    
-    if (!token) {
-      localStorage.removeItem("hrms_token");
-      localStorage.removeItem("user_role");
-      router.push("/login");
-      return;
-    }
 
     if (role === "MEMBER") {
       router.push("/member/track-order");
@@ -76,19 +68,23 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
     const isAdminOrStaff = ["ADMIN", "SUPER ADMIN", "SUPERADMIN", "SYSTEM ADMIN", "HR", "DIRECTOR", "EMPLOYEE ADMIN", "EMPLOYEE"].some(r => role.includes(r));
 
-    if (role !== "CLIENT" && !isAdminOrStaff) {
+    if (role && role !== "CLIENT" && !isAdminOrStaff) {
       router.push("/hrms/dashboard");
       return;
     }
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
-        headers: {
-          "Authorization": `Bearer ${token}`,
-        },
+        credentials: "include"
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem("hrms_token");
+          localStorage.removeItem("user_role");
+          router.push("/login");
+          return;
+        }
         throw new Error("Failed to fetch client profile");
       }
 

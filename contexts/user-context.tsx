@@ -90,29 +90,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const fetchProfile = React.useCallback(async (isBackground = false) => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-    if (!token) {
-      setProfile(null);
-      setIsAdmin(false);
-      setPermissions([]);
-      setLoading(false);
-      return;
-    }
-
     try {
       if (!isBackground) {
         setLoading(true);
       }
       const [authRes, profileRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me?t=${Date.now()}`, {
+          credentials: "include",
           headers: { 
-            "Authorization": `Bearer ${token}`,
             "Cache-Control": "no-cache"
           }
         }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/?t=${Date.now()}`, {
+          credentials: "include",
           headers: { 
-            "Authorization": `Bearer ${token}`,
             "Cache-Control": "no-cache"
           }
         })
@@ -137,6 +128,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setIsAdmin(isAdminFlag);
         const freshPermissions = data.permissions || [];
         setPermissions(freshPermissions);
+        localStorage.setItem("hrms_token", "cookie_based_session_active");
         localStorage.setItem("user_role", data.role?.name || "");
         localStorage.setItem("user_email", data.email || "");
         localStorage.setItem("hrms_permissions", JSON.stringify(freshPermissions));
@@ -158,13 +150,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // 1. Try to load cached session from localStorage to render instantly
-    const token = localStorage.getItem("hrms_token");
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
+    // 1. Try to load cached session from localStorage to render UI instantly
     let hasCache = false;
     try {
       const cachedProfile = localStorage.getItem("hrms_profile");
@@ -189,7 +175,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       console.error("Error loading cached session:", e);
     }
 
-    // 2. Fetch fresh details in the background (SWR)
+    // 2. Fetch fresh details via httpOnly cookie in the background (SWR)
     fetchProfile(hasCache);
   }, [fetchProfile]);
 
@@ -200,8 +186,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     const resetInactivityTimer = () => {
       clearTimeout(inactivityTimer);
-      const token = localStorage.getItem("hrms_token");
-      if (!token) return;
+      const userEmail = localStorage.getItem("user_email");
+      if (!userEmail) return;
 
       inactivityTimer = setTimeout(() => {
         localStorage.removeItem("hrms_token");

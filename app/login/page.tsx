@@ -44,7 +44,7 @@ export default function LoginPage() {
         setError("Session expired: You were automatically logged out due to 30 minutes of inactivity.");
       }
     }
-    if (localStorage.getItem("hrms_token")) {
+    if (localStorage.getItem("user_email") && localStorage.getItem("user_role")) {
       const role = localStorage.getItem("user_role");
       if (role === "MEMBER") {
         router.push("/member/track-order");
@@ -149,18 +149,19 @@ export default function LoginPage() {
       }
 
       const data = await response.json();
-      localStorage.setItem("hrms_token", data.access_token);
 
-      // Fetch user profile to determine role
+      // Fetch user profile to determine role via httpOnly session cookie
       const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
+        credentials: "include",
         headers: {
-          "Authorization": `Bearer ${data.access_token}`
+          "Cache-Control": "no-cache"
         }
       });
 
       if (userResponse.ok) {
         const user = await userResponse.json();
         const roleName = user.role?.name || "";
+        localStorage.setItem("hrms_token", "cookie_based_session_active");
         localStorage.setItem("user_role", roleName);
         localStorage.setItem("user_email", user.email);
         localStorage.setItem("user_id", user.id.toString());

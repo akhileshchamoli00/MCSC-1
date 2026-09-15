@@ -61,7 +61,6 @@ export function DropboxFileManager({
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   useEffect(() => {
@@ -77,7 +76,7 @@ export function DropboxFileManager({
     try {
       const fetchPath = path.startsWith(basePath) ? path : basePath;
       const res = await fetch(`${API_URL}/api/dropbox/list?path=${encodeURIComponent(fetchPath)}`, {
-        headers: { "Authorization": `Bearer ${token}` }
+        credentials: "include"
       });
       const data = await res.json();
       
@@ -105,7 +104,7 @@ export function DropboxFileManager({
       
       const res = await fetch(`${API_URL}/api/dropbox/folder`, {
         method: "POST",
-        headers: { "Authorization": `Bearer ${token}` },
+        credentials: "include",
         body: formData
       });
       
@@ -137,7 +136,7 @@ export function DropboxFileManager({
 
       const res = await fetch(`${API_URL}/api/dropbox/upload`, {
         method: "POST",
-        headers: { "Authorization": `Bearer ${token}` },
+        credentials: "include",
         body: formData
       });
       
@@ -159,7 +158,7 @@ export function DropboxFileManager({
     try {
       const toastId = toast.loading("Generating secure link...");
       const res = await fetch(`${API_URL}/api/dropbox/download?path=${encodeURIComponent(path)}`, {
-        headers: { "Authorization": `Bearer ${token}` }
+        credentials: "include"
       });
       const data = await res.json();
       toast.dismiss(toastId);
@@ -194,7 +193,7 @@ export function DropboxFileManager({
     try {
       const res = await fetch(`${API_URL}/api/dropbox/delete?path=${encodeURIComponent(itemToDelete)}`, {
         method: "DELETE",
-        headers: { "Authorization": `Bearer ${token}` }
+        credentials: "include"
       });
       const data = await res.json();
       

@@ -154,9 +154,6 @@ export default function CalendarWidget() {
   const fetchOverview = useCallback(async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("hrms_token");
-      const headers = { "Authorization": `Bearer ${token}` };
-      
       const queryParams = new URLSearchParams({
         month: String(currentMonth + 1),
         year: String(currentYear)
@@ -169,7 +166,7 @@ export default function CalendarWidget() {
       if (selectedLeaveStatus !== "all") queryParams.append("leave_status", selectedLeaveStatus);
 
       const url = `${process.env.NEXT_PUBLIC_API_URL}/api/calendar/monthly-overview?${queryParams.toString()}`;
-      const res = await fetch(url, { headers });
+      const res = await fetch(url, { credentials: "include" });
       
       if (res.ok) {
         const data = await res.json();

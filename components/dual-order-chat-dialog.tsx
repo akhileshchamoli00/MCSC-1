@@ -109,7 +109,7 @@ export function DualOrderChatDialog({
   const handlePreviewAttachment = (msg: any) => {
     if (!msg.attachment_url || msg.attachment_url === "uploading...") return;
     setPreviewAttachment(msg);
-    const url = `/api-proxy/api/clients/orders/${orderNumber}/attachments/preview?path=${encodeURIComponent(msg.attachment_url)}&token=${token}`;
+    const url = `/api-proxy/api/clients/orders/${orderNumber}/attachments/preview?path=${encodeURIComponent(msg.attachment_url)}`;
     setPreviewUrl(url);
   };
 
@@ -132,20 +132,18 @@ export function DualOrderChatDialog({
   const clientMessagesContainerRef = useRef<HTMLDivElement | null>(null);
   const internalMessagesContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-
   useEffect(() => {
     setMounted(true);
   }, []);
 
   // 1. Fetch Client Messages
   const fetchClientMessages = async (isInitial = false) => {
-    if (!orderNumber || !token) return;
+    if (!orderNumber) return;
     if (isInitial) setLoadingClient(true);
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/progress?channel=CLIENT`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { credentials: "include" }
       );
       if (res.status === 403) {
         toast.error("You are not authorized to view the chat for this order.");
@@ -165,12 +163,12 @@ export function DualOrderChatDialog({
 
   // 2. Fetch Internal Messages
   const fetchInternalMessages = async (isInitial = false) => {
-    if (!orderNumber || !token) return;
+    if (!orderNumber) return;
     if (isInitial) setLoadingInternal(true);
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/progress?channel=INTERNAL`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { credentials: "include" }
       );
       if (res.status === 403) {
         toast.error("You are not authorized to view the internal chat for this order.");
@@ -190,14 +188,14 @@ export function DualOrderChatDialog({
 
   // 3. Fetch Taggable Users (for Internal Chat @mentions)
   const fetchTaggableUsers = async () => {
-    if (!token || !orderNumber) return;
+    if (!orderNumber) return;
     try {
       const [tagRes, teamRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/taggable-users`, {
-          headers: { Authorization: `Bearer ${token}` }
+          credentials: "include"
         }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, {
-          headers: { Authorization: `Bearer ${token}` }
+          credentials: "include"
         })
       ]);
 
@@ -299,7 +297,7 @@ export function DualOrderChatDialog({
   };
 
   const handleConfirmSendClientMessage = async () => {
-    if (!pendingClientMessage || !orderNumber || !token || sendingClient) return;
+    if (!pendingClientMessage || !orderNumber || sendingClient) return;
     try {
       setSendingClient(true);
       setIsConfirmClientOpen(false);
@@ -307,9 +305,9 @@ export function DualOrderChatDialog({
         `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/progress`,
         {
           method: "POST",
+          credentials: "include",
           headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`
+            "Content-Type": "application/json"
           },
           body: JSON.stringify({
             message: pendingClientMessage,
@@ -338,7 +336,7 @@ export function DualOrderChatDialog({
   // 5. Handle Internal Message Send (Instant, No Confirmation)
   const handleInternalSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!internalInput.trim() || !orderNumber || !token || sendingInternal) return;
+    if (!internalInput.trim() || !orderNumber || sendingInternal) return;
     const msgToSend = internalInput.trim();
     try {
       setSendingInternal(true);
@@ -348,9 +346,9 @@ export function DualOrderChatDialog({
         `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/progress`,
         {
           method: "POST",
+          credentials: "include",
           headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`
+            "Content-Type": "application/json"
           },
           body: JSON.stringify({
             message: msgToSend,

@@ -203,7 +203,7 @@ async def get_current_user(
     cookie_token = request.cookies.get("hrms_token")
     actual_token = cookie_token if cookie_token else token
     
-    if not actual_token or actual_token == "cookie_based_session_active":
+    if not actual_token or actual_token in ("cookie_based_session_active", "null", "undefined"):
         raise credentials_exception
     
     try:

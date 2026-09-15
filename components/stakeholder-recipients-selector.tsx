@@ -50,13 +50,10 @@ export function StakeholderRecipientsSelector({
     }
 
     const fetchStakeholders = async () => {
-      const activeToken = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-      if (!activeToken) return;
-
       setLoading(true);
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}/stakeholders`, {
-          headers: { Authorization: `Bearer ${activeToken}` }
+          credentials: "include"
         });
         if (res.ok) {
           const data = await res.json();

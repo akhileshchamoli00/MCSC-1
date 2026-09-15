@@ -24,17 +24,9 @@ export default function MemberLayout({
   useEffect(() => {
     setMounted(true);
     const verifyAuth = async () => {
-      const token = localStorage.getItem("hrms_token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
-
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          credentials: "include",
         });
 
         if (!res.ok) {
@@ -53,6 +45,7 @@ export default function MemberLayout({
         setMemberUser(data);
       } catch (err) {
         console.error("Auth verification failed", err);
+        router.push("/login");
       } finally {
         setLoading(false);
       }
@@ -63,15 +56,10 @@ export default function MemberLayout({
 
   const handleLogout = async () => {
     try {
-      const token = localStorage.getItem("hrms_token");
-      if (token) {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/logout`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }).catch(() => {});
-      }
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      }).catch(() => {});
     } finally {
       localStorage.removeItem("hrms_token");
       localStorage.removeItem("user_role");

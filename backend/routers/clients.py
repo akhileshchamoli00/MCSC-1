@@ -1967,7 +1967,7 @@ async def preview_client_document(
         
     actual_token = cookie_token or header_token or token
     
-    if not actual_token or actual_token == "cookie_based_session_active":
+    if not actual_token or actual_token in ("cookie_based_session_active", "null", "undefined"):
         raise HTTPException(status_code=401, detail="Unauthorized access")
         
     from jose import jwt, JWTError
@@ -2992,7 +2992,7 @@ async def preview_order_attachment(
         header_token = auth_header.replace("Bearer ", "", 1)
         
     actual_token = cookie_token or header_token or token
-    if not actual_token or actual_token == "cookie_based_session_active":
+    if not actual_token or actual_token in ("cookie_based_session_active", "null", "undefined"):
         raise HTTPException(status_code=401, detail="Unauthorized access")
         
     from jose import jwt, JWTError
@@ -4146,9 +4146,25 @@ public_router = APIRouter(
 @public_router.post("/webhook")
 async def xendit_webhook(request: Request, db: Session = Depends(database.get_db)):
     x_token = request.headers.get("x-callback-token")
-    env_token = os.getenv("XENDIT_CALLBACK_TOKEN", "")
-    if env_token and x_token != env_token:
-        raise HTTPException(status_code=401, detail="Unauthorized webhook source")
+    env_token = os.getenv("XENDIT_CALLBACK_TOKEN", "").strip()
+    is_prod = os.getenv("ENV", "development").lower() == "production"
+    
+    if not env_token:
+        if is_prod:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="XENDIT_CALLBACK_TOKEN is not configured on the server."
+            )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized webhook source: XENDIT_CALLBACK_TOKEN is required."
+        )
+        
+    if not x_token or x_token != env_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized webhook source: Invalid callback token."
+        )
         
     try:
         payload = await request.json()

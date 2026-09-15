@@ -124,7 +124,7 @@ async def get_uploaded_file(
     if not token:
         token = request.query_params.get("token")
         
-    if not token or token == "cookie_based_session_active":
+    if not token or token in ("cookie_based_session_active", "null", "undefined"):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required to access protected documents",
@@ -195,8 +195,47 @@ async def get_uploaded_file(
                     )
                     
         elif clean_subfolder == "chat_attachments":
-            # Active authenticated users can access chat attachments
-            pass
+            # Verify user is a participant (sender, assigned employee, or company client) in the chat
+            is_authorized_chat = False
+            
+            if role_name in ("ADMIN", "SUPER ADMIN", "HR") or auth.has_permission(current_user, "chat_center", "view", db) or auth.has_permission(current_user, "chat", "view", db):
+                is_authorized_chat = True
+            else:
+                # Query messages referencing this attachment
+                matching_messages = db.query(models.Message).filter(
+                    models.Message.attachment.like(f"%{clean_file_path}%")
+                ).all()
+                
+                if matching_messages:
+                    for msg in matching_messages:
+                        # 1. Sender
+                        if msg.sender_id == current_user.id:
+                            is_authorized_chat = True
+                            break
+                        # 2. Conversation participants
+                        conv = msg.conversation
+                        if conv:
+                            if current_user.employee and conv.employee_id == current_user.employee.id:
+                                is_authorized_chat = True
+                                break
+                            if current_user.client and conv.company and conv.company.client_id == current_user.client.id:
+                                is_authorized_chat = True
+                                break
+                            if current_user.employee and conv.company_id:
+                                from routers.clients import is_assigned_employee_to_company
+                                if is_assigned_employee_to_company(current_user, conv.company_id, db):
+                                    is_authorized_chat = True
+                                    break
+                else:
+                    # If attachment was freshly uploaded before message record is created, restrict to active staff/client
+                    if current_user.employee is not None or current_user.client is not None:
+                        is_authorized_chat = True
+
+            if not is_authorized_chat:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied. You are not an authorized participant in the conversation containing this attachment."
+                )
             
     return FileResponse(
         target_path,

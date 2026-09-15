@@ -382,10 +382,9 @@ function HRMSLayoutContent({ children }: { children: React.ReactNode }) {
 
   // Route protection and authentication guards
   useEffect(() => {
-    const token = localStorage.getItem("hrms_token");
     const role = (localStorage.getItem("user_role") || "").toUpperCase();
     if (!loading) {
-      if (!token) {
+      if (!userProfile && !isAdmin) {
         localStorage.removeItem("hrms_token");
         router.push("/login");
         return;
@@ -400,12 +399,6 @@ function HRMSLayoutContent({ children }: { children: React.ReactNode }) {
       // Defensive guard: Member users belong to the Member Order Tracker Portal
       if (role === "MEMBER") {
         router.push("/member/track-order");
-        return;
-      }
-
-      if (!userProfile && !isAdmin) {
-        localStorage.removeItem("hrms_token");
-        router.push("/login");
         return;
       }
 

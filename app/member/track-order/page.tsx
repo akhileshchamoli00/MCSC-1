@@ -202,12 +202,6 @@ function MemberTrackOrderContent() {
     if (!orderData) return;
     if (!chatMessage.trim() && !selectedFile) return;
 
-    const token = localStorage.getItem("hrms_token");
-    if (!token) {
-      toast.error("Session expired. Please log in again.");
-      return;
-    }
-
     setSendingMessage(true);
 
     try {
@@ -223,7 +217,7 @@ function MemberTrackOrderContent() {
           `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/public/orders/${encodeURIComponent(orderData.order_number)}/upload-attachment`,
           {
             method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
+            credentials: "include",
             body: formData
           }
         );
@@ -240,9 +234,9 @@ function MemberTrackOrderContent() {
           `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/public/orders/${encodeURIComponent(orderData.order_number)}/chat`,
           {
             method: "POST",
+            credentials: "include",
             headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`
+              "Content-Type": "application/json"
             },
             body: JSON.stringify({ message: chatMessage.trim() })
           }

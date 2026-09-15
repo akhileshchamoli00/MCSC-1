@@ -34,12 +34,9 @@ export function NotificationBell() {
   }, [pathname]);
 
   const fetchNotifications = async () => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
-    
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications?limit=5`, {
-        headers: { "Authorization": `Bearer ${token}` },
+        credentials: "include",
         cache: "no-store"
       });
       if (res.status === 401) return;
@@ -49,7 +46,7 @@ export function NotificationBell() {
       }
       
       const countRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/unread-count`, {
-        headers: { "Authorization": `Bearer ${token}` },
+        credentials: "include",
         cache: "no-store"
       });
       if (countRes.status === 401) return;
@@ -70,45 +67,34 @@ export function NotificationBell() {
     };
     window.addEventListener("notifications-updated", handleUpdate);
     
-    const token = localStorage.getItem("hrms_token");
-    if (token) {
-      // Connect WS
-      // Resolve WebSocket URL robustly for local development and production
-      let wsUrl = "";
-      const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-      const nextPublicApiUrl = process.env.NEXT_PUBLIC_API_URL || "/api-proxy";
-      
-      if (nextPublicApiUrl.startsWith("http")) {
-        const wsProtocol = nextPublicApiUrl.startsWith("https") ? "wss" : "ws";
-        const hostPart = nextPublicApiUrl.replace(/^https?:\/\//, "");
-        wsUrl = `${wsProtocol}://${hostPart}/api/notifications/ws?token=${token}`;
-      } else {
-        const cleanPath = nextPublicApiUrl.replace(/\/$/, "");
-        wsUrl = `${protocol}://${window.location.host}${cleanPath}/api/notifications/ws?token=${token}`;
-      }
-      const socket = new WebSocket(wsUrl);
-      
-      socket.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.action === "REFRESH_NOTIFICATIONS" || data.type === "NOTIFICATION_REMOVED") {
-            fetchNotifications();
-            window.dispatchEvent(new Event("notifications-updated"));
-            return;
-          }
-          if (data.id && data.title) {
-            setNotifications(prev => [data, ...prev.filter(n => n.id !== data.id)].slice(0, 5));
-            setUnreadCount(prev => prev + 1);
-            window.dispatchEvent(new Event("notifications-updated"));
-          }
-        } catch (e) {
-          console.error("Failed to parse WS message", e);
-        }
-      };
-      
-      ws.current = socket;
-    }
+    // Connect WS using cookie session authentication
+    let wsUrl = "";
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const nextPublicApiUrl = process.env.NEXT_PUBLIC_API_URL || "/api-proxy";
     
+    if (nextPublicApiUrl.startsWith("http")) {
+      const wsProtocol = nextPublicApiUrl.startsWith("https") ? "wss" : "ws";
+      const hostPart = nextPublicApiUrl.replace(/^https?:\/\//, "");
+      wsUrl = `${wsProtocol}://${hostPart}/api/notifications/ws`;
+    } else {
+      const cleanPath = nextPublicApiUrl.replace(/\/$/, "");
+      wsUrl = `${protocol}://${window.location.host}${cleanPath}/api/notifications/ws`;
+    }
+    const socket = new WebSocket(wsUrl);
+    
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.action === "REFRESH_NOTIFICATIONS" || data.type === "NOTIFICATION_REMOVED") {
+          fetchNotifications();
+        }
+      } catch (err) {
+        console.error("Failed to parse websocket message", err);
+      }
+    };
+    
+    ws.current = socket;
+
     return () => {
       window.removeEventListener("notifications-updated", handleUpdate);
       if (ws.current) {
@@ -118,13 +104,10 @@ export function NotificationBell() {
   }, []);
 
   const markAsRead = async (id: number) => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
-    
     try {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}/read`, {
         method: "PUT",
-        headers: { "Authorization": `Bearer ${token}` }
+        credentials: "include"
       });
       
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
@@ -136,13 +119,10 @@ export function NotificationBell() {
   };
 
   const markAllAsRead = async () => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
-    
     try {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/read-all`, {
         method: "PUT",
-        headers: { "Authorization": `Bearer ${token}` }
+        credentials: "include"
       });
       
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
@@ -155,13 +135,10 @@ export function NotificationBell() {
 
   const deleteNotification = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
-    
     try {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}`, {
         method: "DELETE",
-        headers: { "Authorization": `Bearer ${token}` }
+        credentials: "include"
       });
       
       const notif = notifications.find(n => n.id === id);

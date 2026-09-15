@@ -164,17 +164,14 @@ function TrackOrderContent() {
 
   // Check existing session
   useEffect(() => {
-    const token = localStorage.getItem("hrms_token");
-    if (token) {
-      fetchCurrentUser(token);
-    }
+    fetchCurrentUser();
   }, []);
 
   // Fetch current user details
-  const fetchCurrentUser = async (token: string) => {
+  const fetchCurrentUser = async () => {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
+        credentials: "include"
       });
       if (res.ok) {
         const data = await res.json();
@@ -316,7 +313,6 @@ function TrackOrderContent() {
       }
 
       const data = await res.json();
-      localStorage.setItem("hrms_token", data.access_token);
       localStorage.setItem("user_role", "MEMBER");
       localStorage.setItem("user_email", data.user.email);
       localStorage.setItem("user_id", data.user.id.toString());
