@@ -253,6 +253,7 @@ class LeaveRequestBase(BaseModel):
     leave_type: str
     allocation_date: Optional[date] = None
     days_requested: Optional[float] = 0.0
+    half_day_session: Optional[str] = None # MORNING, AFTERNOON
     reason: Optional[str] = None
     attachment_url: Optional[str] = None
     status: str = "PENDING"
@@ -260,6 +261,7 @@ class LeaveRequestBase(BaseModel):
 class LeaveRequestCreate(LeaveRequestBase):
     employee_id: Optional[int] = None
     is_half_day: Optional[bool] = False
+    half_day_session: Optional[str] = None
     reason: Optional[str] = Field(None, max_length=100)
 
 class LeaveRequestUpdate(BaseModel):
@@ -268,6 +270,7 @@ class LeaveRequestUpdate(BaseModel):
     leave_type: str
     reason: Optional[str] = Field(None, max_length=100)
     is_half_day: Optional[bool] = False
+    half_day_session: Optional[str] = None
 
 class LeaveRequestResponse(LeaveRequestBase):
     id: int

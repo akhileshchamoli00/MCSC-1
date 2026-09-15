@@ -20,7 +20,8 @@ const leaveFormSchema = z.object({
   start_date: z.string().min(1, { message: "Start date is required" }),
   end_date: z.string().min(1, { message: "End date is required" }),
   reason: z.string().min(5, { message: "Reason must be at least 5 characters" }).max(100, { message: "Reason cannot exceed 100 characters" }),
-  is_half_day: z.boolean().default(false)
+  is_half_day: z.boolean().default(false),
+  half_day_session: z.enum(["MORNING", "AFTERNOON"]).optional()
 }).refine((data) => {
   if (data.is_half_day) return true; // if half day, we don't care about end date strictness as much, but we set it equal anyway
   return new Date(data.end_date) >= new Date(data.start_date);
@@ -98,7 +99,8 @@ export default function ApplyLeavePage() {
     start_date: "",
     end_date: "",
     reason: "",
-    is_half_day: false
+    is_half_day: false,
+    half_day_session: "MORNING"
   });
   const [editCalculatedDays, setEditCalculatedDays] = useState(0);
   const [editSubmitting, setEditSubmitting] = useState(false);
@@ -111,7 +113,8 @@ export default function ApplyLeavePage() {
       start_date: "",
       end_date: "",
       reason: "",
-      is_half_day: false
+      is_half_day: false,
+      half_day_session: "MORNING"
     }
   });
 
@@ -371,7 +374,8 @@ export default function ApplyLeavePage() {
       start_date: req.start_date,
       end_date: req.end_date,
       reason: req.reason || "",
-      is_half_day: req.days_requested === 0.5 && req.start_date === req.end_date
+      is_half_day: req.days_requested === 0.5 && req.start_date === req.end_date,
+      half_day_session: req.half_day_session || "MORNING"
     });
   };
 
@@ -461,7 +465,7 @@ export default function ApplyLeavePage() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-6">
+    <div className="space-y-6 w-full max-w-[1700px] mx-auto px-2 sm:px-4 lg:px-6 pb-8">
       {/* Minimalist Metrics Strip Row */}
       <div className="flex flex-col md:flex-row items-stretch gap-3 w-full">
         {/* Minimalist Metric Strip - Expanded Horizontally */}
@@ -524,9 +528,9 @@ export default function ApplyLeavePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Application Form */}
-        <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl md:col-span-1 h-fit">
+        <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl lg:col-span-5 xl:col-span-4 h-fit">
           <CardHeader className="py-4 border-b border-border/40 bg-muted/20">
             <CardTitle className="text-sm font-bold text-foreground">New Leave Request</CardTitle>
           </CardHeader>
@@ -538,10 +542,10 @@ export default function ApplyLeavePage() {
                   value={form.watch("leave_type") || ""} 
                   onValueChange={(val) => form.setValue("leave_type", val)}
                 >
-                  <SelectTrigger className="w-full h-10 rounded-xl border-border/50 text-xs">
+                  <SelectTrigger className="w-full h-10 rounded-xl border-border/50 text-xs bg-background/80">
                     <SelectValue placeholder="Select Leave Type" />
                   </SelectTrigger>
-                  <SelectContent position="popper" className="rounded-xl">
+                  <SelectContent position="popper" side="bottom" sideOffset={4} className="rounded-xl shadow-xl z-50">
                     <SelectItem value="Annual Leave" className="text-xs">Annual Leave</SelectItem>
                     <SelectItem value="Sick Leave" className="text-xs">Sick Leave</SelectItem>
                     <SelectItem value="Unpaid Leave" className="text-xs">Unpaid Leave</SelectItem>
@@ -552,28 +556,83 @@ export default function ApplyLeavePage() {
                 {form.formState.errors.leave_type && <p className="text-[10px] text-red-500 mt-0.5">{form.formState.errors.leave_type.message}</p>}
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Start Date</label>
-                <Input type="date" className="h-10 text-xs rounded-xl border-border/50" {...form.register("start_date")} />
-                {form.formState.errors.start_date && <p className="text-[10px] text-red-500 mt-0.5">{form.formState.errors.start_date.message}</p>}
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">End Date</label>
-                <Input type="date" className="h-10 text-xs rounded-xl border-border/50" {...form.register("end_date")} disabled={watchIsHalfDay} />
-                {form.formState.errors.end_date && <p className="text-[10px] text-red-500 mt-0.5">{form.formState.errors.end_date.message}</p>}
-              </div>
-
-              <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-xl border border-border/40">
-                <input 
-                  type="checkbox" 
-                  id="is_half_day" 
-                  {...form.register("is_half_day")}
-                  className="h-4 w-4 rounded border-border text-emerald-600 focus:ring-emerald-500"
-                />
-                <label htmlFor="is_half_day" className="text-xs font-semibold leading-none cursor-pointer">
-                  Half-Day Leave
+              {/* Half-Day Checkbox Header Row */}
+              <div className="flex items-center justify-between pt-1">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {watchIsHalfDay ? "Date & Session" : "Date Range"}
                 </label>
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="checkbox" 
+                    id="is_half_day" 
+                    checked={watchIsHalfDay}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      form.setValue("is_half_day", checked);
+                      if (checked && form.getValues("start_date")) {
+                        form.setValue("end_date", form.getValues("start_date"));
+                      }
+                    }}
+                    className="h-3.5 w-3.5 rounded border-border text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <label htmlFor="is_half_day" className="text-xs font-semibold leading-none cursor-pointer select-none text-foreground flex items-center gap-1.5">
+                    <span>Half-Day Leave</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">0.5 d</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* 2-Column Aligned Date & Session Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium text-muted-foreground">
+                    {watchIsHalfDay ? "Leave Date" : "Start Date"} <span className="text-rose-500">*</span>
+                  </label>
+                  <Input 
+                    type="date" 
+                    className="h-10 text-xs rounded-xl border-border/50 bg-background/80" 
+                    {...form.register("start_date")}
+                    onChange={(e) => {
+                      form.setValue("start_date", e.target.value);
+                      if (watchIsHalfDay) {
+                        form.setValue("end_date", e.target.value);
+                      }
+                    }}
+                  />
+                  {form.formState.errors.start_date && <p className="text-[10px] text-red-500 mt-0.5">{form.formState.errors.start_date.message}</p>}
+                </div>
+
+                {watchIsHalfDay ? (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-medium text-muted-foreground">
+                      Session <span className="text-rose-500">*</span>
+                    </label>
+                    <Select 
+                      value={form.watch("half_day_session") || "MORNING"} 
+                      onValueChange={(val) => form.setValue("half_day_session", val as "MORNING" | "AFTERNOON")}
+                    >
+                      <SelectTrigger className="w-full h-10 rounded-xl border-border/50 text-xs bg-background/80">
+                        <SelectValue placeholder="Select Session" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" side="bottom" sideOffset={4} className="rounded-xl shadow-xl z-50">
+                        <SelectItem value="MORNING" className="text-xs cursor-pointer py-2">🌅 Morning Session</SelectItem>
+                        <SelectItem value="AFTERNOON" className="text-xs cursor-pointer py-2">🌇 Afternoon Session</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-medium text-muted-foreground">
+                      End Date <span className="text-rose-500">*</span>
+                    </label>
+                    <Input 
+                      type="date" 
+                      className="h-10 text-xs rounded-xl border-border/50 bg-background/80" 
+                      {...form.register("end_date")} 
+                    />
+                    {form.formState.errors.end_date && <p className="text-[10px] text-red-500 mt-0.5">{form.formState.errors.end_date.message}</p>}
+                  </div>
+                )}
               </div>
 
               {form.watch("leave_type") === "Sick Leave" && (
@@ -639,7 +698,7 @@ export default function ApplyLeavePage() {
         </Card>
 
         {/* Right Column: Stack of Balances and History */}
-        <div className="md:col-span-2 flex flex-col gap-6">
+        <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-6">
           {/* Balance Summary Table */}
           <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
             <CardHeader className="bg-muted/20 border-b border-border/40 py-3.5 px-5">
@@ -762,7 +821,18 @@ export default function ApplyLeavePage() {
                             {req.leave_type === "Leave Allocation" ? "-" : req.end_date}
                           </td>
                           <td className={`px-5 py-3.5 font-bold text-center ${req.leave_type === "Leave Allocation" ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
-                            {req.leave_type === "Leave Allocation" ? `+${req.days_requested}` : req.days_requested}
+                            {req.leave_type === "Leave Allocation" ? (
+                              `+${req.days_requested}`
+                            ) : req.days_requested === 0.5 ? (
+                              <div className="flex flex-col items-center justify-center gap-0.5">
+                                <span>0.5 Day</span>
+                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 whitespace-nowrap">
+                                  {req.half_day_session === "AFTERNOON" ? "Afternoon (PM)" : "Morning (AM)"}
+                                </span>
+                              </div>
+                            ) : (
+                              `${req.days_requested} ${req.days_requested === 1 ? 'Day' : 'Days'}`
+                            )}
                           </td>
                           <td className={`px-5 py-3.5 max-w-xs truncate ${req.leave_type === "Leave Allocation" ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-muted-foreground"}`} title={req.reason && req.reason.startsWith("Forced Leave") ? "Forced Leave" : (req.reason || "N/A")}>
                             {req.reason && req.reason.startsWith("Forced Leave") ? "Forced Leave" : (req.reason || "N/A")}
@@ -868,7 +938,7 @@ export default function ApplyLeavePage() {
                   <SelectTrigger className="w-full h-10 rounded-xl border-border/50 text-xs">
                     <SelectValue placeholder="Select Leave Type" />
                   </SelectTrigger>
-                  <SelectContent position="popper" className="rounded-xl">
+                  <SelectContent position="popper" side="bottom" sideOffset={4} className="rounded-xl shadow-xl z-50">
                     <SelectItem value="Annual Leave">Annual Leave</SelectItem>
                     <SelectItem value="Sick Leave">Sick Leave</SelectItem>
                     <SelectItem value="Unpaid Leave">Unpaid Leave</SelectItem>
@@ -878,39 +948,85 @@ export default function ApplyLeavePage() {
                 </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Start Date</label>
-                  <Input 
-                    type="date" 
-                    value={editForm.start_date} 
-                    onChange={(e) => setEditForm(prev => ({ ...prev, start_date: e.target.value }))}
-                    className="rounded-xl border-border/50 text-xs"
+              {/* Half-Day Checkbox Header Row */}
+              <div className="flex items-center justify-between pt-1">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {editForm.is_half_day ? "Date & Session" : "Date Range"}
+                </label>
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="checkbox" 
+                    id="edit_is_half_day" 
+                    checked={editForm.is_half_day}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setEditForm(prev => ({ 
+                        ...prev, 
+                        is_half_day: checked,
+                        end_date: checked && prev.start_date ? prev.start_date : prev.end_date
+                      }));
+                    }}
+                    className="h-3.5 w-3.5 rounded border-border text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                   />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">End Date</label>
-                  <Input 
-                    type="date" 
-                    value={editForm.end_date} 
-                    disabled={editForm.is_half_day}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, end_date: e.target.value }))}
-                    className="rounded-xl border-border/50 text-xs"
-                  />
+                  <label htmlFor="edit_is_half_day" className="text-xs font-semibold leading-none cursor-pointer select-none text-foreground flex items-center gap-1.5">
+                    <span>Half-Day Leave</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">0.5 d</span>
+                  </label>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-xl border border-border/40">
-                <input 
-                  type="checkbox" 
-                  id="edit_is_half_day" 
-                  checked={editForm.is_half_day}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, is_half_day: e.target.checked }))}
-                  className="h-4 w-4 rounded border-border text-emerald-600 focus:ring-emerald-500"
-                />
-                <label htmlFor="edit_is_half_day" className="text-xs font-semibold leading-none cursor-pointer">
-                  Half-Day Leave
-                </label>
+              {/* 2-Column Aligned Date & Session Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium text-muted-foreground">
+                    {editForm.is_half_day ? "Leave Date" : "Start Date"} <span className="text-rose-500">*</span>
+                  </label>
+                  <Input 
+                    type="date" 
+                    value={editForm.start_date} 
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEditForm(prev => ({ 
+                        ...prev, 
+                        start_date: val,
+                        end_date: prev.is_half_day ? val : (prev.end_date || val)
+                      }));
+                    }}
+                    className="h-10 rounded-xl border-border/50 text-xs bg-background/80"
+                  />
+                </div>
+
+                {editForm.is_half_day ? (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-medium text-muted-foreground">
+                      Session <span className="text-rose-500">*</span>
+                    </label>
+                    <Select 
+                      value={editForm.half_day_session || "MORNING"} 
+                      onValueChange={(val) => setEditForm(prev => ({ ...prev, half_day_session: val as "MORNING" | "AFTERNOON" }))}
+                    >
+                      <SelectTrigger className="w-full h-10 text-xs rounded-xl border-border/50 bg-background/80">
+                        <SelectValue placeholder="Choose Session" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" side="bottom" sideOffset={4} className="rounded-xl shadow-xl z-50">
+                        <SelectItem value="MORNING" className="text-xs cursor-pointer py-2">🌅 Morning Session</SelectItem>
+                        <SelectItem value="AFTERNOON" className="text-xs cursor-pointer py-2">🌇 Afternoon Session</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-medium text-muted-foreground">
+                      End Date <span className="text-rose-500">*</span>
+                    </label>
+                    <Input 
+                      type="date" 
+                      value={editForm.end_date} 
+                      onChange={(e) => setEditForm(prev => ({ ...prev, end_date: e.target.value }))}
+                      className="h-10 rounded-xl border-border/50 text-xs bg-background/80"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1 bg-muted/30 p-3 rounded-xl border border-border/40 flex justify-between items-center">

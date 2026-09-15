@@ -92,7 +92,8 @@ export default function LeaveApprovalPage() {
     start_date: "",
     end_date: "",
     reason: "",
-    is_half_day: false
+    is_half_day: false,
+    half_day_session: "MORNING"
   });
 
   const fetchEmployees = async () => {
@@ -166,7 +167,8 @@ export default function LeaveApprovalPage() {
           start_date: "",
           end_date: "",
           reason: "",
-          is_half_day: false
+          is_half_day: false,
+          half_day_session: "MORNING"
         });
         fetchRequests();
         showAlert("Leave successfully applied for employee.");
@@ -307,7 +309,7 @@ export default function LeaveApprovalPage() {
   const paginatedRequests = filteredRequests.slice(startIndex, endIndex);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-[1700px] mx-auto px-2 sm:px-4 lg:px-6 pb-8">
       {/* Minimalist Metrics Strip & Action Button Row */}
       <div className="flex flex-col md:flex-row items-stretch gap-3 w-full">
         {/* Minimalist Metric Strip - Expanded Horizontally */}
@@ -425,7 +427,16 @@ export default function LeaveApprovalPage() {
                         {req.start_date} <br/>to {req.end_date}
                       </td>
                       <td className="px-5 py-4 font-bold text-foreground">
-                        {req.days_requested} Days
+                        {req.days_requested === 0.5 ? (
+                          <div className="flex flex-col items-start gap-0.5">
+                            <span>0.5 Day</span>
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 whitespace-nowrap">
+                              {req.half_day_session === "AFTERNOON" ? "Afternoon" : "Morning"}
+                            </span>
+                          </div>
+                        ) : (
+                          `${req.days_requested} ${req.days_requested === 1 ? "Day" : "Days"}`
+                        )}
                       </td>
                       <td className="px-5 py-4 text-xs text-muted-foreground">
                         {format(new Date(req.created_at), "dd MMM yyyy, HH:mm")}
@@ -556,7 +567,16 @@ export default function LeaveApprovalPage() {
                     </div>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Days Requested</p>
-                      <p className="font-semibold text-foreground text-sm">{viewingRequest.days_requested} Days</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-foreground text-sm">
+                          {viewingRequest.days_requested} {viewingRequest.days_requested === 1 ? "Day" : "Days"}
+                        </p>
+                        {viewingRequest.days_requested === 0.5 && (
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                            {viewingRequest.half_day_session === "AFTERNOON" ? "Afternoon" : "Morning"}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Start Date</p>
@@ -843,7 +863,7 @@ export default function LeaveApprovalPage() {
                   <SelectTrigger className="h-11 rounded-2xl border-border/60 bg-background/60 shadow-xs text-xs font-semibold hover:border-emerald-500/50 transition-colors">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="rounded-2xl border-border/50 shadow-xl">
+                  <SelectContent position="popper" side="bottom" sideOffset={4} className="rounded-2xl border-border/50 shadow-xl z-50">
                     <SelectItem value="Annual Leave" className="text-xs cursor-pointer py-2 font-medium">🌴 Annual Leave</SelectItem>
                     <SelectItem value="Sick Leave" className="text-xs cursor-pointer py-2 font-medium">🤒 Sick Leave</SelectItem>
                     <SelectItem value="Emergency Leave" className="text-xs cursor-pointer py-2 font-medium">🚨 Emergency Leave</SelectItem>
@@ -904,7 +924,7 @@ export default function LeaveApprovalPage() {
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5 text-emerald-500" />
-                    Start Date <span className="text-rose-500">*</span>
+                    {adminLeaveForm.is_half_day ? "Leave Date" : "Start Date"} <span className="text-rose-500">*</span>
                   </label>
                   <Input 
                     type="date" 
@@ -922,20 +942,40 @@ export default function LeaveApprovalPage() {
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5 text-emerald-500" />
-                    End Date <span className="text-rose-500">*</span>
-                  </label>
-                  <Input 
-                    type="date" 
-                    value={adminLeaveForm.end_date}
-                    onChange={(e) => setAdminLeaveForm({...adminLeaveForm, end_date: e.target.value})}
-                    disabled={adminLeaveForm.is_half_day}
-                    required
-                    className="h-11 rounded-2xl border-border/60 bg-background/60 shadow-xs text-xs font-medium focus:border-emerald-500/50 disabled:opacity-60 disabled:cursor-not-allowed"
-                  />
-                </div>
+                {adminLeaveForm.is_half_day ? (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-amber-500" />
+                      Session <span className="text-rose-500">*</span>
+                    </label>
+                    <Select 
+                      value={adminLeaveForm.half_day_session || "MORNING"} 
+                      onValueChange={(val) => setAdminLeaveForm({...adminLeaveForm, half_day_session: val})}
+                    >
+                      <SelectTrigger className="h-11 rounded-2xl border-border/60 bg-background/80 shadow-xs text-xs font-semibold hover:border-amber-500/50 transition-colors">
+                        <SelectValue placeholder="Choose Session" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" side="bottom" sideOffset={4} className="rounded-2xl border-border/50 shadow-xl z-50">
+                        <SelectItem value="MORNING" className="text-xs cursor-pointer py-2 font-medium">🌅 Morning Session</SelectItem>
+                        <SelectItem value="AFTERNOON" className="text-xs cursor-pointer py-2 font-medium">🌇 Afternoon Session</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5 text-emerald-500" />
+                      End Date <span className="text-rose-500">*</span>
+                    </label>
+                    <Input 
+                      type="date" 
+                      value={adminLeaveForm.end_date}
+                      onChange={(e) => setAdminLeaveForm({...adminLeaveForm, end_date: e.target.value})}
+                      required
+                      className="h-11 rounded-2xl border-border/60 bg-background/60 shadow-xs text-xs font-medium focus:border-emerald-500/50"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Dynamic Duration Live Calculation Banner */}
@@ -948,7 +988,7 @@ export default function LeaveApprovalPage() {
                       <CalendarDays className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       <span className="font-semibold">
                         {adminLeaveForm.is_half_day 
-                          ? `Single Half-Day on ${adminLeaveForm.start_date ? format(new Date(adminLeaveForm.start_date), "MMM d, yyyy") : ""}`
+                          ? `Single Half-Day on ${adminLeaveForm.start_date ? format(new Date(adminLeaveForm.start_date), "MMM d, yyyy") : ""} (${adminLeaveForm.half_day_session === "AFTERNOON" ? "Afternoon" : "Morning"})`
                           : `${adminLeaveForm.start_date ? format(new Date(adminLeaveForm.start_date), "MMM d, yyyy") : ""} → ${adminLeaveForm.end_date ? format(new Date(adminLeaveForm.end_date), "MMM d, yyyy") : ""}`}
                       </span>
                     </div>

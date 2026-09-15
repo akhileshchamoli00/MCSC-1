@@ -105,6 +105,20 @@ def run_migrations():
             conn.rollback()
             handle_migration_error("allocation_date", "leave_requests", e)
 
+        try:
+            conn.execute(text("ALTER TABLE leave_requests ADD COLUMN half_day_session VARCHAR(20)"))
+            conn.commit()
+            print("Added column 'half_day_session' to 'leave_requests' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("half_day_session", "leave_requests", e)
+
+        try:
+            conn.execute(text("UPDATE leave_requests SET half_day_session = 'MORNING' WHERE days_requested = 0.5 AND (half_day_session IS NULL OR half_day_session = '')"))
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+
         # Columns to add to client_companies
         for col, col_type in [("director_name", "VARCHAR(255)"), ("director_email", "VARCHAR(255)"), ("director_contact", "VARCHAR(255)"), ("notes", "TEXT")]:
             try:

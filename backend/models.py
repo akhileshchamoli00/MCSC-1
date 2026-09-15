@@ -198,6 +198,7 @@ class LeaveRequest(Base):
     leave_type = Column(String)
     allocation_date = Column(Date, nullable=True)
     days_requested = Column(Float, default=0.0)
+    half_day_session = Column(String, nullable=True) # MORNING, AFTERNOON
     reason = Column(String, nullable=True)
     attachment_url = Column(String, nullable=True)
     status = Column(Enum(LeaveStatus), default=LeaveStatus.PENDING)

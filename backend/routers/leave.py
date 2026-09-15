@@ -506,6 +506,12 @@ def apply_for_leave(leave: schemas.LeaveRequestCreate, db: Session = Depends(dat
     data["days_requested"] = days_requested
     data["status"] = "PENDING"
     
+    if days_requested == 0.5:
+        session_val = str(getattr(leave, "half_day_session", "MORNING") or "MORNING").upper()
+        data["half_day_session"] = session_val if session_val in ["MORNING", "AFTERNOON"] else "MORNING"
+    else:
+        data["half_day_session"] = None
+    
     db_leave = models.LeaveRequest(**data)
     db.add(db_leave)
     db.commit()
@@ -635,6 +641,12 @@ def update_my_leave_request(request_id: int, leave_update: schemas.LeaveRequestU
     leave_req.leave_type = leave_update.leave_type
     leave_req.reason = leave_update.reason
     leave_req.days_requested = days_requested
+    
+    if days_requested == 0.5:
+        session_val = str(getattr(leave_update, "half_day_session", "MORNING") or "MORNING").upper()
+        leave_req.half_day_session = session_val if session_val in ["MORNING", "AFTERNOON"] else "MORNING"
+    else:
+        leave_req.half_day_session = None
     
     db.commit()
     db.refresh(leave_req)

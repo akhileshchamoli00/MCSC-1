@@ -1,3 +1,12 @@
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load root .env.local as the single source of truth for all backend services
+root_env_path = Path(__file__).resolve().parent.parent / ".env.local"
+if root_env_path.exists():
+    load_dotenv(dotenv_path=root_env_path, override=True)
+
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
