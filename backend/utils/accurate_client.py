@@ -3,10 +3,14 @@ import json
 import re
 import requests
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 
+root_env = Path(__file__).resolve().parent.parent.parent / ".env.local"
+if root_env.exists():
+    load_dotenv(dotenv_path=root_env, override=True)
 load_dotenv()
 
 import models
@@ -226,8 +230,10 @@ class AccurateClient:
 
         # If using backend API token with signature secret, sign the request
         if secret and env_token:
-            now = datetime.now()
-            timestamp_str = now.strftime("%d/%m/%Y %H:%M:%S")
+            # Accurate Online API expects timestamps formatted in Asia/Jakarta timezone (UTC+7 / WIB)
+            jakarta_tz = timezone(timedelta(hours=7))
+            now_jakarta = datetime.now(jakarta_tz)
+            timestamp_str = now_jakarta.strftime("%d/%m/%Y %H:%M:%S")
             sig_hex = hmac.new(secret.encode("utf-8"), timestamp_str.encode("utf-8"), hashlib.sha256).hexdigest()
             headers["X-Api-Timestamp"] = timestamp_str
             headers["X-Api-Signature"] = sig_hex
