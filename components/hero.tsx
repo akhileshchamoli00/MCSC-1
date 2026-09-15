@@ -16,8 +16,8 @@ export function Hero() {
       id="home"
       className="relative flex min-h-[85vh] items-center justify-center overflow-hidden py-24 lg:py-32"
     >
-      <div className="container relative z-10 mx-auto px-4 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center max-w-7xl mx-auto">
+      <div className="container relative z-10 mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center w-full mx-auto">
           {/* Left Side: Text Content */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}

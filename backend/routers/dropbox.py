@@ -53,6 +53,48 @@ def check_invoice_permission(user: models.User, action: str, db: Session) -> boo
         
     return False
 
+def validate_user_dropbox_access(user: models.User, path: str, db: Session):
+    """
+    Ensures users cannot access arbitrary paths outside their authorization scope.
+    Super Admins and staff with clients_documents permissions have full access.
+    Clients and members are strictly restricted to their own /Clients/{company_code} paths.
+    """
+    if auth.is_super_admin(user):
+        return True
+        
+    role_name = (user.role.name if user.role else "").strip().upper()
+    if role_name in ("CLIENT", "MEMBER"):
+        norm_path = path.replace("\\", "/").strip().lower()
+        allowed_codes = []
+        if user.client:
+            for comp in user.client.companies:
+                if comp.company_code:
+                    allowed_codes.append(comp.company_code.strip().lower())
+                allowed_codes.append(f"comp_{comp.id}".lower())
+                
+        is_allowed = any(
+            norm_path.startswith(f"/clients/{code}") or norm_path.startswith(f"clients/{code}") 
+            for code in allowed_codes
+        )
+        if not is_allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied. You are only authorized to access your company's documents."
+            )
+        return True
+        
+    # For internal staff, verify document viewing permissions
+    if not (
+        auth.has_permission(user, "clients_documents", "view", db) 
+        or auth.has_permission(user, "clients_company", "view", db)
+        or auth.has_permission(user, "clients_all", "view", db)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. Insufficient permissions to access corporate cloud storage."
+        )
+    return True
+
 @router.get("/list")
 async def list_files(
     path: str = "", 
@@ -60,6 +102,7 @@ async def list_files(
     db: Session = Depends(database.get_db)
 ):
     """List files in a given Dropbox path with dynamic RBAC filtering on invoice folders/files."""
+    validate_user_dropbox_access(current_user, path, db)
     can_view_invoices = check_invoice_permission(current_user, "view", db)
     
     # If user lacks invoice permission and attempts to directly list an invoice folder, return empty items
@@ -95,6 +138,7 @@ async def upload_file(
     db: Session = Depends(database.get_db)
 ):
     """Upload a file to a specific path in Dropbox."""
+    validate_user_dropbox_access(current_user, path, db)
     destination_path = f"{path.rstrip('/')}/{file.filename}"
     if destination_path.startswith("//"):
         destination_path = destination_path[1:] # clean up double slashes
@@ -118,6 +162,7 @@ async def create_folder(
     db: Session = Depends(database.get_db)
 ):
     """Create a new folder."""
+    validate_user_dropbox_access(current_user, path, db)
     if is_invoice_path_or_item(path) and not check_invoice_permission(current_user, "create", db):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
@@ -136,6 +181,7 @@ async def get_download_link(
     db: Session = Depends(database.get_db)
 ):
     """Get a temporary direct link to download or preview a file."""
+    validate_user_dropbox_access(current_user, path, db)
     if is_invoice_path_or_item(path) and not check_invoice_permission(current_user, "download", db):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
@@ -154,6 +200,7 @@ async def delete_item(
     db: Session = Depends(database.get_db)
 ):
     """Delete a file or folder from Dropbox."""
+    validate_user_dropbox_access(current_user, path, db)
     if is_invoice_path_or_item(path) and not check_invoice_permission(current_user, "delete", db):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 

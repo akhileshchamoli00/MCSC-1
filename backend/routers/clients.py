@@ -4167,49 +4167,102 @@ public_orders_router = APIRouter(
 @public_orders_router.get("/{order_number}/track", response_model=schemas.PublicOrderTrackResponse)
 def track_public_order(
     order_number: str,
-    tax_id: str = Query(..., description="Company Tax ID (NPWP) for verification"),
+    company_id: Optional[str] = Query(None, description="Company ID (Code or Number) for verification"),
+    tax_id: Optional[str] = Query(None, description="Legacy Company Tax ID (NPWP) for fallback verification"),
     db: Session = Depends(database.get_db)
 ):
     import re
     clean_order_no = order_number.strip().upper()
-    if not tax_id or not tax_id.strip():
-        raise HTTPException(status_code=400, detail="Company Tax ID (NPWP) is required to track order.")
+    
+    # Accept either company_id or legacy tax_id
+    raw_identifier = (company_id or tax_id or "").strip()
+    if not raw_identifier:
+        raise HTTPException(status_code=400, detail="Company ID is required to track order.")
         
-    clean_input_tax = re.sub(r'[^a-zA-Z0-9]', '', tax_id.strip()).upper()
-    if not clean_input_tax:
-        raise HTTPException(status_code=400, detail="Invalid Company Tax ID format.")
+    clean_input = re.sub(r'[^a-zA-Z0-9]', '', raw_identifier).upper()
+    if not clean_input:
+        raise HTTPException(status_code=400, detail="Invalid Company ID format.")
 
     orders = db.query(models.ClientOrder).filter(
         func.upper(models.ClientOrder.order_number) == clean_order_no
     ).all()
     if not orders:
-        raise HTTPException(status_code=404, detail="Order not found. Please verify your Order ID and Company Tax ID.")
+        raise HTTPException(status_code=404, detail="Order not found. Please verify your Order ID and Company ID.")
     
     first_order = orders[0]
     
-    # Retrieve and verify associated Company's tax number
-    comp_tax = ""
-    if first_order.company and first_order.company.tax_number:
-        comp_tax = first_order.company.tax_number
-    elif first_order.billing_company and first_order.billing_company.tax_number:
-        comp_tax = first_order.billing_company.tax_number
-        
-    clean_comp_tax = re.sub(r'[^a-zA-Z0-9]', '', comp_tax).upper()
-    
-    if not clean_comp_tax or clean_comp_tax != clean_input_tax:
+    # Retrieve associated Companies for verification
+    associated_companies = []
+    if first_order.company:
+        associated_companies.append(first_order.company)
+    elif first_order.company_id:
+        c = db.query(models.ClientCompany).filter(models.ClientCompany.id == first_order.company_id).first()
+        if c:
+            associated_companies.append(c)
+
+    if first_order.billing_company and first_order.billing_company not in associated_companies:
+        associated_companies.append(first_order.billing_company)
+    elif first_order.billing_company_id:
+        bc = db.query(models.ClientCompany).filter(models.ClientCompany.id == first_order.billing_company_id).first()
+        if bc and bc not in associated_companies:
+            associated_companies.append(bc)
+            
+    # Check if input matches any valid identifier of the associated company
+    is_verified = False
+    for comp in associated_companies:
+        comp_id_str = str(comp.id)
+        comp_code = (comp.company_code or "").strip().upper()
+        clean_comp_code = re.sub(r'[^a-zA-Z0-9]', '', comp_code)
+        comp_tax = (comp.tax_number or "").strip().upper()
+        clean_comp_tax = re.sub(r'[^a-zA-Z0-9]', '', comp_tax)
+        acc_cust = (comp.accurate_customer_no or "").strip().upper()
+        clean_acc_cust = re.sub(r'[^a-zA-Z0-9]', '', acc_cust)
+
+        possible_matches = {
+            comp_id_str,
+            f"COMP_{comp_id_str}",
+            f"COMP{comp_id_str}",
+            f"CUST_{comp_id_str}",
+            f"CUST{comp_id_str}",
+            comp_code,
+            clean_comp_code,
+            comp_tax,
+            clean_comp_tax,
+            acc_cust,
+            clean_acc_cust,
+        }
+        possible_matches.discard("")
+
+        if clean_input in possible_matches or raw_identifier.upper() in possible_matches:
+            is_verified = True
+            break
+
+    # Secondary check: verify against client code if client exists
+    if not is_verified and first_order.client and first_order.client.client_code:
+        client_code_clean = re.sub(r'[^a-zA-Z0-9]', '', (first_order.client.client_code or "").strip()).upper()
+        if clean_input == client_code_clean or raw_identifier.upper() == (first_order.client.client_code or "").strip().upper():
+            is_verified = True
+
+    if not is_verified:
         raise HTTPException(
             status_code=403, 
-            detail="Company Tax ID verification failed. The provided Tax ID does not match the company registered to this order."
+            detail="Company ID verification failed. The provided Company ID does not match the company registered to this order."
         )
+
     service_title = first_order.job_title
     job_id = first_order.job_id
     branch_name = first_order.branch_name or "Headquarters"
     
     company_name = None
+    company_code = None
+    company_id_val = first_order.company_id or first_order.billing_company_id
+    
     if first_order.company:
         company_name = first_order.company.company_name
+        company_code = first_order.company.company_code
     elif first_order.billing_company:
         company_name = first_order.billing_company.company_name
+        company_code = first_order.billing_company.company_code
         
     client_name = None
     if first_order.client:
@@ -4258,6 +4311,8 @@ def track_public_order(
         job_title=service_title,
         job_id=job_id,
         company_name=company_name,
+        company_code=company_code,
+        company_id=company_id_val,
         client_name=client_name,
         branch_name=branch_name,
         status=first_order.status,

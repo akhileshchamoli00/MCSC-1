@@ -65,6 +65,8 @@ interface OrderTrackData {
   job_title: string;
   job_id?: string | null;
   company_name?: string | null;
+  company_code?: string | null;
+  company_id?: number | null;
   client_name?: string | null;
   branch_name?: string | null;
   status: string;
@@ -134,7 +136,9 @@ function TrackOrderContent() {
 
   // Search & Order State
   const [searchInput, setSearchInput] = useState(searchParams.get("order") || "");
-  const [taxIdInput, setTaxIdInput] = useState(searchParams.get("tax_id") || "");
+  const [companyIdInput, setCompanyIdInput] = useState(
+    searchParams.get("company_id") || searchParams.get("company_code") || searchParams.get("tax_id") || ""
+  );
   const [orderData, setOrderData] = useState<OrderTrackData | null>(null);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -188,14 +192,14 @@ function TrackOrderContent() {
     }
   };
 
-  // Auto-search if URL query contains order and tax_id
+  // Auto-search if URL query contains order and company_id
   useEffect(() => {
     const orderQuery = searchParams.get("order");
-    const taxQuery = searchParams.get("tax_id");
-    if (orderQuery && taxQuery) {
+    const compQuery = searchParams.get("company_id") || searchParams.get("company_code") || searchParams.get("tax_id");
+    if (orderQuery && compQuery) {
       setSearchInput(orderQuery);
-      setTaxIdInput(taxQuery);
-      handleTrackOrder(orderQuery, taxQuery);
+      setCompanyIdInput(compQuery);
+      handleTrackOrder(orderQuery, compQuery);
     } else if (orderQuery) {
       setSearchInput(orderQuery);
     }
@@ -208,17 +212,17 @@ function TrackOrderContent() {
     }
   }, [orderData?.messages]);
 
-  const handleTrackOrder = async (orderNum?: string, taxId?: string, isSilent = false) => {
+  const handleTrackOrder = async (orderNum?: string, compId?: string, isSilent = false) => {
     const targetOrder = (orderNum || searchInput).trim();
-    const targetTax = (taxId || taxIdInput).trim();
+    const targetCompanyId = (compId || companyIdInput).trim();
 
     if (!targetOrder) {
       toast.error("Please enter a valid Order ID.");
       return;
     }
 
-    if (!targetTax) {
-      toast.error("Please enter your Company Tax ID (NPWP) for verification.");
+    if (!targetCompanyId) {
+      toast.error("Please enter your Company ID for verification.");
       return;
     }
 
@@ -229,12 +233,12 @@ function TrackOrderContent() {
 
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/public/orders/${encodeURIComponent(targetOrder)}/track?tax_id=${encodeURIComponent(targetTax)}`
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/public/orders/${encodeURIComponent(targetOrder)}/track?company_id=${encodeURIComponent(targetCompanyId)}`
       );
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.detail || "Order not found. Please verify your Order ID and Company Tax ID.");
+        throw new Error(errJson.detail || "Order not found. Please verify your Order ID and Company ID.");
       }
 
       const data: OrderTrackData = await res.json();
@@ -322,8 +326,8 @@ function TrackOrderContent() {
 
       // Forward to member order tracking portal
       const targetOrder = orderData?.order_number || searchInput.trim();
-      const targetTax = taxIdInput.trim();
-      const queryParam = targetOrder && targetTax ? `?order=${encodeURIComponent(targetOrder)}&tax_id=${encodeURIComponent(targetTax)}` : (targetOrder ? `?order=${encodeURIComponent(targetOrder)}` : "");
+      const targetCompanyId = companyIdInput.trim();
+      const queryParam = targetOrder && targetCompanyId ? `?order=${encodeURIComponent(targetOrder)}&company_id=${encodeURIComponent(targetCompanyId)}` : (targetOrder ? `?order=${encodeURIComponent(targetOrder)}` : "");
 
       setTimeout(() => {
         router.push(`/member/track-order${queryParam}`);
@@ -352,7 +356,7 @@ function TrackOrderContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background/95 to-muted/20 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-6">
         {/* Page Top Header */}
         <div className="text-center space-y-3">
           <Badge variant="outline" className="px-3 py-1 bg-primary/10 text-primary border-primary/20 text-xs font-semibold uppercase tracking-wider">
@@ -362,7 +366,7 @@ function TrackOrderContent() {
             Track Order & Progress
           </h1>
           <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto">
-            Key in your Order ID and registered Company Tax ID (NPWP) to monitor real-time execution milestones and corporate advisory progress.
+            Key in your Order ID and registered Company ID to monitor real-time execution milestones and corporate advisory progress.
           </p>
         </div>
 
@@ -387,7 +391,7 @@ function TrackOrderContent() {
               size="sm"
               className="h-8 text-xs font-bold gap-1.5 px-3 bg-primary text-primary-foreground shrink-0 shadow-xs"
             >
-              <Link href={orderData ? `/member/track-order?order=${orderData.order_number}&tax_id=${taxIdInput}` : "/member/track-order"}>
+              <Link href={orderData ? `/member/track-order?order=${orderData.order_number}&company_id=${companyIdInput}` : "/member/track-order"}>
                 Open Member Tracker <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </Button>
@@ -457,15 +461,15 @@ function TrackOrderContent() {
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> Company Tax ID (NPWP) *
+                  <Building2 className="h-3.5 w-3.5 text-primary" /> Company ID *
                 </Label>
                 <Input
                   type="text"
                   required
-                  placeholder="e.g. 01.234.567.8-999.000 or digits"
-                  value={taxIdInput}
-                  onChange={(e) => setTaxIdInput(e.target.value)}
-                  className="h-11 text-sm bg-background/60 border-border font-mono tracking-wide"
+                  placeholder="e.g. A260001, COMP-001, or Company ID"
+                  value={companyIdInput}
+                  onChange={(e) => setCompanyIdInput(e.target.value)}
+                  className="h-11 text-sm bg-background/60 border-border uppercase font-mono tracking-wide"
                 />
               </div>
             </div>
@@ -473,7 +477,7 @@ function TrackOrderContent() {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
               <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
                 <span className="font-semibold text-foreground/80">Security Notice:</span>
-                <span>Both Order ID & Tax ID are required to verify ownership.</span>
+                <span>Both Order ID & Company ID are required to verify ownership.</span>
               </div>
 
               <Button
@@ -544,9 +548,16 @@ function TrackOrderContent() {
                   <span className="text-muted-foreground font-medium flex items-center gap-1.5">
                     <Building2 className="h-3.5 w-3.5 text-primary" /> Company Entity
                   </span>
-                  <p className="font-bold text-foreground text-sm truncate">
-                    {orderData.company_name || "General Client Order"}
-                  </p>
+                  <div className="space-y-0.5">
+                    <p className="font-bold text-foreground text-sm truncate">
+                      {orderData.company_name || "General Client Order"}
+                    </p>
+                    {orderData.company_code && (
+                      <Badge variant="outline" className="text-[10px] font-mono font-bold px-1.5 py-0 bg-primary/5 text-primary border-primary/20">
+                        ID: {orderData.company_code}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 <div className="p-3 rounded-xl bg-muted/40 border border-border/60 space-y-1">
                   <span className="text-muted-foreground font-medium flex items-center gap-1.5">

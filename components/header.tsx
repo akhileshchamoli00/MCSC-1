@@ -79,21 +79,21 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex py-4 items-center justify-between px-4 lg:px-8">
+      <div className="container mx-auto flex py-3 sm:py-4 items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link
           href={`/${language}`}
-          className="group flex items-center gap-3 transition-all duration-300"
+          className="group flex items-center gap-3 transition-all duration-300 shrink-0"
         >
-          <AskLogo className="h-16 w-auto transition-transform duration-300 group-hover:scale-105" />
+          <AskLogo className="h-12 sm:h-14 xl:h-16 w-auto transition-transform duration-300 group-hover:scale-105" />
         </Link>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden items-center gap-1 md:flex">
+        {/* Desktop Navigation (Visible on Large Desktops & Widescreens >= 1280px) */}
+        <nav className="hidden items-center gap-1 xl:flex shrink-0">
           {navItems.slice(0, 2).map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className={`group relative px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${pathname === item.href
+              className={`group relative px-3 2xl:px-4 py-2 text-[13px] 2xl:text-[14px] font-semibold tracking-wide transition-colors duration-300 whitespace-nowrap ${pathname === item.href
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -113,7 +113,7 @@ export function Header() {
           >
             <Link
               href={`/${language}/services`}
-              className={`group relative flex items-center gap-1 px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${pathname.startsWith(`/${language}/services`)
+              className={`group relative flex items-center gap-1 px-3 2xl:px-4 py-2 text-[13px] 2xl:text-[14px] font-semibold tracking-wide transition-colors duration-300 whitespace-nowrap ${pathname.startsWith(`/${language}/services`)
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -160,7 +160,7 @@ export function Header() {
           >
             <Link
               href={`/${language}/resources`}
-              className={`group relative flex items-center gap-1 px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${pathname.startsWith(`/${language}/resources`)
+              className={`group relative flex items-center gap-1 px-3 2xl:px-4 py-2 text-[13px] 2xl:text-[14px] font-semibold tracking-wide transition-colors duration-300 whitespace-nowrap ${pathname.startsWith(`/${language}/resources`)
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -204,7 +204,7 @@ export function Header() {
             <Link
               key={item.href}
               href={item.href}
-              className={`group relative px-5 py-2 text-[14px] font-semibold tracking-wide transition-colors duration-300 ${pathname === item.href
+              className={`group relative px-3 2xl:px-4 py-2 text-[13px] 2xl:text-[14px] font-semibold tracking-wide transition-colors duration-300 whitespace-nowrap ${pathname === item.href
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -217,21 +217,26 @@ export function Header() {
             </Link>
           ))}
 
-          <div className="ml-4 border-l border-border/40 pl-4 flex items-center gap-2">
+          <div className="ml-3 2xl:ml-4 border-l border-border/40 pl-3 2xl:pl-4 flex items-center gap-2.5 shrink-0">
             <LanguageSwitcher />
-            <ThemeToggle />
-            <Link
-              href="/login"
-              className="ml-2 rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground transition-all duration-300 hover:bg-foreground hover:text-background dark:hover:bg-white dark:hover:text-black"
-            >
-              Login
-            </Link>
+            <ThemeToggle variant="segmented" showLabel={true} />
+            <div className="flex flex-col items-center gap-0.5 shrink-0">
+              <span className="text-[8.5px] font-mono font-semibold tracking-wider text-muted-foreground uppercase opacity-75 select-none">
+                Portal
+              </span>
+              <Link
+                href="/login"
+                className="rounded-full bg-primary px-3.5 py-1 text-[11px] font-bold text-primary-foreground transition-all duration-200 hover:bg-foreground hover:text-background dark:hover:bg-white dark:hover:text-black shadow-xs hover:scale-105 uppercase tracking-wide flex items-center justify-center h-[26px] whitespace-nowrap"
+              >
+                Login
+              </Link>
+            </div>
           </div>
         </nav>
 
-        {/* Mobile Menu Button */}
+        {/* Mobile / Tablet Menu Button (Visible on screens < 1280px) */}
         <button
-          className="rounded-lg p-2 transition-colors hover:bg-muted md:hidden"
+          className="rounded-lg p-2 transition-colors hover:bg-muted xl:hidden"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           aria-label="Toggle menu"
         >
@@ -245,7 +250,7 @@ export function Header() {
 
       {/* Mobile Navigation */}
       {mobileMenuOpen && (
-        <div className="animate-fade-in border-t border-border/40 bg-background/95 backdrop-blur-md md:hidden">
+        <div className="animate-fade-in border-t border-border/40 bg-background/95 backdrop-blur-md xl:hidden">
           <nav className="container mx-auto flex flex-col gap-1 px-4 py-6">
             {navItems.slice(0, 2).map((item) => (
               <Link
@@ -351,7 +356,7 @@ export function Header() {
               </Link>
               <div className="flex items-center justify-around gap-4">
                 <LanguageSwitcher />
-                <ThemeToggle />
+                <ThemeToggle variant="segmented" showLabel={true} />
               </div>
             </div>
           </nav>

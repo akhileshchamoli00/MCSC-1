@@ -313,8 +313,19 @@ def get_or_create_conversation(payload: dict, db: Session = Depends(database.get
 @router.post("/upload")
 async def upload_chat_attachment(file: UploadFile = File(...), db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     from storage import upload_file
+    from utils.file_sanitizer import validate_and_sanitize_file
     
     file_bytes = await file.read()
-    file_url = upload_file(file_bytes, file.filename, "chat_attachments")
+    if len(file_bytes) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Attachment exceeds 25MB limit")
+        
+    sanitized_bytes, secure_filename = validate_and_sanitize_file(
+        file_bytes=file_bytes,
+        original_filename=file.filename or "attachment",
+        allowed_types=["jpeg", "png", "pdf", "docx", "xlsx", "zip"],
+        strip_exif=False
+    )
+    
+    file_url = upload_file(sanitized_bytes, secure_filename, "chat_attachments")
         
     return {"attachment_url": file_url, "filename": file.filename}

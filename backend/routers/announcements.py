@@ -267,17 +267,24 @@ async def upload_announcement_attachment(
     if not is_staff_or_admin(current_user, "create", db):
         raise HTTPException(status_code=403, detail="Only authorized staff can upload attachments")
         
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    orig_name = file.filename or "attachment.pdf"
-    clean_name = re.sub(r'[^a-zA-Z0-9_.-]', '_', orig_name)
-    stored_filename = f"announcement_{timestamp}_{clean_name}"
+    from utils.file_sanitizer import validate_and_sanitize_file
     
     file_bytes = await file.read()
-    file_url = upload_file(file_bytes, stored_filename, "hrms-documents")
+    if len(file_bytes) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Attachment exceeds 15MB limit")
+
+    sanitized_bytes, secure_filename = validate_and_sanitize_file(
+        file_bytes=file_bytes,
+        original_filename=file.filename or "attachment.pdf",
+        allowed_types=["jpeg", "png", "pdf", "docx", "xlsx", "zip"],
+        strip_exif=False
+    )
+    
+    file_url = upload_file(sanitized_bytes, secure_filename, "hrms-documents")
     
     return {
         "file_url": file_url,
-        "file_name": orig_name
+        "file_name": file.filename or secure_filename
     }
 
 @router.delete("/{id}")

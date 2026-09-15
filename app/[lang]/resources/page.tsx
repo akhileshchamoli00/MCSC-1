@@ -116,7 +116,7 @@ export default function ResourcesPage() {
       {/* Cards Section */}
       <section className="pb-16 flex-grow">
         <div className="container mx-auto px-4">
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 w-full mx-auto">
             {cards.map((card, index) => (
               <motion.div
                 key={index}

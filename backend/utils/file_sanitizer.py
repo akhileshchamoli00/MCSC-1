@@ -9,7 +9,10 @@ from fastapi import HTTPException, status
 ALLOWED_MAGIC_BYTES = {
     "jpeg": [b"\xFF\xD8\xFF"],
     "png": [b"\x89PNG\r\n\x1a\n"],
-    "pdf": [b"%PDF-"]
+    "pdf": [b"%PDF-"],
+    "docx": [b"PK\x03\x04"],
+    "xlsx": [b"PK\x03\x04"],
+    "zip": [b"PK\x03\x04"]
 }
 
 def validate_and_sanitize_file(
@@ -48,7 +51,14 @@ def validate_and_sanitize_file(
         )
 
     # 2. Secure Filename Randomization
-    ext = "jpg" if detected_type == "jpeg" else detected_type
+    orig_ext = original_filename.rsplit('.', 1)[-1].lower() if '.' in original_filename else ""
+    if detected_type in ["docx", "xlsx", "zip"] and orig_ext in ["docx", "xlsx", "zip"]:
+        ext = orig_ext
+    elif detected_type == "jpeg":
+        ext = "jpg"
+    else:
+        ext = detected_type
+        
     safe_orig_name = re.sub(r'[^a-zA-Z0-9_]', '_', original_filename.rsplit('.', 1)[0])[:30]
     unique_suffix = uuid.uuid4().hex[:8]
     secure_filename = f"{safe_orig_name}_{unique_suffix}.{ext}"

@@ -21,7 +21,11 @@ def get_employees(skip: int = 0, limit: int = 100, db: Session = Depends(databas
     return employees
 
 @router.get("/{employee_id}", response_model=schemas.EmployeeResponse)
-def get_employee(employee_id: str, db: Session = Depends(database.get_db)):
+def get_employee(
+    employee_id: str, 
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
     employee = None
     if employee_id.isdigit():
         employee = db.query(models.Employee).filter(models.Employee.id == int(employee_id)).first()
@@ -29,6 +33,10 @@ def get_employee(employee_id: str, db: Session = Depends(database.get_db)):
         employee = db.query(models.Employee).filter(models.Employee.employee_id_custom == employee_id).first()
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
+        
+    is_own_profile = bool(current_user.employee and (current_user.employee.id == employee.id or current_user.employee.employee_id_custom == employee.employee_id_custom))
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "employees_all", "view", db) or (is_own_profile and auth.has_permission(current_user, "employees_profile", "view", db))):
+        raise HTTPException(status_code=403, detail="Not authorized to view employee details")
     return employee
 
 @router.post("", response_model=schemas.EmployeeResponse, status_code=status.HTTP_201_CREATED)
@@ -152,7 +160,14 @@ def delete_employee(employee_id: int, db: Session = Depends(database.get_db), cu
     return
 
 @router.get("/{employee_id}/documents", response_model=List[schemas.EmployeeDocumentResponse])
-def get_employee_documents(employee_id: int, db: Session = Depends(database.get_db)):
+def get_employee_documents(
+    employee_id: int, 
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    is_own_profile = bool(current_user.employee and current_user.employee.id == employee_id)
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "employees_all", "view", db) or (is_own_profile and auth.has_permission(current_user, "employees_profile", "view", db))):
+        raise HTTPException(status_code=403, detail="Not authorized to view employee documents")
     documents = db.query(models.EmployeeDocument).filter(models.EmployeeDocument.employee_id == employee_id).all()
     return documents
 
@@ -169,29 +184,28 @@ async def upload_employee_document(
         raise HTTPException(status_code=403, detail="Not authorized to upload employee documents")
 
     from storage import upload_file
+    from utils.file_sanitizer import validate_and_sanitize_file
     employee = db.query(models.Employee).filter(models.Employee.id == employee_id).first()
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
 
-    import datetime
-    import re
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    emp_name = f"{employee.first_name}_{employee.last_name or ''}".strip()
-    emp_name_clean = re.sub(r'[^a-zA-Z0-9_]', '', emp_name.replace(" ", "_"))
-    
-    file_ext = file.filename.split(".")[-1] if "." in file.filename else ""
-    orig_name = file.filename.rsplit(".", 1)[0]
-    orig_name_clean = re.sub(r'[^a-zA-Z0-9_]', '_', orig_name)
-    
-    new_filename = f"{emp_name_clean}_{timestamp}_{orig_name_clean}.{file_ext}" if file_ext else f"{emp_name_clean}_{timestamp}_{orig_name_clean}"
-
     file_bytes = await file.read()
-    file_url = upload_file(file_bytes, new_filename, "hrms-documents")
+    if len(file_bytes) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Document file size exceeds 15MB limit.")
+        
+    sanitized_bytes, secure_filename = validate_and_sanitize_file(
+        file_bytes=file_bytes,
+        original_filename=file.filename or "document.pdf",
+        allowed_types=["jpeg", "png", "pdf", "docx", "xlsx"],
+        strip_exif=False
+    )
+    
+    file_url = upload_file(sanitized_bytes, secure_filename, "hrms-documents")
     
     new_doc = models.EmployeeDocument(
         employee_id=employee_id,
         document_type=document_type,
-        file_name=new_filename,
+        file_name=secure_filename,
         file_url=file_url
     )
     

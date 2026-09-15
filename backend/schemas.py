@@ -1472,6 +1472,8 @@ class PublicOrderTrackResponse(BaseModel):
     job_title: str
     job_id: Optional[str] = None
     company_name: Optional[str] = None
+    company_code: Optional[str] = None
+    company_id: Optional[int] = None
     client_name: Optional[str] = None
     branch_name: Optional[str] = None
     status: str

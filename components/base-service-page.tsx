@@ -120,7 +120,7 @@ export function BaseServicePage({
         subServices && subServices.length > 0 && (
           <section className="pt-4 pb-20 bg-background/20 backdrop-blur-[2px]">
             <div className="container mx-auto px-4">
-              <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 max-w-7xl mx-auto">
+              <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 w-full mx-auto">
                 {subServices.map((service, index) => (
                   <motion.div
                     key={index}

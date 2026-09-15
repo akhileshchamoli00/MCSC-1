@@ -428,11 +428,11 @@ export default function KBLIPage() {
 
       {/* Results Section */}
       <section className="pt-4 pb-16 bg-background/20 backdrop-blur-[2px] flex-grow">
-        <div className="container mx-auto px-4 max-w-5xl">
+        <div className="container mx-auto px-4 max-w-6xl">
           <AnimatePresence mode="popLayout">
             {filteredData.length > 0 ? (
               <div className="flex flex-col gap-8">
-                <motion.div className="grid gap-4 max-w-5xl mx-auto" layout>
+                <motion.div className="grid gap-4 w-full mx-auto" layout>
                   {filteredData.slice(0, visibleCount).map((item, index) => (
                     <motion.div
                       key={item.code}

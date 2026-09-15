@@ -282,14 +282,36 @@ export default function LoginPage() {
         <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-emerald-500/10 blur-[120px] pointer-events-none -z-10" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] rounded-full bg-primary/10 blur-[130px] pointer-events-none -z-10" />
 
-        <div className="relative z-10 w-full max-w-md">
+        {/* Top-Left Floating Back Button */}
+        <div className="absolute top-5 left-5 sm:top-8 sm:left-8 z-30">
           <Link
             href="/"
-            className="group mb-8 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            className="group inline-flex items-center gap-2.5 px-4 py-2 rounded-full border border-border/80 bg-background/80 dark:bg-zinc-900/90 text-foreground hover:border-primary/60 hover:bg-accent hover:shadow-lg hover:shadow-primary/10 transition-all duration-300 hover:scale-105 active:scale-95 text-xs font-bold tracking-wide backdrop-blur-xl shadow-md"
           >
-            <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
-            Back to Website
+            <div className="w-6 h-6 rounded-full bg-primary/15 text-primary group-hover:bg-primary group-hover:text-primary-foreground flex items-center justify-center transition-colors">
+              <ArrowLeft className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-x-0.5" />
+            </div>
+            <span>Back to Website</span>
           </Link>
+        </div>
+
+        <div className="relative z-10 w-full max-w-md">
+          {/* Highlighted Card Top Back Pill */}
+          <div className="mb-6 flex items-center justify-between">
+            <Link
+              href="/"
+              className="group inline-flex items-center gap-2.5 px-4 py-2 rounded-xl border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary dark:text-emerald-400 shadow-sm backdrop-blur-md transition-all duration-200 hover:scale-105 active:scale-95 text-xs font-bold tracking-wide cursor-pointer"
+            >
+              <div className="w-5 h-5 rounded-md bg-primary/20 text-primary flex items-center justify-center transition-colors">
+                <ArrowLeft className="h-3 w-3 transition-transform duration-300 group-hover:-translate-x-0.5" />
+              </div>
+              <span>Back to Website</span>
+            </Link>
+            <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest font-semibold flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Portal Access
+            </span>
+          </div>
 
           <div className="mb-8 flex justify-center">
             <AskLogo className="h-16 w-auto" />

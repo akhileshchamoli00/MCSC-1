@@ -12,29 +12,29 @@ export function LanguageSwitcher() {
   ]
 
   const labelMap = {
-    en: "Select Language",
-    id: "Pilih Bahasa",
-    cn: "选择语言"
-  }[language] || "Select Language"
+    en: "Language",
+    id: "Bahasa",
+    cn: "语言"
+  }[language] || "Language"
  
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center gap-0.5">
       {/* Label above the pills */}
-      <span className="text-[9px] font-mono font-bold tracking-widest text-muted-foreground uppercase opacity-80 select-none">
+      <span className="text-[8.5px] font-mono font-semibold tracking-wider text-muted-foreground uppercase opacity-75 select-none">
         {labelMap}
       </span>
       
-      {/* Super Premium Larger inline pills */}
-      <div className="flex items-center gap-1.5 rounded-full border border-border/40 bg-background/25 backdrop-blur-md p-1 shadow-sm">
+      {/* Compact inline pills */}
+      <div className="flex items-center gap-0.5 rounded-full border border-border/50 bg-background/30 backdrop-blur-md p-0.5 shadow-xs">
         {languages.map((lang) => {
           const isActive = language === lang.code
           return (
             <button
               key={lang.code}
               onClick={() => setLanguage(lang.code as any)}
-              className={`rounded-full px-5 py-2.5 text-[13px] font-bold uppercase transition-all duration-300 cursor-pointer ${
+              className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase transition-all duration-200 cursor-pointer ${
                 isActive 
-                  ? "bg-primary text-primary-foreground shadow-md scale-105" 
+                  ? "bg-primary text-primary-foreground shadow-xs scale-105" 
                   : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
               }`}
             >

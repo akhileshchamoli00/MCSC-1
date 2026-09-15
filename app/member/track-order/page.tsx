@@ -53,6 +53,8 @@ interface OrderTrackData {
   job_title: string;
   job_id?: string | null;
   company_name?: string | null;
+  company_code?: string | null;
+  company_id?: number | null;
   client_name?: string | null;
   branch_name?: string | null;
   status: string;
@@ -112,7 +114,9 @@ function MemberTrackOrderContent() {
 
   // Search & Order State
   const [searchInput, setSearchInput] = useState(searchParams.get("order") || "");
-  const [taxIdInput, setTaxIdInput] = useState(searchParams.get("tax_id") || "");
+  const [companyIdInput, setCompanyIdInput] = useState(
+    searchParams.get("company_id") || searchParams.get("company_code") || searchParams.get("tax_id") || ""
+  );
   const [orderData, setOrderData] = useState<OrderTrackData | null>(null);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -126,14 +130,14 @@ function MemberTrackOrderContent() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-search if URL query contains order and tax_id
+  // Auto-search if URL query contains order and company_id
   useEffect(() => {
     const orderQuery = searchParams.get("order");
-    const taxQuery = searchParams.get("tax_id");
-    if (orderQuery && taxQuery) {
+    const compQuery = searchParams.get("company_id") || searchParams.get("company_code") || searchParams.get("tax_id");
+    if (orderQuery && compQuery) {
       setSearchInput(orderQuery);
-      setTaxIdInput(taxQuery);
-      handleTrackOrder(orderQuery, taxQuery);
+      setCompanyIdInput(compQuery);
+      handleTrackOrder(orderQuery, compQuery);
     } else if (orderQuery) {
       setSearchInput(orderQuery);
     }
@@ -146,17 +150,17 @@ function MemberTrackOrderContent() {
     }
   }, [orderData?.messages]);
 
-  const handleTrackOrder = async (orderNum?: string, taxId?: string, isSilent = false) => {
+  const handleTrackOrder = async (orderNum?: string, compId?: string, isSilent = false) => {
     const targetOrder = (orderNum || searchInput).trim();
-    const targetTax = (taxId || taxIdInput).trim();
+    const targetCompanyId = (compId || companyIdInput).trim();
 
     if (!targetOrder) {
       toast.error("Please enter a valid Order ID.");
       return;
     }
 
-    if (!targetTax) {
-      toast.error("Please enter your Company Tax ID (NPWP) for verification.");
+    if (!targetCompanyId) {
+      toast.error("Please enter your Company ID for verification.");
       return;
     }
 
@@ -167,12 +171,12 @@ function MemberTrackOrderContent() {
 
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/public/orders/${encodeURIComponent(targetOrder)}/track?tax_id=${encodeURIComponent(targetTax)}`
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/public/orders/${encodeURIComponent(targetOrder)}/track?company_id=${encodeURIComponent(targetCompanyId)}`
       );
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.detail || "Order not found. Please verify your Order ID and Company Tax ID.");
+        throw new Error(errJson.detail || "Order not found. Please verify your Order ID and Company ID.");
       }
 
       const data: OrderTrackData = await res.json();
@@ -252,7 +256,7 @@ function MemberTrackOrderContent() {
 
       setChatMessage("");
       setSelectedFile(null);
-      handleTrackOrder(orderData.order_number, taxIdInput.trim(), true);
+      handleTrackOrder(orderData.order_number, companyIdInput.trim(), true);
     } catch (err: any) {
       toast.error(err.message || "Failed to send message.");
     } finally {
@@ -292,7 +296,7 @@ function MemberTrackOrderContent() {
             Order Tracking & Consultant Live Chat
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-            Enter your Order ID and Company Tax ID to monitor corporate deliverables and message directly with your assigned consulting team.
+            Enter your Order ID and Company ID to monitor corporate deliverables and message directly with your assigned consulting team.
           </p>
         </div>
       </div>
@@ -323,15 +327,15 @@ function MemberTrackOrderContent() {
 
             <div className="space-y-1.5">
               <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> Company Tax ID (NPWP) *
+                <Building2 className="h-3.5 w-3.5 text-primary" /> Company ID *
               </Label>
               <Input
                 type="text"
                 required
-                placeholder="e.g. 01.234.567.8-999.000 or digits"
-                value={taxIdInput}
-                onChange={(e) => setTaxIdInput(e.target.value)}
-                className="h-11 text-sm bg-background/60 border-border font-mono tracking-wide"
+                placeholder="e.g. A260001, COMP-001, or Company ID"
+                value={companyIdInput}
+                onChange={(e) => setCompanyIdInput(e.target.value)}
+                className="h-11 text-sm bg-background/60 border-border uppercase font-mono tracking-wide"
               />
             </div>
           </div>
@@ -339,7 +343,7 @@ function MemberTrackOrderContent() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
               <span className="font-semibold text-foreground/80">Active Verification:</span>
-              <span>Order ID and Tax ID pair unlocks live 2-way consultant messaging & document sharing.</span>
+              <span>Order ID and Company ID pair unlocks live 2-way consultant messaging & document sharing.</span>
             </div>
 
             <Button
@@ -380,7 +384,7 @@ function MemberTrackOrderContent() {
           </div>
           <h3 className="text-lg font-bold text-foreground">Key in your Order ID to Begin</h3>
           <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
-            Enter your Order ID (e.g. MCSX-260002) and registered Company Tax ID above to track milestones, view corporate invoices, and chat directly with your assigned consultants.
+            Enter your Order ID (e.g. MCSX-260002) and registered Company ID above to track milestones, view corporate invoices, and chat directly with your assigned consultants.
           </p>
         </Card>
       )}
@@ -423,9 +427,16 @@ function MemberTrackOrderContent() {
                 <span className="text-muted-foreground font-medium flex items-center gap-1.5">
                   <Building2 className="h-3.5 w-3.5 text-primary" /> Company Entity
                 </span>
-                <p className="font-bold text-foreground text-sm truncate">
-                  {orderData.company_name || "General Client Order"}
-                </p>
+                <div className="space-y-0.5">
+                  <p className="font-bold text-foreground text-sm truncate">
+                    {orderData.company_name || "General Client Order"}
+                  </p>
+                  {orderData.company_code && (
+                    <Badge variant="outline" className="text-[10px] font-mono font-bold px-1.5 py-0 bg-primary/5 text-primary border-primary/20">
+                      ID: {orderData.company_code}
+                    </Badge>
+                  )}
+                </div>
               </div>
               <div className="p-3 rounded-xl bg-muted/40 border border-border/60 space-y-1">
                 <span className="text-muted-foreground font-medium flex items-center gap-1.5">

@@ -314,7 +314,7 @@ export default function BrandClassificationPage() {
       <section className="pb-24 flex-grow container mx-auto px-4">
         {isLoading ? (
           /* Loading State with Skeletal UI */
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 max-w-7xl mx-auto h-[600px]">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 w-full mx-auto h-[600px]">
             <Card className="col-span-1 bg-white/40 dark:bg-background/50 backdrop-blur-md p-6 h-full hidden md:block border border-border/50 dark:border-white/20">
               <div className="animate-pulse space-y-4">
                 <div className="h-6 bg-zinc-200 dark:bg-zinc-800 rounded w-2/3"></div>
@@ -353,7 +353,7 @@ export default function BrandClassificationPage() {
           </div>
         ) : (
           /* Main Interactive Workspace Grid */
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 max-w-7xl mx-auto items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 w-full mx-auto items-start">
             {/* Sidebar Left Column: Nice Classes Nav Tabs */}
             <aside className="lg:col-span-1 hidden lg:block sticky top-24 max-h-[calc(100vh-140px)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
               <div className="space-y-6">

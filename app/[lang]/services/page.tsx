@@ -89,7 +89,7 @@ export default function ServicesPage() {
       {/* Services Grid with Electric Borders & Glassmorphism */}
       <section className="pt-4 pb-20">
         <div className="container mx-auto px-4">
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4 max-w-7xl mx-auto">
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4 w-full mx-auto">
             {servicesList.map((service, index) => {
               const Icon = service.icon;
               return (

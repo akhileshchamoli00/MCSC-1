@@ -30,14 +30,30 @@ for subfolder in [
 def save_file_locally(file_bytes: bytes, filename: str, subfolder: str = "documents") -> str:
     """
     Saves binary content to the persistent disk storage outside the code repository.
+    Sanitizes filename and prevents directory traversal attacks.
     Returns the public web URL path: `/uploads/<subfolder>/<filename>`.
     """
-    target_dir = os.path.join(UPLOAD_DIR, subfolder)
+    clean_subfolder = os.path.basename(subfolder.replace("\\", "/").strip().rstrip("/")) or "documents"
+    clean_filename = os.path.basename(filename.replace("\\", "/").strip())
+    if not clean_filename:
+        clean_filename = f"file_{uuid.uuid4().hex[:12]}"
+
+    target_dir = os.path.abspath(os.path.join(UPLOAD_DIR, clean_subfolder))
+    base_upload_dir = os.path.abspath(UPLOAD_DIR)
+
+    # Path traversal validation guard
+    if not target_dir.startswith(base_upload_dir):
+        target_dir = os.path.abspath(os.path.join(UPLOAD_DIR, "documents"))
+
     os.makedirs(target_dir, exist_ok=True)
-    file_path = os.path.join(target_dir, filename)
+    file_path = os.path.abspath(os.path.join(target_dir, clean_filename))
+
+    if not file_path.startswith(base_upload_dir):
+        raise ValueError("Invalid file destination path")
+
     with open(file_path, "wb") as f:
         f.write(file_bytes)
-    return f"/uploads/{subfolder}/{filename}"
+    return f"/uploads/{clean_subfolder}/{clean_filename}"
 
 
 def upload_file(file_bytes: bytes, filename: str, bucket_name: str = "hrms-documents") -> str:
@@ -66,14 +82,21 @@ def get_file_url(file_url_or_path: str, bucket_name: str = "hrms-documents", exp
 def delete_file(file_url: str, bucket_name: str = "hrms-documents") -> bool:
     """
     Deletes a file from persistent disk storage.
+    Validates destination path to prevent path traversal deletions.
     """
     if not file_url:
         return False
 
     if file_url.startswith("/uploads/"):
-        rel_path = file_url.replace("/uploads/", "")
-        local_path = os.path.join(UPLOAD_DIR, rel_path)
-        if os.path.exists(local_path):
+        rel_path = file_url.replace("/uploads/", "").lstrip("/\\")
+        base_upload_dir = os.path.abspath(UPLOAD_DIR)
+        local_path = os.path.abspath(os.path.join(UPLOAD_DIR, rel_path))
+        
+        # Verify local path is strictly within base upload dir
+        if not local_path.startswith(base_upload_dir):
+            return False
+
+        if os.path.exists(local_path) and os.path.isfile(local_path):
             try:
                 os.remove(local_path)
                 return True

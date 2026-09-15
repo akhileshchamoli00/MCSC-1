@@ -526,7 +526,7 @@ export default function CheckApplicationStatusPage() {
       </section>
 
       {/* Main Interactive Workspace Section */}
-      <section className="pb-12 flex-grow container mx-auto px-4 max-w-5xl">
+      <section className="pb-12 flex-grow container mx-auto px-4 max-w-6xl">
         <div className="space-y-8">
 
           {/* Inline Form Container inside BorderGlow */}
