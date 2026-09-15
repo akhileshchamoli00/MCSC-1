@@ -408,6 +408,16 @@ class AuditLog(Base):
 
     employee = relationship("Employee")
 
+class LoginAttempt(Base):
+    __tablename__ = "login_attempts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ip_address = Column(String, index=True)
+    attempted_email = Column(String, nullable=True, index=True)
+    is_successful = Column(Boolean, default=False)
+    user_agent = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
 class Notification(Base):
     __tablename__ = "notifications"
     

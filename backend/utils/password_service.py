@@ -6,12 +6,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# We need a stable key for fernet encryption. If not provided, we create a deterministic one based on a secret
-# or just generate one and tell the user they must keep it in .env
+# We need a stable key for fernet encryption.
 FERNET_KEY = os.getenv("FERNET_KEY")
 if not FERNET_KEY:
-    # This is a fallback purely for the sake of the demo, in production it MUST be in .env
-    # We generate a stable key using a known secret to avoid losing access on restart if not in env
+    secret_str = os.getenv("SECRET_KEY")
+    if not secret_str:
+        is_prod = os.getenv("ENV", "development").lower() == "production"
+        if is_prod:
+            raise RuntimeError(
+                "FATAL SECURITY ERROR: Neither 'FERNET_KEY' nor 'SECRET_KEY' environment variables are set. "
+                "Production deployments cannot start without an encryption key."
+            )
+        import secrets
+        secret_str = secrets.token_hex(32)
+        print("WARNING: 'FERNET_KEY' and 'SECRET_KEY' missing; generated temporary runtime encryption key.")
+
     import base64
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -22,7 +31,7 @@ if not FERNET_KEY:
         salt=b"hrms_salt_for_fernet",
         iterations=390000,
     )
-    secret = os.getenv("SECRET_KEY", "supersecret").encode()
+    secret = secret_str.encode()
     FERNET_KEY = base64.urlsafe_b64encode(kdf.derive(secret))
 
 fernet = Fernet(FERNET_KEY)

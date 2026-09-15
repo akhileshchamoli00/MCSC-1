@@ -65,6 +65,10 @@ def validate_user_dropbox_access(user: models.User, path: str, db: Session):
     role_name = (user.role.name if user.role else "").strip().upper()
     if role_name in ("CLIENT", "MEMBER"):
         norm_path = path.replace("\\", "/").strip().lower()
+        if not norm_path.startswith("/"):
+            norm_path = "/" + norm_path
+        norm_path_clean = norm_path.rstrip("/")
+        
         allowed_codes = []
         if user.client:
             for comp in user.client.companies:
@@ -72,10 +76,14 @@ def validate_user_dropbox_access(user: models.User, path: str, db: Session):
                     allowed_codes.append(comp.company_code.strip().lower())
                 allowed_codes.append(f"comp_{comp.id}".lower())
                 
-        is_allowed = any(
-            norm_path.startswith(f"/clients/{code}") or norm_path.startswith(f"clients/{code}") 
-            for code in allowed_codes
-        )
+        is_allowed = False
+        for code in allowed_codes:
+            expected_prefix = f"/clients/{code}"
+            # Strict boundary check: exact folder or slash-delimited sub-item
+            if norm_path_clean == expected_prefix or norm_path.startswith(f"{expected_prefix}/"):
+                is_allowed = True
+                break
+
         if not is_allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

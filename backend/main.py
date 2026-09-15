@@ -73,11 +73,138 @@ app.include_router(teams.router)
 app.include_router(webhooks.router)
 app.include_router(accurate.router)
 
-# Mount persistent uploads directory (located outside git code directory on AWS)
+# Persistent uploads directory (located outside git code directory on AWS)
 import os
 from storage import UPLOAD_DIR
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
+from fastapi.responses import FileResponse
+from jose import jwt, JWTError
+
+PUBLIC_UPLOAD_SUBFOLDERS = {"profile-photos", "logos", "public"}
+
+@app.get("/uploads/{subfolder}/{file_path:path}")
+async def get_uploaded_file(
+    subfolder: str,
+    file_path: str,
+    request: Request,
+    db: Session = Depends(database.get_db)
+):
+    """
+    Secure file streaming endpoint.
+    - Public assets (profile-photos, logos) are served immediately.
+    - Protected documents (hrms-documents, client-documents, chat_attachments) require authentication & RBAC.
+    """
+    clean_subfolder = os.path.basename(subfolder.replace("\\", "/").strip())
+    clean_file_path = file_path.replace("\\", "/").lstrip("/")
+    
+    base_dir = os.path.abspath(UPLOAD_DIR)
+    target_path = os.path.abspath(os.path.join(base_dir, clean_subfolder, clean_file_path))
+    
+    # Path traversal protection
+    if not target_path.startswith(base_dir) or not os.path.exists(target_path) or not os.path.isfile(target_path):
+        raise HTTPException(status_code=404, detail="File not found")
+        
+    # 1. Public assets: served immediately
+    if clean_subfolder in PUBLIC_UPLOAD_SUBFOLDERS:
+        return FileResponse(
+            target_path,
+            headers={
+                "X-Content-Type-Options": "nosniff",
+                "Cache-Control": "public, max-age=86400"
+            }
+        )
+        
+    # 2. Protected files: require valid session token (cookie, Authorization header, or query param)
+    token = request.cookies.get("hrms_token")
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ", 1)[1]
+    if not token:
+        token = request.query_params.get("token")
+        
+    if not token or token == "cookie_based_session_active":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required to access protected documents",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+        
+    try:
+        payload = jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
+        email: str = payload.get("sub")
+        if not email:
+            raise HTTPException(status_code=401, detail="Invalid session token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired session token")
+        
+    current_user = auth.get_user_by_email(db, email=email)
+    if not current_user or not current_user.is_active:
+        raise HTTPException(status_code=401, detail="User account inactive or not found")
+        
+    # 3. RBAC & Multi-Tenant Authorization Checks
+    if not auth.is_super_admin(current_user):
+        role_name = (current_user.role.name if current_user.role else "").strip().upper()
+        
+        if clean_subfolder in ("client-documents", "client_documents"):
+            has_staff_perm = (
+                auth.has_permission(current_user, "clients_documents", "view", db) or
+                auth.has_permission(current_user, "clients_company", "view", db) or
+                auth.has_permission(current_user, "clients_all", "view", db)
+            )
+            if not has_staff_perm:
+                user_company_codes = []
+                if current_user.client:
+                    for c in current_user.client.companies:
+                        if c.company_code:
+                            user_company_codes.append(c.company_code.lower())
+                        user_company_codes.append(f"comp_{c.id}".lower())
+                        user_company_codes.append(f"company_{c.id}".lower())
+                
+                path_lower = clean_file_path.lower()
+                is_authorized_client = any(
+                    path_lower.startswith(f"{code}/") or f"/{code}/" in path_lower or path_lower.startswith(f"{code}_") or f"_{code}_" in path_lower
+                    for code in user_company_codes
+                )
+                if not is_authorized_client:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Access denied. You do not have permission to view this client document."
+                    )
+                    
+        elif clean_subfolder == "hrms-documents":
+            has_hrms_perm = (
+                auth.has_permission(current_user, "employees_all", "view", db) or
+                auth.has_permission(current_user, "announcements", "view", db) or
+                auth.has_permission(current_user, "leave_requests", "view", db) or
+                (role_name not in ("CLIENT", "MEMBER") and not clean_file_path.lower().startswith("contract_"))
+            )
+            if not has_hrms_perm:
+                emp = current_user.employee
+                is_own = False
+                if emp:
+                    emp_code = (emp.employee_id_custom or "").lower()
+                    emp_name = f"{emp.first_name}_{emp.last_name or ''}".strip().lower()
+                    if (emp_code and emp_code in clean_file_path.lower()) or (emp_name and emp_name in clean_file_path.lower()):
+                        is_own = True
+                if not is_own:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Access denied. You do not have permission to view this HR document."
+                    )
+                    
+        elif clean_subfolder == "chat_attachments":
+            # Active authenticated users can access chat attachments
+            pass
+            
+    return FileResponse(
+        target_path,
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, no-cache"
+        }
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -235,19 +362,28 @@ def register_member(
     }
 
 
+from utils.rate_limiter import check_login_rate_limit, record_failed_attempt, clear_failed_attempts
+
 @app.post("/api/auth/member-login")
 def login_member(
     req: schemas.MemberLoginRequest,
+    request: Request,
     response: Response,
     db: Session = Depends(database.get_db)
 ):
-    user = auth.get_user_by_email(db, email=req.email.lower().strip())
+    check_login_rate_limit(request, max_attempts=5, window_seconds=300, db=db)
+    
+    clean_email = req.email.lower().strip()
+    user = auth.get_user_by_email(db, email=clean_email)
     if not user or not user.is_active or not auth.verify_password(req.password, user.hashed_password):
+        record_failed_attempt(request, attempted_email=clean_email, db=db)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password."
         )
         
+    clear_failed_attempts(request, attempted_email=clean_email, db=db)
+    
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
@@ -279,22 +415,26 @@ def login_member(
         }
     }
 
-from utils.rate_limiter import check_login_rate_limit, record_failed_attempt, clear_failed_attempts
-
 @app.post("/api/auth/login", response_model=schemas.Token)
-def login_for_access_token(request: Request, response: Response, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(database.get_db)):
-    check_login_rate_limit(request, max_attempts=5, window_seconds=300)
+def login_for_access_token(
+    request: Request, 
+    response: Response, 
+    form_data: OAuth2PasswordRequestForm = Depends(), 
+    db: Session = Depends(database.get_db)
+):
+    check_login_rate_limit(request, max_attempts=5, window_seconds=300, db=db)
     
-    user = auth.get_user_by_email(db, email=form_data.username)
+    clean_email = (form_data.username or "").strip().lower()
+    user = auth.get_user_by_email(db, email=clean_email)
     if not user or not user.is_active or not auth.verify_password(form_data.password, user.hashed_password):
-        record_failed_attempt(request)
+        record_failed_attempt(request, attempted_email=clean_email, db=db)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password.",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    clear_failed_attempts(request)
+    clear_failed_attempts(request, attempted_email=clean_email, db=db)
     
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(

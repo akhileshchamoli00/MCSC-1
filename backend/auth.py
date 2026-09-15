@@ -10,7 +10,18 @@ from sqlalchemy.orm import Session
 import schemas, models, database
 
 # Security configuration
-SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey-change-me-in-production")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    is_prod = os.getenv("ENV", "development").lower() == "production"
+    if is_prod:
+        raise RuntimeError(
+            "FATAL SECURITY ERROR: 'SECRET_KEY' environment variable is not set. "
+            "Production deployments cannot start without an explicitly configured, high-entropy SECRET_KEY."
+        )
+    import secrets
+    SECRET_KEY = secrets.token_hex(32)
+    print("WARNING: 'SECRET_KEY' environment variable was not found; generated temporary runtime secret.")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 7 days for MVP
 
