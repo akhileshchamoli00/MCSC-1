@@ -102,17 +102,14 @@ export default function CompanyDetailPage() {
   const [sendingEmail, setSendingEmail] = useState(false);
 
   const handleSendWelcomeEmail = async () => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token || !companyId) return;
+    if (!companyId) return;
 
     setSendingEmail(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}/send-welcome-email`, {
+      credentials: "include",
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
+        });
 
       const data = await res.json();
       if (!res.ok) {
@@ -134,14 +131,13 @@ export default function CompanyDetailPage() {
   };
 
   const handleDeleteCompany = async () => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token || !company) return;
+    if (!company) return;
     setDeleting(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${company.id}`, {
+      credentials: "include",
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         toast.success(`Company "${company.company_name}" deleted successfully`);
         router.push("/business/clients/companies");
@@ -184,20 +180,17 @@ export default function CompanyDetailPage() {
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-
   const fetchCompanyDetails = async () => {
-    if (!token || !companyId) return;
+    if (!companyId) return;
     try {
       setLoading(true);
       const [compRes, cliRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        }),
+      credentials: "include",
+          }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        })
+      credentials: "include",
+          })
       ]);
 
       if (cliRes.ok) setClients(await cliRes.json());
@@ -237,17 +230,17 @@ export default function CompanyDetailPage() {
   }, [companyId]);
 
   const handleValidateCompany = async (status: "VALIDATED" | "NEEDS_REVISION" | "PENDING_VALIDATION", notes?: string) => {
-    if (!token || !companyId) return;
+    if (!companyId) return;
     setValidating(true);
     setErrorMsg(null);
     setSuccessMsg(null);
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}/validate`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           status: status,
@@ -280,7 +273,7 @@ export default function CompanyDetailPage() {
 
   const handleUpdateCompany = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !companyId) return;
+    if (!companyId) return;
     setSaving(true);
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -358,10 +351,10 @@ export default function CompanyDetailPage() {
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(payload)
       });

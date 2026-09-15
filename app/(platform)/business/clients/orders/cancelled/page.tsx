@@ -118,20 +118,22 @@ export default function CancelledOrdersPage() {
 
   const fetchData = async () => {
     if (userLoading || !canView) return;
-    const activeToken = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-    if (!activeToken) {
-      setLoading(false);
-      return;
-    }
+
     try {
       setLoading(true);
       const [ordRes, cliRes, compRes, serRes, empRes, teamRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, { headers: { Authorization: `Bearer ${activeToken}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, { headers: { Authorization: `Bearer ${activeToken}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, { headers: { Authorization: `Bearer ${activeToken}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, { headers: { Authorization: `Bearer ${activeToken}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, { headers: { Authorization: `Bearer ${activeToken}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, { headers: { Authorization: `Bearer ${activeToken}` } })
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, {
+      credentials: "include", })
       ]);
 
       if (ordRes.ok) {
@@ -177,13 +179,12 @@ export default function CancelledOrdersPage() {
   }, [isViewOpen, isChatOpen, isProformaPreviewOpen, isFinalInvoicePreviewOpen]);
 
   const fetchProgressUpdates = async (orderNum: string) => {
-    const activeToken = localStorage.getItem("hrms_token");
-    if (!activeToken) return;
+
     setLoadingProgress(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNum}/progress`, {
-        headers: { Authorization: `Bearer ${activeToken}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         setProgressUpdates(await res.json());
       }
@@ -431,17 +432,13 @@ export default function CancelledOrdersPage() {
   // Reopen Cancelled Order back to Active (DRAFT)
   const handleReopenOrderSubmit = async () => {
     if (!selectedOrderGroup) return;
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
 
     setReopeningOrder(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/group/${selectedOrderGroup.order_number}/reopen`, {
+      credentials: "include",
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+        });
 
       if (res.ok) {
         toast.success(`Order #${selectedOrderGroup.order_number} has been reopened and restored to Active Orders.`);
@@ -464,17 +461,13 @@ export default function CancelledOrdersPage() {
   // Delete Order Group
   const handleDeleteOrderSubmit = async () => {
     if (!selectedOrderGroup) return;
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
 
     setDeletingOrder(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/group/${selectedOrderGroup.order_number}`, {
+      credentials: "include",
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+        });
 
       if (res.ok) {
         toast.success(`Order #${selectedOrderGroup.order_number} deleted successfully.`);

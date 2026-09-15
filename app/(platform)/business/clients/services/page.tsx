@@ -63,16 +63,12 @@ export default function ClientServicesPage() {
 
   const [selectedService, setSelectedService] = useState<any>(null);
   const [saving, setSaving] = useState(false);
-
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-
   const fetchServices = async () => {
-    if (!token) return;
     try {
       setLoading(true);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         const data = await res.json();
         setServices(data);
@@ -92,13 +88,13 @@ export default function ClientServicesPage() {
   }, []);
 
   const handleDeleteSubmit = async () => {
-    if (!token || !selectedService) return;
+    if (!selectedService) return;
     setSaving(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog/${selectedService.id}`, {
+      credentials: "include",
         method: "DELETE",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         toast.success("Service entry deleted");
         setIsDeleteOpen(false);

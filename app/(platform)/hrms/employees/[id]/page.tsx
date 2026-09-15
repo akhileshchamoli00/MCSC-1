@@ -35,14 +35,14 @@ export default function EmployeeProfilePage() {
   const [isDeletingDoc, setIsDeletingDoc] = useState(false);
 
   const fetchData = async () => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
     try {
-      const headers = { Authorization: `Bearer ${token}` };
       const [empRes, docRes, perfRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/${employeeId}`, { headers }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/${employeeId}/documents`, { headers }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/reviews?employee_id=${employeeId}`, { headers })
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/${employeeId}`, {
+      credentials: "include" }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/${employeeId}/documents`, {
+      credentials: "include" }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/reviews?employee_id=${employeeId}`, {
+      credentials: "include" })
       ]);
       
       if (empRes.ok) setEmployee(await empRes.json());
@@ -83,16 +83,14 @@ export default function EmployeeProfilePage() {
     }
 
     setUploadingDoc(true);
-    const token = localStorage.getItem("hrms_token");
-    
     const formData = new FormData();
     formData.append("file", file);
     formData.append("document_type", docType);
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/${employeeId}/documents`, {
+      credentials: "include",
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
         body: formData
       });
       
@@ -116,12 +114,11 @@ export default function EmployeeProfilePage() {
     if (!deletingDocumentId) return;
     
     setIsDeletingDoc(true);
-    const token = localStorage.getItem("hrms_token");
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/${employeeId}/documents/${deletingDocumentId}`, {
+      credentials: "include",
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         toast.success("Document deleted successfully");
         await fetchData();
@@ -190,8 +187,6 @@ export default function EmployeeProfilePage() {
     if (!file) return;
 
     setUploadingPhoto(true);
-    const token = localStorage.getItem("hrms_token");
-    
     let fileToUpload = file;
     try {
       fileToUpload = await compressImage(file);
@@ -204,8 +199,8 @@ export default function EmployeeProfilePage() {
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/${employeeId}/photo`, {
+      credentials: "include",
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
         body: formData
       });
       

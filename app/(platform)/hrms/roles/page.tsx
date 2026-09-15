@@ -15,13 +15,10 @@ export default function RolesPage() {
   useEffect(() => {
     const fetchRoles = async () => {
       try {
-        const token = localStorage.getItem("hrms_token");
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
         const res = await fetch(`${apiUrl}/api/roles`, {
-          headers: {
-            "Authorization": `Bearer ${token}`
-          }
-        });
+      credentials: "include",
+          });
         
         if (!res.ok) {
           throw new Error("Failed to fetch roles");

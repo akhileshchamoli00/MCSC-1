@@ -38,26 +38,21 @@ export default function AssignConsultants() {
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-
   useEffect(() => {
-    if (!token) return;
-    
     const loadInitialData = async () => {
       try {
         // Fetch clients
         const clientsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         const clientsData = await clientsRes.json();
         const activeClients = clientsData.filter((c: any) => c.status === "ACTIVE");
         setClients(activeClients);
 
         // Fetch employees
         const employeesRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         const employeesData = await employeesRes.json();
         // Keep only active employees
         setEmployees(employeesData.filter((e: any) => e.status === "ACTIVE"));
@@ -73,7 +68,7 @@ export default function AssignConsultants() {
 
   // Fetch current assignments when client changes
   useEffect(() => {
-    if (!selectedCompanyId || !token) {
+    if (!selectedCompanyId) {
       setSelectedEmployeeIds([]);
       setPrimaryEmployeeId(null);
       return;
@@ -82,8 +77,8 @@ export default function AssignConsultants() {
     const fetchCurrentAssignments = async () => {
       try {
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${selectedCompanyId}/consultants`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         if (response.ok) {
           const current = await response.json();
           const empIds = current.map((c: any) => c.id);
@@ -118,17 +113,17 @@ export default function AssignConsultants() {
   };
 
   const handleSaveAssignments = async () => {
-    if (!selectedCompanyId || !token) return;
+    if (!selectedCompanyId) return;
     setSaving(true);
     setSuccessMsg("");
     setErrorMsg("");
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${selectedCompanyId}/assign`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           employee_ids: selectedEmployeeIds,

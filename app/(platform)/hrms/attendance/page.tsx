@@ -35,14 +35,13 @@ export default function AttendancePage() {
 
   const fetchData = async () => {
     try {
-      const token = localStorage.getItem("hrms_token");
       // For employee, we don't have a direct settings endpoint. We will need to fetch it.
       // Wait, admin only? Oh, the clock-in endpoint handles it securely.
       // But we want to show distance in UI. Let's make an endpoint for settings if missing, or just rely on the clock-in error.
       // I will just fetch history.
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance/my-history`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         const data = await res.json();
         setMyHistory(data);
@@ -84,10 +83,10 @@ export default function AttendancePage() {
     setLocationError("");
     setSubmitting(true);
     try {
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance/clock-in`, {
+      credentials: "include",
         method: "POST",
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ latitude: coords.lat, longitude: coords.lng })
       });
       if (res.ok) {
@@ -110,10 +109,10 @@ export default function AttendancePage() {
     setLocationError("");
     setSubmitting(true);
     try {
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance/clock-out`, {
+      credentials: "include",
         method: "POST",
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ latitude: coords.lat, longitude: coords.lng })
       });
       if (res.ok) {

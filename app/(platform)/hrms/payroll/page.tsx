@@ -67,9 +67,6 @@ export default function AdminPayrollPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("hrms_token");
-      if (!token) return;
-
       const canView = contextIsAdmin || hasPermission("payroll_management", "view");
       if (!canView) {
         router.push("/my-payroll");
@@ -78,8 +75,8 @@ export default function AdminPayrollPage() {
       setIsAdmin(true);
 
       const payrollRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payroll/`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (payrollRes.ok) {
         setPayrolls(await payrollRes.json());
       }
@@ -110,11 +107,10 @@ export default function AdminPayrollPage() {
     setIsGenerating(true);
     const toastId = toast.loading("Generating monthly payroll drafts...");
     try {
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payroll/generate`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
@@ -149,10 +145,9 @@ export default function AdminPayrollPage() {
   };
 
   const handleDownload = (id: number, month: number, year: number, empId: string) => {
-    const token = localStorage.getItem("hrms_token");
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payroll/${id}/download`, {
-      headers: { "Authorization": `Bearer ${token}` }
-    })
+      credentials: "include",
+      })
       .then(async res => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({ detail: "Download failed" }));
@@ -177,13 +172,12 @@ export default function AdminPayrollPage() {
   };
 
   const handleSendPayslip = async (id: number) => {
-    const token = localStorage.getItem("hrms_token");
     const toastId = toast.loading("Finalizing payslip and encrypting PDF...");
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payroll/${id}/generate-payslip`, {
+      credentials: "include",
         method: "POST",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         toast.success("Payslip finalized", {
           id: toastId,
@@ -207,14 +201,13 @@ export default function AdminPayrollPage() {
   };
 
   const handleSendAllPayslips = async () => {
-    const token = localStorage.getItem("hrms_token");
     setGeneratingAll(true);
     const toastId = toast.loading(`Finalizing all draft payslips for ${getMonthName(searchMonth)} ${searchYear}...`);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payroll/generate-all-payslips`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({ month: searchMonth, year: searchYear })

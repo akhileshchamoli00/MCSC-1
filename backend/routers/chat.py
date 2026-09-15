@@ -113,17 +113,18 @@ async def get_ws_user(token: str, db: Session) -> models.User:
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
-    if not token:
-        # Check query params
-        token = websocket.query_params.get("token")
-        
-    if not token:
+    # If token is not provided or is placeholder, read from HttpOnly cookies
+    actual_token = websocket.cookies.get("hrms_token") or token or websocket.query_params.get("token")
+    if actual_token == "cookie_based_session_active":
+        actual_token = websocket.cookies.get("hrms_token") or websocket.query_params.get("token")
+
+    if not actual_token or actual_token == "cookie_based_session_active":
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
     db = database.SessionLocal()
     try:
-        current_user = await get_ws_user(token, db)
+        current_user = await get_ws_user(actual_token, db)
         if not current_user:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return

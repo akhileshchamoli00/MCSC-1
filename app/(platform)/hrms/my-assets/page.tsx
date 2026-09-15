@@ -11,12 +11,9 @@ export default function MyAssetsPage() {
   const fetchMyAssets = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("hrms_token");
-      if (!token) return;
-
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/assets/my-assets`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         setAssets(await res.json());
       }

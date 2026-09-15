@@ -29,14 +29,11 @@ export default function NewRolePage() {
     setError(null);
     
     try {
-      const token = localStorage.getItem("hrms_token");
-      if (!token) throw new Error("Authentication token not found. Please log in again.");
-
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/roles/`, {
+      credentials: "include",
         method: "POST",
         headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(formData)
       });

@@ -81,22 +81,23 @@ export default function EditClientOrderPage() {
     notes: ""
   });
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-
   const fetchData = async () => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+
     try {
       setLoading(true);
       const [ordRes, serRes, empRes, teamRes, notariesRes, compRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, { headers: { "Authorization": `Bearer ${token}` } })
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, {
+      credentials: "include", })
       ]);
 
       let fetchedOrders: any[] = [];
@@ -336,7 +337,7 @@ export default function EditClientOrderPage() {
 
   const handleCreateCompanySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
+
     if (!newCompanyForm.company_name.trim()) {
       toast.error("Company name is required");
       return;
@@ -368,10 +369,10 @@ export default function EditClientOrderPage() {
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/standalone`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(payload)
       });
@@ -411,7 +412,7 @@ export default function EditClientOrderPage() {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !selectedOrderGroup || !editForm.items) return;
+    if (!selectedOrderGroup || !editForm.items) return;
 
     const validItems = editForm.items.filter((i: any) => i.service_id && i.job_title);
     if (validItems.length === 0) {
@@ -426,9 +427,9 @@ export default function EditClientOrderPage() {
         await Promise.all(
           deletedItemIds.map((id) =>
             fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${id}`, {
+      credentials: "include",
               method: "DELETE",
-              headers: { "Authorization": `Bearer ${token}` }
-            })
+              })
           )
         );
       }
@@ -446,10 +447,10 @@ export default function EditClientOrderPage() {
         await Promise.all(
           existingItems.map((item: any, idx: number) =>
             fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${item.id}`, {
+      credentials: "include",
               method: "PUT",
               headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
+                "Content-Type": "application/json"
               },
               body: JSON.stringify({
                 status: editForm.status,
@@ -499,10 +500,10 @@ export default function EditClientOrderPage() {
         };
 
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
+      credentials: "include",
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
+            "Content-Type": "application/json"
           },
           body: JSON.stringify(payload)
         });

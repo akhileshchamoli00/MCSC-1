@@ -34,21 +34,16 @@ export default function ReviewForm({ reviewId }: ReviewFormProps) {
   const [reviewerId, setReviewerId] = useState<number | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-
-    const headers = { Authorization: `Bearer ${token}` };
-
     const loadFormData = async () => {
       try {
         // Fetch cycles and employees
         const [cycleRes, empRes, profileRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/review-cycles`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile`, { headers })
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/review-cycles`, {
+      credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, {
+      credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile`, {
+      credentials: "include" })
         ]);
 
         if (cycleRes.ok) setCycles(await cycleRes.json());
@@ -60,7 +55,8 @@ export default function ReviewForm({ reviewId }: ReviewFormProps) {
 
         // If editing, load the review data
         if (reviewId) {
-          const reviewRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/reviews`, { headers });
+          const reviewRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/reviews`, {
+      credentials: "include" });
           if (reviewRes.ok) {
             const allReviews = await reviewRes.json();
             const review = allReviews.find((r: any) => r.id.toString() === reviewId);
@@ -99,9 +95,7 @@ export default function ReviewForm({ reviewId }: ReviewFormProps) {
     }
 
     setSaving(true);
-    const token = localStorage.getItem("hrms_token");
     const headers = {
-      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json"
     };
 
@@ -122,6 +116,7 @@ export default function ReviewForm({ reviewId }: ReviewFormProps) {
       let res;
       if (reviewId) {
         res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/reviews/${reviewId}`, {
+      credentials: "include",
           method: "PUT",
           headers,
           body: JSON.stringify({
@@ -136,6 +131,7 @@ export default function ReviewForm({ reviewId }: ReviewFormProps) {
         });
       } else {
         res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/reviews`, {
+      credentials: "include",
           method: "POST",
           headers,
           body: JSON.stringify(payload)

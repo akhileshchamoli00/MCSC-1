@@ -109,12 +109,11 @@ export default function AssetsAdminPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("hrms_token");
-      if (!token) return;
-
       const [assetsRes, empRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/assets`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, { headers: { "Authorization": `Bearer ${token}` } })
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/assets`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, {
+      credentials: "include", })
       ]);
 
       if (assetsRes.ok) setAssets(await assetsRes.json());
@@ -143,11 +142,10 @@ export default function AssetsAdminPage() {
     if (!values.employee_id) return alert("Select an employee");
     try {
       setSubmitting(true);
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/assets/bulk-assign`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
@@ -189,11 +187,10 @@ export default function AssetsAdminPage() {
   const onEditSubmit = async (values: any) => {
     try {
       setSubmitting(true);
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/assets/${editingAsset.id}`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify(values)
@@ -217,11 +214,10 @@ export default function AssetsAdminPage() {
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete (archive) this asset? It will be removed from the active list.")) return;
     try {
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/assets/${id}`, {
+      credentials: "include",
         method: "DELETE",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         fetchData();
       }
@@ -232,10 +228,9 @@ export default function AssetsAdminPage() {
 
   const fetchHistory = async (id: number) => {
     try {
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/assets/${id}/history`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         setHistoryLogs(await res.json());
       }

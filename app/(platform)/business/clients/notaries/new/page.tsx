@@ -70,18 +70,16 @@ export default function NewNotaryPage() {
     { code: "OTHER", name: "Other Bank (Manual Code)" }
   ];
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-
   // Fetch catalog services
   useEffect(() => {
-    if (!token) return;
+
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
-      headers: { "Authorization": `Bearer ${token}` }
-    })
+      credentials: "include",
+      })
       .then(res => res.json())
       .then(data => setServices(Array.isArray(data) ? data : []))
       .catch(err => console.error("Error loading services:", err));
-  }, [token]);
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -102,7 +100,6 @@ export default function NewNotaryPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
 
     if (!formData.vendor_type) {
       toast.error("Please select a Vendor Type.");
@@ -153,10 +150,10 @@ export default function NewNotaryPage() {
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(payload)
       });

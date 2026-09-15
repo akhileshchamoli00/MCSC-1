@@ -52,12 +52,10 @@ export default function TimesheetManagement() {
   const [rejectionReason, setRejectionReason] = useState("");
 
   const fetchTimesheets = async () => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timesheets/all`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         const data = await res.json();
         setTimesheets(data);
@@ -83,13 +81,11 @@ export default function TimesheetManagement() {
   };
 
   const handleApprove = async (id: number) => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timesheets/${id}/approve`, {
+      credentials: "include",
         method: "PUT",
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         toast.success("Timesheet approved successfully");
         setIsReviewModalOpen(false);
@@ -107,13 +103,11 @@ export default function TimesheetManagement() {
       toast.error("Please provide a reason for rejection");
       return;
     }
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timesheets/${id}/reject?comment=${encodeURIComponent(rejectionReason)}`, {
+      credentials: "include",
         method: "PUT",
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         toast.success("Timesheet rejected");
         setIsReviewModalOpen(false);

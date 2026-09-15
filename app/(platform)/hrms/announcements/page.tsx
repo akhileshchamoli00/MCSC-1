@@ -75,14 +75,12 @@ export default function HRMSAnnouncementsPage() {
   const [expandedIds, setExpandedIds] = useState<Record<number, boolean>>({});
 
   const fetchAnnouncements = async () => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
 
     try {
       setLoading(true);
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/announcements`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (response.ok) {
         const data = await response.json();
         // Sort pinned notices first, then newest published_at or created_at

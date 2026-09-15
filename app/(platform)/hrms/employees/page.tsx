@@ -45,13 +45,13 @@ export default function EmployeesPage() {
 
     const fetchData = async () => {
       try {
-        const token = localStorage.getItem("hrms_token");
-        const headers = { "Authorization": `Bearer ${token}` };
-
         const [empRes, deptRes, roleRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/departments/`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/roles/`, { headers })
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/`, {
+      credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/departments/`, {
+      credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/roles/`, {
+      credentials: "include" })
         ]);
 
         if (empRes.ok) {

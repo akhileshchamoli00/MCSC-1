@@ -138,16 +138,15 @@ export default function ClientOrderChatPage() {
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
 
   // 1. Fetch Orders
   const fetchOrders = async () => {
-    if (!token) return;
+
     try {
       setLoadingOrders(true);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         const data = await res.json();
         setOrders(data || []);
@@ -205,16 +204,14 @@ export default function ClientOrderChatPage() {
 
   // 2. Fetch Messages for selected order (channel=CLIENT)
   const fetchMessages = async (orderNumber: string, isInitial = false) => {
-    if (!token) return;
+
     try {
       if (isInitial) {
         setLoadingMessages(true);
       }
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/progress?channel=CLIENT`,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/progress?channel=CLIENT`, {
+      credentials: "include",
+          }
       );
       if (res.ok) {
         const data = await res.json();
@@ -274,7 +271,7 @@ export default function ClientOrderChatPage() {
   // 3. Send Message / Upload Document
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if ((!inputText.trim() && !selectedFile) || !selectedOrderGroup || !token || sending) return;
+    if ((!inputText.trim() && !selectedFile) || !selectedOrderGroup || sending) return;
 
     const messageText = inputText.trim();
     const fileToUpload = selectedFile;
@@ -313,13 +310,9 @@ export default function ClientOrderChatPage() {
           formData.append("message", messageText);
         }
 
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.orderNumber}/upload-attachment`,
-          {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.orderNumber}/upload-attachment`, {
+      credentials: "include",
             method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`
-            },
             body: formData
           }
         );
@@ -339,13 +332,11 @@ export default function ClientOrderChatPage() {
         }
       } else {
         // Plain text message endpoint
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.orderNumber}/progress`,
-          {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.orderNumber}/progress`, {
+      credentials: "include",
             method: "POST",
             headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`
+              "Content-Type": "application/json"
             },
             body: JSON.stringify({
               message: messageText,

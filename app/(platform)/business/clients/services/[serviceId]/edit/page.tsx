@@ -49,14 +49,12 @@ export default function EditClientServicePage() {
     needs_other_vendors: false
   });
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-
   useEffect(() => {
-    if (!token || !serviceId) return;
+    if (!serviceId) return;
     setLoading(true);
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog/${serviceId}`, {
-      headers: { "Authorization": `Bearer ${token}` }
-    })
+      credentials: "include",
+      })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load service");
         return res.json();
@@ -81,7 +79,7 @@ export default function EditClientServicePage() {
         toast.error("Error loading service details");
       })
       .finally(() => setLoading(false));
-  }, [token, serviceId]);
+  }, [serviceId]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -90,7 +88,7 @@ export default function EditClientServicePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !serviceId) return;
+    if (!serviceId) return;
     setSaving(true);
     try {
       const payload = {
@@ -108,10 +106,10 @@ export default function EditClientServicePage() {
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog/${serviceId}`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(payload)
       });

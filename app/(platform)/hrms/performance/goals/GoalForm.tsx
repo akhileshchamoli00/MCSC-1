@@ -31,19 +31,13 @@ export default function GoalForm({ goalId }: GoalFormProps) {
   const [goalProgress, setGoalProgress] = useState(0);
 
   useEffect(() => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-
-    const headers = { Authorization: `Bearer ${token}` };
-
     const loadFormData = async () => {
       try {
         const [cycleRes, empRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/review-cycles`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, { headers })
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/review-cycles`, {
+      credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, {
+      credentials: "include" })
         ]);
 
         if (cycleRes.ok) setCycles(await cycleRes.json());
@@ -51,7 +45,8 @@ export default function GoalForm({ goalId }: GoalFormProps) {
 
         // If editing, load the goal data
         if (goalId) {
-          const goalRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/goals`, { headers });
+          const goalRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/goals`, {
+      credentials: "include" });
           if (goalRes.ok) {
             const allGoals = await goalRes.json();
             const goal = allGoals.find((g: any) => g.id.toString() === goalId);
@@ -89,9 +84,7 @@ export default function GoalForm({ goalId }: GoalFormProps) {
     }
 
     setSaving(true);
-    const token = localStorage.getItem("hrms_token");
     const headers = {
-      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json"
     };
 
@@ -110,6 +103,7 @@ export default function GoalForm({ goalId }: GoalFormProps) {
       let res;
       if (goalId) {
         res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/goals/${goalId}`, {
+      credentials: "include",
           method: "PUT",
           headers,
           body: JSON.stringify({
@@ -123,6 +117,7 @@ export default function GoalForm({ goalId }: GoalFormProps) {
         });
       } else {
         res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/goals`, {
+      credentials: "include",
           method: "POST",
           headers,
           body: JSON.stringify(payload)

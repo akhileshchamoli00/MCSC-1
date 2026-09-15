@@ -53,8 +53,6 @@ export default function CompanyDocumentsManagementPage() {
   const params = useParams();
   const companyId = params.id as string;
   const router = useRouter();
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-
   const [loading, setLoading] = useState(true);
   const [companyName, setCompanyName] = useState<string>("Loading...");
   const [companyCode, setCompanyCode] = useState<string>("");
@@ -112,18 +110,19 @@ export default function CompanyDocumentsManagementPage() {
 
 
   const fetchInitialData = async () => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
     try {
       setLoading(true);
       const [compRes, docRes, stkRes, actRes, ordRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}/documents`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}/stakeholders`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}/activities`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, { headers: { "Authorization": `Bearer ${token}` } })
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}/documents`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}/stakeholders`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}/activities`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
+      credentials: "include", })
       ]);
 
       if (docRes.ok) setDocuments(await docRes.json());
@@ -178,7 +177,6 @@ export default function CompanyDocumentsManagementPage() {
   };
 
   const handleUploadDocuments = async () => {
-    if (!token) return;
     if (!uploadRow.file) {
       toast.error("Please attach a file to upload.");
       return;
@@ -203,8 +201,8 @@ export default function CompanyDocumentsManagementPage() {
       if (uploadRow.expiry_date) formData.append("expiry_date", uploadRow.expiry_date);
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}/documents`, {
+      credentials: "include",
         method: "POST",
-        headers: { "Authorization": `Bearer ${token}` },
         body: formData
       });
 
@@ -229,13 +227,13 @@ export default function CompanyDocumentsManagementPage() {
   };
 
   const handleDeleteDocument = async () => {
-    if (!token || !deleteDocId) return;
+    if (!deleteDocId) return;
     setIsDeleting(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}/documents/${deleteDocId}`, {
+      credentials: "include",
         method: "DELETE",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+        });
       if (!res.ok) throw new Error("Failed to delete document");
       setDocuments(prev => prev.filter(doc => doc.id !== deleteDocId));
       toast.success("Document deleted successfully");
@@ -248,7 +246,7 @@ export default function CompanyDocumentsManagementPage() {
   };
 
   const handleEditDocument = async () => {
-    if (!token || !editDoc) return;
+    if (!editDoc) return;
     setIsEditing(true);
     try {
       const formData = new FormData();
@@ -282,10 +280,8 @@ export default function CompanyDocumentsManagementPage() {
       }
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}/documents/${editDoc.id}`, {
+      credentials: "include",
         method: "PATCH",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        },
         body: formData
       });
       if (!res.ok) throw new Error("Failed to update document");
@@ -308,12 +304,11 @@ export default function CompanyDocumentsManagementPage() {
     }
 
     // Resolve directly to the secure backend preview endpoint that streams Dropbox or local file bytes
-    const previewUrl = `/api-proxy/api/clients/companies/${companyId}/documents/${doc.id}/preview?token=${token}`;
+    const previewUrl = `/api-proxy/api/clients/companies/${companyId}/documents/${doc.id}/preview`;
     setResolvedPreviewUrl(previewUrl);
   };
 
   const handleDownloadDocFile = async (doc: any) => {
-    if (!token) return;
     if (!doc.file_url || doc.file_url === "#") {
       toast.error("No valid URL found for this document.");
       return;
@@ -323,8 +318,8 @@ export default function CompanyDocumentsManagementPage() {
       const toastId = toast.loading("Generating secure Dropbox download link...");
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dropbox/download?path=${encodeURIComponent(doc.file_url)}`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         const data = await res.json();
         toast.dismiss(toastId);
         if (res.ok && data.success && data.link) {
@@ -345,7 +340,7 @@ export default function CompanyDocumentsManagementPage() {
   // Stakeholder Creation
   const handleAddStakeholder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !newStakeholder.name) return;
+    if (!newStakeholder.name) return;
 
     if (newStakeholder.email && !isValidEmail(newStakeholder.email)) {
       toast.error("Please enter a valid email address (e.g. contact@domain.com).");
@@ -360,10 +355,10 @@ export default function CompanyDocumentsManagementPage() {
     setAddingStakeholder(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}/stakeholders`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(newStakeholder)
       });
@@ -384,12 +379,11 @@ export default function CompanyDocumentsManagementPage() {
   };
 
   const handleDeleteStakeholder = async (id: number) => {
-    if (!token) return;
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/stakeholders/${id}`, {
+      credentials: "include",
         method: "DELETE",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         setStakeholders(prev => prev.filter(s => s.id !== id));
         toast.success("Stakeholder removed");
@@ -401,14 +395,14 @@ export default function CompanyDocumentsManagementPage() {
 
   const handleUpdateStakeholder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !editStakeholder || !editStakeholder.name) return;
+    if (!editStakeholder || !editStakeholder.name) return;
     setSavingStakeholder(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/stakeholders/${editStakeholder.id}`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           name: editStakeholder.name,

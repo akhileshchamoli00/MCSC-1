@@ -221,13 +221,11 @@ export default function AssignedOrdersPage() {
   const [pendingConfirmStatus, setPendingConfirmStatus] = useState<string>("");
 
   const fetchProgressUpdates = async (orderNum: string) => {
-    const activeToken = localStorage.getItem("hrms_token");
-    if (!activeToken) return;
     setLoadingProgress(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNum}/progress`, {
-        headers: { "Authorization": `Bearer ${activeToken}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         setProgressUpdates(await res.json());
       }
@@ -241,15 +239,13 @@ export default function AssignedOrdersPage() {
   const handlePostProgress = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProgressMessage.trim() || !selectedGroup) return;
-    const activeToken = localStorage.getItem("hrms_token");
-    if (!activeToken) return;
     setPostingProgress(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedGroup.order_number}/progress`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${activeToken}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({ message: newProgressMessage })
       });
@@ -272,16 +268,11 @@ export default function AssignedOrdersPage() {
 
   const fetchAssignedOrders = async () => {
     if (userLoading || !canView) return;
-    const activeToken = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-    if (!activeToken) {
-      setLoading(false);
-      return;
-    }
     try {
       setLoading(true);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/my-assigned`, {
-        headers: { "Authorization": `Bearer ${activeToken}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         const data = await res.json();
         setOrders(Array.isArray(data) ? data : []);
@@ -295,12 +286,12 @@ export default function AssignedOrdersPage() {
 
   const fetchMetaData = async () => {
     if (userLoading || !canView) return;
-    const activeToken = localStorage.getItem("hrms_token");
-    if (!activeToken) return;
     try {
       const [empRes, teamRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, { headers: { "Authorization": `Bearer ${activeToken}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, { headers: { "Authorization": `Bearer ${activeToken}` } })
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, {
+      credentials: "include", })
       ]);
       if (empRes.ok) setEmployees(await empRes.json());
       if (teamRes.ok) setTeams(await teamRes.json());
@@ -359,17 +350,16 @@ export default function AssignedOrdersPage() {
   };
 
   const executeUpdateStatus = async (group: any, newStatus: string) => {
-    const activeToken = localStorage.getItem("hrms_token");
-    if (!activeToken || !group || !group.items) return;
+    if (!group || !group.items) return;
     setSavingStatus(true);
     try {
       await Promise.all(
         group.items.map((itemRow: any) =>
           fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${itemRow.id}`, {
+      credentials: "include",
             method: "PUT",
             headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${activeToken}`
+              "Content-Type": "application/json"
             },
             body: JSON.stringify({ status: newStatus })
           })

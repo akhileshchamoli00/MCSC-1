@@ -90,10 +90,9 @@ export default function EmployeeDashboard() {
 
   const handleDownloadPayslip = async (id: number, monthStr: string, empId: string) => {
     try {
-      const token = localStorage.getItem("hrms_token");
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payroll/${id}/download`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -134,10 +133,9 @@ export default function EmployeeDashboard() {
 
     const fetchBirthdayStatus = async () => {
       try {
-        const token = localStorage.getItem("hrms_token");
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/birthday`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         if (res.ok) {
           const bData = await res.json();
           setBirthdayData(bData);
@@ -161,10 +159,8 @@ export default function EmployeeDashboard() {
 
     const fetchDashboardData = async () => {
       try {
-        const token = localStorage.getItem("hrms_token");
-        const headers = { "Authorization": `Bearer ${token}` };
-
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/employee`, { headers });
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/employee`, {
+      credentials: "include" });
 
         if (response.ok) {
           const freshData = await response.json();

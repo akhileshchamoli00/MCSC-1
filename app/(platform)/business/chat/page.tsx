@@ -87,17 +87,14 @@ export default function EmployeeChatPage() {
   const wsRef = useRef<WebSocket | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
   const currentUserId = typeof window !== "undefined" ? Number(localStorage.getItem("user_id")) : null;
 
   const fetchConversations = async () => {
     if (userLoading || !canView) return;
-    if (!token) return;
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat/conversations`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (response.ok) {
         const data = await response.json();
         setConversations(data);
@@ -123,11 +120,10 @@ export default function EmployeeChatPage() {
 
   const loadMyCompanies = async () => {
     if (userLoading || !canView) return;
-    if (!token) return;
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (response.ok) {
         const clientsData = await response.json();
         // Flatten to get all companies assigned to the employee
@@ -146,13 +142,13 @@ export default function EmployeeChatPage() {
 
   const handleStartChat = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !selectedCompId) return;
+    if (!selectedCompId) return;
     setErrorMsg("");
 
     try {
       const meRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (!meRes.ok) throw new Error("Failed to authenticate employee profile");
       const meData = await meRes.json();
       const empId = meData.employee?.id;
@@ -162,10 +158,10 @@ export default function EmployeeChatPage() {
       }
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat/conversations`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           company_id: Number(selectedCompId),
@@ -192,11 +188,10 @@ export default function EmployeeChatPage() {
   }, []);
 
   const fetchMessages = async (convId: number) => {
-    if (!token) return;
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat/conversations/${convId}/messages`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (response.ok) {
         setMessages(await response.json());
       }
@@ -212,8 +207,6 @@ export default function EmployeeChatPage() {
 
   // Connect WebSocket
   useEffect(() => {
-    if (!token) return;
-
     // Resolve WebSocket URL robustly for local development and production
     let wsUrl = "";
     if (typeof window !== "undefined") {
@@ -223,14 +216,14 @@ export default function EmployeeChatPage() {
       if (nextPublicApiUrl.startsWith("http")) {
         const wsProtocol = nextPublicApiUrl.startsWith("https") ? "wss" : "ws";
         const hostPart = nextPublicApiUrl.replace(/^https?:\/\//, "");
-        wsUrl = `${wsProtocol}://${hostPart}/api/chat/ws?token=${token}`;
+        wsUrl = `${wsProtocol}://${hostPart}/api/chat/ws`;
       } else {
         if (window.location.port) {
           const hostname = window.location.hostname === "localhost" ? "127.0.0.1" : window.location.hostname;
-          wsUrl = `${protocol}://${hostname}:8000/api/chat/ws?token=${token}`;
+          wsUrl = `${protocol}://${hostname}:8000/api/chat/ws`;
         } else {
           const apiPath = nextPublicApiUrl.includes("proxy") ? "/api" : (nextPublicApiUrl || "/api");
-          wsUrl = `${protocol}://${window.location.host}${apiPath}/chat/ws?token=${token}`;
+          wsUrl = `${protocol}://${window.location.host}${apiPath}/chat/ws`;
         }
       }
     }
@@ -271,7 +264,7 @@ export default function EmployeeChatPage() {
     return () => {
       ws.close();
     };
-  }, [token, selectedConv]);
+  }, [selectedConv]);
 
   useEffect(() => {
     if (messagesContainerRef.current) {
@@ -305,7 +298,7 @@ export default function EmployeeChatPage() {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !token) return;
+    if (!file) return;
 
     setUploading(true);
     const formData = new FormData();
@@ -313,10 +306,8 @@ export default function EmployeeChatPage() {
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat/upload`, {
+      credentials: "include",
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        },
         body: formData
       });
 

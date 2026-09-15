@@ -66,19 +66,17 @@ export default function NewCompanyPage() {
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [dirEmailTouched, setDirEmailTouched] = useState(false);
   const [dirPhoneTouched, setDirPhoneTouched] = useState(false);
-
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-
   const [nextCompanySeq, setNextCompanySeq] = useState<number>(1);
 
   // Load clients list for parent client dropdown and get next sequence number
   useEffect(() => {
     const fetchClientsAndCount = async () => {
-      if (!token) return;
       try {
         const [cliRes, compRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, { headers: { "Authorization": `Bearer ${token}` } }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, { headers: { "Authorization": `Bearer ${token}` } })
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
+      credentials: "include", }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, {
+      credentials: "include", })
         ]);
         if (cliRes.ok) setClients(await cliRes.json());
         if (compRes.ok) {
@@ -92,7 +90,7 @@ export default function NewCompanyPage() {
       }
     };
     fetchClientsAndCount();
-  }, [token]);
+  }, []);
 
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -173,10 +171,10 @@ export default function NewCompanyPage() {
       };
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/standalone`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(payload)
       });

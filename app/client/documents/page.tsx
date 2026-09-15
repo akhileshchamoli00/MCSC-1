@@ -71,20 +71,16 @@ export default function SharedDocuments() {
   // Collapsed order sections state: mapping orderKey -> boolean (true = expanded)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-
   const fetchDocuments = async () => {
-    if (!token || !activeCompany?.id) {
+    if (!activeCompany?.id) {
       setLoading(false);
       return;
     }
     try {
       setLoading(true);
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${activeCompany.id}/documents`,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${activeCompany.id}/documents`, {
+      credentials: "include",
+          }
       );
       if (res.ok) {
         const data: ClientDoc[] = await res.json();

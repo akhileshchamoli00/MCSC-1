@@ -90,22 +90,23 @@ function NewClientOrderContent() {
     }
   ]);
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-
   const fetchData = async () => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+
     try {
       setLoading(true);
       const [cliRes, compRes, serRes, empRes, teamRes, notariesRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries`, { headers: { "Authorization": `Bearer ${token}` } })
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries`, {
+      credentials: "include", })
       ]);
 
       if (cliRes.ok) setClients(await cliRes.json());
@@ -259,7 +260,7 @@ function NewClientOrderContent() {
 
   const handleCreateCompanySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
+
     if (!newCompanyForm.company_name.trim()) {
       toast.error("Company name is required");
       return;
@@ -291,10 +292,10 @@ function NewClientOrderContent() {
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/standalone`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(payload)
       });
@@ -328,7 +329,7 @@ function NewClientOrderContent() {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
+
     if (!selectedCompanyId) {
       toast.error("Please select a target company entity");
       return;
@@ -369,10 +370,10 @@ function NewClientOrderContent() {
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(payload)
       });

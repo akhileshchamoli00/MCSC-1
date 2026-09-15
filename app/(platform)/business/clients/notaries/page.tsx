@@ -102,17 +102,13 @@ export default function NotariesPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedNotary, setSelectedNotary] = useState<any>(null);
   const [saving, setSaving] = useState(false);
-
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-
   const fetchNotaries = async () => {
     if (userLoading || !canView) return;
-    if (!token) return;
     try {
       setLoading(true);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         const data = await res.json();
         setNotaries(data);
@@ -134,15 +130,13 @@ export default function NotariesPage() {
   }, [userLoading, canView]);
 
   const handleDeleteSubmit = async () => {
-    if (!token || !selectedNotary) return;
+    if (!selectedNotary) return;
     setSaving(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/${selectedNotary.id}`, {
+      credentials: "include",
         method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
+        });
 
       if (res.ok) {
         toast.success("Notary record deleted successfully!");

@@ -53,13 +53,12 @@ export default function BusinessAnnouncementsPage() {
   const [deleting, setDeleting] = useState(false);
 
   const fetchAnnouncements = async () => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
+
     try {
       setLoading(true);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/announcements?scope=management`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         setAnnouncements(await res.json());
       }
@@ -109,12 +108,12 @@ export default function BusinessAnnouncementsPage() {
 
   // Quick Action: Toggle Pin
   const handleTogglePin = async (id: number) => {
-    const token = localStorage.getItem("hrms_token");
+
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/announcements/${id}/toggle-pin`, {
+      credentials: "include",
         method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         toast.success("Pinned status updated");
         fetchAnnouncements();
@@ -126,12 +125,12 @@ export default function BusinessAnnouncementsPage() {
 
   // Quick Action: Publish Draft
   const handleQuickPublish = async (id: number) => {
-    const token = localStorage.getItem("hrms_token");
+
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/announcements/${id}/publish`, {
+      credentials: "include",
         method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         toast.success("Announcement published live!");
         fetchAnnouncements();
@@ -145,12 +144,12 @@ export default function BusinessAnnouncementsPage() {
   const handleDeleteConfirm = async () => {
     if (!deletingId) return;
     setDeleting(true);
-    const token = localStorage.getItem("hrms_token");
+
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/announcements/${deletingId}`, {
+      credentials: "include",
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         toast.success("Announcement deleted successfully");
         setDeletingId(null);

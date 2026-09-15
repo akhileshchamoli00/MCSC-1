@@ -125,10 +125,9 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchBirthdayStatus = async () => {
       try {
-        const token = localStorage.getItem("hrms_token");
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/birthday`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         if (res.ok) {
           const bData = await res.json();
           setBirthdayData(bData);
@@ -174,10 +173,8 @@ export default function AdminDashboard() {
 
     const fetchDashboardData = async () => {
       try {
-        const token = localStorage.getItem("hrms_token");
-        const headers = { "Authorization": `Bearer ${token}` };
-
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/admin-summary`, { headers });
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/admin-summary`, {
+      credentials: "include" });
         if (res.ok) {
           const data = await res.json();
           

@@ -15,12 +15,9 @@ export default function MyPayrollPage() {
   useEffect(() => {
     const fetchMyPayroll = async () => {
       try {
-        const token = localStorage.getItem("hrms_token");
-        if (!token) return;
-        
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payroll/me`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         if (res.ok) {
           const data = await res.json();
           // Backend already filters for the current employee and non-draft status
@@ -48,10 +45,9 @@ export default function MyPayrollPage() {
   };
 
   const handleDownload = (id: number, month: number, year: number, empId: string) => {
-    const token = localStorage.getItem("hrms_token");
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payroll/${id}/download`, {
-      headers: { "Authorization": `Bearer ${token}` }
-    })
+      credentials: "include",
+      })
     .then(async res => {
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: "Download failed" }));
@@ -77,13 +73,12 @@ export default function MyPayrollPage() {
   };
 
   const handleEmailPayslip = async (id: number) => {
-    const token = localStorage.getItem("hrms_token");
     const toastId = toast.loading("Emailing your payslip...");
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payroll/${id}/resend-password`, {
+      credentials: "include",
         method: "POST",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         toast.success("Payslip Emailed", {
           id: toastId,

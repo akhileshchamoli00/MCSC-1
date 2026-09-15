@@ -76,14 +76,16 @@ export default function NewEmployeePage() {
 
   useEffect(() => {
     const fetchDropdownData = async () => {
-      const token = localStorage.getItem("hrms_token");
-      if (!token) return;
       try {
         const [deptRes, empRes, roleRes, companyRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/departments/`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/roles/`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/companies/`, { headers: { Authorization: `Bearer ${token}` } })
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/departments/`, {
+      credentials: "include", }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/`, {
+      credentials: "include", }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/roles/`, {
+      credentials: "include", }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/companies/`, {
+      credentials: "include", })
         ]);
         if (deptRes.ok) setDepartments(await deptRes.json());
         if (empRes.ok) setManagers(await empRes.json());
@@ -133,11 +135,9 @@ export default function NewEmployeePage() {
     }
 
     try {
-      const token = localStorage.getItem("hrms_token");
-      if (!token) throw new Error("Authentication token not found.");
-
       // 1. Create User account first
       const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/register`, {
+      credentials: "include",
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -210,10 +210,10 @@ export default function NewEmployeePage() {
       if (formData.bank_account_number) employeePayload.bank_account_number = formData.bank_account_number;
 
       const empResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/`, {
+      credentials: "include",
         method: "POST",
         headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(employeePayload)
       });

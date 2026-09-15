@@ -107,17 +107,12 @@ export default function CreateOrEditAnnouncementPage() {
     if (!editId) return;
 
     const fetchAnnouncement = async () => {
-      const token = localStorage.getItem("hrms_token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
 
       try {
         setLoadingInitial(true);
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/announcements/${editId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         if (res.ok) {
           const data = await res.json();
           setForm({
@@ -169,14 +164,14 @@ export default function CreateOrEditAnnouncementPage() {
     }
 
     setUploadingAttachment(true);
-    const token = localStorage.getItem("hrms_token");
+
     const formData = new FormData();
     formData.append("file", file);
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/announcements/upload-attachment`, {
+      credentials: "include",
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
         body: formData
       });
 
@@ -222,7 +217,6 @@ export default function CreateOrEditAnnouncementPage() {
     }
 
     setSubmitting(true);
-    const token = localStorage.getItem("hrms_token");
 
     const payload = {
       ...form,
@@ -238,10 +232,10 @@ export default function CreateOrEditAnnouncementPage() {
       const method = isEditing ? "PUT" : "POST";
 
       const res = await fetch(url, {
+      credentials: "include",
         method,
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(payload)
       });

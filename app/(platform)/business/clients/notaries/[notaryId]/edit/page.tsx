@@ -112,19 +112,17 @@ export default function EditNotaryPage() {
     { code: "OTHER", name: "Other Bank (Manual Code)" }
   ];
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-
   // Fetch Notary Data & Services
   useEffect(() => {
-    if (!token || !notaryId) return;
+    if (!notaryId) return;
 
     const fetchData = async () => {
       try {
         setLoading(true);
         // 1. Fetch Notary
         const resNotary = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/${notaryId}`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
 
         if (!resNotary.ok) {
           toast.error("Vendor not found");
@@ -162,8 +160,8 @@ export default function EditNotaryPage() {
 
         // 2. Fetch Services
         const resServices = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         if (resServices.ok) {
           const sData = await resServices.json();
           setServices(Array.isArray(sData) ? sData : []);
@@ -177,17 +175,17 @@ export default function EditNotaryPage() {
     };
 
     fetchData();
-  }, [token, notaryId, router]);
+  }, [notaryId, router]);
 
   const handleValidateNotary = async (status: "VALIDATED" | "NEEDS_REVISION" | "PENDING_VALIDATION", notes?: string) => {
-    if (!token || !notaryId) return;
+    if (!notaryId) return;
     setValidating(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/${notaryId}/validate`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           status: status,
@@ -233,7 +231,7 @@ export default function EditNotaryPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !notaryId) return;
+    if (!notaryId) return;
 
     if (!formData.vendor_type) {
       toast.error("Please select a Vendor Type.");
@@ -284,10 +282,10 @@ export default function EditNotaryPage() {
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/${notaryId}`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(payload)
       });
@@ -308,13 +306,13 @@ export default function EditNotaryPage() {
   };
 
   const handleDelete = async () => {
-    if (!token || !notaryId) return;
+    if (!notaryId) return;
     setSaving(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/${notaryId}`, {
+      credentials: "include",
         method: "DELETE",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+        });
 
       if (res.ok) {
         toast.success("Vendor record deleted successfully!");

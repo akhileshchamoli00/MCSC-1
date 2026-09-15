@@ -343,13 +343,11 @@ export default function ClientOrdersPage() {
   const [postingProgress, setPostingProgress] = useState(false);
 
   const fetchProgressUpdates = async (orderNum: string) => {
-    const activeToken = localStorage.getItem("hrms_token");
-    if (!activeToken) return;
     setLoadingProgress(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNum}/progress`, {
-        headers: { "Authorization": `Bearer ${activeToken}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         setProgressUpdates(await res.json());
       }
@@ -363,15 +361,13 @@ export default function ClientOrdersPage() {
   const handlePostProgress = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProgressMessage.trim() || !selectedOrderGroup) return;
-    const activeToken = localStorage.getItem("hrms_token");
-    if (!activeToken) return;
     setPostingProgress(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/progress`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${activeToken}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({ message: newProgressMessage })
       });
@@ -421,20 +417,21 @@ export default function ClientOrdersPage() {
 
   const fetchData = async () => {
     if (userLoading || !canView) return;
-    const activeToken = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-    if (!activeToken) {
-      setLoading(false);
-      return;
-    }
     try {
       setLoading(true);
       const [ordRes, cliRes, compRes, serRes, empRes, teamRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, { headers: { "Authorization": `Bearer ${activeToken}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, { headers: { "Authorization": `Bearer ${activeToken}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, { headers: { "Authorization": `Bearer ${activeToken}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, { headers: { "Authorization": `Bearer ${activeToken}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, { headers: { "Authorization": `Bearer ${activeToken}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, { headers: { "Authorization": `Bearer ${activeToken}` } })
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, {
+      credentials: "include", })
       ]);
 
       if (ordRes.ok) {
@@ -733,17 +730,16 @@ export default function ClientOrdersPage() {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const activeToken = localStorage.getItem("hrms_token");
-    if (!activeToken || !selectedOrderGroup || !editForm.items) return;
+    if (!selectedOrderGroup || !editForm.items) return;
     setSaving(true);
     try {
       await Promise.all(
         editForm.items.map((item: any) =>
           fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${item.id}`, {
+      credentials: "include",
             method: "PUT",
             headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${activeToken}`
+              "Content-Type": "application/json"
             },
             body: JSON.stringify({
               status: editForm.status,
@@ -807,21 +803,20 @@ export default function ClientOrdersPage() {
 
 
   const handleDeleteSubmit = async () => {
-    const activeToken = localStorage.getItem("hrms_token");
-    if (!activeToken || !selectedOrderGroup) return;
+    if (!selectedOrderGroup) return;
     setSaving(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/group/${selectedOrderGroup.order_number}`, {
+      credentials: "include",
         method: "DELETE",
-        headers: { "Authorization": `Bearer ${activeToken}` }
-      });
+        });
       if (!res.ok && selectedOrderGroup.items) {
         await Promise.all(
           selectedOrderGroup.items.map((itemRow: any) =>
             fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${itemRow.id}`, {
+      credentials: "include",
               method: "DELETE",
-              headers: { "Authorization": `Bearer ${activeToken}` }
-            })
+              })
           )
         );
       }
@@ -975,9 +970,6 @@ export default function ClientOrdersPage() {
   const handleFinalizeInvoice = async () => {
     const element = document.getElementById("proforma-invoice-doc");
     if (!element || !selectedOrderGroup) return;
-    const activeToken = localStorage.getItem("hrms_token");
-    if (!activeToken) return;
-
     setFinalizingInvoice(true);
     const company = selectedOrderGroup.company_name || "Client";
     const contractRef = selectedOrderGroup.order_number || "Proforma_Invoice";
@@ -1009,10 +1001,8 @@ export default function ClientOrdersPage() {
       formData.append("proforma_stage_percent", String(proformaPercent));
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/finalize-invoice`, {
+      credentials: "include",
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${activeToken}`
-        },
         body: formData
       });
 
@@ -1100,7 +1090,6 @@ export default function ClientOrdersPage() {
 
     setSendingEmail(true);
     setIsEmailConfirmOpen(false);
-    const activeToken = localStorage.getItem("hrms_token");
     try {
       const primaryEmail = selectedInvoiceEmails[0] || "";
       const additionalEmails = selectedInvoiceEmails.slice(1);
@@ -1111,11 +1100,9 @@ export default function ClientOrdersPage() {
       }
 
       const res = await fetch(url, {
+      credentials: "include",
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${activeToken}`
-        }
-      });
+        });
       if (res.ok) {
         const updatedOrders = await res.json();
         const channelLabel = invoiceDeliveryChannel === 'both'
@@ -1145,10 +1132,10 @@ export default function ClientOrdersPage() {
             : `Final invoice has been ${chatVerb} to the client ${channelLabel}`;
 
           const chatRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/progress`, {
+      credentials: "include",
             method: "POST",
             headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${activeToken}`
+              "Content-Type": "application/json"
             },
             body: JSON.stringify({ message: chatMsg })
           });
@@ -1195,12 +1182,10 @@ export default function ClientOrdersPage() {
     setSendDocsRecipientName(initialName);
     setSendDocsDocuments([]);
     setFetchingDocsLoading(true);
-
-    const activeToken = localStorage.getItem("hrms_token");
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderGroup.order_number}/final-documents`, {
-        headers: { "Authorization": `Bearer ${activeToken}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         const data = await res.json();
         setSendDocsDocuments(data.documents || []);
@@ -1231,17 +1216,16 @@ export default function ClientOrdersPage() {
     }
 
     setSendingDocsLoading(true);
-    const activeToken = localStorage.getItem("hrms_token");
     const primaryEmail = selectedDocsEmails[0];
     const additionalRecipients = selectedDocsEmails.slice(1);
     const toastId = toast.loading(`Dispatching final documents to ${primaryEmail}...`);
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${sendDocsOrder.order_number}/send-final-documents`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${activeToken}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           recipient_email: primaryEmail.trim(),
@@ -1521,9 +1505,6 @@ export default function ClientOrdersPage() {
   const handleFinalizeFinalInvoice = async () => {
     const element = document.getElementById("final-invoice-doc");
     if (!element || !selectedOrderGroup) return;
-    const activeToken = localStorage.getItem("hrms_token");
-    if (!activeToken) return;
-
     setFinalizingFinalInvoice(true);
     const company = selectedOrderGroup.company_name || "Client";
     const contractRef = selectedOrderGroup.order_number || "Invoice";
@@ -1554,10 +1535,8 @@ export default function ClientOrdersPage() {
       formData.append("file", pdfBlob, fileName);
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/finalize-final-invoice`, {
+      credentials: "include",
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${activeToken}`
-        },
         body: formData
       });
 
@@ -1876,15 +1855,12 @@ export default function ClientOrdersPage() {
                                         toast.success("Payment link copied to clipboard!");
                                         return;
                                       }
-                                      const activeToken = localStorage.getItem("hrms_token");
                                       const toastId = toast.loading("Generating secure payment link...");
                                       try {
                                         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${ord.order_number}/payment-link`, {
+      credentials: "include",
                                           method: "POST",
-                                          headers: {
-                                            "Authorization": `Bearer ${activeToken}`
-                                          }
-                                        });
+                                          });
                                         if (res.ok) {
                                           const data = await res.json();
                                           toast.success("Payment link generated and copied to clipboard!", { id: toastId });
@@ -1906,13 +1882,12 @@ export default function ClientOrdersPage() {
                                     variant="outline"
                                     className="h-6 px-2 text-[10px] gap-1 font-bold border-indigo-500/20 bg-indigo-500/5 text-indigo-600 hover:bg-indigo-500/10 hover:text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/30 shadow-sm"
                                     onClick={async () => {
-                                      const activeToken = localStorage.getItem("hrms_token");
                                       const toastId = toast.loading("Verifying payment with Xendit...");
                                       try {
                                         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${ord.order_number}/sync-payment`, {
+      credentials: "include",
                                           method: "POST",
-                                          headers: { "Authorization": `Bearer ${activeToken}` }
-                                        });
+                                          });
                                         const data = await res.json();
                                         if (res.ok && data.status === "success") {
                                           toast.success(data.message || "Payment verified and updated!", { id: toastId });
@@ -2407,15 +2382,12 @@ export default function ClientOrdersPage() {
                                     toast.success("Payment link copied to clipboard!");
                                     return;
                                   }
-                                  const activeToken = localStorage.getItem("hrms_token");
                                   const toastId = toast.loading("Generating secure payment link...");
                                   try {
                                     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/payment-link`, {
+      credentials: "include",
                                       method: "POST",
-                                      headers: {
-                                        "Authorization": `Bearer ${activeToken}`
-                                      }
-                                    });
+                                      });
                                     if (res.ok) {
                                       const data = await res.json();
                                       toast.success("Payment link generated and copied to clipboard!", { id: toastId });
@@ -2438,13 +2410,12 @@ export default function ClientOrdersPage() {
                                 variant="outline"
                                 className="h-7 px-2.5 text-[11px] gap-1.5 font-semibold border-zinc-300 bg-zinc-50 text-zinc-700 hover:bg-zinc-100 shadow-xs transition-colors rounded-lg"
                                 onClick={async () => {
-                                  const activeToken = localStorage.getItem("hrms_token");
                                   const toastId = toast.loading("Verifying payment with Xendit...");
                                   try {
                                     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/sync-payment`, {
+      credentials: "include",
                                       method: "POST",
-                                      headers: { "Authorization": `Bearer ${activeToken}` }
-                                    });
+                                      });
                                     const data = await res.json();
                                     if (res.ok && data.status === "success") {
                                       toast.success(data.message || "Payment verified and updated!", { id: toastId });

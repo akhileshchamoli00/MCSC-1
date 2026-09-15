@@ -55,15 +55,7 @@ export default function AssignedCompaniesPage() {
   const [allEmployees, setAllEmployees] = useState<any[]>([]);
   const [selectedEmpId, setSelectedEmpId] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState("");
-
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-
   const fetchInitialData = async () => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-    
     try {
       const adminOrHr = userContextIsAdmin;
       setIsAdmin(adminOrHr);
@@ -73,8 +65,8 @@ export default function AssignedCompaniesPage() {
 
       // 2. Fetch Clients & Companies
       const clientsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (clientsRes.ok) {
         const clientsData = await clientsRes.json();
         
@@ -99,8 +91,8 @@ export default function AssignedCompaniesPage() {
           for (const comp of allComps) {
             try {
               const consultantsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${comp.id}/consultants`, {
-                headers: { "Authorization": `Bearer ${token}` }
-              });
+      credentials: "include",
+                });
               if (consultantsRes.ok) {
                 const consultantsData = await consultantsRes.json();
                 const isAssigned = consultantsData.some((c: any) => c.id === empId);
@@ -125,8 +117,8 @@ export default function AssignedCompaniesPage() {
       // 3. Preload all employees for Admin override
       if (adminOrHr) {
         const empRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         if (empRes.ok) {
           const empData = await empRes.json();
           setAllEmployees(empData.filter((e: any) => e.status === "ACTIVE"));
@@ -147,13 +139,13 @@ export default function AssignedCompaniesPage() {
   }, [sessionLoading]);
 
   const handleStartChatEmployee = async (companyId: number) => {
-    if (!token || !currentEmpId) return;
+    if (!currentEmpId) return;
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat/conversations`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           company_id: companyId,
@@ -180,8 +172,8 @@ export default function AssignedCompaniesPage() {
 
     try {
       const consultantsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${company.id}/consultants`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (consultantsRes.ok) {
         const consultantsData = await consultantsRes.json();
         setCompanyConsultants(consultantsData);
@@ -202,15 +194,15 @@ export default function AssignedCompaniesPage() {
 
   const handleAdminStartChat = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !selectedCompany || !selectedEmpId) return;
+    if (!selectedCompany || !selectedEmpId) return;
     setErrorMsg("");
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat/conversations`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           company_id: selectedCompany.id,

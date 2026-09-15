@@ -73,18 +73,16 @@ export default function NewClientPage() {
   const [nextCompanySeq, setNextCompanySeq] = useState<number>(1);
 
   useEffect(() => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
-      headers: { "Authorization": `Bearer ${token}` }
-    })
+      credentials: "include",
+      })
       .then((res) => res.ok ? res.json() : [])
       .then((data) => setAvailableServices(data))
       .catch((err) => console.error("Failed to load service catalog for orders", err));
 
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, {
-      headers: { "Authorization": `Bearer ${token}` }
-    })
+      credentials: "include",
+      })
       .then((res) => res.ok ? res.json() : [])
       .then((data) => {
         if (Array.isArray(data)) {
@@ -219,14 +217,6 @@ export default function NewClientPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
-    const token = localStorage.getItem("hrms_token");
-    if (!token) {
-      setError("Authentication token not found.");
-      setLoading(false);
-      return;
-    }
-
     if (!formData.email || !isValidEmail(formData.email)) {
       setError("Please provide a valid client representative email address (e.g. client@company.com).");
       setActiveTab("personal");
@@ -272,10 +262,10 @@ export default function NewClientPage() {
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(payload)
       });

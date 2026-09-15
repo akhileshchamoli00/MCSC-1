@@ -71,15 +71,18 @@ export default function EditEmployeePage() {
 
   useEffect(() => {
     const fetchInitialData = async () => {
-      const token = localStorage.getItem("hrms_token");
-      if (!token) return;
       try {
         const [deptRes, empRes, employeeRes, companyRes, roleRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/departments/`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/${employeeId}`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/companies/`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/roles/`, { headers: { Authorization: `Bearer ${token}` } })
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/departments/`, {
+      credentials: "include", }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/`, {
+      credentials: "include", }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/${employeeId}`, {
+      credentials: "include", }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/companies/`, {
+      credentials: "include", }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/roles/`, {
+      credentials: "include", })
         ]);
         
         if (deptRes.ok) setDepartments(await deptRes.json());
@@ -172,9 +175,6 @@ export default function EditEmployeePage() {
     }
 
     try {
-      const token = localStorage.getItem("hrms_token");
-      if (!token) throw new Error("Authentication token not found. Please log in again.");
-
       // For edit, we update the employee profile and optionally the User account role.
       const employeePayload: any = {
         first_name: formData.first_name,
@@ -226,10 +226,10 @@ export default function EditEmployeePage() {
       if (formData.additional_coverage !== "") employeePayload.additional_coverage = parseFloat(formData.additional_coverage);
 
       const empResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/${employeeId}`, {
+      credentials: "include",
         method: "PUT",
         headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(employeePayload)
       });

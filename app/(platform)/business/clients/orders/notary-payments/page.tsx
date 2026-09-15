@@ -104,10 +104,9 @@ function NotaryPaymentsContent() {
   const fetchSummaries = async () => {
     if (userLoading || !canView) return;
     try {
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/payments/summary`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         setSummaries(await res.json());
       }
@@ -124,10 +123,9 @@ function NotaryPaymentsContent() {
     if (userLoading || !canView) return;
     setHistoryLoading(true);
     try {
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/payments/${notaryId}/history`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         const data = await res.json();
         setSelectedNotary(data.notary);
@@ -182,11 +180,10 @@ function NotaryPaymentsContent() {
     setDisbursing(true);
     const toastId = toast.loading("Processing automated disbursement via Xendit...");
     try {
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/payments/${disburseJob.id}/disburse`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({ description: disburseNotes })
@@ -222,11 +219,10 @@ function NotaryPaymentsContent() {
     setSubmittingPayment(true);
     const toastId = toast.loading("Registering manual payment...");
     try {
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/payments/${payingJob.id}/pay`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify(paymentForm)
@@ -391,12 +387,10 @@ function NotaryPaymentsContent() {
           console.warn("Could not generate PDF attachment for email:", pdfErr);
         }
       }
-
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries/payments/${selectedVoucherJob.id}/send-voucher-email`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({

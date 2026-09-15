@@ -78,15 +78,13 @@ export default function AdminChatCenter() {
 
   const wsRef = useRef<WebSocket | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
   const currentUserId = typeof window !== "undefined" ? Number(localStorage.getItem("user_id")) : null;
 
   const fetchConversations = async () => {
-    if (!token) return;
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat/conversations`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (response.ok) {
         const data = await response.json();
         setConversations(data);
@@ -105,15 +103,14 @@ export default function AdminChatCenter() {
   };
 
   const loadNewChatData = async () => {
-    if (!token) return;
     try {
       const [clientsRes, employeesRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        }),
+      credentials: "include",
+          }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        })
+      credentials: "include",
+          })
       ]);
       
       if (clientsRes.ok) setClients(await clientsRes.json());
@@ -128,15 +125,15 @@ export default function AdminChatCenter() {
 
   const handleStartChat = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !selectedCompId || !selectedEmpId) return;
+    if (!selectedCompId || !selectedEmpId) return;
     setErrorMsg("");
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat/conversations`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           company_id: Number(selectedCompId),
@@ -163,11 +160,10 @@ export default function AdminChatCenter() {
   }, []);
 
   const fetchMessages = async (convId: number) => {
-    if (!token) return;
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/chat/conversations/${convId}/messages`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (response.ok) {
         setMessages(await response.json());
       }
@@ -183,8 +179,6 @@ export default function AdminChatCenter() {
 
   // Connect WebSocket
   useEffect(() => {
-    if (!token) return;
-
     // Resolve WebSocket URL robustly for local development and production
     let wsUrl = "";
     if (typeof window !== "undefined") {
@@ -194,14 +188,14 @@ export default function AdminChatCenter() {
       if (nextPublicApiUrl.startsWith("http")) {
         const wsProtocol = nextPublicApiUrl.startsWith("https") ? "wss" : "ws";
         const hostPart = nextPublicApiUrl.replace(/^https?:\/\//, "");
-        wsUrl = `${wsProtocol}://${hostPart}/api/chat/ws?token=${token}`;
+        wsUrl = `${wsProtocol}://${hostPart}/api/chat/ws`;
       } else {
         if (window.location.port) {
           const hostname = window.location.hostname === "localhost" ? "127.0.0.1" : window.location.hostname;
-          wsUrl = `${protocol}://${hostname}:8000/api/chat/ws?token=${token}`;
+          wsUrl = `${protocol}://${hostname}:8000/api/chat/ws`;
         } else {
           const apiPath = nextPublicApiUrl.includes("proxy") ? "/api" : (nextPublicApiUrl || "/api");
-          wsUrl = `${protocol}://${window.location.host}${apiPath}/chat/ws?token=${token}`;
+          wsUrl = `${protocol}://${window.location.host}${apiPath}/chat/ws`;
         }
       }
     }
@@ -242,7 +236,7 @@ export default function AdminChatCenter() {
     return () => {
       ws.close();
     };
-  }, [token, selectedConv]);
+  }, [selectedConv]);
 
   useEffect(() => {
     if (messagesContainerRef.current) {

@@ -16,12 +16,10 @@ export default function RoleProfilePage() {
 
   useEffect(() => {
     const fetchRole = async () => {
-      const token = localStorage.getItem("hrms_token");
-      if (!token) return;
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/roles/${roleId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         if (res.ok) {
           setRole(await res.json());
         } else {

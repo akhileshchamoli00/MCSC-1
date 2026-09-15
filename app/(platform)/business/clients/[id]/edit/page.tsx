@@ -64,16 +64,13 @@ export default function EditClientPage() {
 
   const [newPassword, setNewPassword] = useState("");
   const [resettingPassword, setResettingPassword] = useState(false);
-
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-
   const fetchClientDetails = async () => {
-    if (!token || !clientId) return;
+    if (!clientId) return;
     try {
       setLoading(true);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/${clientId}`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
 
       if (res.ok) {
         const data = await res.json();
@@ -115,7 +112,7 @@ export default function EditClientPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !clientId) return;
+    if (!clientId) return;
 
     if (!editForm.email || !isValidEmail(editForm.email)) {
       setError("Please provide a valid email address (e.g. contact@domain.com).");
@@ -135,10 +132,10 @@ export default function EditClientPage() {
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/${clientId}`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(editForm)
       });
@@ -163,13 +160,13 @@ export default function EditClientPage() {
   };
 
   const handleToggleStatus = async () => {
-    if (!token || !clientData) return;
+    if (!clientData) return;
     const newStatus = clientData.status === "ACTIVE" ? "DISABLED" : "ACTIVE";
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/${clientId}/status?status_str=${newStatus}`, {
+      credentials: "include",
         method: "PUT",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         toast.success(`Client status set to ${newStatus}`);
         fetchClientDetails();
@@ -184,14 +181,14 @@ export default function EditClientPage() {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !clientId || !newPassword) return;
+    if (!clientId || !newPassword) return;
     setResettingPassword(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/${clientId}/password`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({ new_password: newPassword })
       });

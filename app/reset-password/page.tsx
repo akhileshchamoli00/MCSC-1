@@ -29,11 +29,6 @@ function ResetPasswordForm() {
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) {
-      setError("Invalid or missing reset token.");
-      return;
-    }
-
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
       return;

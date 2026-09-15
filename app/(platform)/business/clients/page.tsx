@@ -51,8 +51,6 @@ export default function ClientList() {
   const router = useRouter();
   const { isAdmin, hasPermission, loading: userLoading } = useUser();
   const canView = isAdmin || hasPermission("clients_all", "view");
-
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -100,15 +98,11 @@ export default function ClientList() {
 
   const fetchClients = async () => {
     if (userLoading || !canView) return;
-    if (!token) {
-      setLoading(false);
-      return;
-    }
     try {
       setLoading(true);
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (response.ok) {
         setClients(await response.json());
       }
@@ -127,16 +121,16 @@ export default function ClientList() {
 
   const handleEditClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !selectedClient) return;
+    if (!selectedClient) return;
     setErrorMsg("");
     setSuccessMsg("");
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/${selectedClient.id}`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(editForm)
       });
@@ -155,18 +149,15 @@ export default function ClientList() {
   };
 
   const handleToggleStatus = async (client: any) => {
-    if (!token) return;
     setErrorMsg("");
     setSuccessMsg("");
     const newStatus = client.status === "ACTIVE" ? "DISABLED" : "ACTIVE";
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/${client.id}/status?status_str=${newStatus}`, {
+      credentials: "include",
         method: "PUT",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
+        });
 
       if (!response.ok) {
         const data = await response.json();
@@ -182,16 +173,16 @@ export default function ClientList() {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !selectedClient) return;
+    if (!selectedClient) return;
     setErrorMsg("");
     setSuccessMsg("");
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/${selectedClient.id}/password`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({ new_password: newPassword })
       });

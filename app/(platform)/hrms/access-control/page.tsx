@@ -105,13 +105,13 @@ export default function AccessControlPage() {
     const fetchInitialData = async () => {
       try {
         setLoadingData(true);
-        const token = localStorage.getItem("hrms_token");
-        const headers = { "Authorization": `Bearer ${token}` };
-
         const [rolesRes, modulesRes, permsRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/roles/`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/access-control/modules`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/access-control/permissions`, { headers })
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/roles/`, {
+      credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/access-control/modules`, {
+      credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/access-control/permissions`, {
+      credentials: "include" })
         ]);
 
         if (!rolesRes.ok || !modulesRes.ok || !permsRes.ok) {
@@ -155,10 +155,9 @@ export default function AccessControlPage() {
 
     const fetchRolePermissions = async () => {
       try {
-        const token = localStorage.getItem("hrms_token");
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/access-control/role-permissions/${selectedRoleId}`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
 
         if (!res.ok) throw new Error("Failed to fetch role permissions");
 
@@ -185,10 +184,9 @@ export default function AccessControlPage() {
 
     const fetchAuditLogs = async () => {
       try {
-        const token = localStorage.getItem("hrms_token");
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/access-control/audit-logs`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         if (!res.ok) throw new Error("Failed to fetch audit logs");
         const data = await res.json();
         setAuditLogs(data);
@@ -272,8 +270,6 @@ export default function AccessControlPage() {
     if (!selectedRoleId) return;
     try {
       setSaving(true);
-      const token = localStorage.getItem("hrms_token");
-
       // Format payload
       const permissionsList: { role_id: number; module_id: number; permission_id: number }[] = [];
       Object.entries(matrix).forEach(([key, val]) => {
@@ -288,9 +284,9 @@ export default function AccessControlPage() {
       });
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/access-control/role-permissions/${selectedRoleId}`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({ permissions: permissionsList })
@@ -314,11 +310,10 @@ export default function AccessControlPage() {
 
     try {
       setResetting(true);
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/access-control/reset-permissions/${selectedRoleId}`, {
+      credentials: "include",
         method: "POST",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+        });
 
       if (!res.ok) throw new Error("Failed to reset permissions");
 
@@ -345,11 +340,10 @@ export default function AccessControlPage() {
 
     try {
       setCloning(true);
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/access-control/clone-permissions`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
@@ -362,8 +356,8 @@ export default function AccessControlPage() {
 
       // Reload matrix
       const matrixRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/access-control/role-permissions/${selectedRoleId}`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (matrixRes.ok) {
         const data = await matrixRes.json();
         const newMatrix: Record<string, boolean> = {};

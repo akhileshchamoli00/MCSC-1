@@ -19,13 +19,10 @@ export default function AttendanceSettingsPage() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const token = localStorage.getItem("hrms_token");
-        if (!token) return;
-        
         // Check role
         const meRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         if (meRes.ok) {
           const data = await meRes.json();
           if (!(data.permissions?.includes("*:*") || data.permissions?.includes("settings:view") || data.email === "admin@mcs-consulting.com" || data.role?.name?.toUpperCase() === "ADMIN")) return;
@@ -34,8 +31,8 @@ export default function AttendanceSettingsPage() {
 
         // Fetch settings
         const setRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance/settings`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         if (setRes.ok) {
           const s = await setRes.json();
           reset({
@@ -49,8 +46,8 @@ export default function AttendanceSettingsPage() {
 
         // Fetch birthday settings
         const bdayRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/settings`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         if (bdayRes.ok) {
           const s = await bdayRes.json();
           setNotifyTeamBirthdays(s.notify_team_birthdays);
@@ -93,10 +90,10 @@ export default function AttendanceSettingsPage() {
   const onSubmit = async (values: any) => {
     setSaving(true);
     try {
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance/settings`, {
+      credentials: "include",
         method: "PUT",
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           office_name: values.office_name,
           latitude: parseFloat(values.latitude),
@@ -123,11 +120,10 @@ export default function AttendanceSettingsPage() {
     setNotifyTeamBirthdays(val);
     setSavingBirthdaySettings(true);
     try {
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dashboard/settings`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({ notify_team_birthdays: val })

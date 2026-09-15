@@ -40,15 +40,9 @@ export default function NotificationsPage() {
   const router = useRouter();
 
   const fetchNotifications = async () => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-    
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications?limit=200`, {
-        headers: { "Authorization": `Bearer ${token}` },
+      credentials: "include",
         cache: "no-store"
       });
       if (res.ok) {
@@ -75,14 +69,11 @@ export default function NotificationsPage() {
   }, []);
 
   const markAsRead = async (id: number) => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
-    
     try {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}/read`, {
+      credentials: "include",
         method: "PUT",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+        });
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
       window.dispatchEvent(new Event("notifications-updated"));
     } catch (err) {
@@ -91,14 +82,11 @@ export default function NotificationsPage() {
   };
 
   const markAllAsRead = async () => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
-    
     try {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/read-all`, {
+      credentials: "include",
         method: "PUT",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+        });
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       window.dispatchEvent(new Event("notifications-updated"));
     } catch (err) {
@@ -108,14 +96,11 @@ export default function NotificationsPage() {
 
   const deleteNotification = async (id: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
-    
     try {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}`, {
+      credentials: "include",
         method: "DELETE",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+        });
       setNotifications(prev => prev.filter(n => n.id !== id));
       window.dispatchEvent(new Event("notifications-updated"));
     } catch (err) {

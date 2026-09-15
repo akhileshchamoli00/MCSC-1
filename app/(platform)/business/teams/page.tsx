@@ -79,13 +79,12 @@ export default function BusinessTeamsPage() {
   ];
 
   const fetchTeams = async () => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
+
     try {
       setLoadingTeams(true);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         setTeams(await res.json());
       }
@@ -98,13 +97,12 @@ export default function BusinessTeamsPage() {
   };
 
   const fetchEmployees = async () => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
+
     try {
       setLoadingEmployees(true);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         setEmployees(await res.json());
       }
@@ -198,7 +196,7 @@ export default function BusinessTeamsPage() {
       return;
     }
     setFormLoading(true);
-    const token = localStorage.getItem("hrms_token");
+
     const payload = {
       name: form.name.trim(),
       description: form.description.trim(),
@@ -214,10 +212,10 @@ export default function BusinessTeamsPage() {
       const method = editingTeam ? "PUT" : "POST";
 
       const res = await fetch(url, {
+      credentials: "include",
         method,
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(payload)
       });
@@ -230,10 +228,10 @@ export default function BusinessTeamsPage() {
         if (teamId && (formMemberIds.length > 0 || editingTeam)) {
           try {
             await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams/${teamId}/members`, {
+      credentials: "include",
               method: "POST",
               headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
+                "Content-Type": "application/json"
               },
               body: JSON.stringify({ employee_ids: formMemberIds })
             });
@@ -286,13 +284,13 @@ export default function BusinessTeamsPage() {
   };
 
   const handleArchiveToggle = async (team: any) => {
-    const token = localStorage.getItem("hrms_token");
+
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams/${team.id}`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({ is_active: !team.is_active })
       });
@@ -310,12 +308,12 @@ export default function BusinessTeamsPage() {
 
   const handleDeleteTeam = async (id: number) => {
     if (!confirm("Are you sure you want to permanently delete this team? All member relationships will be removed.")) return;
-    const token = localStorage.getItem("hrms_token");
+
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams/${id}`, {
+      credentials: "include",
         method: "DELETE",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         toast.success("Team deleted successfully");
         fetchTeams();
@@ -353,13 +351,13 @@ export default function BusinessTeamsPage() {
   const handleSaveMembers = async () => {
     if (!selectedTeam) return;
     setSavingMembers(true);
-    const token = localStorage.getItem("hrms_token");
+
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams/${selectedTeam.id}/members`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({ employee_ids: assignMemberIds })
       });

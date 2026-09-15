@@ -69,12 +69,10 @@ export default function MyTimesheets() {
   );
 
   const fetchTimesheets = async () => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timesheets/`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         const data = await res.json();
         setTimesheets(data);
@@ -87,12 +85,12 @@ export default function MyTimesheets() {
   };
 
   const fetchProjectsAndTasks = async () => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
     try {
       const [projRes, taskRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timesheets/projects`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timesheets/tasks`, { headers: { Authorization: `Bearer ${token}` } })
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timesheets/projects`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timesheets/tasks`, {
+      credentials: "include", })
       ]);
       if (projRes.ok) setProjects(await projRes.json());
       if (taskRes.ok) setTasks(await taskRes.json());
@@ -124,9 +122,6 @@ export default function MyTimesheets() {
   };
 
   const handleSaveEntry = async () => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
-
     if (!newEntry.project_name || !newEntry.task_name || !newEntry.date) {
       toast.error("Please fill in all required fields");
       return;
@@ -144,9 +139,9 @@ export default function MyTimesheets() {
       // Create timesheet if it doesn't exist
       if (!activeTimesheet) {
         const createRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timesheets/`, {
+      credentials: "include",
           method: "POST",
           headers: { 
-            "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
@@ -167,9 +162,9 @@ export default function MyTimesheets() {
 
       // Add entry
       const entryRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timesheets/${activeTimesheet.id}/entries`, {
+      credentials: "include",
         method: "POST",
         headers: { 
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
@@ -198,14 +193,11 @@ export default function MyTimesheets() {
 
   const handleSubmitTimesheet = async () => {
     if (!currentTimesheet) return;
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
-
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/timesheets/${currentTimesheet.id}/submit`, {
+      credentials: "include",
         method: "PUT",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         toast.success("Timesheet submitted for approval");
         fetchTimesheets();

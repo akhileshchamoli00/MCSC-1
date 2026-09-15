@@ -225,12 +225,11 @@ export default function ApplyLeavePage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("hrms_token");
-      if (!token) return;
-
       const [balRes, histRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/leave/my-balances`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/leave/my-requests`, { headers: { "Authorization": `Bearer ${token}` } })
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/leave/my-balances`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/leave/my-requests`, {
+      credentials: "include", })
       ]);
 
       if (balRes.ok) setBalances(await balRes.json());
@@ -254,11 +253,10 @@ export default function ApplyLeavePage() {
   const executeSubmit = async (values: LeaveFormValues) => {
     try {
       setSubmitting(true);
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/leave/request`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify(values)
@@ -281,10 +279,8 @@ export default function ApplyLeavePage() {
           
           try {
             await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/leave/request/${createdLeave.id}/upload-attachment`, {
+      credentials: "include",
               method: "POST",
-              headers: {
-                "Authorization": `Bearer ${token}`
-              },
               body: formData
             });
           } catch (uploadErr) {
@@ -382,11 +378,10 @@ export default function ApplyLeavePage() {
   const executeEditSubmit = async (values: typeof editForm) => {
     try {
       setEditSubmitting(true);
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/leave/request/${editingLeave.id}`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify(values)

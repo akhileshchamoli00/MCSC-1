@@ -73,16 +73,18 @@ export default function BusinessDashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const token = localStorage.getItem("hrms_token");
-      if (!token) return;
-      
+
       try {
-        const headers = { "Authorization": `Bearer ${token}` };
+
         const [clientsRes, ordersRes, catalogRes, docsRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/documents/expiring`, { headers })
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
+      credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
+      credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
+      credentials: "include" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/documents/expiring`, {
+      credentials: "include" })
         ]);
 
         if (clientsRes.ok) setClients(await clientsRes.json());

@@ -152,10 +152,6 @@ export default function PerformancePage() {
 
   const fetchData = async () => {
     setLoading(true);
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
-    const headers = { Authorization: `Bearer ${token}` };
-
     try {
       const endpoints = [
         `${process.env.NEXT_PUBLIC_API_URL}/api/performance/dashboard-stats`,
@@ -168,7 +164,8 @@ export default function PerformancePage() {
       ];
 
       const responses = await Promise.all(
-        endpoints.map(url => fetch(url, { headers }))
+        endpoints.map(url => fetch(url, {
+      credentials: "include" }))
       );
 
       const dataPromises = responses.map(async (res, idx) => {
@@ -206,10 +203,7 @@ export default function PerformancePage() {
       toast.error("Please fill all required cycle fields");
       return;
     }
-
-    const token = localStorage.getItem("hrms_token");
     const headers = {
-      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json"
     };
 
@@ -225,12 +219,14 @@ export default function PerformancePage() {
       let res;
       if (editingCycleId) {
         res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/review-cycles/${editingCycleId}`, {
+      credentials: "include",
           method: "PUT",
           headers,
           body: JSON.stringify(payload)
         });
       } else {
         res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/review-cycles`, {
+      credentials: "include",
           method: "POST",
           headers,
           body: JSON.stringify(payload)
@@ -270,10 +266,7 @@ export default function PerformancePage() {
       toast.error("Please select a cycle and employee first");
       return;
     }
-
-    const token = localStorage.getItem("hrms_token");
     const headers = {
-      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json"
     };
 
@@ -294,6 +287,7 @@ export default function PerformancePage() {
       let res;
       if (editingReviewId) {
         res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/reviews/${editingReviewId}`, {
+      credentials: "include",
           method: "PUT",
           headers,
           body: JSON.stringify({
@@ -308,6 +302,7 @@ export default function PerformancePage() {
         });
       } else {
         res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/reviews`, {
+      credentials: "include",
           method: "POST",
           headers,
           body: JSON.stringify(payload)
@@ -349,10 +344,7 @@ export default function PerformancePage() {
       toast.error("Please add a title and select an employee");
       return;
     }
-
-    const token = localStorage.getItem("hrms_token");
     const headers = {
-      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json"
     };
 
@@ -371,6 +363,7 @@ export default function PerformancePage() {
       let res;
       if (editingGoalId) {
         res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/goals/${editingGoalId}`, {
+      credentials: "include",
           method: "PUT",
           headers,
           body: JSON.stringify({
@@ -384,6 +377,7 @@ export default function PerformancePage() {
         });
       } else {
         res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/goals`, {
+      credentials: "include",
           method: "POST",
           headers,
           body: JSON.stringify(payload)
@@ -424,10 +418,7 @@ export default function PerformancePage() {
       toast.error("Please select a review cycle");
       return;
     }
-
-    const token = localStorage.getItem("hrms_token");
     const headers = {
-      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json"
     };
 
@@ -443,6 +434,7 @@ export default function PerformancePage() {
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/self-review`, {
+      credentials: "include",
         method: "POST",
         headers,
         body: JSON.stringify(payload)
@@ -849,11 +841,10 @@ export default function PerformancePage() {
                           </DialogHeader>
                           <form onSubmit={async (e) => {
                             e.preventDefault();
-                            const token = localStorage.getItem("hrms_token");
                             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/performance/goals/${g.id}`, {
+      credentials: "include",
                               method: "PUT",
                               headers: {
-                                Authorization: `Bearer ${token}`,
                                 "Content-Type": "application/json"
                               },
                               body: JSON.stringify({

@@ -65,12 +65,9 @@ export default function PayrollDetailsPage() {
 
   const fetchData = async () => {
     try {
-      const token = localStorage.getItem("hrms_token");
-      if (!token) return;
-
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payroll/${params.id}`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       
       if (res.ok) {
         const data = await res.json();
@@ -119,11 +116,10 @@ export default function PayrollDetailsPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payroll/${params.id}`, {
+      credentials: "include",
         method: "PUT",
         headers: { 
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify(form)
@@ -150,13 +146,10 @@ export default function PayrollDetailsPage() {
     setRegenerateConfirmOpen(false);
     setRegenerating(true);
     try {
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payroll/${params.id}/regenerate`, {
+      credentials: "include",
         method: "POST",
-        headers: { 
-          "Authorization": `Bearer ${token}`
-        }
-      });
+        });
       if (res.ok) {
         toast.success("Payroll recalculated successfully.");
         fetchData();
@@ -172,11 +165,10 @@ export default function PayrollDetailsPage() {
   };
 
   const handleDownload = () => {
-    const token = localStorage.getItem("hrms_token");
     const toastId = toast.loading("Downloading PDF...");
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/payroll/${params.id}/download`, {
-      headers: { "Authorization": `Bearer ${token}` }
-    })
+      credentials: "include",
+      })
     .then(async res => {
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: "Download failed" }));

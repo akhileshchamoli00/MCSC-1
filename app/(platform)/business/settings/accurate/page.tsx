@@ -109,10 +109,10 @@ export default function AccurateSettingsPage() {
   const fetchConfig = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("hrms_token");
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/accurate/config`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         const data = await res.json();
         setConfig(data);
@@ -140,10 +140,10 @@ export default function AccurateSettingsPage() {
   const fetchLogs = async () => {
     try {
       setLoadingLogs(true);
-      const token = localStorage.getItem("hrms_token");
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/accurate/logs?limit=50`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         const data = await res.json();
         setLogs(data);
@@ -164,12 +164,12 @@ export default function AccurateSettingsPage() {
     if (e) e.preventDefault();
     try {
       setSaving(true);
-      const token = localStorage.getItem("hrms_token");
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/accurate/config`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(formData)
       });
@@ -191,11 +191,11 @@ export default function AccurateSettingsPage() {
   const handleTestConnection = async () => {
     try {
       setTesting(true);
-      const token = localStorage.getItem("hrms_token");
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/accurate/test-connection`, {
+      credentials: "include",
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        });
       const data = await res.json();
       if (data.success) {
         toast.success(data.message || "Connected to Accurate Online successfully!");

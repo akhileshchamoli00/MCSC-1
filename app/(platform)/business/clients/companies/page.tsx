@@ -110,17 +110,15 @@ export default function CompaniesDirectory() {
   const [sendingEmail, setSendingEmail] = useState(false);
 
   const handleSendWelcomeEmail = async (company: any) => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token || !company) return;
+
+    if (!company) return;
 
     setSendingEmail(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${company.id}/send-welcome-email`, {
+      credentials: "include",
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
+        });
 
       const data = await res.json();
       if (!res.ok) {
@@ -144,17 +142,13 @@ export default function CompaniesDirectory() {
 
   const handleDeleteCompany = async () => {
     if (!companyToDelete) return;
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
 
     setDeleting(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyToDelete.id}`, {
+      credentials: "include",
         method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
+        });
 
       if (res.ok) {
         toast.success(`Company "${companyToDelete.company_name}" deleted successfully`);
@@ -175,16 +169,14 @@ export default function CompaniesDirectory() {
 
   const fetchData = async () => {
     if (userLoading || !canView) return;
-    const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+
     try {
       setLoading(true);
       const [clientsRes, companiesRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, { headers: { "Authorization": `Bearer ${token}` } })
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, {
+      credentials: "include", })
       ]);
       
       if (clientsRes.ok) {
@@ -207,8 +199,7 @@ export default function CompaniesDirectory() {
   }, [userLoading, canView]);
 
   const handleToggleCompanyStatus = async (comp: any) => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
+
     setErrorMsg("");
     setSuccessMsg("");
     const newStatus = comp.status === "ACTIVE" ? "DISABLED" : "ACTIVE";
@@ -227,10 +218,10 @@ export default function CompaniesDirectory() {
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${comp.id}`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(payload)
       });

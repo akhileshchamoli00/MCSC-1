@@ -25,13 +25,13 @@ export default function AttendanceManagementPage() {
   
   const fetchAdminData = async () => {
     try {
-      const token = localStorage.getItem("hrms_token");
-      if (!token) return;
-
       const [sumRes, attRes, corrRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance/today-summary`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance`, { headers: { "Authorization": `Bearer ${token}` } }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance/corrections?status=PENDING`, { headers: { "Authorization": `Bearer ${token}` } })
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance/today-summary`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance`, {
+      credentials: "include", }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance/corrections?status=PENDING`, {
+      credentials: "include", })
       ]);
       
       if (sumRes.ok) setSummary(await sumRes.json());
@@ -48,20 +48,18 @@ export default function AttendanceManagementPage() {
 
   const handleApprove = async (id: number) => {
     try {
-      const token = localStorage.getItem("hrms_token");
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance/correction/${id}/approve`, {
-        method: "PUT", headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        method: "PUT", });
       fetchAdminData();
     } catch (e) {}
   };
 
   const handleReject = async (id: number) => {
     try {
-      const token = localStorage.getItem("hrms_token");
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance/correction/${id}/reject`, {
-        method: "PUT", headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        method: "PUT", });
       fetchAdminData();
     } catch (e) {}
   };
@@ -83,7 +81,6 @@ export default function AttendanceManagementPage() {
   const handleEditSave = async () => {
     if (!selectedRecord) return;
     try {
-      const token = localStorage.getItem("hrms_token");
       const buildDate = (timeStr: string) => {
         if (!timeStr || !timeStr.trim()) return null;
         const cleaned = timeStr.replace(/[^0-9:]/g, "");
@@ -100,9 +97,9 @@ export default function AttendanceManagementPage() {
       };
 
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/attendance/${selectedRecord.id}`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({

@@ -90,18 +90,12 @@ export default function ClientDashboard() {
       return;
     }
 
-    const token = localStorage.getItem("hrms_token");
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
     const loadDashboardData = async () => {
       try {
         // Fetch Orders
         const ordRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         if (ordRes.ok) {
           const allOrders = await ordRes.json();
           setOrders(allOrders || []);
@@ -112,8 +106,8 @@ export default function ClientDashboard() {
 
         // Fetch announcements
         const annRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/announcements`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         if (annRes.ok) setAnnouncements(await annRes.json());
 
       } catch (err) {

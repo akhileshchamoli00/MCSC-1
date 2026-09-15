@@ -42,12 +42,9 @@ export default function LeaveManagementPage() {
   const fetchBalances = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("hrms_token");
-      if (!token) return;
-
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/leave/balances`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         setBalances(await res.json());
       }
@@ -103,11 +100,10 @@ export default function LeaveManagementPage() {
 
     try {
       setSaving(true);
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/leave/balances/${editingBalance.employee_id}`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify(editForm)
@@ -158,11 +154,10 @@ export default function LeaveManagementPage() {
 
     try {
       setAllocating(true);
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/leave/allocate`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({

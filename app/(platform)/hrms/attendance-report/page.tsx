@@ -70,11 +70,10 @@ export default function ConsolidatedAttendanceReport() {
   useEffect(() => {
     const fetchDepts = async () => {
       try {
-        const token = localStorage.getItem("hrms_token");
-        if (!token) return;
+
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/departments/`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         if (res.ok) {
           const data = await res.json();
           setDepartments(data);
@@ -91,12 +90,6 @@ export default function ConsolidatedAttendanceReport() {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem("hrms_token");
-      if (!token) {
-        setError("User is not authenticated.");
-        setLoading(false);
-        return;
-      }
 
       let url = `${process.env.NEXT_PUBLIC_API_URL}/api/attendance/monthly-report?year=${selectedYear}&month=${selectedMonth}`;
       if (selectedDept !== "all") {
@@ -104,8 +97,8 @@ export default function ConsolidatedAttendanceReport() {
       }
 
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));

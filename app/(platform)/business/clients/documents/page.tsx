@@ -51,16 +51,11 @@ export default function CompanyDocumentsDirectory() {
 
   const fetchData = async () => {
     if (userLoading || !canView) return;
-    const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-    if (!token) {
-      setLoading(false);
-      return;
-    }
     try {
       setLoading(true);
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, { 
-        headers: { "Authorization": `Bearer ${token}` } 
-      });
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, {
+      credentials: "include", 
+        });
       
       if (response.ok) {
         setCompanies(await response.json());

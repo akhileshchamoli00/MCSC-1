@@ -74,7 +74,6 @@ export default function ClientProfilePage() {
   const [logoUploading, setLogoUploading] = useState(false);
 
   const logoInputRef = useRef<HTMLInputElement | null>(null);
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
 
   // Sync state with client context
   useEffect(() => {
@@ -103,11 +102,9 @@ export default function ClientProfilePage() {
       const fetchDocs = async () => {
         setDocsLoading(true);
         try {
-          const res = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${activeCompany.id}/documents`,
-            {
-              headers: { Authorization: `Bearer ${token}` }
-            }
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${activeCompany.id}/documents`, {
+      credentials: "include",
+              }
           );
           if (res.ok) {
             const data = await res.json();
@@ -121,12 +118,12 @@ export default function ClientProfilePage() {
       };
       fetchDocs();
     }
-  }, [activeCompany?.id, token]);
+  }, [activeCompany?.id]);
 
   // Update Representative Details
   const handleUpdateRep = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !clientProfile) return;
+    if (!clientProfile) return;
 
     if (!repForm.email || !isValidEmail(repForm.email)) {
       toast.error("Please enter a valid email address.");
@@ -140,10 +137,10 @@ export default function ClientProfilePage() {
     setSavingRep(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/${clientProfile.id}`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(repForm)
       });
@@ -166,15 +163,15 @@ export default function ClientProfilePage() {
   // Update Company Details
   const handleUpdateCompany = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !activeCompany) return;
+    if (!activeCompany) return;
 
     setSavingCompany(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${activeCompany.id}`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(companyForm)
       });
@@ -197,7 +194,7 @@ export default function ClientProfilePage() {
   // Upload Logo
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !token || !activeCompany?.id) return;
+    if (!file || !activeCompany?.id) return;
 
     setLogoUploading(true);
     const formData = new FormData();
@@ -205,8 +202,8 @@ export default function ClientProfilePage() {
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${activeCompany.id}/logo`, {
+      credentials: "include",
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
         body: formData
       });
 
@@ -249,10 +246,10 @@ export default function ClientProfilePage() {
     setPasswordLoading(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/change-password`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           current_password: currentPassword,

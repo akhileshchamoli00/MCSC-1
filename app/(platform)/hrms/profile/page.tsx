@@ -55,9 +55,8 @@ export default function MyProfilePage() {
       const fetchDocs = async () => {
         setDocsLoading(true);
         try {
-          const token = localStorage.getItem("hrms_token");
-          const headers = { Authorization: `Bearer ${token}` };
-          const docRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/${employee.id}/documents`, { headers });
+          const docRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/${employee.id}/documents`, {
+      credentials: "include" });
           if (docRes.ok) setDocuments(await docRes.json());
         } catch (e) {
           console.error("Failed to load documents", e);
@@ -78,14 +77,12 @@ export default function MyProfilePage() {
     }
 
     setSaving(true);
-    const token = localStorage.getItem("hrms_token");
-    
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/`, {
+      credentials: "include",
         method: "PUT",
         headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` 
+          "Content-Type": "application/json" 
         },
         body: JSON.stringify(editForm)
       });
@@ -157,8 +154,6 @@ export default function MyProfilePage() {
     if (!file || !employee?.id) return;
 
     setUploadingPhoto(true);
-    const token = localStorage.getItem("hrms_token");
-    
     let fileToUpload = file;
     try {
       fileToUpload = await compressImage(file);
@@ -171,8 +166,8 @@ export default function MyProfilePage() {
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees/${employee.id}/photo`, {
+      credentials: "include",
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
         body: formData
       });
       
@@ -212,14 +207,12 @@ export default function MyProfilePage() {
     }
 
     setPasswordLoading(true);
-    const token = localStorage.getItem("hrms_token");
-
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/change-password`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           current_password: currentPassword,

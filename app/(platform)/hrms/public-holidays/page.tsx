@@ -612,22 +612,16 @@ export default function PublicHolidaysPage() {
                                   holidays: cellHolidays
                                 });
                               } else {
-                                const token = localStorage.getItem("hrms_token");
-                                if (token) {
-                                  try {
-                                    const payload = JSON.parse(atob(token.split('.')[1]));
-                                    const role = payload.role?.toUpperCase() || "";
-                                    if (role === "ADMIN" || role === "SUPER ADMIN" || role === "HR") {
-                                      reset({
-                                        holiday_name: "",
-                                        holiday_date: formatDateString(cell.date),
-                                        holiday_type: "National Holiday",
-                                        recurring: false,
-                                        description: ""
-                                      });
-                                      setIsAddOpen(true);
-                                    }
-                                  } catch (e) {}
+                                const role = (localStorage.getItem("user_role") || "").toUpperCase();
+                                if (role === "ADMIN" || role === "SUPER ADMIN" || role === "HR") {
+                                  reset({
+                                    holiday_name: "",
+                                    holiday_date: formatDateString(cell.date),
+                                    holiday_type: "National Holiday",
+                                    recurring: false,
+                                    description: ""
+                                  });
+                                  setIsAddOpen(true);
                                 }
                               }
                             }}
@@ -887,40 +881,34 @@ export default function PublicHolidaysPage() {
                 
                 {/* Admin Actions */}
                 {(() => {
-                  const token = typeof window !== 'undefined' ? localStorage.getItem("hrms_token") : null;
-                  if (token) {
-                    try {
-                      const payload = JSON.parse(atob(token.split('.')[1]));
-                      const role = payload.role?.toUpperCase() || "";
-                      if (role === "ADMIN" || role === "SUPER ADMIN" || role === "HR") {
-                        return (
-                          <div className="flex justify-end gap-2 pt-2 border-t border-border/20 mt-2">
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="h-8 text-xs rounded-lg gap-1.5 border-border/50 cursor-pointer" 
-                              onClick={() => {
-                                setSelectedHolidayDetails(null);
-                                openEdit(h);
-                              }}
-                            >
-                              <Pencil className="w-3 h-3 text-emerald-500" /> Edit
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="h-8 text-xs rounded-lg gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 cursor-pointer" 
-                              onClick={() => {
-                                setSelectedHolidayDetails(null);
-                                openDelete(h);
-                              }}
-                            >
-                              <Trash2 className="w-3 h-3" /> Delete
-                            </Button>
-                          </div>
-                        );
-                      }
-                    } catch (e) {}
+                  const role = (localStorage.getItem("user_role") || "").toUpperCase();
+                  if (role === "ADMIN" || role === "SUPER ADMIN" || role === "HR") {
+                    return (
+                      <div className="flex justify-end gap-2 pt-2 border-t border-border/20 mt-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-8 text-xs rounded-lg gap-1.5 border-border/50 cursor-pointer" 
+                          onClick={() => {
+                            setSelectedHolidayDetails(null);
+                            openEdit(h);
+                          }}
+                        >
+                          <Pencil className="w-3 h-3 text-emerald-500" /> Edit
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-8 text-xs rounded-lg gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 cursor-pointer" 
+                          onClick={() => {
+                            setSelectedHolidayDetails(null);
+                            openDelete(h);
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3" /> Delete
+                        </Button>
+                      </div>
+                    );
                   }
                   return null;
                 })()}

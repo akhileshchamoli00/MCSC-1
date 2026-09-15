@@ -53,17 +53,12 @@ export default function AddClientServicesPage() {
     }
   }, [userLoading, isAdmin, hasPermission, router]);
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-
   const fetchServicesCount = async () => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         const data = await res.json();
         setInitialCount(data.length);
@@ -155,7 +150,7 @@ export default function AddClientServicesPage() {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || createItems.length === 0) return;
+    if (createItems.length === 0) return;
     setSaving(true);
     try {
       const payload = createItems.map((item) => ({
@@ -178,10 +173,10 @@ export default function AddClientServicesPage() {
         : `${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`;
 
       const res = await fetch(endpoint, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify(isBulk ? payload : payload[0])
       });

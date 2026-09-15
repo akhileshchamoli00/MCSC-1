@@ -78,20 +78,16 @@ export default function PipelineOrdersPage() {
 
   const fetchData = async () => {
     if (userLoading || !canView) return;
-    const token = typeof window !== "undefined" ? localStorage.getItem("hrms_token") : null;
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+
     try {
       setLoading(true);
       const [ordersRes, compRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
+      credentials: "include",
+          }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+      credentials: "include",
+          })
       ]);
 
       if (ordersRes.ok) {
@@ -201,14 +197,14 @@ export default function PipelineOrdersPage() {
   };
 
   const handleDeleteSubmit = async () => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token || !selectedOrderGroup) return;
+
+    if (!selectedOrderGroup) return;
     setSaving(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/group/${selectedOrderGroup.order_number}`, {
+      credentials: "include",
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         toast.success(`Pipeline order ${selectedOrderGroup.order_number} deleted successfully`);
         setIsDeleteOpen(false);
@@ -226,14 +222,14 @@ export default function PipelineOrdersPage() {
   };
 
   const handleMoveToActiveSubmit = async () => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token || !selectedOrderGroup) return;
+
+    if (!selectedOrderGroup) return;
     setMovingOrder(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/move-to-active`, {
+      credentials: "include",
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         toast.success(`Order ${selectedOrderGroup.order_number} moved to Active Orders!`);
         setIsMoveToActiveOpen(false);

@@ -98,11 +98,9 @@ export default function LeaveApprovalPage() {
 
   const fetchEmployees = async () => {
     try {
-      const token = localStorage.getItem("hrms_token");
-      if (!token) return;
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         setEmployeesList(await res.json());
       }
@@ -114,12 +112,9 @@ export default function LeaveApprovalPage() {
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("hrms_token");
-      if (!token) return;
-
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/leave/requests`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      credentials: "include",
+        });
       if (res.ok) {
         setRequests(await res.json());
       }
@@ -144,16 +139,15 @@ export default function LeaveApprovalPage() {
 
     try {
       setIsSubmittingAdminLeave(true);
-      const token = localStorage.getItem("hrms_token");
       const payload = {
         ...adminLeaveForm,
         employee_id: parseInt(adminLeaveForm.employee_id)
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/leave/request`, {
+      credentials: "include",
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify(payload)
@@ -187,11 +181,10 @@ export default function LeaveApprovalPage() {
   const handleAction = async (requestId: number, action: "approve" | "reject") => {
     try {
       setActionLoading(true);
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/leave/requests/${requestId}/${action}`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         }
       });
@@ -241,11 +234,10 @@ export default function LeaveApprovalPage() {
     
     try {
       setUpdatingAllocation(true);
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/leave/requests/${editingAllocation.id}/allocation`, {
+      credentials: "include",
         method: "PUT",
         headers: {
-          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify(allocationForm)
@@ -270,11 +262,10 @@ export default function LeaveApprovalPage() {
     if (!deletingRequestId) return;
     try {
       setIsDeleting(true);
-      const token = localStorage.getItem("hrms_token");
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/leave/requests/${deletingRequestId}`, {
+      credentials: "include",
         method: "DELETE",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+        });
       if (res.ok) {
         setDeletingRequestId(null);
         fetchRequests();

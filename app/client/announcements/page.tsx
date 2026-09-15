@@ -62,14 +62,12 @@ export default function ClientAnnouncementsPage() {
   const [expandedIds, setExpandedIds] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
-    const token = localStorage.getItem("hrms_token");
-    if (!token) return;
 
     const fetchAnnouncements = async () => {
       try {
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/announcements`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+      credentials: "include",
+          });
         if (response.ok) {
           const data = await response.json();
           // Sort pinned first, then newest published_at or created_at
