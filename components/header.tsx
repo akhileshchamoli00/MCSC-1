@@ -79,21 +79,21 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex py-3 sm:py-4 items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[1600px] mx-auto flex py-2.5 sm:py-3.5 items-center justify-between px-3 sm:px-4 lg:px-6 2xl:px-8">
         <Link
           href={`/${language}`}
-          className="group flex items-center gap-3 transition-all duration-300 shrink-0"
+          className="group flex items-center gap-2 2xl:gap-3 transition-all duration-300 shrink-0"
         >
-          <AskLogo className="h-12 sm:h-14 xl:h-16 w-auto transition-transform duration-300 group-hover:scale-105" />
+          <AskLogo className="h-9 sm:h-10 xl:h-11 2xl:h-13 w-auto transition-transform duration-300 group-hover:scale-105" />
         </Link>
 
         {/* Desktop Navigation (Visible on Large Desktops & Widescreens >= 1280px) */}
-        <nav className="hidden items-center gap-1 xl:flex shrink-0">
+        <nav className="hidden items-center gap-0.5 2xl:gap-1.5 xl:flex shrink-0">
           {navItems.slice(0, 2).map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className={`group relative px-3 2xl:px-4 py-2 text-[13px] 2xl:text-[14px] font-semibold tracking-wide transition-colors duration-300 whitespace-nowrap ${pathname === item.href
+              className={`group relative px-1.5 xl:px-2.5 2xl:px-3.5 py-1.5 2xl:py-2 text-[12px] xl:text-[12.5px] 2xl:text-[14px] font-semibold tracking-wide transition-colors duration-300 whitespace-nowrap ${pathname === item.href
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -113,14 +113,14 @@ export function Header() {
           >
             <Link
               href={`/${language}/services`}
-              className={`group relative flex items-center gap-1 px-3 2xl:px-4 py-2 text-[13px] 2xl:text-[14px] font-semibold tracking-wide transition-colors duration-300 whitespace-nowrap ${pathname.startsWith(`/${language}/services`)
+              className={`group relative flex items-center gap-1 px-1.5 xl:px-2.5 2xl:px-3.5 py-1.5 2xl:py-2 text-[12px] xl:text-[12.5px] 2xl:text-[14px] font-semibold tracking-wide transition-colors duration-300 whitespace-nowrap ${pathname.startsWith(`/${language}/services`)
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               {t.nav.services}
               <ChevronDown
-                className={`h-4 w-4 transition-transform duration-300 ${servicesDropdownOpen ? "rotate-180" : ""}`}
+                className={`h-3.5 w-3.5 2xl:h-4 2xl:w-4 transition-transform duration-300 ${servicesDropdownOpen ? "rotate-180" : ""}`}
               />
               <span
                 className={`absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-300 ${pathname.startsWith(`/${language}/services`)
@@ -160,14 +160,14 @@ export function Header() {
           >
             <Link
               href={`/${language}/resources`}
-              className={`group relative flex items-center gap-1 px-3 2xl:px-4 py-2 text-[13px] 2xl:text-[14px] font-semibold tracking-wide transition-colors duration-300 whitespace-nowrap ${pathname.startsWith(`/${language}/resources`)
+              className={`group relative flex items-center gap-1 px-1.5 xl:px-2.5 2xl:px-3.5 py-1.5 2xl:py-2 text-[12px] xl:text-[12.5px] 2xl:text-[14px] font-semibold tracking-wide transition-colors duration-300 whitespace-nowrap ${pathname.startsWith(`/${language}/resources`)
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               {t.nav.intellectualProperty}
               <ChevronDown
-                className={`h-4 w-4 transition-transform duration-300 ${ipDropdownOpen ? "rotate-180" : ""}`}
+                className={`h-3.5 w-3.5 2xl:h-4 2xl:w-4 transition-transform duration-300 ${ipDropdownOpen ? "rotate-180" : ""}`}
               />
               <span
                 className={`absolute bottom-0 left-0 h-0.5 bg-primary transition-all duration-300 ${pathname.startsWith(`/${language}/resources`)
@@ -204,7 +204,7 @@ export function Header() {
             <Link
               key={item.href}
               href={item.href}
-              className={`group relative px-3 2xl:px-4 py-2 text-[13px] 2xl:text-[14px] font-semibold tracking-wide transition-colors duration-300 whitespace-nowrap ${pathname === item.href
+              className={`group relative px-1.5 xl:px-2.5 2xl:px-3.5 py-1.5 2xl:py-2 text-[12px] xl:text-[12.5px] 2xl:text-[14px] font-semibold tracking-wide transition-colors duration-300 whitespace-nowrap ${pathname === item.href
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -217,16 +217,16 @@ export function Header() {
             </Link>
           ))}
 
-          <div className="ml-3 2xl:ml-4 border-l border-border/40 pl-3 2xl:pl-4 flex items-center gap-2.5 shrink-0">
+          <div className="ml-2 xl:ml-2.5 2xl:ml-4 border-l border-border/40 pl-2 xl:pl-2.5 2xl:pl-4 flex items-center gap-1.5 xl:gap-2 2xl:gap-3 shrink-0">
             <LanguageSwitcher />
             <ThemeToggle variant="segmented" showLabel={true} />
             <div className="flex flex-col items-center gap-0.5 shrink-0">
-              <span className="text-[8.5px] font-mono font-semibold tracking-wider text-muted-foreground uppercase opacity-75 select-none">
+              <span className="text-[8px] 2xl:text-[8.5px] font-mono font-semibold tracking-wider text-muted-foreground uppercase opacity-75 select-none">
                 Portal
               </span>
               <Link
                 href="/login"
-                className="rounded-full bg-primary px-3.5 py-1 text-[11px] font-bold text-primary-foreground transition-all duration-200 hover:bg-foreground hover:text-background dark:hover:bg-white dark:hover:text-black shadow-xs hover:scale-105 uppercase tracking-wide flex items-center justify-center h-[26px] whitespace-nowrap"
+                className="rounded-full bg-primary px-3 2xl:px-3.5 py-0.5 2xl:py-1 text-[10.5px] 2xl:text-[11px] font-bold text-primary-foreground transition-all duration-200 hover:bg-foreground hover:text-background dark:hover:bg-white dark:hover:text-black shadow-xs hover:scale-105 uppercase tracking-wide flex items-center justify-center h-[24px] 2xl:h-[26px] whitespace-nowrap"
               >
                 Login
               </Link>

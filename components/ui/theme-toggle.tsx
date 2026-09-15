@@ -37,7 +37,7 @@ export function ThemeToggle({
     return (
       <div className={`flex flex-col items-center gap-0.5 ${className}`}>
         {showLabel && (
-          <span className="text-[8.5px] font-mono font-semibold tracking-wider text-muted-foreground uppercase opacity-75 select-none">
+          <span className="text-[8px] 2xl:text-[8.5px] font-mono font-semibold tracking-wider text-muted-foreground uppercase opacity-75 select-none">
             {labelMap.title}
           </span>
         )}
@@ -46,27 +46,27 @@ export function ThemeToggle({
             type="button"
             onClick={() => setTheme("light")}
             aria-label="Switch to Light Theme"
-            className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase transition-all duration-200 cursor-pointer ${
+            className={`flex items-center gap-1 rounded-full px-1.5 2xl:px-2.5 py-0.5 2xl:py-1 text-[10px] 2xl:text-[11px] font-bold uppercase transition-all duration-200 cursor-pointer ${
               !isDark
                 ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 shadow-xs"
                 : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
             }`}
           >
             <Sun className={`h-3 w-3 ${!isDark ? "text-amber-500 fill-amber-500/30" : "text-muted-foreground"}`} />
-            <span className="text-[10px] tracking-wide">{labelMap.light}</span>
+            <span className="hidden 2xl:inline text-[10px] tracking-wide">{labelMap.light}</span>
           </button>
           <button
             type="button"
             onClick={() => setTheme("dark")}
             aria-label="Switch to Dark Theme"
-            className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase transition-all duration-200 cursor-pointer ${
+            className={`flex items-center gap-1 rounded-full px-1.5 2xl:px-2.5 py-0.5 2xl:py-1 text-[10px] 2xl:text-[11px] font-bold uppercase transition-all duration-200 cursor-pointer ${
               isDark
                 ? "bg-sky-500/20 text-sky-400 border border-sky-500/30 shadow-xs"
                 : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
             }`}
           >
             <Moon className={`h-3 w-3 ${isDark ? "text-sky-400 fill-sky-400/30" : "text-muted-foreground"}`} />
-            <span className="text-[10px] tracking-wide">{labelMap.dark}</span>
+            <span className="hidden 2xl:inline text-[10px] tracking-wide">{labelMap.dark}</span>
           </button>
         </div>
       </div>
