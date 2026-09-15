@@ -402,8 +402,62 @@ def reset_password(req: schemas.ResetPasswordRequest, db: Session = Depends(data
         
     # Update password
     auth.validate_password_strength(req.new_password)
-    hashed_password = auth.get_password_hash(req.new_password)
     user.hashed_password = hashed_password
     db.commit()
     
     return {"message": "Password successfully reset."}
+
+@app.post("/api/contact")
+async def submit_contact_form(request: Request):
+    """
+    Public endpoint for processing website contact leads and dispatching notification emails.
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    name = payload.get("name", "").strip()
+    email = payload.get("email", "").strip()
+    phone = payload.get("phone", "").strip()
+    message = payload.get("message", "").strip()
+
+    if not name or not email or not message:
+        raise HTTPException(status_code=400, detail="Name, email, and message are required.")
+
+    from utils.email_service import send_contact_lead_email
+    success = send_contact_lead_email(name=name, email=email, phone=phone, message=message)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to dispatch contact inquiry email. Please verify SMTP settings.")
+
+    return {"success": True, "message": "Message sent successfully!"}
+
+@app.post("/api/status-check")
+async def submit_trademark_status_query(request: Request):
+    """
+    Public endpoint for processing website trademark status queries and dispatching notification emails.
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    brand_name = payload.get("brandInput", "").strip()
+    owner_name = payload.get("ownerInput", "").strip()
+    email = payload.get("emailInput", "").strip()
+    app_no = payload.get("appNoInput", "").strip()
+    reg_no = payload.get("regNoInput", "").strip()
+
+    from utils.email_service import send_trademark_query_email
+    success = send_trademark_query_email(
+        brand_name=brand_name,
+        owner_name=owner_name,
+        email=email,
+        app_no=app_no,
+        reg_no=reg_no
+    )
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to dispatch trademark query email.")
+
+    return {"success": True, "message": "Trademark status query submitted successfully!"}
+

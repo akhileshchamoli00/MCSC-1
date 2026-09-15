@@ -1747,6 +1747,114 @@ www.mcsc.co.id
     return send_smtp_email(msg, recipient_email, f"company welcome & verified ID card email for {effective_name} ({effective_code})")
 
 
+def send_contact_lead_email(name: str, email: str, phone: str, message: str) -> bool:
+    """
+    Sends a new contact inquiry notification email to admin@mcsc.co.id with customer reply-to.
+    """
+    msg = MIMEMultipart("alternative")
+    sender_name = os.getenv("SENDER_NAME", "MCS Consulting")
+    sender_email = os.getenv("SENDER_EMAIL", "admin@mcsc.co.id")
+
+    msg["Subject"] = f"🔥 New Contact Lead from {name}"
+    msg["From"] = f"{sender_name} Lead Form <{sender_email}>"
+    msg["Reply-To"] = email
+
+    html_content = f"""
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; padding: 32px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h2 style="color: #1e3a8a; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.025em;">MCS CONSULTING</h2>
+        <p style="color: #64748b; margin: 4px 0 0 0; font-size: 14px;">New Website Lead Notification</p>
+      </div>
+      
+      <div style="background-color: #f8fafc; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 6px 0; font-weight: 600; color: #475569; width: 100px; font-size: 14px;">Name:</td>
+            <td style="padding: 6px 0; color: #0f172a; font-size: 14px; font-weight: 700;">{name}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; font-weight: 600; color: #475569; font-size: 14px;">Email:</td>
+            <td style="padding: 6px 0; color: #3b82f6; font-size: 14px;"><a href="mailto:{email}" style="color: #3b82f6; text-decoration: none;">{email}</a></td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; font-weight: 600; color: #475569; font-size: 14px;">Phone:</td>
+            <td style="padding: 6px 0; color: #0f172a; font-size: 14px;"><a href="tel:{phone}" style="color: #0f172a; text-decoration: none; font-weight: 600;">{phone}</a></td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; border-left: 4px solid #3b82f6;">
+        <p style="font-weight: 700; margin: 0 0 8px 0; color: #1e293b; font-size: 14px;">Message Details:</p>
+        <p style="color: #334155; line-height: 1.6; white-space: pre-wrap; margin: 0; font-size: 14px;">{message}</p>
+      </div>
+
+      <p style="font-size: 11px; color: #94a3b8; margin-top: 32px; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 16px; line-height: 1.5;">
+        This lead was securely generated from the MCS Consulting Contact page.<br/>
+        Delivered via MCS Mail Dispatcher (Amazon SES).
+      </p>
+    </div>
+    """
+    msg.attach(MIMEText(html_content, "html"))
+    return send_smtp_email(msg, "admin@mcsc.co.id", f"contact lead inquiry from {name} ({email})")
+
+
+def send_trademark_query_email(brand_name: str, owner_name: str, email: str, app_no: str, reg_no: str) -> bool:
+    """
+    Sends a new trademark status check inquiry notification email to admin@mcsc.co.id.
+    """
+    msg = MIMEMultipart("alternative")
+    sender_name = os.getenv("SENDER_NAME", "MCS Consulting")
+    sender_email = os.getenv("SENDER_EMAIL", "admin@mcsc.co.id")
+
+    msg["Subject"] = f"🔍 New Trademark Status Query: {brand_name or 'No Brand Name'}"
+    msg["From"] = f"{sender_name} Status Check <{sender_email}>"
+    msg["Reply-To"] = email if email else sender_email
+
+    html_content = f"""
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; padding: 32px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h2 style="color: #1e3a8a; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.025em;">MCS CONSULTING</h2>
+        <p style="color: #64748b; margin: 4px 0 0 0; font-size: 14px;">New Trademark Status Query</p>
+      </div>
+      
+      <div style="background-color: #f8fafc; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #334155;">
+          <tr>
+            <td style="padding: 8px 0; font-weight: 600; width: 160px; color: #475569; border-bottom: 1px solid #f1f5f9;">Brand Name:</td>
+            <td style="padding: 8px 0; color: #0f172a; font-weight: 800; font-size: 15px; border-bottom: 1px solid #f1f5f9;">{brand_name or '-'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Owner Name:</td>
+            <td style="padding: 8px 0; color: #0f172a; font-weight: 700; border-bottom: 1px solid #f1f5f9;">{owner_name or '-'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Email Address:</td>
+            <td style="padding: 8px 0; color: #0f172a; font-weight: 700; border-bottom: 1px solid #f1f5f9;">
+              <a href="mailto:{email}" style="color: #2563eb; text-decoration: none;">{email or '-'}</a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Application Number:</td>
+            <td style="padding: 8px 0; color: #0f172a; border-bottom: 1px solid #f1f5f9;">{app_no or '-'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: 600; color: #475569;">Registration Number:</td>
+            <td style="padding: 8px 0; color: #0f172a;">{reg_no or '-'}</td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="font-size: 11px; color: #94a3b8; margin-top: 32px; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 16px; line-height: 1.5;">
+        This request was securely generated from the MCS Consulting Status Check page.<br/>
+        Delivered via MCS Mail Dispatcher (Amazon SES).
+      </p>
+    </div>
+    """
+    msg.attach(MIMEText(html_content, "html"))
+    return send_smtp_email(msg, "admin@mcsc.co.id", f"trademark query for {brand_name} ({email})")
+
+
+
 
 
 

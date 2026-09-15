@@ -117,9 +117,14 @@ export default function ContactPage() {
         body: JSON.stringify(formData),
       });
 
-      const data = await response.json();
+      let data: any = null;
+      try {
+        data = await response.json();
+      } catch (parseErr) {
+        data = null;
+      }
 
-      if (response.ok && data.success) {
+      if (response.ok && data?.success) {
         setStatus("success");
         setFormData({
           name: "",
@@ -129,12 +134,12 @@ export default function ContactPage() {
         });
       } else {
         setStatus("error");
-        setErrorMessage(data.error || "Failed to send message.");
+        setErrorMessage(data?.error || data?.detail || data?.message || (response.statusText ? `Server Error (${response.status}: ${response.statusText})` : "Failed to send message."));
       }
-    } catch (err) {
-      console.error("Resend API contact submission error:", err);
+    } catch (err: any) {
+      console.error("Contact submission error:", err);
       setStatus("error");
-      setErrorMessage("Network error. Please try again later.");
+      setErrorMessage(err?.message || "Network error. Please try again later.");
     }
   };
 
