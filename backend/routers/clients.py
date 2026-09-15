@@ -1728,7 +1728,7 @@ def upload_company_logo(company_id: int, file: UploadFile = File(...), db: Sessi
     try:
         file_bytes = file.file.read()
         unique_filename = f"logos/{uuid.uuid4()}_{file.filename}"
-        public_url = upload_file_to_supabase(file_bytes, unique_filename, "client-documents")
+        public_url = upload_file(file_bytes, unique_filename, "client-documents")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload to storage: {str(e)}")
         

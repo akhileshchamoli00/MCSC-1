@@ -9,6 +9,7 @@ const nextConfig = {
   allowedDevOrigins: ["www.mcsc.co.id", "localhost:3000"],
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api-proxy',
+    NEXT_PUBLIC_GOOGLE_BOOKING_URL: process.env.NEXT_PUBLIC_GOOGLE_BOOKING_URL || 'https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ31IXiaEvl2cikqyQcW6RexFUEwzyIjodTul1tyRpIhQMT1GJYtVrFBZqIwpPGyIEC5vkPJ03Wh',
   },
   async headers() {
     return [
