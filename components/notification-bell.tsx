@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bell, Trash2, Calendar, Wallet, Monitor, CheckCircle2, Clock, Package, MessageSquare, FileText, Megaphone } from "lucide-react";
+import { Bell, Trash2, Calendar, Wallet, Monitor, CheckCircle2, Clock, Package, MessageSquare, FileText, Megaphone, Briefcase, Users, Building2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -16,8 +15,12 @@ import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { useUser } from "@/contexts/user-context";
 
-export function NotificationBell() {
-  const { isAdmin, hasPermission } = useUser();
+interface NotificationBellProps {
+  systemArea?: "hrms" | "business" | "all";
+}
+
+export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
+  const { isAdmin, hasPermission, currentMode } = useUser();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
@@ -28,6 +31,11 @@ export function NotificationBell() {
   // websocket ref to prevent multiple connections
   const ws = useRef<WebSocket | null>(null);
 
+  // Active system area: explicit prop -> route detection -> user context mode
+  const activeArea: "hrms" | "business" | "all" = 
+    systemArea || 
+    (pathname.startsWith("/client") || pathname.startsWith("/business") ? "business" : (currentMode || "hrms"));
+
   useEffect(() => {
     const role = (localStorage.getItem("user_role") || "").toUpperCase();
     setIsClientUser(role === "CLIENT" || pathname.startsWith("/client"));
@@ -35,7 +43,8 @@ export function NotificationBell() {
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications?limit=5`, {
+      const areaParam = activeArea && activeArea !== "all" ? `&system_area=${activeArea}` : "";
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications?limit=6${areaParam}`, {
         credentials: "include",
         cache: "no-store"
       });
@@ -45,7 +54,8 @@ export function NotificationBell() {
         setNotifications(data);
       }
       
-      const countRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/unread-count`, {
+      const countAreaParam = activeArea && activeArea !== "all" ? `?system_area=${activeArea}` : "";
+      const countRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/unread-count${countAreaParam}`, {
         credentials: "include",
         cache: "no-store"
       });
@@ -87,6 +97,13 @@ export function NotificationBell() {
         const data = JSON.parse(event.data);
         if (data.action === "REFRESH_NOTIFICATIONS" || data.type === "NOTIFICATION_REMOVED") {
           fetchNotifications();
+        } else if (data.system_area) {
+          // If WS message has matching system_area or is shared, re-fetch
+          if (activeArea === "all" || data.system_area === "shared" || data.system_area === activeArea) {
+            fetchNotifications();
+          }
+        } else {
+          fetchNotifications();
         }
       } catch (err) {
         console.error("Failed to parse websocket message", err);
@@ -101,7 +118,7 @@ export function NotificationBell() {
         ws.current.close();
       }
     };
-  }, []);
+  }, [activeArea]);
 
   const markAsRead = async (id: number) => {
     try {
@@ -120,7 +137,8 @@ export function NotificationBell() {
 
   const markAllAsRead = async () => {
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/read-all`, {
+      const areaParam = activeArea && activeArea !== "all" ? `?system_area=${activeArea}` : "";
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/read-all${areaParam}`, {
         method: "PUT",
         credentials: "include"
       });
@@ -228,31 +246,43 @@ export function NotificationBell() {
     const lowerMod = (moduleName || "").toLowerCase();
 
     if (lowerMod.includes("order") || lowerType.includes("order")) {
-      return <Package className="h-5 w-5 text-sky-500" />;
+      return <Package className="h-4 w-4 text-sky-400" />;
     }
     if (lowerMod.includes("chat") || lowerType.includes("chat") || lowerType.includes("message")) {
-      return <MessageSquare className="h-5 w-5 text-indigo-500" />;
+      return <MessageSquare className="h-4 w-4 text-indigo-400" />;
     }
     if (lowerMod.includes("doc") || lowerType.includes("doc")) {
-      return <FileText className="h-5 w-5 text-emerald-500" />;
+      return <FileText className="h-4 w-4 text-emerald-400" />;
+    }
+    if (lowerMod.includes("company") || lowerType.includes("company")) {
+      return <Building2 className="h-4 w-4 text-cyan-400" />;
+    }
+    if (lowerMod.includes("client") || lowerMod.includes("partner")) {
+      return <Users className="h-4 w-4 text-emerald-400" />;
     }
     if (lowerMod.includes("announcement") || lowerType.includes("announcement")) {
-      return <Megaphone className="h-5 w-5 text-amber-500" />;
+      return <Megaphone className="h-4 w-4 text-amber-400" />;
     }
-    if (lowerType.includes("leave")) return <Calendar className="h-5 w-5 text-blue-500" />;
-    if (lowerType.includes("payroll")) return <Wallet className="h-5 w-5 text-green-500" />;
-    if (lowerType.includes("attendance")) return <Clock className="h-5 w-5 text-orange-500" />;
-    if (lowerType.includes("asset")) return <Monitor className="h-5 w-5 text-purple-500" />;
-    return <Bell className="h-5 w-5 text-muted-foreground" />;
+    if (lowerType.includes("leave")) return <Calendar className="h-4 w-4 text-blue-400" />;
+    if (lowerType.includes("payroll")) return <Wallet className="h-4 w-4 text-emerald-400" />;
+    if (lowerType.includes("attendance")) return <Clock className="h-4 w-4 text-orange-400" />;
+    if (lowerType.includes("asset")) return <Monitor className="h-4 w-4 text-purple-400" />;
+    if (lowerType.includes("timesheet")) return <Clock className="h-4 w-4 text-teal-400" />;
+    return <Bell className="h-4 w-4 text-muted-foreground" />;
   };
 
-  const viewAllUrl = isClientUser ? "/client/notifications" : "/shared/notifications";
+  const areaTitle = activeArea === "business" ? "Business Notifications" : (activeArea === "hrms" ? "HRMS Notifications" : "Notifications");
+  const viewAllUrl = isClientUser 
+    ? "/client/notifications" 
+    : (activeArea === "business" ? "/shared/notifications?system=business" : "/shared/notifications?system=hrms");
+
+  const badgeGlow = activeArea === "business" ? "text-emerald-400" : "text-indigo-400";
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <button className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-300 hover:text-white hover:bg-white/10 hover:border-white/20 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/30 transition-all duration-200 cursor-pointer shadow-sm">
-          <Bell className={`h-4 w-4 ${unreadCount > 0 ? "animate-[wiggle_1s_ease-in-out_infinite] text-emerald-400" : ""}`} />
+          <Bell className={`h-4 w-4 ${unreadCount > 0 ? `animate-[wiggle_1s_ease-in-out_infinite] ${badgeGlow}` : ""}`} />
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 rounded-full bg-rose-500 text-[9px] font-black text-white flex items-center justify-center shadow-[0_0_8px_rgba(244,63,94,0.6)] border border-[#0b0c10]">
               {unreadCount > 9 ? "9+" : unreadCount}
@@ -262,14 +292,18 @@ export function NotificationBell() {
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-80 md:w-96 rounded-xl border border-zinc-800 bg-[#12131a] dark:bg-[#0c0e17] text-zinc-100 shadow-[0_10px_30px_rgba(0,0,0,0.85)] overflow-hidden" align="end" sideOffset={8}>
         <div className="flex items-center justify-between px-4 py-3 bg-white/[0.03] border-b border-zinc-800/80">
-          <DropdownMenuLabel className="p-0 font-bold text-sm text-white flex items-center gap-2">
-            Notifications
+          <div className="flex items-center gap-2">
+            <DropdownMenuLabel className="p-0 font-bold text-xs sm:text-sm text-white flex items-center gap-1.5">
+              {activeArea === "business" && <span className="h-2 w-2 rounded-full bg-emerald-400 inline-block"></span>}
+              {activeArea === "hrms" && <span className="h-2 w-2 rounded-full bg-indigo-400 inline-block"></span>}
+              <span>{areaTitle}</span>
+            </DropdownMenuLabel>
             {unreadCount > 0 && (
-              <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] px-2 py-0.5 rounded-full font-bold">
+              <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] px-2 py-0.2 rounded-full font-bold">
                 {unreadCount} new
               </span>
             )}
-          </DropdownMenuLabel>
+          </div>
           {unreadCount > 0 && (
             <Button variant="ghost" size="sm" onClick={markAllAsRead} className="h-6 px-2 text-[11px] text-zinc-400 hover:text-white hover:bg-white/10 rounded-md">
               <CheckCircle2 className="mr-1 h-3 w-3 text-emerald-400" />
@@ -285,7 +319,7 @@ export function NotificationBell() {
                 <Bell className="h-5 w-5 text-zinc-500" />
               </div>
               <p className="text-xs font-semibold text-zinc-300">All caught up!</p>
-              <p className="text-[11px] mt-0.5 text-zinc-500">You have no new notifications.</p>
+              <p className="text-[11px] mt-0.5 text-zinc-500">No new {activeArea !== "all" ? activeArea.toUpperCase() : ""} notifications.</p>
             </div>
           ) : (
             <div className="flex flex-col divide-y divide-zinc-800/60">
@@ -293,10 +327,10 @@ export function NotificationBell() {
                 <div 
                   key={notif.id}
                   onClick={() => handleNotificationClick(notif)}
-                  className={`group relative flex gap-3.5 p-3.5 cursor-pointer hover:bg-white/[0.06] transition-colors ${!notif.is_read ? "bg-emerald-500/[0.04]" : ""}`}
+                  className={`group relative flex gap-3.5 p-3.5 cursor-pointer hover:bg-white/[0.06] transition-colors ${!notif.is_read ? (activeArea === "business" ? "bg-emerald-500/[0.05]" : "bg-indigo-500/[0.05]") : ""}`}
                 >
                   {!notif.is_read && (
-                    <div className="absolute left-1.5 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" />
+                    <div className={`absolute left-1.5 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full ${activeArea === "business" ? "bg-emerald-400 shadow-[0_0_6px_#34d399]" : "bg-indigo-400 shadow-[0_0_6px_#818cf8]"}`} />
                   )}
                   
                   <div className={`mt-0.5 shrink-0 rounded-lg p-2 flex items-center justify-center ${!notif.is_read ? 'bg-white/10 text-white shadow-sm border border-white/15' : 'bg-white/5 text-zinc-400'}`}>
@@ -318,9 +352,16 @@ export function NotificationBell() {
                     <p className={`text-[11px] line-clamp-2 pr-1 leading-relaxed ${!notif.is_read ? "text-zinc-300" : "text-zinc-500"}`}>
                       {notif.message}
                     </p>
-                    <p className="text-[9.5px] font-medium text-zinc-500 pt-0.5">
-                      {notif.created_at ? formatDistanceToNow(new Date(notif.created_at), { addSuffix: true }) : "Just now"}
-                    </p>
+                    <div className="flex items-center justify-between pt-0.5">
+                      <span className="text-[9.5px] font-medium text-zinc-500">
+                        {notif.created_at ? formatDistanceToNow(new Date(notif.created_at), { addSuffix: true }) : "Just now"}
+                      </span>
+                      {notif.system_area && (
+                        <span className={`text-[9px] uppercase font-bold px-1.5 py-0.2 rounded border ${notif.system_area === 'business' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>
+                          {notif.system_area}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -331,7 +372,7 @@ export function NotificationBell() {
         <div className="p-2 border-t border-zinc-800/80 bg-white/[0.02]">
           <Link href={viewAllUrl} onClick={() => setOpen(false)}>
             <Button variant="ghost" className="w-full text-xs font-semibold h-8 text-zinc-300 hover:text-white hover:bg-white/10 rounded-lg">
-              View All Notifications
+              View All {activeArea === "business" ? "Business" : (activeArea === "hrms" ? "HRMS" : "")} Notifications
             </Button>
           </Link>
         </div>
@@ -339,4 +380,5 @@ export function NotificationBell() {
     </DropdownMenu>
   );
 }
+
 

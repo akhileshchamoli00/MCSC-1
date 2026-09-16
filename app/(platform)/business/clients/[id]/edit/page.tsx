@@ -15,32 +15,40 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
 import {
   ArrowLeft,
   Building,
   Mail,
-  MapPin,
   Lock,
   User,
   Phone,
   Plus,
   Loader2,
   Save,
-  ShieldAlert,
-  ExternalLink,
-  Edit2,
+  CheckCircle,
+  Building2,
+  KeyRound,
   ShieldCheck,
-  Clock,
-  AlertTriangle
+  Link as LinkIcon,
+  Trash2
 } from "lucide-react";
 import { toast } from "sonner";
+import { useUser } from "@/contexts/user-context";
+
+interface CompanyOption {
+  id: number;
+  company_name: string;
+  company_code: string;
+}
 
 export default function EditClientPage() {
   const params = useParams();
   const router = useRouter();
-  const clientId = params.id as string;
+  const customerId = params.id as string;
+  const { isAdmin, hasPermission, loading: userLoading } = useUser();
+  const canView = isAdmin || hasPermission("clients_all", "view");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,46 +56,73 @@ export default function EditClientPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("personal");
 
-  const [clientData, setClientData] = useState<any>(null);
+  const [customerData, setCustomerData] = useState<any>(null);
+  const [availableCompanies, setAvailableCompanies] = useState<CompanyOption[]>([]);
+  const [selectedLinkCompanyId, setSelectedLinkCompanyId] = useState("NONE");
 
   const [editForm, setEditForm] = useState({
-    contact_person: "",
+    full_name: "",
     email: "",
     phone: "",
+    status: "ACTIVE",
     notes: "",
     date_of_birth: "",
     nationality: "",
     gender: "",
     identification_number: "",
-    personal_address: ""
+    address: "",
+    company_id: "NONE"
   });
 
   const [newPassword, setNewPassword] = useState("");
   const [resettingPassword, setResettingPassword] = useState(false);
-  const fetchClientDetails = async () => {
-    if (!clientId) return;
+
+  // Authorization Check
+  useEffect(() => {
+    if (!userLoading && !canView) {
+      toast.error("Access Denied: You do not have permission to edit clients.");
+      router.replace("/business/dashboard");
+    }
+  }, [userLoading, canView, router]);
+
+  const fetchCustomerDetails = async () => {
+    if (!customerId) return;
     try {
       setLoading(true);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/${clientId}`, {
-      credentials: "include",
-        });
+      const [custRes, compRes] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers/${customerId}`, {
+          credentials: "include"
+        }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, {
+          credentials: "include"
+        })
+      ]);
 
-      if (res.ok) {
-        const data = await res.json();
-        setClientData(data);
+      if (custRes.ok) {
+        const data = await custRes.json();
+        setCustomerData(data);
         setEditForm({
-          contact_person: data.contact_person || "",
+          full_name: data.full_name || "",
           email: data.email || "",
           phone: data.phone || "",
+          status: data.status || "ACTIVE",
           notes: data.notes || "",
-          date_of_birth: data.date_of_birth || "",
+          date_of_birth: data.date_of_birth ? data.date_of_birth.substring(0, 10) : "",
           nationality: data.nationality || "",
           gender: data.gender || "",
           identification_number: data.identification_number || "",
-          personal_address: data.personal_address || ""
+          address: data.address || "",
+          company_id: data.company_id ? data.company_id.toString() : "NONE"
         });
       } else {
         setError("Failed to fetch client details or client not found.");
+      }
+
+      if (compRes.ok) {
+        const comps = await compRes.json();
+        if (Array.isArray(comps)) {
+          setAvailableCompanies(comps);
+        }
       }
     } catch (err) {
       console.error("Error loading client details:", err);
@@ -98,8 +133,10 @@ export default function EditClientPage() {
   };
 
   useEffect(() => {
-    fetchClientDetails();
-  }, [clientId]);
+    if (!userLoading && canView) {
+      fetchCustomerDetails();
+    }
+  }, [customerId, userLoading, canView]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -112,17 +149,17 @@ export default function EditClientPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientId) return;
+    if (!customerId) return;
 
-    if (!editForm.email || !isValidEmail(editForm.email)) {
-      setError("Please provide a valid email address (e.g. contact@domain.com).");
-      toast.error("Please provide a valid email address.");
+    if (!editForm.full_name.trim()) {
+      setError("Client full name is required.");
+      setActiveTab("personal");
       return;
     }
 
-    if (editForm.phone && !isValidPhoneNumber(editForm.phone)) {
-      setError("Please provide a valid phone number (6 to 15 digits).");
-      toast.error("Please provide a valid phone number.");
+    if (!editForm.email.trim()) {
+      setError("Client email address is required.");
+      setActiveTab("personal");
       return;
     }
 
@@ -131,78 +168,109 @@ export default function EditClientPage() {
     setSuccess(null);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/${clientId}`, {
-      credentials: "include",
+      const payload: any = {
+        full_name: editForm.full_name.trim(),
+        email: editForm.email.trim().toLowerCase(),
+        phone: editForm.phone.trim() || null,
+        status: editForm.status,
+        notes: editForm.notes.trim() || null,
+        date_of_birth: editForm.date_of_birth || null,
+        nationality: editForm.nationality.trim() || null,
+        gender: editForm.gender.trim() || null,
+        identification_number: editForm.identification_number.trim() || null,
+        address: editForm.address.trim() || null,
+        company_id: editForm.company_id && editForm.company_id !== "NONE" ? parseInt(editForm.company_id) : null
+      };
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers/${customerId}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(editForm)
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
-        toast.success("Client representative updated successfully!");
+        toast.success("Client details updated successfully!");
         setSuccess("Client details updated successfully!");
         setTimeout(() => {
           router.push("/business/clients");
-        }, 800);
+        }, 600);
       } else {
         const errData = await res.json();
         throw new Error(errData.detail || "Failed to update client details");
       }
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Failed to update client");
-      toast.error(err.message || "Failed to update client");
+      setError(err.message || "Failed to save changes.");
+      toast.error(err.message || "Failed to save changes.");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleToggleStatus = async () => {
-    if (!clientData) return;
-    const newStatus = clientData.status === "ACTIVE" ? "DISABLED" : "ACTIVE";
+  const handleLinkCompany = async () => {
+    if (selectedLinkCompanyId === "NONE") return;
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/${clientId}/status?status_str=${newStatus}`, {
-      credentials: "include",
-        method: "PUT",
-        });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/customers/${customerId}/link-company?company_id=${selectedLinkCompanyId}`,
+        {
+          method: "POST",
+          credentials: "include"
+        }
+      );
       if (res.ok) {
-        toast.success(`Client status set to ${newStatus}`);
-        fetchClientDetails();
+        toast.success("Company linked to client successfully!");
+        setSelectedLinkCompanyId("NONE");
+        fetchCustomerDetails();
       } else {
-        toast.error("Failed to update client status");
+        const err = await res.json();
+        toast.error(err.detail || "Failed to link company");
       }
-    } catch (err) {
-      console.error(err);
-      toast.error("Error updating status");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to link company");
+    }
+  };
+
+  const handleUnlinkCompany = async (companyId: number) => {
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/customers/${customerId}/unlink-company?company_id=${companyId}`,
+        {
+          method: "POST",
+          credentials: "include"
+        }
+      );
+      if (res.ok) {
+        toast.success("Company unlinked successfully");
+        fetchCustomerDetails();
+      } else {
+        const err = await res.json();
+        toast.error(err.detail || "Failed to unlink company");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to unlink company");
     }
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientId || !newPassword) return;
+    if (!newPassword) return;
     setResettingPassword(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/${clientId}/password`, {
-      credentials: "include",
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers/${customerId}/password`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ new_password: newPassword })
       });
       if (res.ok) {
-        toast.success(clientData?.user_id ? "Client portal password reset successfully!" : "Client portal account created successfully!");
+        toast.success("Client portal password updated successfully!");
         setNewPassword("");
-        fetchClientDetails();
       } else {
-        const errData = await res.json();
-        toast.error(errData.detail || "Failed to reset password");
+        const err = await res.json();
+        toast.error(err.detail || "Failed to reset password");
       }
-    } catch (err) {
-      console.error(err);
-      toast.error("Error resetting password");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to reset password");
     } finally {
       setResettingPassword(false);
     }
@@ -210,391 +278,387 @@ export default function EditClientPage() {
 
   if (loading) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
+      <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm font-medium">Loading client details...</p>
       </div>
     );
   }
 
-  if (error && !clientData) {
-    return (
-      <div className="space-y-4 max-w-2xl mx-auto p-6 text-center">
-        <div className="bg-destructive/15 text-destructive p-4 rounded-lg border border-destructive/20 font-medium">
-          {error}
-        </div>
-        <Link href="/business/clients">
-          <Button variant="outline" className="gap-2">
-            <ArrowLeft className="h-4 w-4" /> Back to Partner Directory
-          </Button>
-        </Link>
-      </div>
-    );
-  }
+  const linkedCompanies =
+    customerData?.companies && customerData.companies.length > 0
+      ? customerData.companies
+      : customerData?.company
+      ? [customerData.company]
+      : [];
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto pb-12">
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-4">
-        <div className="flex items-center gap-4">
+    <div className="space-y-6 pb-12 animate-in fade-in duration-500">
+      {/* Header & Back Action */}
+      <div className="flex items-center justify-between border-b border-border/40 pb-4">
+        <div className="flex items-center gap-3">
           <Link href="/business/clients">
-            <Button variant="ghost" size="icon" className="rounded-xl">
-              <ArrowLeft className="h-5 w-5" />
+            <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl">
+              <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
-          <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 shadow-sm shrink-0 flex items-center justify-center">
-            <User className="h-6 w-6" />
-          </div>
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">{editForm.contact_person || "Edit Client"}</h1>
-              {clientData?.client_code && (
-                <Badge variant="outline" className="font-mono text-xs font-bold bg-zinc-100 dark:bg-white/5 border-border/50 text-zinc-800 dark:text-zinc-200 rounded-md">
-                  {clientData.client_code}
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                Edit Client - {customerData?.full_name || "Client"}
+              </h1>
+              {(customerData?.client_code || customerData?.customer_code) && (
+                <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 font-mono text-xs font-semibold">
+                  {customerData.client_code || customerData.customer_code}
                 </Badge>
               )}
-              <Badge variant={clientData?.status === "ACTIVE" ? "default" : "destructive"}>
-                {clientData?.status || "ACTIVE"}
-              </Badge>
             </div>
-            <p className="text-muted-foreground text-sm mt-0.5">
-              Update representative details, manage associated companies, and configure portal credentials.
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Update contact information, manage corporate company associations, and configure portal credentials.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={handleToggleStatus}
-            className="text-xs rounded-xl h-10 font-bold"
-          >
-            {clientData?.status === "ACTIVE" ? "Disable Client Account" : "Activate Client Account"}
-          </Button>
-          <Button
-            onClick={handleSubmit}
+          <Link href="/business/clients">
+            <Button variant="ghost" size="sm" className="text-xs">
+              Cancel
+            </Button>
+          </Link>
+          <Button 
+            onClick={handleSubmit} 
             disabled={saving}
-            className="gap-2 font-bold shadow-sm rounded-xl h-10 px-4"
+            className="gap-2 font-bold shadow-sm rounded-xl px-5 text-xs h-9"
           >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Save className="h-3.5 w-3.5 mr-1" />}
             Save Changes
           </Button>
         </div>
       </div>
 
-      {/* Notifications */}
-      {success && (
-        <div className="bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 p-3 rounded-lg text-xs font-medium">
-          {success}
-        </div>
-      )}
       {error && (
-        <div className="bg-destructive/10 border border-destructive/25 text-destructive p-3 rounded-lg text-xs font-medium">
+        <div className="bg-destructive/10 border border-destructive/25 text-destructive p-3.5 rounded-xl text-xs font-medium">
           {error}
         </div>
       )}
 
-      {/* Main Full-Screen Form Container */}
+      {success && (
+        <div className="bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 p-3.5 rounded-xl text-xs font-medium">
+          {success}
+        </div>
+      )}
+
+      {/* Main Tabs Card */}
       <form onSubmit={handleSubmit}>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6 h-auto sm:h-12 bg-muted/50 p-1 rounded-lg">
-            <TabsTrigger value="personal" className="h-full gap-2 text-sm">
-              <User className="h-4 w-4" /> <span>Personal Details</span>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-3 max-w-md h-10 p-1 bg-muted/60 rounded-xl">
+            <TabsTrigger value="personal" className="rounded-lg text-xs font-semibold gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-xs">
+              <User className="h-3.5 w-3.5" /> Client Details
             </TabsTrigger>
-            <TabsTrigger value="companies" className="h-full gap-2 text-sm">
-              <Building className="h-4 w-4" /> <span>Associated Companies ({clientData?.companies?.length || 0})</span>
+            <TabsTrigger value="company" className="rounded-lg text-xs font-semibold gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-xs">
+              <Building2 className="h-3.5 w-3.5" /> Company Entity ({linkedCompanies.length})
             </TabsTrigger>
-            <TabsTrigger value="security" className="h-full gap-2 text-sm">
-              <Lock className="h-4 w-4" /> <span>Portal Security</span>
+            <TabsTrigger value="portal" className="rounded-lg text-xs font-semibold gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-xs">
+              <Lock className="h-3.5 w-3.5" /> Portal Access
             </TabsTrigger>
           </TabsList>
 
-          {/* TAB 1: Personal Details */}
-          <TabsContent value="personal" className="space-y-6">
-            <Card className="border-border/50 shadow-sm">
-              <CardHeader>
-                <CardTitle>Client Representative Information</CardTitle>
-                <CardDescription>Primary profile and contact details of the client representative.</CardDescription>
+          {/* TAB 1: CLIENT DETAILS */}
+          <TabsContent value="personal">
+            <Card className="border-border/40 bg-card/60 backdrop-blur-md shadow-xs rounded-2xl">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <User className="h-4 w-4 text-primary" />
+                  Client Information
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Primary contact and identity details for this client account.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="contact_person">Representative Full Name *</label>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-foreground">
+                      Full Name <span className="text-destructive">*</span>
+                    </label>
                     <Input
-                      id="contact_person"
-                      name="contact_person"
-                      value={editForm.contact_person}
+                      name="full_name"
+                      placeholder="e.g. John Doe"
+                      value={editForm.full_name}
                       onChange={handleInputChange}
+                      className="h-9 text-xs rounded-xl"
                       required
-                      placeholder="e.g. Donald Trump"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="email">Email Address *</label>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-foreground">
+                      Email Address <span className="text-destructive">*</span>
+                    </label>
                     <EmailInput
-                      id="email"
+                      name="email"
+                      placeholder="e.g. john@company.com"
                       value={editForm.email}
-                      onChange={(val) => setEditForm((prev) => ({ ...prev, email: val }))}
+                      onChange={(val) => setEditForm((p) => ({ ...p, email: val }))}
                       required
-                      placeholder="contact@domain.com"
+                      className="h-9 text-xs rounded-xl"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="phone">Phone Number</label>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-foreground">Mobile Phone</label>
                     <PhoneInput
-                      id="phone"
                       value={editForm.phone}
-                      onChange={(val) => setEditForm((prev) => ({ ...prev, phone: val }))}
-                      placeholder="812 3456 789"
+                      onChange={(val) => setEditForm((p) => ({ ...p, phone: val }))}
+                      placeholder="+62 812 3456 7890"
+                      className="h-9 text-xs rounded-xl"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="date_of_birth">Date of Birth</label>
-                    <Input
-                      id="date_of_birth"
-                      name="date_of_birth"
-                      type="date"
-                      value={editForm.date_of_birth}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="nationality">Nationality</label>
-                    <Input
-                      id="nationality"
-                      name="nationality"
-                      value={editForm.nationality}
-                      onChange={handleInputChange}
-                      placeholder="e.g. Indonesian, American"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="gender">Gender</label>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-foreground">Account Status</label>
                     <Select
-                      value={editForm.gender}
-                      onValueChange={(val) => handleSelectChange("gender", val)}
+                      value={editForm.status}
+                      onValueChange={(val) => handleSelectChange("status", val)}
                     >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Choose Gender" />
+                      <SelectTrigger className="h-9 text-xs rounded-xl">
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="MALE">Male</SelectItem>
-                        <SelectItem value="FEMALE">Female</SelectItem>
-                        <SelectItem value="OTHER">Other</SelectItem>
+                        <SelectItem value="ACTIVE">Active</SelectItem>
+                        <SelectItem value="DISABLED">Disabled</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="identification_number">Passport / ID Number</label>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-foreground">Date of Birth</label>
                     <Input
-                      id="identification_number"
+                      type="date"
+                      name="date_of_birth"
+                      value={editForm.date_of_birth}
+                      onChange={handleInputChange}
+                      className="h-9 text-xs rounded-xl"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-foreground">Nationality</label>
+                    <Input
+                      name="nationality"
+                      placeholder="e.g. Indonesian / Australian"
+                      value={editForm.nationality}
+                      onChange={handleInputChange}
+                      className="h-9 text-xs rounded-xl"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-foreground">Gender</label>
+                    <Select
+                      value={editForm.gender}
+                      onValueChange={(val) => handleSelectChange("gender", val)}
+                    >
+                      <SelectTrigger className="h-9 text-xs rounded-xl">
+                        <SelectValue placeholder="Select Gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Male">Male</SelectItem>
+                        <SelectItem value="Female">Female</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-foreground">National ID / KTP / Passport</label>
+                    <Input
                       name="identification_number"
+                      placeholder="e.g. 3171xxxxxxxx0001"
                       value={editForm.identification_number}
                       onChange={handleInputChange}
-                      placeholder="National ID Card or Passport No."
+                      className="h-9 text-xs rounded-xl"
                     />
                   </div>
 
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium" htmlFor="personal_address">Residential Address</label>
-                    <textarea
-                      id="personal_address"
-                      name="personal_address"
-                      value={editForm.personal_address}
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-xs font-semibold text-foreground">Residential Address</label>
+                    <Input
+                      name="address"
+                      placeholder="Street, City, Province, Country"
+                      value={editForm.address}
                       onChange={handleInputChange}
-                      rows={3}
-                      className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      placeholder="Residential address of the client representative..."
+                      className="h-9 text-xs rounded-xl"
                     />
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-4 border-t border-border/40 mt-4">
-                  <Button type="button" onClick={() => setActiveTab("companies")} className="gap-2">
-                    Manage Companies →
-                  </Button>
+                <div className="space-y-1.5 pt-2">
+                  <label className="text-xs font-semibold text-foreground">Internal Notes / Background</label>
+                  <textarea
+                    name="notes"
+                    rows={3}
+                    placeholder="Internal notes or communication log for this client..."
+                    value={editForm.notes}
+                    onChange={handleInputChange}
+                    className="w-full rounded-xl border border-input bg-background/50 px-3 py-2 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* TAB 2: Associated Companies */}
-          <TabsContent value="companies" className="space-y-6">
-            <Card className="border-border/50 shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Associated Corporate Accounts</CardTitle>
-                  <CardDescription>Corporate entities managed under this client representative.</CardDescription>
-                </div>
-                <Link href={`/business/clients/companies/new?client_id=${clientId}`}>
-                  <Button size="sm" className="gap-2">
-                    <Plus className="h-4 w-4" /> Add New Company
-                  </Button>
-                </Link>
+          {/* TAB 2: COMPANY ENTITY */}
+          <TabsContent value="company">
+            <Card className="border-border/40 bg-card/60 backdrop-blur-md shadow-xs rounded-2xl">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-primary" />
+                  Associated Companies
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Companies currently linked to this client account.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {!clientData?.companies || clientData.companies.length === 0 ? (
-                  <div className="p-8 text-center border border-dashed rounded-lg text-muted-foreground space-y-2">
-                    <Building className="h-10 w-10 mx-auto opacity-40" />
-                    <p className="font-semibold text-sm">No Corporate Profiles Linked</p>
-                    <p className="text-xs">Click "Add New Company" above to register a company for this client.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {clientData.companies.map((company: any) => (
-                      <div key={company.id} className="p-4 rounded-xl border border-border/60 bg-muted/20 space-y-3 hover:border-primary/40 transition-colors">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-bold text-base text-foreground">{company.company_name}</h4>
-                              {company.validation_status === "VALIDATED" && (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                                  <ShieldCheck className="h-3 w-3" /> Verified
-                                </span>
-                              )}
-                              {company.validation_status === "PENDING_VALIDATION" && (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                                  <Clock className="h-3 w-3" /> Pending Review
-                                </span>
-                              )}
-                              {company.validation_status === "NEEDS_REVISION" && (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
-                                  <AlertTriangle className="h-3 w-3" /> Needs Revision
-                                </span>
-                              )}
-                            </div>
-                            <span className="font-mono text-xs text-primary font-semibold">Code: {company.company_code}</span>
-                          </div>
-                          <Link href={`/business/clients/companies/${company.id}`}>
-                            <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs">
-                              <Edit2 className="h-3.5 w-3.5" /> Edit Company
-                            </Button>
-                          </Link>
-                        </div>
-
-                        <div className="space-y-1.5 text-xs text-muted-foreground border-t border-border/40 pt-2">
-                          {company.industry && (
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-foreground">Industry:</span> {company.industry}
-                            </div>
-                          )}
-                          {company.tax_number && (
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-foreground">NPWP/Tax ID:</span> {company.tax_number}
-                            </div>
-                          )}
-                          {company.address && (
-                            <div className="flex items-start gap-2 truncate">
-                              <MapPin className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
-                              <span className="truncate">{company.address}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex justify-between pt-4 border-t border-border/40 mt-6">
-                  <Button type="button" variant="outline" onClick={() => setActiveTab("personal")}>
-                    ← Back to Personal
-                  </Button>
-                  <Button type="button" onClick={() => setActiveTab("security")}>
-                    Portal Security →
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* TAB 3: Portal Security */}
-          <TabsContent value="security" className="space-y-6">
-            <Card className="border-border/50 shadow-sm">
-              <CardHeader>
-                <CardTitle>Portal Access & Security</CardTitle>
-                <CardDescription>Reset login credentials or change account access status.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-
-                {/* Reset Password Form */}
-                <div className="p-4 rounded-xl border border-border/50 bg-muted/20 space-y-4">
-                  <div>
-                    <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
-                      <Lock className="h-4 w-4 text-primary" /> {clientData?.user_id ? "Reset Portal Password" : "Enable Portal Login Account"}
-                    </h4>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {clientData?.user_id 
-                        ? `Assign a new access password for ${editForm.contact_person}'s portal account (${editForm.email}).`
-                        : `This partner representative does not have a portal login yet. Set a password to create their login account using email: ${editForm.email}.`
-                      }
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-end gap-3 max-w-md">
-                    <div className="space-y-1.5 flex-1 w-full">
-                      <label className="text-xs font-semibold">New Password</label>
-                      <Input
-                        type="text"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className="font-mono text-sm font-semibold"
-                        placeholder="Enter new strong password"
-                      />
+              <CardContent className="space-y-5">
+                {/* List of currently linked companies */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-foreground">Currently Linked Companies</label>
+                  {linkedCompanies.length === 0 ? (
+                    <div className="p-6 text-center text-muted-foreground border border-dashed border-border/60 rounded-xl">
+                      <p className="text-xs">No companies are currently associated with this client.</p>
                     </div>
-                    <Button
-                      type="button"
-                      onClick={handleResetPassword}
-                      disabled={resettingPassword || !newPassword}
-                      className="w-full sm:w-auto"
-                    >
-                      {resettingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : (clientData?.user_id ? "Update Password" : "Create Portal Account")}
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Account Status Toggle */}
-                <div className="p-4 rounded-xl border border-border/50 bg-muted/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div>
-                    <h4 className="font-bold text-sm text-foreground">Portal Account Status</h4>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {clientData?.user_id ? (
-                        <>Currently: <span className="font-bold uppercase text-foreground">{clientData?.status || "ACTIVE"}</span>. Disabling blocks client portal login.</>
-                      ) : (
-                        <>Currently: <span className="font-bold uppercase text-amber-600 dark:text-amber-400">NO PORTAL ACCESS</span>. Portal user login has not been set up.</>
-                      )}
-                    </p>
-                  </div>
-                  {clientData?.user_id && (
-                    <Button
-                      type="button"
-                      variant={clientData?.status === "ACTIVE" ? "destructive" : "default"}
-                      onClick={handleToggleStatus}
-                      className="text-xs"
-                    >
-                      {clientData?.status === "ACTIVE" ? "Disable Client Portal Account" : "Activate Client Portal Account"}
-                    </Button>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {linkedCompanies.map((comp: any) => (
+                        <div
+                          key={comp.id}
+                          className="flex items-center justify-between p-3 bg-muted/20 border border-border/50 rounded-xl"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                              <Building className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-foreground truncate">{comp.company_name}</p>
+                              <p className="font-mono text-[10px] text-muted-foreground">{comp.company_code}</p>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleUnlinkCompany(comp.id)}
+                            className="h-7 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            title="Unlink company"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
 
-                <div className="flex justify-between pt-4 border-t border-border/40 mt-6">
-                  <Button type="button" variant="outline" onClick={() => setActiveTab("companies")}>
-                    ← Back to Companies
-                  </Button>
-                  <Button type="submit" disabled={saving} className="gap-2 font-semibold">
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    Save All Changes
-                  </Button>
+                {/* Link another company */}
+                <div className="p-4 bg-muted/30 border border-border/50 rounded-xl space-y-3">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <LinkIcon className="h-3.5 w-3.5 text-primary" />
+                    Link Another Existing Company
+                  </label>
+                  <div className="flex gap-2">
+                    <Select
+                      value={selectedLinkCompanyId}
+                      onValueChange={setSelectedLinkCompanyId}
+                    >
+                      <SelectTrigger className="h-9 text-xs rounded-xl bg-background flex-1">
+                        <SelectValue placeholder="Choose a registered corporate entity..." />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        <SelectItem value="NONE">-- Select Company --</SelectItem>
+                        {availableCompanies.map((c) => (
+                          <SelectItem key={c.id} value={c.id.toString()}>
+                            {c.company_name} ({c.company_code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      onClick={handleLinkCompany}
+                      disabled={selectedLinkCompanyId === "NONE"}
+                      className="text-xs h-9 rounded-xl px-4"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Link
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* TAB 3: PORTAL ACCESS */}
+          <TabsContent value="portal">
+            <Card className="border-border/40 bg-card/60 backdrop-blur-md shadow-xs rounded-2xl">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <Lock className="h-4 w-4 text-primary" />
+                  Client Portal Authentication
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Set or reset the login password for this client account.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-muted/20 border border-border/40 rounded-xl space-y-3">
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="h-4 w-4 text-primary" />
+                    <span className="text-xs font-bold text-foreground">Reset Portal Password</span>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-foreground">New Password</label>
+                    <div className="flex gap-2 max-w-md">
+                      <Input
+                        type="password"
+                        placeholder="Enter new password (8+ chars, uppercase, lowercase, digit)"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="h-9 text-xs rounded-xl bg-background font-mono"
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleResetPassword}
+                        disabled={!newPassword || resettingPassword}
+                        className="text-xs h-9 rounded-xl px-4 shrink-0"
+                      >
+                        {resettingPassword ? "Updating..." : "Update Password"}
+                      </Button>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Client logs in using email: <span className="font-semibold text-foreground">{editForm.email}</span>.
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Bottom Submission Bar */}
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/40 mt-6">
+          <Link href="/business/clients">
+            <Button variant="outline" type="button" className="text-xs rounded-xl h-9 px-4">
+              Cancel
+            </Button>
+          </Link>
+          <Button 
+            type="submit" 
+            disabled={saving}
+            className="gap-2 font-bold shadow-sm rounded-xl px-6 text-xs h-9"
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Save className="h-3.5 w-3.5 mr-1" />}
+            Save Changes
+          </Button>
+        </div>
       </form>
     </div>
   );

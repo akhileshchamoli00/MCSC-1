@@ -48,27 +48,52 @@ async def websocket_endpoint(websocket: WebSocket, token: str = None):
     except WebSocketDisconnect:
         manager.disconnect(user_id, websocket)
 
+from typing import List, Optional
+from sqlalchemy import or_
+
 @router.get("", response_model=List[schemas.NotificationResponse])
 def get_notifications(
     skip: int = 0, 
     limit: int = 50, 
+    system_area: Optional[str] = None,
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    notifications = db.query(models.Notification)\
-        .filter(models.Notification.user_id == current_user.id)\
-        .order_by(models.Notification.created_at.desc())\
+    query = db.query(models.Notification)\
+        .filter(models.Notification.user_id == current_user.id)
+    
+    if system_area and system_area.lower() in ["hrms", "business"]:
+        area = system_area.lower()
+        query = query.filter(
+            or_(
+                models.Notification.system_area == area,
+                models.Notification.system_area == "shared"
+            )
+        )
+
+    notifications = query.order_by(models.Notification.created_at.desc())\
         .offset(skip).limit(limit).all()
     return notifications
 
 @router.get("/unread-count")
 def get_unread_count(
+    system_area: Optional[str] = None,
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    count = db.query(models.Notification)\
-        .filter(models.Notification.user_id == current_user.id, models.Notification.is_read == False)\
-        .count()
+    query = db.query(models.Notification)\
+        .filter(models.Notification.user_id == current_user.id, models.Notification.is_read == False)
+    
+    if system_area and system_area.lower() in ["hrms", "business"]:
+        area = system_area.lower()
+        query = query.filter(
+            or_(
+                models.Notification.system_area == area,
+                models.Notification.system_area == "shared"
+            )
+        )
+
+    count = query.count()
     return {"unread_count": count}
 
 @router.put("/{notification_id}/read", response_model=schemas.NotificationResponse)
@@ -92,14 +117,25 @@ def mark_as_read(
 
 @router.put("/read-all")
 def mark_all_as_read(
+    system_area: Optional[str] = None,
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    db.query(models.Notification).filter(
+    query = db.query(models.Notification).filter(
         models.Notification.user_id == current_user.id,
         models.Notification.is_read == False
-    ).update({"is_read": True})
-    
+    )
+
+    if system_area and system_area.lower() in ["hrms", "business"]:
+        area = system_area.lower()
+        query = query.filter(
+            or_(
+                models.Notification.system_area == area,
+                models.Notification.system_area == "shared"
+            )
+        )
+
+    query.update({"is_read": True}, synchronize_session=False)
     db.commit()
     return {"message": "All notifications marked as read"}
 

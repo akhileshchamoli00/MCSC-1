@@ -32,7 +32,24 @@ class NotificationManager:
                 except Exception as e:
                     print(f"Error sending to websocket: {e}")
                 
-    async def notify_user(self, db: Session, user_id: int, title: str, message: str, type: str, module: str, reference_id: int = None, action_url: str = None):
+    def _resolve_system_area(self, module: str = None, type: str = None, action_url: str = None, system_area: str = None) -> str:
+        if system_area and str(system_area).strip():
+            return str(system_area).strip().lower()
+        mod_lower = (module or "").lower()
+        type_lower = (type or "").lower()
+        url_lower = (action_url or "").lower()
+        if (
+            "client" in mod_lower or "order" in mod_lower or "business" in mod_lower or "notar" in mod_lower
+            or url_lower.startswith("/business") or url_lower.startswith("/client")
+            or "order" in type_lower or "chat" in type_lower or "document" in type_lower
+        ):
+            return "business"
+        elif mod_lower in ["leave", "payroll", "attendance", "timesheet", "timesheets", "asset", "assets", "performance", "employees"]:
+            return "hrms"
+        return "hrms"
+
+    async def notify_user(self, db: Session, user_id: int, title: str, message: str, type: str, module: str, reference_id: int = None, action_url: str = None, system_area: str = None):
+        resolved_area = self._resolve_system_area(module, type, action_url, system_area)
         # 1. Save to DB
         notif = models.Notification(
             user_id=user_id,
@@ -40,6 +57,7 @@ class NotificationManager:
             message=message,
             type=type,
             module=module,
+            system_area=resolved_area,
             reference_id=reference_id,
             action_url=action_url
         )
@@ -57,6 +75,7 @@ class NotificationManager:
                 "message": notif.message,
                 "type": notif.type,
                 "module": notif.module,
+                "system_area": notif.system_area,
                 "reference_id": notif.reference_id,
                 "is_read": notif.is_read,
                 "action_url": notif.action_url,
@@ -65,7 +84,8 @@ class NotificationManager:
         
         return notif
 
-    def notify_user_sync(self, db: Session, user_id: int, title: str, message: str, type: str, module: str, reference_id: int = None, action_url: str = None):
+    def notify_user_sync(self, db: Session, user_id: int, title: str, message: str, type: str, module: str, reference_id: int = None, action_url: str = None, system_area: str = None):
+        resolved_area = self._resolve_system_area(module, type, action_url, system_area)
         # 1. Save to DB
         notif = models.Notification(
             user_id=user_id,
@@ -73,6 +93,7 @@ class NotificationManager:
             message=message,
             type=type,
             module=module,
+            system_area=resolved_area,
             reference_id=reference_id,
             action_url=action_url
         )
@@ -90,6 +111,7 @@ class NotificationManager:
                 "message": notif.message,
                 "type": notif.type,
                 "module": notif.module,
+                "system_area": notif.system_area,
                 "reference_id": notif.reference_id,
                 "is_read": notif.is_read,
                 "action_url": notif.action_url,

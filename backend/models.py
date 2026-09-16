@@ -25,19 +25,27 @@ class User(Base):
 
     role = relationship("Role")
     employee = relationship("Employee", back_populates="user", uselist=False)
+    partner = relationship("Partner", back_populates="user", uselist=False)
     client = relationship("Client", back_populates="user", uselist=False)
-    member = relationship("Member", back_populates="user", uselist=False)
+
+    @property
+    def customer(self):
+        return self.client
+
+    @property
+    def member(self):
+        return self.client
 
     @property
     def name(self) -> str:
+        if self.client and self.client.full_name:
+            return self.client.full_name
         if self.employee:
             parts = [p for p in [self.employee.first_name, self.employee.last_name] if p]
             if parts:
                 return " ".join(parts).strip()
-        if self.member and self.member.full_name:
-            return self.member.full_name
-        if self.client and self.client.contact_person:
-            return self.client.contact_person
+        if self.partner and self.partner.contact_person:
+            return self.partner.contact_person
         if self.email and "@" in self.email:
             prefix = self.email.split("@")[0]
             clean = " ".join([word.capitalize() for word in prefix.replace(".", " ").replace("_", " ").replace("-", " ").split()])
@@ -427,6 +435,7 @@ class Notification(Base):
     message = Column(String)
     type = Column(String)
     module = Column(String)
+    system_area = Column(String, default="hrms", index=True, nullable=True)
     reference_id = Column(Integer, nullable=True)
     is_read = Column(Boolean, default=False)
     action_url = Column(String, nullable=True)
@@ -513,7 +522,8 @@ class TimesheetEntry(Base):
 class ClientCompany(Base):
     __tablename__ = "client_companies"
     id = Column(Integer, primary_key=True, index=True)
-    client_id = Column(Integer, ForeignKey("clients.id", ondelete="SET NULL"), index=True, nullable=True)
+    client_id = Column(Integer, ForeignKey("partners.id", ondelete="SET NULL"), index=True, nullable=True)
+    customer_id = Column(Integer, ForeignKey("clients.id", ondelete="SET NULL"), index=True, nullable=True)
     company_name = Column(String, index=True)
     company_code = Column(String, unique=True, index=True)
     address = Column(String, nullable=True)
@@ -550,7 +560,14 @@ class ClientCompany(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    client = relationship("Client", back_populates="companies")
+    partner = relationship("Partner", back_populates="companies")
+    
+    client = relationship("Client", foreign_keys=[customer_id], back_populates="companies")
+
+    @property
+    def customer(self):
+        return self.client
+
     creator = relationship("User", foreign_keys=[created_by_user_id])
     validator = relationship("User", foreign_keys=[validated_by_user_id])
     consultants = relationship("ClientConsultant", back_populates="company", cascade="all, delete-orphan")
@@ -561,6 +578,41 @@ class ClientCompany(Base):
 
 class Client(Base):
     __tablename__ = "clients"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_code = Column(String, unique=True, index=True) # e.g. CUST-0001 / CLI-0001
+    full_name = Column(String, index=True)
+    email = Column(String, index=True)
+    phone = Column(String, nullable=True)
+    date_of_birth = Column(Date, nullable=True)
+    nationality = Column(String, nullable=True)
+    gender = Column(String, nullable=True)
+    identification_number = Column(String, nullable=True)
+    address = Column(String, nullable=True)
+    status = Column(String, default="ACTIVE") # ACTIVE, DISABLED
+    notes = Column(String, nullable=True)
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=True)
+    company_id = Column(Integer, ForeignKey("client_companies.id", ondelete="SET NULL"), index=True, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    user = relationship("User", back_populates="client")
+    company = relationship("ClientCompany", foreign_keys=[company_id], backref="associated_clients")
+    companies = relationship("ClientCompany", foreign_keys="ClientCompany.customer_id", back_populates="client")
+
+    @property
+    def client_code(self):
+        return self.customer_code
+
+    @client_code.setter
+    def client_code(self, val):
+        self.customer_code = val
+
+
+class Partner(Base):
+    __tablename__ = "partners"
     id = Column(Integer, primary_key=True, index=True)
     contact_person = Column(String)
     email = Column(String)
@@ -570,7 +622,7 @@ class Client(Base):
     notes = Column(String, nullable=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True)
     
-    # Client Personal Details
+    # Partner Personal Details
     date_of_birth = Column(Date, nullable=True)
     nationality = Column(String, nullable=True)
     gender = Column(String, nullable=True)
@@ -580,24 +632,13 @@ class Client(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    user = relationship("User", back_populates="client")
-    companies = relationship("ClientCompany", back_populates="client", cascade="all, delete-orphan")
+    user = relationship("User", back_populates="partner")
+    companies = relationship("ClientCompany", back_populates="partner", cascade="all, delete-orphan")
 
 
-class Member(Base):
-    __tablename__ = "members"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True)
-    full_name = Column(String, nullable=False)
-    email = Column(String, index=True, nullable=False)
-    phone = Column(String, nullable=True)  # Mobile number
-    date_of_birth = Column(Date, nullable=True)
-    status = Column(String, default="ACTIVE")  # ACTIVE, SUSPENDED
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    user = relationship("User", back_populates="member")
+# Backward compatibility aliases
+Customer = Client
+Member = Client
 
 
 class ClientConsultant(Base):
@@ -634,14 +675,14 @@ class ClientActivityLog(Base):
     __tablename__ = "client_activity_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    client_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), index=True, nullable=True)
+    client_id = Column(Integer, ForeignKey("partners.id", ondelete="CASCADE"), index=True, nullable=True)
     company_id = Column(Integer, ForeignKey("client_companies.id", ondelete="CASCADE"), index=True, nullable=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     action_type = Column(String, nullable=False) # ORDER_CREATED, DOCUMENT_UPLOADED, CONSULTANT_ASSIGNED, STAKEHOLDER_ADDED
     description = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    client = relationship("Client", backref="activities")
+    client = relationship("Partner", backref="activities")
     company = relationship("ClientCompany")
     user = relationship("User")
 
@@ -747,10 +788,11 @@ class ClientOrder(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     order_number = Column(String, index=True) # e.g. MCSX-260001
-    client_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    client_id = Column(Integer, ForeignKey("partners.id", ondelete="CASCADE"), nullable=False)
     company_id = Column(Integer, ForeignKey("client_companies.id", ondelete="SET NULL"), nullable=True)
     billing_company_id = Column(Integer, ForeignKey("client_companies.id", ondelete="SET NULL"), nullable=True)
     service_id = Column(Integer, ForeignKey("client_services.id", ondelete="SET NULL"), nullable=True)
+    customer_id = Column(Integer, ForeignKey("clients.id", ondelete="SET NULL"), nullable=True)
     job_id = Column(String, nullable=True) # e.g. OA-001
     job_title = Column(String, nullable=False)
     branch_name = Column(String, nullable=True) # e.g. Bali Branch, HQ
@@ -804,7 +846,12 @@ class ClientOrder(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    client = relationship("Client", backref="orders")
+    partner = relationship("Partner", foreign_keys=[client_id], backref="orders")
+    client = relationship("Client", foreign_keys=[customer_id], backref="orders")
+
+    @property
+    def customer(self):
+        return self.client
     company = relationship("ClientCompany", foreign_keys=[company_id])
     billing_company = relationship("ClientCompany", foreign_keys=[billing_company_id])
     service = relationship("ClientService")

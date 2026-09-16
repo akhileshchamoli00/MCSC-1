@@ -4,30 +4,24 @@ import { useEffect, useState } from "react";
 import { useUser } from "@/contexts/user-context";
 import { resolveImageUrl } from "@/lib/utils";
 import {
-  Users, Briefcase, ShoppingBag, FolderGit, Download, Sunrise, Sun, Moon, ArrowUpRight, Search, FileText, CheckCircle, Clock
+  Users, Briefcase, FolderGit, Sunrise, Sun, Moon, ArrowUpRight, FileText, CheckCircle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import MagicBento, { BentoCardItem, BentoCard } from "@/components/magic-bento";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 
 export default function BusinessDashboard() {
   const { resolvedTheme } = useTheme();
   const glowColor = resolvedTheme === "dark" ? "16, 185, 129" : "148, 163, 184"; // emerald glow for business
-  const { profile, isAdmin, hasPermission } = useUser();
-  const canAccessServicesCatalog = isAdmin || hasPermission("clients_services", "view") || hasPermission("clients_services", "read");
+  const { profile } = useUser();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview");
 
   // State for metrics
   const [clients, setClients] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
-  const [catalog, setCatalog] = useState<any[]>([]);
-  const [catalogSearch, setCatalogSearch] = useState("");
   const [expiringDocs, setExpiringDocs] = useState<any[]>([]);
 
   const getDaysRemaining = (expiryDateStr?: string) => {
@@ -73,23 +67,21 @@ export default function BusinessDashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
-
       try {
-
-        const [clientsRes, ordersRes, catalogRes, docsRes] = await Promise.all([
+        const [clientsRes, ordersRes, docsRes] = await Promise.all([
           fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
-      credentials: "include" }),
+            credentials: "include"
+          }),
           fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
-      credentials: "include" }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
-      credentials: "include" }),
+            credentials: "include"
+          }),
           fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/documents/expiring`, {
-      credentials: "include" })
+            credentials: "include"
+          })
         ]);
 
         if (clientsRes.ok) setClients(await clientsRes.json());
         if (ordersRes.ok) setOrders(await ordersRes.json());
-        if (catalogRes.ok) setCatalog(await catalogRes.json());
         if (docsRes.ok) setExpiringDocs(await docsRes.json());
       } catch (err) {
         console.error("Failed to load dashboard metrics:", err);
@@ -100,15 +92,6 @@ export default function BusinessDashboard() {
 
     fetchData();
   }, []);
-
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric"
-    });
-  };
 
   const getOrderStatusBadge = (status: string) => {
     const s = (status || "").toUpperCase();
@@ -174,7 +157,7 @@ export default function BusinessDashboard() {
       children: (
         <div className="mt-2 w-full">
           <div className="text-3xl font-extrabold text-foreground">{clients.length}</div>
-          <p className="text-[10px] text-muted-foreground mt-1">Partners registered</p>
+          <p className="text-[10px] text-muted-foreground mt-1">Clients registered</p>
         </div>
       )
     },
@@ -207,27 +190,11 @@ export default function BusinessDashboard() {
           <p className="text-[10px] text-indigo-500 font-semibold mt-1">Scope deliverables</p>
         </div>
       )
-    },
-    {
-      label: "Services Catalog",
-      icon: ShoppingBag,
-      children: (
-        <div className="mt-2 w-full">
-          <div className="text-3xl font-extrabold text-foreground">{catalog.length}</div>
-          <p className="text-[10px] text-cyan-500 font-semibold mt-1">Active services list</p>
-        </div>
-      )
     }
   ];
 
   const greetingData = getGreetingData();
   const GreetingIcon = greetingData.icon;
-
-  const filteredCatalog = catalog.filter(c => 
-    (c.job_title || "").toLowerCase().includes(catalogSearch.toLowerCase()) ||
-    (c.job_id || "").toLowerCase().includes(catalogSearch.toLowerCase()) ||
-    (c.description || "").toLowerCase().includes(catalogSearch.toLowerCase())
-  );
 
   return (
     <div className="flex-1 space-y-8 pb-10">
@@ -253,13 +220,13 @@ export default function BusinessDashboard() {
                 {greetingData.greeting}, {profile ? `${profile.first_name} ${profile.last_name}` : "Team Partner"}
               </h1>
               <p className="text-zinc-700 dark:text-emerald-100/90 text-sm sm:text-base leading-relaxed max-w-xl font-medium">
-                {greetingData.subtitle} You have <span className="font-bold text-zinc-950 dark:text-emerald-300 underline decoration-emerald-500/30 underline-offset-4">{activeOrders.length} active projects</span> and <span className="font-bold text-zinc-950 dark:text-emerald-300 underline decoration-emerald-500/30 underline-offset-4">{clients.length} business partners</span> in your pipeline.
+                {greetingData.subtitle} You have <span className="font-bold text-zinc-950 dark:text-emerald-300 underline decoration-emerald-500/30 underline-offset-4">{activeOrders.length} active projects</span> and <span className="font-bold text-zinc-950 dark:text-emerald-300 underline decoration-emerald-500/30 underline-offset-4">{clients.length} clients</span> in your pipeline.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-4 pt-2">
               <div className="bg-white/80 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl px-4 py-2.5 backdrop-blur-md shadow-sm transition-all duration-300 hover:border-zinc-400/40">
-                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">Partners</span>
+                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">Clients</span>
                 <span className="text-xs font-bold text-zinc-900 dark:text-white mt-0.5 block">{clients.length}</span>
               </div>
               <div className="bg-white/80 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl px-4 py-2.5 backdrop-blur-md shadow-sm transition-all duration-300 hover:border-zinc-400/40">
@@ -267,8 +234,8 @@ export default function BusinessDashboard() {
                 <span className="text-xs font-bold text-zinc-900 dark:text-white mt-0.5 block">{activeOrders.length}</span>
               </div>
               <div className="bg-white/80 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl px-4 py-2.5 backdrop-blur-md shadow-sm transition-all duration-300 hover:border-zinc-400/40">
-                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">Catalog Services</span>
-                <span className="text-xs font-bold text-zinc-900 dark:text-white mt-0.5 block">{catalog.length}</span>
+                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">Completed</span>
+                <span className="text-xs font-bold text-zinc-900 dark:text-white mt-0.5 block">{completedOrders}</span>
               </div>
             </div>
           </div>
@@ -283,19 +250,17 @@ export default function BusinessDashboard() {
         </div>
       </BentoCard>
 
-      {/* 2. NAVIGATION ROW */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card/40 backdrop-blur-xl p-4 rounded-xl border border-border/40 shadow-sm">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-          <TabsList className="h-10 w-full md:w-auto grid grid-cols-2 bg-muted/60 p-1">
-            <TabsTrigger value="overview" className="h-8 text-xs font-semibold px-6">Overview</TabsTrigger>
-            <TabsTrigger value="catalog" className="h-8 text-xs font-semibold px-6">Services Catalog</TabsTrigger>
-          </TabsList>
-        </Tabs>
+      {/* 2. NAVIGATION / ACTION BAR */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card/40 backdrop-blur-xl p-4 rounded-xl border border-border/40 shadow-sm">
+        <div>
+          <h2 className="text-sm font-bold text-foreground">Operational Overview</h2>
+          <p className="text-xs text-muted-foreground">Monitor ongoing client projects, assignments, and corporate documents</p>
+        </div>
         
         <div className="flex items-center gap-3">
           <Link href="/business/clients/new">
             <Button size="sm" className="h-9 font-semibold text-xs gap-1">
-              Add Partner
+              Add Client
             </Button>
           </Link>
           <Link href="/business/clients/orders">
@@ -306,247 +271,166 @@ export default function BusinessDashboard() {
         </div>
       </div>
 
-      {/* TABS CONTENT */}
-      {activeTab === "overview" && (
-        <div className="space-y-8 animate-in fade-in duration-500">
-          {/* Bento Stats */}
-          <MagicBento
-            cards={businessCards}
-            textAutoHide={true}
-            enableStars
-            enableSpotlight={false}
-            enableBorderGlow={true}
-            enableTilt={false}
-            enableMagnetism={false}
-            clickEffect
-            spotlightRadius={400}
-            particleCount={12}
-            glowColor="16, 185, 129"
-            gridClassName="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 w-full"
-          />
+      {/* STATS & MAIN CONTENT */}
+      <div className="space-y-8 animate-in fade-in duration-500">
+        {/* Bento Stats */}
+        <MagicBento
+          cards={businessCards}
+          textAutoHide={true}
+          enableStars
+          enableSpotlight={false}
+          enableBorderGlow={true}
+          enableTilt={false}
+          enableMagnetism={false}
+          clickEffect
+          spotlightRadius={400}
+          particleCount={12}
+          glowColor="16, 185, 129"
+          gridClassName="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full"
+        />
 
-          {/* Side-by-Side Grid Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start w-full">
-            {/* Expiring Documents & Permits Card */}
-            <Card className="overflow-hidden border border-border/40 bg-background/50 shadow-sm backdrop-blur-md rounded-2xl">
-              <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-border/30 bg-muted/10">
-                <div>
-                  <CardTitle className="text-base font-bold flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-emerald-500" />
-                    <span>Expiring Documents & Permits</span>
-                  </CardTitle>
-                  <CardDescription className="text-xs">Track validity and expiration of legal corporate files</CardDescription>
-                </div>
-                <Link href="/business/clients/documents">
-                  <Button variant="ghost" size="sm" className="text-xs hover:bg-muted/80 flex items-center gap-1 rounded-xl">
-                    Manage Documents <ArrowUpRight className="h-3 w-3" />
-                  </Button>
-                </Link>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left">
-                    <thead className="text-[10px] text-muted-foreground uppercase bg-muted/30 border-b border-border/40 font-semibold tracking-wider">
-                      <tr>
-                        <th className="px-5 py-3 font-semibold">Partner</th>
-                        <th className="px-5 py-3 font-semibold">Company</th>
-                        <th className="px-5 py-3 font-semibold">Document Name</th>
-                        <th className="px-5 py-3 font-semibold text-right">Status / Days Left</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/20">
-                      {[...expiringDocs]
-                        .sort((a, b) => getDaysRemaining(a.expiry_date) - getDaysRemaining(b.expiry_date))
-                        .map((doc) => {
-                          const daysLeft = getDaysRemaining(doc.expiry_date);
-                          return (
-                            <tr key={doc.id} className="hover:bg-muted/20 transition-colors">
-                              <td className="px-5 py-3.5 font-bold text-foreground">{doc.partner_name || "Individual Client"}</td>
-                              <td className="px-5 py-3.5 font-semibold text-muted-foreground">{doc.company_name}</td>
-                              <td className="px-5 py-3.5 whitespace-normal break-words max-w-[200px] leading-normal">
-                                <div className="font-semibold text-foreground">{doc.file_name}</div>
-                                <div className="text-[10px] text-muted-foreground/80 mt-0.5">{doc.document_type}</div>
-                              </td>
-                              <td className="px-5 py-3.5 text-right font-semibold">
-                                {daysLeft < 0 ? (
-                                  <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20">
-                                    EXPIRED ({Math.abs(daysLeft)}d ago)
-                                  </span>
-                                ) : daysLeft === 0 ? (
-                                  <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
-                                    TODAY
-                                  </span>
-                                ) : daysLeft <= 30 ? (
-                                  <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
-                                    {daysLeft}d LEFT
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
-                                    {daysLeft}d LEFT
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      {expiringDocs.length === 0 && (
-                        <tr>
-                          <td colSpan={4} className="px-5 py-8 text-center text-muted-foreground text-xs italic">
-                            No expiring corporate documents found in workspace database.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recent Orders log */}
-            <Card className="overflow-hidden border border-border/40 bg-background/50 shadow-sm backdrop-blur-md rounded-2xl">
-              <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-border/30 bg-muted/10">
-                <div>
-                  <CardTitle className="text-base font-bold">Recent Client Orders</CardTitle>
-                  <CardDescription className="text-xs">Latest services purchased and execution status</CardDescription>
-                </div>
-                <Link href="/business/clients/orders">
-                  <Button variant="ghost" size="sm" className="text-xs hover:bg-muted/80 flex items-center gap-1 rounded-xl">
-                    Manage Orders <ArrowUpRight className="h-3 w-3" />
-                  </Button>
-                </Link>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left">
-                    <thead className="text-[10px] text-muted-foreground uppercase bg-muted/30 border-b border-border/40 font-semibold tracking-wider">
-                      <tr>
-                        <th className="px-5 py-3 font-semibold">Order Number</th>
-                        <th className="px-5 py-3 font-semibold">Representative</th>
-                        <th className="px-5 py-3 font-semibold">Assigned To</th>
-                        <th className="px-5 py-3 font-semibold text-right">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/20">
-                      {groupedOrders.slice(0, 5).map((order) => (
-                        <tr key={order.order_number} className="hover:bg-muted/20 transition-colors">
-                          <td className="px-5 py-3.5">
-                            <span className="font-mono font-bold text-xs bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 px-2 py-0.5 rounded-md text-foreground">
-                              {order.order_number}
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5 text-muted-foreground font-semibold">{order.client_name || "-"}</td>
-                          <td className="px-5 py-3.5">
-                            {order.consultants && order.consultants.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {order.consultants.map((c: any) => (
-                                  <span key={c.id} className="bg-primary/10 text-primary border border-primary/20 text-[10px] font-bold py-0.5 px-2 rounded-full">
-                                    {c.name}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground/60 italic text-[11px]">Unassigned</span>
-                            )}
-                          </td>
-                          <td className="px-5 py-3.5 text-right">{getOrderStatusBadge(order.status)}</td>
-                        </tr>
-                      ))}
-                      {groupedOrders.length === 0 && (
-                        <tr>
-                          <td colSpan={4} className="px-5 py-8 text-center text-muted-foreground text-xs italic">
-                            No client orders found in workspace database.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {activeTab === "catalog" && (
-        <div className="space-y-6 animate-in fade-in duration-500">
-          <div className="flex items-center justify-between gap-3 bg-card/40 backdrop-blur-xl p-4 rounded-xl border border-border/40 shadow-sm flex-wrap">
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search catalog services, Job ID, or keywords..."
-                className="pl-8 h-9 text-xs"
-                value={catalogSearch}
-                onChange={(e) => setCatalogSearch(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              {catalogSearch && (
-                <Button size="sm" variant="ghost" className="text-xs h-9" onClick={() => setCatalogSearch("")}>
-                  Clear
+        {/* Side-by-Side Grid Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start w-full">
+          {/* Expiring Documents & Permits Card */}
+          <Card className="overflow-hidden border border-border/40 bg-background/50 shadow-sm backdrop-blur-md rounded-2xl">
+            <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-border/30 bg-muted/10">
+              <div>
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-emerald-500" />
+                  <span>Expiring Documents & Permits</span>
+                </CardTitle>
+                <CardDescription className="text-xs">Track validity and expiration of legal corporate files</CardDescription>
+              </div>
+              <Link href="/business/clients/documents">
+                <Button variant="ghost" size="sm" className="text-xs hover:bg-muted/80 flex items-center gap-1 rounded-xl">
+                  Manage Documents <ArrowUpRight className="h-3 w-3" />
                 </Button>
-              )}
-              {canAccessServicesCatalog && (
-                <Link href="/business/clients/services">
-                  <Button size="sm" variant="outline" className="text-xs h-9 font-semibold gap-1.5 border-border/60">
-                    <Briefcase className="h-3.5 w-3.5 text-emerald-500" />
-                    Manage Catalog & Price List
-                  </Button>
-                </Link>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredCatalog.map((item) => (
-              <div key={item.id} className="p-4 rounded-xl border border-border/50 bg-card/60 backdrop-blur-md shadow-sm hover:shadow-md transition-all duration-300 hover:border-emerald-500/20 flex flex-col justify-between group">
-                <div>
-                  <div className="flex items-center justify-between mb-2.5 gap-2">
-                    <Badge variant="outline" className="font-mono font-bold text-xs bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-200 px-2.5 py-0.5 rounded-md">
-                      {item.job_id || `JOB-${item.id}`}
-                    </Badge>
-                  </div>
-                  <h3 className="font-bold text-foreground text-sm leading-snug mb-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                    {item.job_title}
-                  </h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap mb-4">
-                    {item.description || "No description available."}
-                  </p>
-                </div>
-
-                <div className="border-t border-border/20 pt-3 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {item.needs_notary && (
-                      <Badge variant="secondary" className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold border-indigo-500/20 text-[9px] px-1.5 py-0.5">
-                        NOTARY
-                      </Badge>
+              </Link>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="text-[10px] text-muted-foreground uppercase bg-muted/30 border-b border-border/40 font-semibold tracking-wider">
+                    <tr>
+                      <th className="px-5 py-3 font-semibold">Client</th>
+                      <th className="px-5 py-3 font-semibold">Company</th>
+                      <th className="px-5 py-3 font-semibold">Document Name</th>
+                      <th className="px-5 py-3 font-semibold text-right">Status / Days Left</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/20">
+                    {[...expiringDocs]
+                      .sort((a, b) => getDaysRemaining(a.expiry_date) - getDaysRemaining(b.expiry_date))
+                      .map((doc) => {
+                        const daysLeft = getDaysRemaining(doc.expiry_date);
+                        return (
+                          <tr key={doc.id} className="hover:bg-muted/20 transition-colors">
+                            <td className="px-5 py-3.5 font-bold text-foreground">{doc.partner_name || "Individual Client"}</td>
+                            <td className="px-5 py-3.5 font-semibold text-muted-foreground">{doc.company_name}</td>
+                            <td className="px-5 py-3.5 whitespace-normal break-words max-w-[200px] leading-normal">
+                              <div className="font-semibold text-foreground">{doc.file_name}</div>
+                              <div className="text-[10px] text-muted-foreground/80 mt-0.5">{doc.document_type}</div>
+                            </td>
+                            <td className="px-5 py-3.5 text-right font-semibold">
+                              {daysLeft < 0 ? (
+                                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20">
+                                  EXPIRED ({Math.abs(daysLeft)}d ago)
+                                </span>
+                              ) : daysLeft === 0 ? (
+                                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
+                                  TODAY
+                                </span>
+                              ) : daysLeft <= 30 ? (
+                                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
+                                  {daysLeft}d LEFT
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+                                  {daysLeft}d LEFT
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    {expiringDocs.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-5 py-8 text-center text-muted-foreground text-xs italic">
+                          No expiring corporate documents found in workspace database.
+                        </td>
+                      </tr>
                     )}
-                    {item.needs_gov_officer && (
-                      <Badge variant="secondary" className="bg-sky-500/10 text-sky-600 dark:text-sky-400 font-bold border-sky-500/20 text-[9px] px-1.5 py-0.5">
-                        GOV BODY
-                      </Badge>
-                    )}
-                    {item.needs_other_vendors && (
-                      <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border-emerald-500/20 text-[9px] px-1.5 py-0.5">
-                        VENDORS
-                      </Badge>
-                    )}
-                    {!item.needs_notary && !item.needs_gov_officer && !item.needs_other_vendors && (
-                      <span className="text-[10px] text-muted-foreground font-semibold">Standard Service</span>
-                    )}
-                  </div>
-                </div>
+                  </tbody>
+                </table>
               </div>
-            ))}
-            {filteredCatalog.length === 0 && (
-              <div className="col-span-full p-12 text-center text-muted-foreground bg-card/30 rounded-xl border border-dashed border-border flex flex-col items-center justify-center gap-2">
-                <ShoppingBag className="h-8 w-8 text-muted-foreground/45" />
-                <span className="text-sm font-semibold">No services match your search</span>
+            </CardContent>
+          </Card>
+
+          {/* Recent Orders log */}
+          <Card className="overflow-hidden border border-border/40 bg-background/50 shadow-sm backdrop-blur-md rounded-2xl">
+            <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-border/30 bg-muted/10">
+              <div>
+                <CardTitle className="text-base font-bold">Recent Client Orders</CardTitle>
+                <CardDescription className="text-xs">Latest services purchased and execution status</CardDescription>
               </div>
-            )}
-          </div>
+              <Link href="/business/clients/orders">
+                <Button variant="ghost" size="sm" className="text-xs hover:bg-muted/80 flex items-center gap-1 rounded-xl">
+                  Manage Orders <ArrowUpRight className="h-3 w-3" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="text-[10px] text-muted-foreground uppercase bg-muted/30 border-b border-border/40 font-semibold tracking-wider">
+                    <tr>
+                      <th className="px-5 py-3 font-semibold">Order Number</th>
+                      <th className="px-5 py-3 font-semibold">Representative</th>
+                      <th className="px-5 py-3 font-semibold">Assigned To</th>
+                      <th className="px-5 py-3 font-semibold text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/20">
+                    {groupedOrders.slice(0, 5).map((order) => (
+                      <tr key={order.order_number} className="hover:bg-muted/20 transition-colors">
+                        <td className="px-5 py-3.5">
+                          <span className="font-mono font-bold text-xs bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 px-2 py-0.5 rounded-md text-foreground">
+                            {order.order_number}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-muted-foreground font-semibold">{order.client_name || "-"}</td>
+                        <td className="px-5 py-3.5">
+                          {order.consultants && order.consultants.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {order.consultants.map((c: any) => (
+                                <span key={c.id} className="bg-primary/10 text-primary border border-primary/20 text-[10px] font-bold py-0.5 px-2 rounded-full">
+                                  {c.name}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground/60 italic text-[11px]">Unassigned</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3.5 text-right">{getOrderStatusBadge(order.status)}</td>
+                      </tr>
+                    ))}
+                    {groupedOrders.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-5 py-8 text-center text-muted-foreground text-xs italic">
+                          No client orders found in workspace database.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      )}
+      </div>
 
     </div>
   );
 }
+

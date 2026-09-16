@@ -37,7 +37,9 @@ import {
   Scale,
   Bell,
   CreditCard,
-  Receipt
+  Receipt,
+  UserCheck,
+  Handshake
 } from "lucide-react";
 import {
   Tooltip,
@@ -212,9 +214,17 @@ const navModules: NavModule[] = [
     systemArea: "hrms"
   },
   {
-    title: "Partners",
-    icon: Users,
+    title: "Clients",
+    icon: UserCheck,
     href: "/business/clients",
+    adminOnly: true,
+    moduleCode: "clients_all",
+    systemArea: "business"
+  },
+  {
+    title: "Partners",
+    icon: Handshake,
+    href: "/business/partners",
     adminOnly: true,
     moduleCode: "clients_all",
     systemArea: "business"

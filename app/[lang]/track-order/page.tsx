@@ -303,7 +303,8 @@ function TrackOrderContent() {
           confirm_password: regConfirmPassword,
           phone: regMobile.trim() || null,
           date_of_birth: regDob || null,
-          order_number: orderData?.order_number || searchInput || null
+          order_number: orderData?.order_number || searchInput || null,
+          company_id: companyIdInput.trim() || orderData?.company_code || (orderData?.company_id ? orderData.company_id.toString() : null)
         })
       });
 
@@ -318,7 +319,8 @@ function TrackOrderContent() {
       localStorage.setItem("user_id", data.user.id.toString());
 
       setShowRegisterModal(false);
-      toast.success(`Welcome, ${data.user.name}! Redirecting to your Member Order Portal...`);
+      const custBadge = data.user.customer_code ? ` [ID: ${data.user.customer_code}]` : "";
+      toast.success(`Welcome, ${data.user.name}${custBadge}! Redirecting to your Member Order Portal...`);
 
       // Forward to member order tracking portal
       const targetOrder = orderData?.order_number || searchInput.trim();

@@ -24,7 +24,17 @@ import {
   FileText,
   Eye,
   ShieldCheck,
-  ExternalLink
+  ExternalLink,
+  Copy,
+  Calendar,
+  Mail,
+  Phone,
+  Layers,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Pencil,
+  Trash2,
+  Check
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -102,6 +112,11 @@ export function DualOrderChatDialog({
   const [loadingInternal, setLoadingInternal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Order Details Summary State
+  const [orderSummary, setOrderSummary] = useState<any | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [showDetails, setShowDetails] = useState(true);
+
   // Document Preview State (Preview Only - No Download)
   const [previewAttachment, setPreviewAttachment] = useState<any | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -129,6 +144,16 @@ export function DualOrderChatDialog({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [cursorPosition, setCursorPosition] = useState<number | null>(null);
 
+  // Current logged in user (for permission check on edit/delete)
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
+
+  // Edit / Delete State
+  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [editingMessageText, setEditingMessageText] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingMessageId, setDeletingMessageId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+
   const clientMessagesContainerRef = useRef<HTMLDivElement | null>(null);
   const internalMessagesContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -136,7 +161,153 @@ export function DualOrderChatDialog({
     setMounted(true);
   }, []);
 
-  // 1. Fetch Client Messages
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
+          credentials: "include"
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setCurrentUser(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch current user:", err);
+      }
+    };
+    if (isOpen) {
+      fetchCurrentUser();
+    }
+  }, [isOpen]);
+
+  const canModifyMessage = (msg: any) => {
+    if (!msg || !msg.id || isSystemMessage(msg)) return false;
+    if (!currentUser) return false;
+    const isSuperAdmin = currentUser.role?.name?.toUpperCase() === "SUPER_ADMIN" || currentUser.is_super_admin;
+    const isAdmin = currentUser.role?.name?.toUpperCase() === "ADMIN" || currentUser.role?.name?.toUpperCase() === "HR" || currentUser.department?.name === "HR";
+    const isAuthor = msg.user_id && msg.user_id === currentUser.id;
+    return Boolean(isAuthor || isSuperAdmin || isAdmin);
+  };
+
+  const handleStartEdit = (msg: any) => {
+    setEditingMessageId(msg.id);
+    setEditingMessageText(msg.message || "");
+    setConfirmDeleteId(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditingMessageText("");
+  };
+
+  const handleSaveEdit = async (msgId: number, channel: "CLIENT" | "INTERNAL") => {
+    if (!orderNumber || !editingMessageText.trim() || savingEdit) return;
+    try {
+      setSavingEdit(true);
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(orderNumber)}/progress/${msgId}`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            message: editingMessageText.trim()
+          })
+        }
+      );
+
+      if (res.ok) {
+        const updated = await res.json();
+        if (channel === "CLIENT") {
+          setClientMessages(prev => prev.map(m => (m.id === msgId ? updated : m)));
+        } else {
+          setInternalMessages(prev => prev.map(m => (m.id === msgId ? updated : m)));
+        }
+        setEditingMessageId(null);
+        setEditingMessageText("");
+        toast.success("Message updated successfully");
+      } else {
+        const err = await res.json();
+        toast.error(err.detail || "Failed to update message");
+      }
+    } catch (err) {
+      console.error("Error updating message:", err);
+      toast.error("Error updating message");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDeleteMessage = async (msgId: number, channel: "CLIENT" | "INTERNAL") => {
+    if (!orderNumber || deletingMessageId) return;
+    try {
+      setDeletingMessageId(msgId);
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(orderNumber)}/progress/${msgId}`,
+        {
+          method: "DELETE",
+          credentials: "include"
+        }
+      );
+
+      if (res.ok) {
+        if (channel === "CLIENT") {
+          setClientMessages(prev => prev.filter(m => m.id !== msgId));
+        } else {
+          setInternalMessages(prev => prev.filter(m => m.id !== msgId));
+        }
+        setConfirmDeleteId(null);
+        toast.success("Message deleted successfully");
+      } else {
+        const err = await res.json();
+        toast.error(err.detail || "Failed to delete message");
+      }
+    } catch (err) {
+      console.error("Error deleting message:", err);
+      toast.error("Error deleting message");
+    } finally {
+      setDeletingMessageId(null);
+    }
+  };
+
+  const formatCurrency = (amount?: number | null) => {
+    if (amount === undefined || amount === null) return "Rp 0";
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard`);
+  };
+
+  // 1. Fetch Order Summary
+  const fetchOrderSummary = async (isInitial = false) => {
+    if (!orderNumber) return;
+    if (isInitial) setLoadingSummary(true);
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(orderNumber)}/summary`,
+        { credentials: "include" }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setOrderSummary(data);
+      }
+    } catch (err) {
+      console.error("Error loading order summary:", err);
+    } finally {
+      if (isInitial) setLoadingSummary(false);
+    }
+  };
+
+  // 2. Fetch Client Messages
   const fetchClientMessages = async (isInitial = false) => {
     if (!orderNumber) return;
     if (isInitial) setLoadingClient(true);
@@ -161,7 +332,7 @@ export function DualOrderChatDialog({
     }
   };
 
-  // 2. Fetch Internal Messages
+  // 3. Fetch Internal Messages
   const fetchInternalMessages = async (isInitial = false) => {
     if (!orderNumber) return;
     if (isInitial) setLoadingInternal(true);
@@ -186,7 +357,7 @@ export function DualOrderChatDialog({
     }
   };
 
-  // 3. Fetch Taggable Users (for Internal Chat @mentions)
+  // 4. Fetch Taggable Users (for Internal Chat @mentions)
   const fetchTaggableUsers = async () => {
     if (!orderNumber) return;
     try {
@@ -222,7 +393,11 @@ export function DualOrderChatDialog({
   // Refresh all messages
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchClientMessages(false), fetchInternalMessages(false)]);
+    await Promise.all([
+      fetchClientMessages(false),
+      fetchInternalMessages(false),
+      fetchOrderSummary(false)
+    ]);
     setRefreshing(false);
   };
 
@@ -242,6 +417,7 @@ export function DualOrderChatDialog({
 
   useEffect(() => {
     if (isOpen && orderNumber) {
+      fetchOrderSummary(true);
       fetchClientMessages(true);
       fetchInternalMessages(true);
       fetchTaggableUsers();
@@ -288,7 +464,7 @@ export function DualOrderChatDialog({
     }
   }, [isOpen, isConfirmClientOpen, onClose]);
 
-  // 4. Handle Client Message Confirmation
+  // 5. Handle Client Message Confirmation
   const handleClientSendClick = (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientInput.trim()) return;
@@ -333,7 +509,7 @@ export function DualOrderChatDialog({
     }
   };
 
-  // 5. Handle Internal Message Send (Instant, No Confirmation)
+  // 6. Handle Internal Message Send (Instant, No Confirmation)
   const handleInternalSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!internalInput.trim() || !orderNumber || sendingInternal) return;
@@ -457,13 +633,13 @@ export function DualOrderChatDialog({
               className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[70]"
             />
 
-            {/* Main Sliding Drawer Panel */}
+            {/* Fullscreen Dynamic Order Chat Dialog */}
             <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "tween", ease: "easeInOut", duration: 0.3 }}
-              className="fixed inset-y-0 top-0 bottom-0 right-0 z-[75] h-screen h-[100dvh] max-h-screen max-h-[100dvh] w-full md:w-[min(1380px,calc(100vw-200px))] lg:w-[calc(100vw-260px)] max-w-7xl bg-background text-foreground shadow-2xl border-l border-border flex flex-col overflow-hidden"
+              initial={{ opacity: 0, scale: 0.99 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.99 }}
+              transition={{ duration: 0.2, ease: "easeInOut" }}
+              className="fixed inset-0 z-[75] h-screen h-[100dvh] max-h-screen max-h-[100dvh] w-screen w-[100vw] max-w-[100vw] bg-background text-foreground shadow-2xl flex flex-col overflow-hidden"
             >
               {/* Top Header Bar - Fixed & Pinned */}
               <div className="p-3.5 sm:p-4 border-b border-border/80 bg-background/95 backdrop-blur-md flex flex-row items-center justify-between shrink-0 gap-4 sticky top-0 z-30 shadow-xs">
@@ -486,31 +662,10 @@ export function DualOrderChatDialog({
                       <h3 className="text-base sm:text-lg font-extrabold font-mono text-foreground">
                         Order #{orderNumber}
                       </h3>
-                      {orderStatus && (
+                      {(orderSummary?.status || orderStatus) && (
                         <Badge variant="outline" className="text-xs font-semibold px-2 py-0.5">
-                          {orderStatus}
+                          {orderSummary?.status || orderStatus}
                         </Badge>
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground truncate flex items-center gap-2 mt-0.5">
-                      <span className="font-semibold text-foreground truncate max-w-[260px]">
-                        {orderTitle || "Corporate Consulting Order"}
-                      </span>
-                      {companyName && (
-                        <>
-                          <span>•</span>
-                          <span className="flex items-center gap-1 shrink-0 text-foreground/90 font-medium">
-                            <Building className="h-3 w-3 text-muted-foreground" /> {companyName}
-                          </span>
-                        </>
-                      )}
-                      {clientName && (
-                        <>
-                          <span>•</span>
-                          <span className="shrink-0">
-                            Client: <strong className="text-foreground">{clientName}</strong>
-                          </span>
-                        </>
                       )}
                     </div>
                   </div>
@@ -520,12 +675,33 @@ export function DualOrderChatDialog({
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => setShowDetails(!showDetails)}
+                    className={`text-xs gap-1.5 h-8.5 font-medium border-border transition-colors ${
+                      showDetails ? "bg-primary/10 text-primary border-primary/30 font-semibold" : "bg-muted/60 text-muted-foreground hover:text-foreground"
+                    }`}
+                    title={showDetails ? "Hide Order Details" : "Show Order Details"}
+                  >
+                    {showDetails ? (
+                      <>
+                        <PanelLeftClose className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Hide Details</span>
+                      </>
+                    ) : (
+                      <>
+                        <PanelLeftOpen className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Show Details</span>
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={handleRefresh}
                     disabled={refreshing}
                     className="text-xs gap-1.5 h-8.5 font-medium border-border"
                   >
                     <RotateCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin text-primary" : ""}`} />
-                    Refresh
+                    <span className="hidden sm:inline">Refresh</span>
                   </Button>
                   <Button
                     variant="ghost"
@@ -538,8 +714,202 @@ export function DualOrderChatDialog({
                 </div>
               </div>
 
-              {/* DUAL CHAT SPLIT PANE CONTAINER */}
-              <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-border/80 min-h-0 h-full max-h-full overflow-hidden bg-muted/5">
+              {/* 3-PANEL BODY: LEFT ORDER DETAILS + DUAL CHAT SPLIT PANE */}
+              <div className="flex-1 flex flex-col lg:flex-row min-h-0 h-full max-h-full overflow-hidden divide-y lg:divide-y-0 lg:divide-x divide-border/80 bg-muted/5">
+                {/* ============================================================ */}
+                {/* LEFT SIDEBAR: ORDER DETAILS & CLIENT OVERVIEW                */}
+                {/* ============================================================ */}
+                {showDetails && (
+                  <div className="w-full lg:w-[320px] xl:w-[350px] 2xl:w-[380px] shrink-0 flex flex-col h-full min-h-0 max-h-full bg-card/60 dark:bg-zinc-950/40 border-r border-border/80 overflow-hidden">
+                    {/* Sidebar Header */}
+                    <div className="px-4 py-2.5 border-b border-border/40 bg-muted/40 flex items-center justify-between shrink-0">
+                      <div className="flex items-center gap-2">
+                        <div className="h-6 w-6 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                          <FileText className="h-3.5 w-3.5" />
+                        </div>
+                        <span className="text-xs font-bold text-foreground uppercase tracking-wider">
+                          Order Details
+                        </span>
+                      </div>
+                      {orderSummary?.status && (
+                        <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5">
+                          {orderSummary.status}
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Sidebar Scrollable Body */}
+                    <div
+                      className="flex-1 min-h-0 overflow-y-auto p-3.5 sm:p-4 space-y-3.5 overscroll-contain"
+                      style={{
+                        scrollbarWidth: "thin",
+                        scrollbarColor: "rgba(125, 125, 125, 0.4) transparent"
+                      }}
+                    >
+                      {loadingSummary ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
+                          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                          <span className="text-xs font-medium">Loading order details...</span>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Card 1: Company Profile */}
+                          <div className="p-3.5 rounded-xl bg-background/90 border border-border/80 shadow-2xs">
+                            <div className="flex items-start gap-2.5">
+                              <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20 mt-0.5">
+                                <Building className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h5 className="text-xs sm:text-sm font-bold text-foreground leading-snug">
+                                  {orderSummary?.company?.company_name || companyName || "Company Profile"}
+                                </h5>
+                                {orderSummary?.company?.company_code && (
+                                  <div className="flex items-center gap-1.5 mt-1.5">
+                                    <span className="text-[10px] font-mono text-primary font-semibold bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
+                                      {orderSummary.company.company_code}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => copyToClipboard(orderSummary.company.company_code, "Company ID")}
+                                      className="text-muted-foreground hover:text-foreground transition-colors"
+                                      title="Copy Company ID"
+                                    >
+                                      <Copy className="h-2.5 w-2.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Card 2: Scope & Deliverables */}
+                          <div className="p-3.5 rounded-xl bg-background/90 border border-border/80 shadow-2xs space-y-3">
+                            <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
+                              <div className="flex items-center gap-1.5">
+                                <Layers className="h-3.5 w-3.5 text-primary shrink-0" />
+                                <span className="text-xs font-bold text-foreground">Scope & Deliverables</span>
+                              </div>
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-mono">
+                                {orderSummary?.items?.length || 1}
+                              </Badge>
+                            </div>
+
+                            <div className="space-y-2.5">
+                              {orderSummary?.items && orderSummary.items.length > 0 ? (
+                                orderSummary.items.map((item: any, i: number) => (
+                                  <div key={item.id || i} className="p-3 rounded-lg bg-muted/40 border border-border/60 space-y-1.5">
+                                    <div className="flex items-start justify-between gap-1.5">
+                                      <span className="text-xs font-bold text-foreground leading-snug">
+                                        {item.job_title}
+                                      </span>
+                                      {item.job_id && (
+                                        <span className="text-[9px] font-mono font-bold bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded shrink-0">
+                                          {item.job_id}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {item.description ? (
+                                      <p className="text-[11px] text-muted-foreground leading-relaxed bg-background/70 p-2 rounded-md border border-border/40 whitespace-pre-line">
+                                        {item.description}
+                                      </p>
+                                    ) : (
+                                      <p className="text-[10px] text-muted-foreground/70 italic">
+                                        Standard scope deliverable
+                                      </p>
+                                    )}
+
+                                    {(item.needs_notary || item.needs_gov_officer || item.needs_other_vendors) && (
+                                      <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                                        {item.needs_notary && (
+                                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 font-medium">
+                                            Notary
+                                          </span>
+                                        )}
+                                        {item.needs_gov_officer && (
+                                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-medium">
+                                            Gov Approval
+                                          </span>
+                                        )}
+                                        {item.needs_other_vendors && (
+                                          <span className="text-[9px] px-1.5 py-0 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-medium">
+                                            Vendor
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="p-2.5 rounded-lg bg-muted/40 border border-border/60">
+                                  <span className="text-xs font-semibold text-foreground block">
+                                    {orderTitle || "Corporate Consulting Service"}
+                                  </span>
+                                  <p className="text-[11px] text-muted-foreground mt-1">
+                                    Consulting and execution for corporate deliverables.
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Card 3: Assigned Consultants */}
+                          <div className="p-3.5 rounded-xl bg-background/90 border border-border/80 shadow-2xs space-y-2.5">
+                            <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
+                              <div className="flex items-center gap-1.5">
+                                <Users className="h-3.5 w-3.5 text-primary shrink-0" />
+                                <span className="text-xs font-bold text-foreground">Assigned Consultants</span>
+                              </div>
+                              {orderSummary?.consultants?.length > 0 && (
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-mono">
+                                  {orderSummary.consultants.length}
+                                </Badge>
+                              )}
+                            </div>
+
+                            {orderSummary?.consultants && orderSummary.consultants.length > 0 ? (
+                              <div className="space-y-2">
+                                {orderSummary.consultants.map((c: any, idx: number) => (
+                                  <div key={c.id || idx} className="flex items-center gap-2.5 p-2 rounded-lg bg-muted/40 border border-border/60">
+                                    {c.profile_photo ? (
+                                      <img
+                                        src={resolveImageUrl(c.profile_photo)}
+                                        alt={c.name}
+                                        className="h-7 w-7 rounded-full object-cover border border-border shrink-0"
+                                      />
+                                    ) : (
+                                      <div className="h-7 w-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs border border-primary/20 shrink-0">
+                                        {c.name?.charAt(0) || "C"}
+                                      </div>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <span className="text-xs font-bold text-foreground truncate block">
+                                        {c.name}
+                                      </span>
+                                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground truncate">
+                                        <span>{c.job_title || c.position || "Consultant"}</span>
+                                        {c.department && <span>• {c.department}</span>}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-[11px] text-muted-foreground italic p-2.5 rounded-lg bg-muted/30 text-center">
+                                No specific consultant assigned yet
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ============================================================ */}
+                {/* DUAL CHAT SPLIT PANE (EXTERNAL CLIENT & INTERNAL NOTES)      */}
+                {/* ============================================================ */}
+                <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-border/80 min-h-0 h-full max-h-full overflow-hidden bg-muted/5">
                 {/* ============================================================ */}
                 {/* PANE 1 (LEFT): CLIENT & CONSULTANT CHAT (EXTERNAL)           */}
                 {/* ============================================================ */}
@@ -612,10 +982,14 @@ export function DualOrderChatDialog({
                           );
                         }
 
+                        const isEditing = editingMessageId === msg.id;
+                        const isDeleting = confirmDeleteId === msg.id;
+                        const canModify = canModifyMessage(msg);
+
                         return (
                           <div
                             key={msg.id || idx}
-                            className={`flex flex-col ${isClientSender ? "items-start" : "items-end"} max-w-[85%] ${
+                            className={`group flex flex-col ${isClientSender ? "items-start" : "items-end"} max-w-[85%] ${
                               isClientSender ? "mr-auto" : "ml-auto"
                             }`}
                           >
@@ -642,67 +1016,150 @@ export function DualOrderChatDialog({
                                   ? new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                                   : ""}
                               </span>
-                            </div>
 
-                            <div
-                              className={`p-3.5 rounded-2xl text-xs sm:text-[13px] leading-relaxed shadow-xs ${
-                                isClientSender
-                                  ? "bg-emerald-500/10 dark:bg-emerald-950/30 text-foreground border border-emerald-500/25 dark:border-emerald-500/30 rounded-tl-sm"
-                                  : "bg-sky-600 dark:bg-sky-600 text-white rounded-tr-sm shadow-sm"
-                              }`}
-                            >
-                              {msg.message}
-
-                              {/* Client Uploaded Document Preview Button (Preview Only - No Download) */}
-                              {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
-                                <div
-                                  className={`mt-2.5 p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs shadow-2xs ${
-                                    isClientSender
-                                      ? "bg-background/90 border-border/60 text-foreground"
-                                      : "bg-sky-700/80 border-sky-500/30 text-white"
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <div
-                                      className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 border ${
-                                        isClientSender
-                                          ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20"
-                                          : "bg-white/10 text-white border-white/20"
-                                      }`}
-                                    >
-                                      <FileText className="h-3.5 w-3.5" />
-                                    </div>
-                                    <div className="min-w-0">
-                                      <span className="font-bold truncate block text-xs">
-                                        {msg.attachment_name || "Client Document"}
-                                      </span>
-                                      <span
-                                        className={`text-[10px] block truncate ${
-                                          isClientSender ? "text-muted-foreground" : "text-sky-200"
-                                        }`}
-                                      >
-                                        Stored in Company Vault (Client Shared Docs)
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  <Button
+                              {canModify && !isEditing && !isDeleting && (
+                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
+                                  <button
                                     type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handlePreviewAttachment(msg)}
-                                    className={`h-7 text-[11px] font-bold gap-1 px-2.5 shrink-0 shadow-2xs ${
-                                      isClientSender
-                                        ? "text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 border-sky-500/30"
-                                        : "text-white bg-white/10 hover:bg-white/20 border-white/30"
-                                    }`}
+                                    onClick={() => handleStartEdit(msg)}
+                                    className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+                                    title="Edit message"
                                   >
-                                    <Eye className="h-3 w-3" />
-                                    Preview
-                                  </Button>
+                                    <Pencil className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmDeleteId(msg.id)}
+                                    className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 transition-colors"
+                                    title="Delete message"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
                                 </div>
                               )}
                             </div>
+
+                            {isEditing ? (
+                              <div className="w-full space-y-2 p-2.5 rounded-xl bg-background border border-sky-500/40 shadow-md">
+                                <textarea
+                                  value={editingMessageText}
+                                  onChange={e => setEditingMessageText(e.target.value)}
+                                  className="w-full text-xs sm:text-[13px] bg-muted/40 border border-border rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-sky-500 min-h-[60px] text-foreground resize-y"
+                                  autoFocus
+                                  placeholder="Edit message..."
+                                />
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleCancelEdit}
+                                    disabled={savingEdit}
+                                    className="h-7 text-xs px-2.5 gap-1 text-muted-foreground hover:text-foreground"
+                                  >
+                                    <X className="h-3 w-3" /> Cancel
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => handleSaveEdit(msg.id, "CLIENT")}
+                                    disabled={!editingMessageText.trim() || savingEdit}
+                                    className="h-7 text-xs px-2.5 gap-1 bg-sky-600 hover:bg-sky-700 text-white font-semibold shadow-xs"
+                                  >
+                                    {savingEdit ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                                    Save
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : isDeleting ? (
+                              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs space-y-2">
+                                <p className="text-rose-600 dark:text-rose-400 font-semibold text-[11px]">
+                                  Delete this message permanently?
+                                </p>
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setConfirmDeleteId(null)}
+                                    disabled={deletingMessageId === msg.id}
+                                    className="h-6.5 text-[11px] px-2"
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => handleDeleteMessage(msg.id, "CLIENT")}
+                                    disabled={deletingMessageId === msg.id}
+                                    className="h-6.5 text-[11px] px-2.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold gap-1"
+                                  >
+                                    {deletingMessageId === msg.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                                    Delete
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div
+                                className={`p-3.5 rounded-2xl text-xs sm:text-[13px] leading-relaxed shadow-xs ${
+                                  isClientSender
+                                    ? "bg-emerald-500/10 dark:bg-emerald-950/30 text-foreground border border-emerald-500/25 dark:border-emerald-500/30 rounded-tl-sm"
+                                    : "bg-sky-600 dark:bg-sky-600 text-white rounded-tr-sm shadow-sm"
+                                }`}
+                              >
+                                {msg.message}
+
+                                {/* Client Uploaded Document Preview Button (Preview Only - No Download) */}
+                                {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
+                                  <div
+                                    className={`mt-2.5 p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs shadow-2xs ${
+                                      isClientSender
+                                        ? "bg-background/90 border-border/60 text-foreground"
+                                        : "bg-sky-700/80 border-sky-500/30 text-white"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <div
+                                        className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 border ${
+                                          isClientSender
+                                            ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20"
+                                            : "bg-white/10 text-white border-white/20"
+                                        }`}
+                                      >
+                                        <FileText className="h-3.5 w-3.5" />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <span className="font-bold truncate block text-xs">
+                                          {msg.attachment_name || "Client Document"}
+                                        </span>
+                                        <span
+                                          className={`text-[10px] block truncate ${
+                                            isClientSender ? "text-muted-foreground" : "text-sky-200"
+                                          }`}
+                                        >
+                                          Stored in Company Vault (Client Shared Docs)
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handlePreviewAttachment(msg)}
+                                      className={`h-7 text-[11px] font-bold gap-1 px-2.5 shrink-0 shadow-2xs ${
+                                        isClientSender
+                                          ? "text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 border-sky-500/30"
+                                          : "text-white bg-white/10 hover:bg-white/20 border-white/30"
+                                      }`}
+                                    >
+                                      <Eye className="h-3 w-3" />
+                                      Preview
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })
@@ -805,8 +1262,12 @@ export function DualOrderChatDialog({
                           );
                         }
 
+                        const isEditing = editingMessageId === msg.id;
+                        const isDeleting = confirmDeleteId === msg.id;
+                        const canModify = canModifyMessage(msg);
+
                         return (
-                          <div key={msg.id || idx} className="flex flex-col items-start max-w-[90%] mr-auto">
+                          <div key={msg.id || idx} className="group flex flex-col items-start max-w-[90%] mr-auto">
                             <div className="flex items-center gap-1.5 mb-1 px-1">
                               <span className="text-[11px] font-bold text-foreground">
                                 {msg.sender_name || "Team Member"}
@@ -821,41 +1282,124 @@ export function DualOrderChatDialog({
                                   ? new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                                   : ""}
                               </span>
-                            </div>
 
-                            <div className="p-3.5 rounded-2xl text-xs sm:text-[13px] leading-relaxed shadow-xs bg-amber-500/10 dark:bg-amber-950/30 text-foreground border border-amber-500/25 dark:border-amber-500/30 rounded-tl-sm">
-                              {renderInternalMessageText(msg.message)}
-
-                              {/* Attached Document Card (Preview Only) */}
-                              {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
-                                <div className="mt-2.5 p-2.5 rounded-xl bg-background/90 border border-border/60 flex items-center justify-between gap-3 text-xs shadow-2xs">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <div className="h-7 w-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
-                                      <FileText className="h-3.5 w-3.5" />
-                                    </div>
-                                    <div className="min-w-0">
-                                      <span className="font-bold text-foreground truncate block text-xs">
-                                        {msg.attachment_name || "Document"}
-                                      </span>
-                                      <span className="text-[10px] text-muted-foreground block">
-                                        Stored in Company Vault
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  <Button
+                              {canModify && !isEditing && !isDeleting && (
+                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
+                                  <button
                                     type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handlePreviewAttachment(msg)}
-                                    className="h-7 text-[11px] font-bold gap-1 px-2.5 shrink-0 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 border-amber-500/30 shadow-2xs"
+                                    onClick={() => handleStartEdit(msg)}
+                                    className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+                                    title="Edit note"
                                   >
-                                    <Eye className="h-3 w-3" />
-                                    Preview
-                                  </Button>
+                                    <Pencil className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmDeleteId(msg.id)}
+                                    className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 transition-colors"
+                                    title="Delete note"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
                                 </div>
                               )}
                             </div>
+
+                            {isEditing ? (
+                              <div className="w-full space-y-2 p-2.5 rounded-xl bg-background border border-amber-500/40 shadow-md">
+                                <textarea
+                                  value={editingMessageText}
+                                  onChange={e => setEditingMessageText(e.target.value)}
+                                  className="w-full text-xs sm:text-[13px] bg-muted/40 border border-border rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-amber-500 min-h-[60px] text-foreground resize-y"
+                                  autoFocus
+                                  placeholder="Edit note..."
+                                />
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleCancelEdit}
+                                    disabled={savingEdit}
+                                    className="h-7 text-xs px-2.5 gap-1 text-muted-foreground hover:text-foreground"
+                                  >
+                                    <X className="h-3 w-3" /> Cancel
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => handleSaveEdit(msg.id, "INTERNAL")}
+                                    disabled={!editingMessageText.trim() || savingEdit}
+                                    className="h-7 text-xs px-2.5 gap-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-xs"
+                                  >
+                                    {savingEdit ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                                    Save
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : isDeleting ? (
+                              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs space-y-2">
+                                <p className="text-rose-600 dark:text-rose-400 font-semibold text-[11px]">
+                                  Delete this internal note permanently?
+                                </p>
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setConfirmDeleteId(null)}
+                                    disabled={deletingMessageId === msg.id}
+                                    className="h-6.5 text-[11px] px-2"
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => handleDeleteMessage(msg.id, "INTERNAL")}
+                                    disabled={deletingMessageId === msg.id}
+                                    className="h-6.5 text-[11px] px-2.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold gap-1"
+                                  >
+                                    {deletingMessageId === msg.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                                    Delete
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="p-3.5 rounded-2xl text-xs sm:text-[13px] leading-relaxed shadow-xs bg-amber-500/10 dark:bg-amber-950/30 text-foreground border border-amber-500/25 dark:border-amber-500/30 rounded-tl-sm">
+                                {renderInternalMessageText(msg.message)}
+
+                                {/* Attached Document Card (Preview Only) */}
+                                {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
+                                  <div className="mt-2.5 p-2.5 rounded-xl bg-background/90 border border-border/60 flex items-center justify-between gap-3 text-xs shadow-2xs">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <div className="h-7 w-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
+                                        <FileText className="h-3.5 w-3.5" />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <span className="font-bold text-foreground truncate block text-xs">
+                                          {msg.attachment_name || "Document"}
+                                        </span>
+                                        <span className="text-[10px] text-muted-foreground block">
+                                          Stored in Company Vault
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handlePreviewAttachment(msg)}
+                                      className="h-7 text-[11px] font-bold gap-1 px-2.5 shrink-0 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 border-amber-500/30 shadow-2xs"
+                                    >
+                                      <Eye className="h-3 w-3" />
+                                      Preview
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })
@@ -920,7 +1464,8 @@ export function DualOrderChatDialog({
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </div>
+          </motion.div>
           </>
         )}
       </AnimatePresence>

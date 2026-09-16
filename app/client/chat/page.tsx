@@ -35,7 +35,9 @@ import {
   X,
   File,
   Lock,
-  UploadCloud
+  UploadCloud,
+  Pencil,
+  Trash2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -135,9 +137,91 @@ export default function ClientOrderChatPage() {
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Edit / Delete Message State
+  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [editingMessageText, setEditingMessageText] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingMessageId, setDeletingMessageId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleStartEdit = (msg: any) => {
+    setEditingMessageId(msg.id);
+    setEditingMessageText(msg.message || "");
+    setConfirmDeleteId(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditingMessageText("");
+  };
+
+  const handleSaveEdit = async (msgId: number) => {
+    if (!selectedOrderGroup || !editingMessageText.trim() || savingEdit) return;
+    try {
+      setSavingEdit(true);
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(selectedOrderGroup.orderNumber)}/progress/${msgId}`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            message: editingMessageText.trim()
+          })
+        }
+      );
+
+      if (res.ok) {
+        const updated = await res.json();
+        setMessages(prev => prev.map(m => (m.id === msgId ? updated : m)));
+        setEditingMessageId(null);
+        setEditingMessageText("");
+        toast.success("Message updated successfully");
+      } else {
+        const err = await res.json();
+        toast.error(err.detail || "Failed to update message");
+      }
+    } catch (err) {
+      console.error("Error updating message:", err);
+      toast.error("Error updating message");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDeleteMessage = async (msgId: number) => {
+    if (!selectedOrderGroup || deletingMessageId) return;
+    try {
+      setDeletingMessageId(msgId);
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(selectedOrderGroup.orderNumber)}/progress/${msgId}`,
+        {
+          method: "DELETE",
+          credentials: "include"
+        }
+      );
+
+      if (res.ok) {
+        setMessages(prev => prev.filter(m => m.id !== msgId));
+        setConfirmDeleteId(null);
+        toast.success("Message deleted successfully");
+      } else {
+        const err = await res.json();
+        toast.error(err.detail || "Failed to delete message");
+      }
+    } catch (err) {
+      console.error("Error deleting message:", err);
+      toast.error("Error deleting message");
+    } finally {
+      setDeletingMessageId(null);
+    }
+  };
 
   // 1. Fetch Orders
   const fetchOrders = async () => {
@@ -699,10 +783,13 @@ export default function ClientOrderChatPage() {
                       );
                     }
 
+                    const isEditing = editingMessageId === msg.id;
+                    const isDeleting = confirmDeleteId === msg.id;
+
                     return (
                       <div
                         key={msg.id || idx}
-                        className={`flex flex-col ${isSelf ? "items-end" : "items-start"} max-w-[85%] sm:max-w-[75%] ${
+                        className={`group flex flex-col ${isSelf ? "items-end" : "items-start"} max-w-[85%] sm:max-w-[75%] ${
                           isSelf ? "ml-auto" : "mr-auto"
                         }`}
                       >
@@ -734,57 +821,134 @@ export default function ClientOrderChatPage() {
                                 })
                               : ""}
                           </span>
-                        </div>
 
-                        <div
-                          className={`p-3.5 sm:p-4 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-xs ${
-                            isSelf
-                              ? "bg-emerald-600 text-white rounded-tr-xs shadow-sm shadow-emerald-600/20"
-                              : "bg-background/80 dark:bg-zinc-900/80 text-foreground border border-border/50 rounded-tl-xs backdrop-blur-md"
-                          }`}
-                        >
-                          <div className="whitespace-pre-wrap">{msg.message}</div>
-
-                          {/* Client Uploaded Attachment Receipt */}
-                          {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
-                            <div
-                              className={`mt-2.5 flex items-center gap-2.5 p-2.5 rounded-xl border text-xs shadow-2xs backdrop-blur-xs ${
-                                isSelf
-                                  ? "bg-white/10 dark:bg-black/25 border-white/20 text-white"
-                                  : "bg-background dark:bg-zinc-950/70 border-border/50 text-foreground"
-                              }`}
-                            >
-                              <div
-                                className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${
-                                  isSelf
-                                  ? "bg-white/20 text-white border-white/30"
-                                  : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                                }`}
+                          {isSelf && !isEditing && !isDeleting && (
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
+                              <button
+                                type="button"
+                                onClick={() => handleStartEdit(msg)}
+                                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+                                title="Edit message"
                               >
-                                <ShieldCheck className="h-4 w-4" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <span className="font-bold truncate block text-[11px] sm:text-xs">
-                                  {msg.attachment_name || "Shared Document"}
-                                </span>
-                                <span
-                                  className={`text-[9px] sm:text-[10px] flex items-center gap-1 mt-0.5 ${
-                                    isSelf ? "text-white/80" : "text-muted-foreground"
-                                  }`}
-                                >
-                                  <Lock className="h-2.5 w-2.5 shrink-0 text-emerald-400" />
-                                  Stored in Company Vault (Order #{selectedOrderGroup.orderNumber})
-                                </span>
-                              </div>
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteId(msg.id)}
+                                className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 transition-colors"
+                                title="Delete message"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
                             </div>
                           )}
-
-                          {msg.pending && (
-                            <span className="inline-block ml-2 text-[10px] opacity-70 animate-pulse">
-                              sending...
-                            </span>
-                          )}
                         </div>
+
+                        {isEditing ? (
+                          <div className="w-full space-y-2 p-2.5 rounded-xl bg-background border border-emerald-500/40 shadow-md text-foreground">
+                            <textarea
+                              value={editingMessageText}
+                              onChange={e => setEditingMessageText(e.target.value)}
+                              className="w-full text-xs sm:text-sm bg-muted/40 border border-border rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 min-h-[60px] text-foreground resize-y"
+                              autoFocus
+                              placeholder="Edit message..."
+                            />
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleCancelEdit}
+                                disabled={savingEdit}
+                                className="h-7 text-xs px-2.5 gap-1 text-muted-foreground hover:text-foreground"
+                              >
+                                <X className="h-3 w-3" /> Cancel
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => handleSaveEdit(msg.id)}
+                                disabled={!editingMessageText.trim() || savingEdit}
+                                className="h-7 text-xs px-2.5 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
+                              >
+                                {savingEdit ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                                Save
+                              </Button>
+                            </div>
+                          </div>
+                        ) : isDeleting ? (
+                          <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs space-y-2">
+                            <p className="text-rose-600 dark:text-rose-400 font-semibold text-[11px]">
+                              Delete this message permanently?
+                            </p>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setConfirmDeleteId(null)}
+                                disabled={deletingMessageId === msg.id}
+                                className="h-6.5 text-[11px] px-2"
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => handleDeleteMessage(msg.id)}
+                                disabled={deletingMessageId === msg.id}
+                                className="h-6.5 text-[11px] px-2.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold gap-1"
+                              >
+                                {deletingMessageId === msg.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            className={`p-3.5 sm:p-4 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-xs ${
+                              isSelf
+                                ? "bg-emerald-600 text-white rounded-tr-xs shadow-sm shadow-emerald-600/20"
+                                : "bg-background/80 dark:bg-zinc-900/80 text-foreground border border-border/50 rounded-tl-xs backdrop-blur-md"
+                            }`}
+                          >
+                            <div className="whitespace-pre-wrap">{msg.message}</div>
+
+                            {/* Client Uploaded Attachment Receipt */}
+                            {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
+                              <div
+                                className={`mt-2.5 flex items-center gap-2.5 p-2.5 rounded-xl border text-xs shadow-2xs backdrop-blur-xs ${
+                                  isSelf
+                                    ? "bg-white/10 dark:bg-black/25 border-white/20 text-white"
+                                    : "bg-background dark:bg-zinc-950/70 border-border/50 text-foreground"
+                                }`}
+                              >
+                                <div
+                                  className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${
+                                    isSelf
+                                      ? "bg-white/20 text-white border-white/30"
+                                      : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                  }`}
+                                >
+                                  <ShieldCheck className="h-4 w-4" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <span className="font-bold truncate block text-[11px] sm:text-xs">
+                                    {msg.attachment_name || "Shared Document"}
+                                  </span>
+                                  <span
+                                    className={`text-[9px] sm:text-[10px] flex items-center gap-1 mt-0.5 ${
+                                      isSelf ? "text-white/80" : "text-muted-foreground"
+                                    }`}
+                                  >
+                                    <Lock className="h-2.5 w-2.5 shrink-0 text-emerald-400" />
+                                    Stored in Company Vault (Order #{selectedOrderGroup.orderNumber})
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })

@@ -55,16 +55,16 @@ def generate_client_code(db: Session) -> str:
     """
     import datetime
     year_str = datetime.datetime.now().strftime("%y")
-    total_clients = db.query(func.count(models.Client.id)).scalar() or 0
+    total_clients = db.query(func.count(models.Partner.id)).scalar() or 0
     seq_num = total_clients + 1
     
     code = f"X{year_str}{seq_num:04d}"
     
-    existing = db.query(models.Client).filter(models.Client.client_code == code).first()
+    existing = db.query(models.Client).filter(models.Partner.client_code == code).first()
     while existing:
         seq_num += 1
         code = f"X{year_str}{seq_num:04d}"
-        existing = db.query(models.Client).filter(models.Client.client_code == code).first()
+        existing = db.query(models.Client).filter(models.Partner.client_code == code).first()
         
     return code
 
@@ -267,7 +267,7 @@ def is_client_themselves(user: models.User, client_id: int, db: Optional[Session
         if user.client and hasattr(user.client, "id") and user.client.id == client_id:
             return True
         if db:
-            c = db.query(models.Client).filter(models.Client.user_id == user.id).first()
+            c = db.query(models.Partner).filter(models.Partner.user_id == user.id).first()
             if c and c.id == client_id:
                 return True
     return False
@@ -276,7 +276,7 @@ def is_client_themselves_for_company(user: models.User, company_id: int, db: Ses
     if user.role is not None and user.role.name.upper() == "CLIENT":
         cid = user.client.id if user.client and hasattr(user.client, "id") else None
         if not cid:
-            c = db.query(models.Client).filter(models.Client.user_id == user.id).first()
+            c = db.query(models.Partner).filter(models.Partner.user_id == user.id).first()
             if c:
                 cid = c.id
         if cid:
@@ -288,20 +288,20 @@ def is_client_themselves_for_company(user: models.User, company_id: int, db: Ses
 @router.get("", response_model=List[schemas.ClientResponse])
 def get_clients(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     role_name = current_user.role.name.upper() if current_user.role else ""
-    base_query = db.query(models.Client).options(
-        joinedload(models.Client.companies),
-        joinedload(models.Client.user)
+    base_query = db.query(models.Partner).options(
+        joinedload(models.Partner.companies),
+        joinedload(models.Partner.user)
     )
     
     if auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_all", "view", db) or is_admin_or_hr(current_user):
-        return base_query.order_by(models.Client.contact_person).all()
+        return base_query.order_by(models.Partner.contact_person).all()
     elif role_name == "CLIENT":
         client_id = current_user.client.id if current_user.client else None
         if not client_id:
-            client_obj = db.query(models.Client).filter(models.Client.user_id == current_user.id).first()
+            client_obj = db.query(models.Partner).filter(models.Partner.user_id == current_user.id).first()
             if not client_obj:
                 # Try matching by user email
-                client_obj = db.query(models.Client).filter(models.Client.email == current_user.email).first()
+                client_obj = db.query(models.Partner).filter(models.Partner.email == current_user.email).first()
                 if client_obj:
                     client_obj.user_id = current_user.id
                     db.commit()
@@ -311,7 +311,7 @@ def get_clients(db: Session = Depends(database.get_db), current_user: models.Use
                     # Auto-create client profile and default company for this client user
                     new_code = generate_client_code(db)
                     client_name = current_user.name or (current_user.email.split("@")[0].capitalize() if current_user.email else "Client")
-                    client_obj = models.Client(
+                    client_obj = models.Partner(
                         user_id=current_user.id,
                         contact_person=client_name,
                         email=current_user.email,
@@ -339,7 +339,7 @@ def get_clients(db: Session = Depends(database.get_db), current_user: models.Use
                     client_id = client_obj.id
             else:
                 client_id = client_obj.id
-        return base_query.filter(models.Client.id == client_id).all()
+        return base_query.filter(models.Partner.id == client_id).all()
     elif is_employee_role(current_user):
         if not current_user.employee:
             return []
@@ -348,7 +348,7 @@ def get_clients(db: Session = Depends(database.get_db), current_user: models.Use
             models.ClientConsultant.employee_id == current_user.employee.id
         ).all()
         client_ids = list(set([c.client_id for c in assigned_companies]))
-        return base_query.filter(models.Client.id.in_(client_ids)).order_by(models.Client.contact_person).all()
+        return base_query.filter(models.Partner.id.in_(client_ids)).order_by(models.Partner.contact_person).all()
     return []
 
 
@@ -433,7 +433,7 @@ def get_my_assigned_orders(db: Session = Depends(database.get_db), current_user:
     Returns ONLY orders allocated/assigned to the currently logged in user/employee.
     """
     all_orders = db.query(models.ClientOrder).options(
-        joinedload(models.ClientOrder.client).joinedload(models.Client.companies),
+        joinedload(models.ClientOrder.partner).joinedload(models.Partner.companies),
         joinedload(models.ClientOrder.company),
         joinedload(models.ClientOrder.billing_company),
         joinedload(models.ClientOrder.service),
@@ -471,7 +471,7 @@ def get_my_assigned_orders(db: Session = Depends(database.get_db), current_user:
 def get_client_orders(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     role_name = current_user.role.name.upper() if current_user.role else ""
     orders_query = db.query(models.ClientOrder).options(
-        joinedload(models.ClientOrder.client).joinedload(models.Client.companies),
+        joinedload(models.ClientOrder.partner).joinedload(models.Partner.companies),
         joinedload(models.ClientOrder.company),
         joinedload(models.ClientOrder.billing_company),
         joinedload(models.ClientOrder.service),
@@ -483,7 +483,7 @@ def get_client_orders(db: Session = Depends(database.get_db), current_user: mode
     elif role_name == "CLIENT":
         cid = current_user.client.id if current_user.client and hasattr(current_user.client, "id") else None
         if not cid:
-            c = db.query(models.Client).filter(models.Client.user_id == current_user.id).first()
+            c = db.query(models.Partner).filter(models.Partner.user_id == current_user.id).first()
             if c:
                 cid = c.id
         if cid:
@@ -548,7 +548,7 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
             target_client_id = comp.client_id
             
     if not target_client_id:
-        first_c = db.query(models.Client).first()
+        first_c = db.query(models.Partner).first()
         if not first_c:
             raise HTTPException(status_code=400, detail="No valid client found to attach this order to")
         target_client_id = first_c.id
@@ -773,7 +773,7 @@ def delete_client_order(id: int, db: Session = Depends(database.get_db), current
 
 @router.get("/{id:int}", response_model=schemas.ClientResponse)
 def get_client(id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    client = db.query(models.Client).filter(models.Client.id == id).first()
+    client = db.query(models.Partner).filter(models.Partner.id == id).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
         
@@ -826,7 +826,7 @@ def create_client(client_data: schemas.ClientCreate, db: Session = Depends(datab
         db.refresh(new_user)
         new_user_id = new_user.id
     
-    db_client = models.Client(
+    db_client = models.Partner(
         contact_person=client_data.contact_person,
         email=client_email,
         phone=client_phone,
@@ -1229,7 +1229,7 @@ def get_company_activities(company_id: int, db: Session = Depends(database.get_d
     from sqlalchemy.orm import joinedload
     return db.query(models.ClientActivityLog).options(
         joinedload(models.ClientActivityLog.user).joinedload(models.User.employee),
-        joinedload(models.ClientActivityLog.user).joinedload(models.User.client)
+        joinedload(models.ClientActivityLog.user).joinedload(models.User.partner)
     ).filter(models.ClientActivityLog.company_id == company_id).order_by(models.ClientActivityLog.id.desc()).all()
 
 @router.get("/{client_id:int}/activities", response_model=List[schemas.ClientActivityLogResponse])
@@ -1237,12 +1237,12 @@ def get_client_activities(client_id: int, db: Session = Depends(database.get_db)
     from sqlalchemy.orm import joinedload
     return db.query(models.ClientActivityLog).options(
         joinedload(models.ClientActivityLog.user).joinedload(models.User.employee),
-        joinedload(models.ClientActivityLog.user).joinedload(models.User.client)
+        joinedload(models.ClientActivityLog.user).joinedload(models.User.partner)
     ).filter(models.ClientActivityLog.client_id == client_id).order_by(models.ClientActivityLog.id.desc()).all()
 
 @router.put("/{id:int}", response_model=schemas.ClientResponse)
 def update_client(id: int, client_update: schemas.ClientBase, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    db_client = db.query(models.Client).filter(models.Client.id == id).first()
+    db_client = db.query(models.Partner).filter(models.Partner.id == id).first()
     if not db_client:
         raise HTTPException(status_code=404, detail="Client not found")
         
@@ -1277,7 +1277,7 @@ def update_client_status(id: int, status_str: str, db: Session = Depends(databas
     if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_all", "edit", db) or is_admin_or_hr(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized to change client status")
         
-    db_client = db.query(models.Client).filter(models.Client.id == id).first()
+    db_client = db.query(models.Partner).filter(models.Partner.id == id).first()
     if not db_client:
         raise HTTPException(status_code=404, detail="Client not found")
         
@@ -1299,7 +1299,7 @@ def reset_client_password(id: int, password_data: schemas.ClientPasswordReset, d
     if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_all", "edit", db) or is_admin_or_hr(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized to reset client passwords")
         
-    db_client = db.query(models.Client).filter(models.Client.id == id).first()
+    db_client = db.query(models.Partner).filter(models.Partner.id == id).first()
     if not db_client:
         raise HTTPException(status_code=404, detail="Client not found")
         
@@ -1345,7 +1345,7 @@ def reset_client_password(id: int, password_data: schemas.ClientPasswordReset, d
 @router.get("/companies/all", response_model=List[schemas.ClientCompanyResponse])
 def get_all_client_companies(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     return db.query(models.ClientCompany).options(
-        joinedload(models.ClientCompany.client),
+        joinedload(models.ClientCompany.partner),
         joinedload(models.ClientCompany.creator).joinedload(models.User.employee),
         joinedload(models.ClientCompany.validator).joinedload(models.User.employee),
         joinedload(models.ClientCompany.consultants).joinedload(models.ClientConsultant.employee),
@@ -1365,7 +1365,7 @@ def create_standalone_client_company(company_data: schemas.ClientCompanyCreate, 
 
     target_client_id = company_data.client_id
     if target_client_id:
-        db_client = db.query(models.Client).filter(models.Client.id == target_client_id).first()
+        db_client = db.query(models.Partner).filter(models.Partner.id == target_client_id).first()
         if not db_client:
             raise HTTPException(status_code=404, detail="Client not found")
     else:
@@ -1425,7 +1425,7 @@ def create_client_company(id: int, company_data: schemas.ClientCompanyCreate, db
     clean_email = validate_and_clean_email(company_data.key_contact_email, "Key Contact Email")
     clean_phone = validate_and_clean_phone(company_data.key_contact_phone, "Key Contact Phone")
         
-    db_client = db.query(models.Client).filter(models.Client.id == id).first()
+    db_client = db.query(models.Partner).filter(models.Partner.id == id).first()
     if not db_client:
         raise HTTPException(status_code=404, detail="Client not found")
         
@@ -1475,7 +1475,7 @@ def create_client_company(id: int, company_data: schemas.ClientCompanyCreate, db
 @router.get("/companies/{company_id}", response_model=schemas.ClientCompanyResponse)
 def get_client_company_by_id(company_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     db_company = db.query(models.ClientCompany).options(
-        joinedload(models.ClientCompany.client),
+        joinedload(models.ClientCompany.partner),
         joinedload(models.ClientCompany.creator).joinedload(models.User.employee),
         joinedload(models.ClientCompany.validator).joinedload(models.User.employee),
         joinedload(models.ClientCompany.consultants).joinedload(models.ClientConsultant.employee),
@@ -1496,7 +1496,7 @@ def validate_client_company(
         raise HTTPException(status_code=403, detail="Not authorized to validate company profiles")
 
     db_company = db.query(models.ClientCompany).options(
-        joinedload(models.ClientCompany.client),
+        joinedload(models.ClientCompany.partner),
         joinedload(models.ClientCompany.creator).joinedload(models.User.employee),
         joinedload(models.ClientCompany.validator).joinedload(models.User.employee)
     ).filter(models.ClientCompany.id == company_id).first()
@@ -1591,7 +1591,7 @@ def send_company_welcome_email_manual(
         raise HTTPException(status_code=403, detail="Not authorized to send company invitation emails")
 
     db_company = db.query(models.ClientCompany).options(
-        joinedload(models.ClientCompany.client)
+        joinedload(models.ClientCompany.partner)
     ).filter(models.ClientCompany.id == company_id).first()
     
     if not db_company:
@@ -2373,10 +2373,11 @@ def get_client_documents(company_id: int, db: Session = Depends(database.get_db)
 
 
 def check_order_authorization_for_chat(user: models.User, order_number: str, db: Session) -> bool:
-    if is_admin_or_hr(user):
+    if is_admin_or_hr(user) or auth.is_super_admin(user):
         return True
     
-    orders_in_group = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
+    clean_no = (order_number or "").strip().upper()
+    orders_in_group = db.query(models.ClientOrder).filter(func.upper(models.ClientOrder.order_number) == clean_no).all()
     if not orders_in_group:
         return False
         
@@ -2387,7 +2388,7 @@ def check_order_authorization_for_chat(user: models.User, order_number: str, db:
     if user.role and user.role.name.upper() == "CLIENT":
         cid = user.client.id if user.client and hasattr(user.client, "id") else None
         if not cid:
-            c = db.query(models.Client).filter(models.Client.user_id == user.id).first()
+            c = db.query(models.Partner).filter(models.Partner.user_id == user.id).first()
             if c:
                 cid = c.id
         if cid:
@@ -2477,10 +2478,10 @@ def format_order_progress_response(u: models.ClientOrderProgress, db: Session) -
             is_client=False
         )
     
-    # 2. Check if sent by a Member or Client user (user chat message)
-    if u.user and u.user.role and u.user.role.name.upper() == "MEMBER":
-        m = db.query(models.Member).filter(models.Member.user_id == u.user.id).first()
-        sender_name = m.full_name if m and m.full_name else u.user.name
+    # 2. Check if sent by a Customer or Member user (user chat message)
+    if u.user and u.user.role and u.user.role.name.upper() in ["MEMBER", "CUSTOMER"]:
+        cust = db.query(models.Customer).filter(models.Customer.user_id == u.user.id).first()
+        sender_name = cust.full_name if cust and cust.full_name else u.user.name
         return schemas.ClientOrderProgressResponse(
             id=u.id,
             order_number=u.order_number,
@@ -2491,13 +2492,13 @@ def format_order_progress_response(u: models.ClientOrderProgress, db: Session) -
             attachment_name=u.attachment_name,
             created_at=u.created_at,
             sender_name=sender_name,
-            sender_role="Member",
+            sender_role="Customer",
             sender_avatar=None,
             is_client=True
         )
 
     if u.user and u.user.role and u.user.role.name.upper() == "CLIENT":
-        c = db.query(models.Client).filter(models.Client.user_id == u.user.id).first()
+        c = db.query(models.Partner).filter(models.Partner.user_id == u.user.id).first()
         if c and c.contact_person:
             sender_name = c.contact_person
         else:
@@ -2552,6 +2553,96 @@ def format_order_progress_response(u: models.ClientOrderProgress, db: Session) -
         sender_avatar=sender_avatar,
         is_client=is_client
     )
+
+
+@router.get("/orders/{order_number}/summary")
+def get_order_summary(
+    order_number: str,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if not check_order_authorization_for_chat(current_user, order_number, db):
+        raise HTTPException(status_code=403, detail="Not authorized to view order details")
+
+    clean_no = (order_number or "").strip().upper()
+    orders = db.query(models.ClientOrder).options(
+        joinedload(models.ClientOrder.partner),
+        joinedload(models.ClientOrder.company),
+        joinedload(models.ClientOrder.billing_company),
+        joinedload(models.ClientOrder.service),
+        joinedload(models.ClientOrder.notary)
+    ).filter(func.upper(models.ClientOrder.order_number) == clean_no).order_by(models.ClientOrder.id.asc()).all()
+
+    if not orders:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    first_order = orders[0]
+
+    # Aggregate all consultant IDs across items in this order
+    all_cids = []
+    for o in orders:
+        all_cids.extend(parse_consultant_ids(o.consultant_ids))
+    unique_cids = list(dict.fromkeys(all_cids))
+    consultants = get_consultants_data(db, unique_cids)
+
+    items = []
+    total_amount = 0.0
+    for o in orders:
+        total_amount += float(o.unit_price or 0.0)
+        desc = o.description or (o.service.description if o.service and o.service.description else None)
+        items.append({
+            "id": o.id,
+            "service_id": o.service_id,
+            "job_id": o.job_id or (f"JOB-{o.service_id}" if o.service_id else None),
+            "job_title": o.job_title or (o.service.job_title if o.service else "Corporate Service"),
+            "description": desc,
+            "unit_price": o.unit_price,
+            "pricing_tier": o.pricing_tier,
+            "needs_notary": o.service.needs_notary if o.service else False,
+            "needs_gov_officer": o.service.needs_gov_officer if o.service else False,
+            "needs_other_vendors": o.service.needs_other_vendors if o.service else False,
+            "notary_name": o.notary.name if o.notary else None,
+            "notary_fee": o.notary_fee
+        })
+
+    company_data = None
+    if first_order.company:
+        company_data = {
+            "id": first_order.company.id,
+            "company_name": first_order.company.company_name,
+            "company_code": first_order.company.company_code,
+            "tax_number": first_order.company.tax_number,
+            "address": first_order.company.address,
+            "director_name": first_order.company.director_name,
+            "key_contact_person": first_order.company.key_contact_person,
+            "key_contact_email": first_order.company.key_contact_email,
+            "key_contact_phone": first_order.company.key_contact_phone
+        }
+
+    client_data = None
+    if first_order.partner:
+        client_data = {
+            "id": first_order.partner.id,
+            "client_code": first_order.partner.client_code,
+            "contact_person": first_order.partner.contact_person,
+            "email": first_order.partner.email,
+            "phone": first_order.partner.phone
+        }
+
+    return {
+        "order_number": first_order.order_number,
+        "status": first_order.status,
+        "payment_status": first_order.payment_status,
+        "invoice_number": first_order.invoice_number,
+        "accurate_so_no": first_order.accurate_so_no,
+        "accurate_inv_no": first_order.accurate_inv_no,
+        "created_at": first_order.created_at.isoformat() if first_order.created_at else None,
+        "total_amount": total_amount,
+        "company": company_data,
+        "client": client_data,
+        "consultants": consultants,
+        "items": items
+    }
 
 
 @router.get("/orders/{order_number}/progress", response_model=List[schemas.ClientOrderProgressResponse])
@@ -2854,6 +2945,82 @@ def add_order_progress(
                 )
 
     return formatted_resp
+
+
+@router.put("/orders/{order_number}/progress/{progress_id}", response_model=schemas.ClientOrderProgressResponse)
+def update_order_progress(
+    order_number: str,
+    progress_id: int,
+    payload: schemas.ClientOrderProgressUpdate,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if not check_order_authorization_for_chat(current_user, order_number, db):
+        raise HTTPException(status_code=403, detail="Not authorized to edit messages for this order")
+
+    clean_no = (order_number or "").strip().upper()
+    progress = db.query(models.ClientOrderProgress).filter(
+        models.ClientOrderProgress.id == progress_id,
+        func.upper(models.ClientOrderProgress.order_number) == clean_no
+    ).first()
+
+    if not progress:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    # Automated milestone messages cannot be edited
+    if not progress.user_id or is_automated_milestone_message(progress.message):
+        raise HTTPException(status_code=400, detail="Automated system milestones cannot be edited")
+
+    # Only author or Admin/Super Admin can edit
+    is_author = progress.user_id == current_user.id
+    is_admin = is_admin_or_hr(current_user) or auth.is_super_admin(current_user)
+    if not (is_author or is_admin):
+        raise HTTPException(status_code=403, detail="You can only edit your own messages")
+
+    new_msg = (payload.message or "").strip()
+    if not new_msg:
+        raise HTTPException(status_code=400, detail="Message content cannot be empty")
+
+    progress.message = new_msg
+    db.commit()
+    db.refresh(progress)
+
+    return format_order_progress_response(progress, db)
+
+
+@router.delete("/orders/{order_number}/progress/{progress_id}")
+def delete_order_progress(
+    order_number: str,
+    progress_id: int,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if not check_order_authorization_for_chat(current_user, order_number, db):
+        raise HTTPException(status_code=403, detail="Not authorized to delete messages for this order")
+
+    clean_no = (order_number or "").strip().upper()
+    progress = db.query(models.ClientOrderProgress).filter(
+        models.ClientOrderProgress.id == progress_id,
+        func.upper(models.ClientOrderProgress.order_number) == clean_no
+    ).first()
+
+    if not progress:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    # Automated milestone messages cannot be deleted
+    if not progress.user_id or is_automated_milestone_message(progress.message):
+        raise HTTPException(status_code=400, detail="Automated system milestones cannot be deleted")
+
+    # Only author or Admin/Super Admin can delete
+    is_author = progress.user_id == current_user.id
+    is_admin = is_admin_or_hr(current_user) or auth.is_super_admin(current_user)
+    if not (is_author or is_admin):
+        raise HTTPException(status_code=403, detail="You can only delete your own messages")
+
+    db.delete(progress)
+    db.commit()
+
+    return {"message": "Message deleted successfully", "id": progress_id}
 
 
 @router.post("/orders/{order_number}/upload-attachment", response_model=schemas.ClientOrderProgressResponse)
@@ -3282,7 +3449,7 @@ def get_expiring_documents(
         raise HTTPException(status_code=403, detail="Not authorized to view expiring documents")
         
     docs = db.query(models.ClientDocument).options(
-        joinedload(models.ClientDocument.company).joinedload(models.ClientCompany.client)
+        joinedload(models.ClientDocument.company).joinedload(models.ClientCompany.partner)
     ).filter(models.ClientDocument.expiry_date != None).all()
     
     res = []
@@ -4501,6 +4668,69 @@ async def upload_public_order_attachment(
         print("Warning: failed to dispatch upload notification:", e)
         
     return format_order_progress_response(db_progress, db)
+
+
+@public_orders_router.put("/{order_number}/chat/{progress_id}", response_model=schemas.ClientOrderProgressResponse)
+def update_public_order_chat(
+    order_number: str,
+    progress_id: int,
+    payload: schemas.ClientOrderProgressUpdate,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    clean_order_no = order_number.strip().upper()
+    progress = db.query(models.ClientOrderProgress).filter(
+        models.ClientOrderProgress.id == progress_id,
+        func.upper(models.ClientOrderProgress.order_number) == clean_order_no
+    ).first()
+    if not progress:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    if not progress.user_id or is_automated_milestone_message(progress.message):
+        raise HTTPException(status_code=400, detail="Automated system milestones cannot be edited")
+
+    is_author = progress.user_id == current_user.id
+    is_admin = is_admin_or_hr(current_user) or auth.is_super_admin(current_user)
+    if not (is_author or is_admin):
+        raise HTTPException(status_code=403, detail="You can only edit your own messages")
+
+    new_msg = (payload.message or "").strip()
+    if not new_msg:
+        raise HTTPException(status_code=400, detail="Message content cannot be empty")
+
+    progress.message = new_msg
+    db.commit()
+    db.refresh(progress)
+    return format_order_progress_response(progress, db)
+
+
+@public_orders_router.delete("/{order_number}/chat/{progress_id}")
+def delete_public_order_chat(
+    order_number: str,
+    progress_id: int,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    clean_order_no = order_number.strip().upper()
+    progress = db.query(models.ClientOrderProgress).filter(
+        models.ClientOrderProgress.id == progress_id,
+        func.upper(models.ClientOrderProgress.order_number) == clean_order_no
+    ).first()
+    if not progress:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    if not progress.user_id or is_automated_milestone_message(progress.message):
+        raise HTTPException(status_code=400, detail="Automated system milestones cannot be deleted")
+
+    is_author = progress.user_id == current_user.id
+    is_admin = is_admin_or_hr(current_user) or auth.is_super_admin(current_user)
+    if not (is_author or is_admin):
+        raise HTTPException(status_code=403, detail="You can only delete your own messages")
+
+    db.delete(progress)
+    db.commit()
+    return {"message": "Message deleted successfully", "id": progress_id}
+
 
 
 

@@ -66,6 +66,11 @@ export default function BusinessTeamsPage() {
   const [titleFilter, setTitleFilter] = useState("ALL");
   const [savingMembers, setSavingMembers] = useState(false);
 
+  // Delete Team Modal State
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [teamToDelete, setTeamToDelete] = useState<any | null>(null);
+  const [deletingTeam, setDeletingTeam] = useState(false);
+
   // Predefined beautiful premium theme colors
   const premiumColors = [
     { name: "Emerald", hex: "#10b981", bg: "rgba(16, 185, 129, 0.15)", border: "rgba(16, 185, 129, 0.3)" },
@@ -306,23 +311,34 @@ export default function BusinessTeamsPage() {
     }
   };
 
-  const handleDeleteTeam = async (id: number) => {
-    if (!confirm("Are you sure you want to permanently delete this team? All member relationships will be removed.")) return;
+  const handleOpenDeleteTeam = (team: any) => {
+    setTeamToDelete(team);
+    setIsDeleteOpen(true);
+  };
+
+  const handleDeleteTeamSubmit = async () => {
+    if (!teamToDelete) return;
+    setDeletingTeam(true);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams/${id}`, {
-      credentials: "include",
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams/${teamToDelete.id}`, {
+        credentials: "include",
         method: "DELETE",
-        });
+      });
       if (res.ok) {
-        toast.success("Team deleted successfully");
+        toast.success(`Team "${teamToDelete.name}" deleted successfully`);
+        setIsDeleteOpen(false);
+        setTeamToDelete(null);
         fetchTeams();
       } else {
-        toast.error("Failed to delete team");
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || "Failed to delete team");
       }
     } catch (err) {
       console.error(err);
       toast.error("Failed to delete team");
+    } finally {
+      setDeletingTeam(false);
     }
   };
 
@@ -559,7 +575,7 @@ export default function BusinessTeamsPage() {
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        onClick={() => handleDeleteTeam(team.id)}
+                        onClick={() => handleOpenDeleteTeam(team)}
                         className="h-8 w-8 text-destructive hover:text-destructive rounded-lg cursor-pointer"
                         title="Delete Team"
                       >
@@ -1117,6 +1133,54 @@ export default function BusinessTeamsPage() {
             </div>
           </DialogFooter>
 
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Team Confirmation Modal */}
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-destructive/10 text-destructive border border-destructive/20">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-bold">Delete Work Team</DialogTitle>
+                <DialogDescription className="text-xs">
+                  Permanently remove this team unit and unbind all assignments.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="py-2 text-xs space-y-2">
+            <p className="text-foreground leading-relaxed">
+              Are you sure you want to delete <span className="font-bold text-foreground">{teamToDelete?.name}</span> (Code: <span className="font-mono font-semibold">{teamToDelete?.code}</span>)?
+            </p>
+            <p className="text-muted-foreground text-[11px] leading-relaxed">
+              All member associations with this team will be removed. Associated employee records will not be deleted. This action cannot be undone.
+            </p>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDeleteOpen(false)}
+              className="font-semibold text-xs h-9 rounded-xl"
+              disabled={deletingTeam}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteTeamSubmit}
+              disabled={deletingTeam}
+              className="font-bold text-xs h-9 gap-1.5 rounded-xl"
+            >
+              {deletingTeam ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              {deletingTeam ? "Deleting..." : "Delete Team"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

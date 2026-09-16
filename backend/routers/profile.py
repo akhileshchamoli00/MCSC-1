@@ -28,6 +28,14 @@ def get_my_profile(
     employee = db.query(models.Employee).filter(models.Employee.user_id == current_user.id).first()
     
     if not employee:
+        # Check if user is an external client, customer, or member - DO NOT auto-create Employee profile
+        user_role_name = (current_user.role.name if current_user.role else "").upper()
+        if user_role_name in ["CLIENT", "CUSTOMER", "MEMBER"] or current_user.client or current_user.customer or current_user.member:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Employee profile not applicable for external customer/client/member accounts"
+            )
+
         # 1. Check if an unlinked employee exists with a matching name from email
         email_prefix = (current_user.email or "user").split("@")[0]
         name_parts = [word.capitalize() for word in email_prefix.replace(".", " ").replace("_", " ").replace("-", " ").split()]

@@ -15,12 +15,136 @@ def handle_migration_error(col, table_name, exception):
 
 def run_migrations():
     print("Running migrations...")
+    
+    with engine.connect() as conn:
+        # 0. Automatically rename 'customers' table to 'clients' if 'customers' exists
+        try:
+            customers_exists = False
+            clients_table_exists = False
+            try:
+                customers_exists = bool(conn.execute(text("""
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_schema = 'public' 
+                        AND table_name = 'customers'
+                    )
+                """)).scalar())
+                clients_table_exists = bool(conn.execute(text("""
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_schema = 'public' 
+                        AND table_name = 'clients'
+                    )
+                """)).scalar())
+            except Exception:
+                customers_exists = bool(conn.execute(text("SELECT 1 FROM sqlite_master WHERE type='table' AND name='customers'")).first())
+                clients_table_exists = bool(conn.execute(text("SELECT 1 FROM sqlite_master WHERE type='table' AND name='clients'")).first())
+
+            if customers_exists and not clients_table_exists:
+                conn.execute(text("ALTER TABLE customers RENAME TO clients"))
+                conn.commit()
+                print("Successfully renamed database table 'customers' to 'clients'.")
+
+                # Rename sequence if applicable
+                try:
+                    conn.execute(text("ALTER SEQUENCE IF EXISTS customers_id_seq RENAME TO clients_id_seq"))
+                    conn.commit()
+                except Exception:
+                    pass
+            elif customers_exists and clients_table_exists:
+                try:
+                    cust_count = conn.execute(text("SELECT count(*) FROM customers")).scalar()
+                    cli_count = conn.execute(text("SELECT count(*) FROM clients")).scalar()
+                    if cust_count and cust_count > 0 and (cli_count == 0 or cli_count is None):
+                        conn.execute(text("INSERT INTO clients SELECT * FROM customers ON CONFLICT DO NOTHING"))
+                        conn.commit()
+                        print("Transferred data from 'customers' to 'clients'.")
+                    conn.execute(text("DROP TABLE IF EXISTS customers CASCADE"))
+                    conn.commit()
+                    print("Cleaned up legacy 'customers' table.")
+                except Exception as e_c:
+                    conn.rollback()
+                    print(f"Notice on copying customers to clients: {e_c}")
+        except Exception as e:
+            conn.rollback()
+            print(f"Notice on clients table migration: {e}")
+
     # Create any new tables defined in models.py
     import models
     models.Base.metadata.create_all(bind=engine)
     print("Ensured all base tables exist in the database.")
     
     with engine.connect() as conn:
+        # 0b. Automatically migrate legacy 'members' records into 'customers' table and drop 'members'
+        try:
+            members_exists = False
+            try:
+                members_exists = bool(conn.execute(text("""
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_schema = 'public' 
+                        AND table_name = 'members'
+                    )
+                """)).scalar())
+            except Exception:
+                members_exists = bool(conn.execute(text("SELECT 1 FROM sqlite_master WHERE type='table' AND name='members'")).first())
+
+            if members_exists:
+                member_rows = conn.execute(text("SELECT * FROM members ORDER BY id ASC")).fetchall()
+                for m in member_rows:
+                    m_dict = dict(m._mapping)
+                    m_user_id = m_dict.get("user_id")
+                    m_email = m_dict.get("email")
+                    m_full_name = m_dict.get("full_name") or "Customer"
+                    m_phone = m_dict.get("phone")
+                    m_dob = m_dict.get("date_of_birth")
+                    m_status = m_dict.get("status") or "ACTIVE"
+                    m_created_at = m_dict.get("created_at")
+
+                    # Check if customer already exists for this user_id or email
+                    existing_cust = None
+                    if m_user_id:
+                        existing_cust = conn.execute(text("SELECT id FROM customers WHERE user_id = :uid"), {"uid": m_user_id}).first()
+                    if not existing_cust and m_email:
+                        existing_cust = conn.execute(text("SELECT id FROM customers WHERE email = :email"), {"email": m_email}).first()
+
+                    if not existing_cust:
+                        max_seq = 0
+                        all_codes = conn.execute(text("SELECT customer_code FROM customers WHERE customer_code LIKE 'CUST-%'")).fetchall()
+                        for c_row in all_codes:
+                            code_val = c_row[0]
+                            if code_val and code_val.startswith("CUST-"):
+                                try:
+                                    num_part = int(code_val.split("-")[1])
+                                    if num_part > max_seq:
+                                        max_seq = num_part
+                                except Exception:
+                                    pass
+                        next_code = f"CUST-{(max_seq + 1):04d}"
+
+                        conn.execute(text("""
+                            INSERT INTO customers (customer_code, full_name, email, phone, date_of_birth, status, user_id, created_at)
+                            VALUES (:code, :name, :email, :phone, :dob, :status, :uid, :created_at)
+                        """), {
+                            "code": next_code,
+                            "name": m_full_name,
+                            "email": m_email,
+                            "phone": m_phone,
+                            "dob": m_dob,
+                            "status": m_status,
+                            "uid": m_user_id,
+                            "created_at": m_created_at
+                        })
+                        conn.commit()
+                        print(f"Migrated legacy member '{m_full_name}' ({m_email}) to customer code '{next_code}'.")
+
+                conn.execute(text("DROP TABLE IF EXISTS members CASCADE"))
+                conn.commit()
+                print("Successfully dropped legacy 'members' table after migrating all records to 'customers'.")
+        except Exception as e_mem:
+            conn.rollback()
+            print(f"Notice on migrating members table: {e_mem}")
+
         # Columns to add to leave_balances
         balance_cols = [
             ("annual_leave_taken", "FLOAT DEFAULT 0.0"),
@@ -150,11 +274,11 @@ def run_migrations():
             except Exception as e:
                 conn.rollback()
 
-        # Add client_code to clients table
+        # Add client_code to partners table
         try:
-            conn.execute(text("ALTER TABLE clients ADD COLUMN client_code VARCHAR(255) UNIQUE"))
+            conn.execute(text("ALTER TABLE partners ADD COLUMN client_code VARCHAR(255) UNIQUE"))
             conn.commit()
-            print("Added column 'client_code' to 'clients' table.")
+            print("Added column 'client_code' to 'partners' table.")
         except Exception as e:
             conn.rollback()
 
@@ -212,9 +336,9 @@ def run_migrations():
                 conn.rollback()
                 handle_migration_error(col, "client_orders", e)
 
-        # Seed existing clients without client_code
+        # Seed existing partners without client_code
         try:
-            res = conn.execute(text("SELECT id, created_at FROM clients WHERE client_code IS NULL ORDER BY id ASC")).fetchall()
+            res = conn.execute(text("SELECT id, created_at FROM partners WHERE client_code IS NULL ORDER BY id ASC")).fetchall()
             import datetime
             for row in res:
                 cid = row[0]
@@ -223,16 +347,16 @@ def run_migrations():
                 seq_num = 1
                 while True:
                     test_code = f"X{year_str}{seq_num:04d}"
-                    exists = conn.execute(text("SELECT 1 FROM clients WHERE client_code = :code"), {"code": test_code}).first()
+                    exists = conn.execute(text("SELECT 1 FROM partners WHERE client_code = :code"), {"code": test_code}).first()
                     if not exists:
-                        conn.execute(text("UPDATE clients SET client_code = :code WHERE id = :id"), {"code": test_code, "id": cid})
+                        conn.execute(text("UPDATE partners SET client_code = :code WHERE id = :id"), {"code": test_code, "id": cid})
                         conn.commit()
-                        print(f"Migrated client ID {cid} to code {test_code}")
+                        print(f"Migrated partner ID {cid} to code {test_code}")
                         break
                     seq_num += 1
         except Exception as e:
             conn.rollback()
-            print(f"Error migrating client codes: {e}")
+            print(f"Error migrating partner codes: {e}")
 
         # Add needs_notary, needs_gov_officer, needs_other_vendors to client_services
         try:
@@ -454,6 +578,38 @@ def run_migrations():
                 conn.rollback()
                 handle_migration_error(col, "client_orders", e)
 
+        # Add customer_id to client_companies
+        try:
+            conn.execute(text("ALTER TABLE client_companies ADD COLUMN customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL"))
+            conn.commit()
+            print("Added column 'customer_id' to 'client_companies' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("customer_id", "client_companies", e)
+
+        # Add customer_id to client_orders
+        try:
+            conn.execute(text("ALTER TABLE client_orders ADD COLUMN customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL"))
+            conn.commit()
+            print("Added column 'customer_id' to 'client_orders' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("customer_id", "client_orders", e)
+
+        # Create indexes for clients/customers and relations
+        for idx_sql, idx_name in [
+            ("CREATE INDEX IF NOT EXISTS ix_clients_customer_code ON clients (customer_code)", "ix_clients_customer_code"),
+            ("CREATE INDEX IF NOT EXISTS ix_clients_company_id ON clients (company_id)", "ix_clients_company_id"),
+            ("CREATE INDEX IF NOT EXISTS ix_client_companies_customer_id ON client_companies (customer_id)", "ix_client_companies_customer_id"),
+            ("CREATE INDEX IF NOT EXISTS ix_client_orders_customer_id ON client_orders (customer_id)", "ix_client_orders_customer_id"),
+        ]:
+            try:
+                conn.execute(text(idx_sql))
+                conn.commit()
+                print(f"Created/verified index '{idx_name}'.")
+            except Exception as e:
+                conn.rollback()
+
     # Update RBAC permissions and role access descriptions
     try:
         from database import SessionLocal
@@ -484,6 +640,13 @@ def run_migrations():
             db_session.commit()
     except Exception as e:
         print(f"Error updating role descriptions in migrations: {e}")
+
+    # Migrate any customer records incorrectly created in employees table (MCS0017)
+    try:
+        from utils.migrate_mcs0017_customer import migrate_mcs0017_to_customer
+        migrate_mcs0017_to_customer()
+    except Exception as e:
+        print(f"Note on MCS0017 customer migration: {e}")
 
     print("Migration check complete.")
 

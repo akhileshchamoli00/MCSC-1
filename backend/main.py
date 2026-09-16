@@ -45,7 +45,7 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
-from routers import departments, employees, attendance, leave, payroll, assets, timesheets, performance, roles, profile, dashboard, notifications, holidays, calendar as calendar_router, clients, chat, announcements, access_control, companies, dropbox, notaries, teams, webhooks, accurate
+from routers import departments, employees, attendance, leave, payroll, assets, timesheets, performance, roles, profile, dashboard, notifications, holidays, calendar as calendar_router, clients, client_directory, chat, announcements, access_control, companies, dropbox, notaries, teams, webhooks, accurate
 app.include_router(departments.router)
 app.include_router(employees.router)
 app.include_router(attendance.router)
@@ -64,6 +64,7 @@ app.include_router(notaries.router, prefix="/api/clients/notaries", tags=["notar
 app.include_router(clients.router)
 app.include_router(clients.public_router)
 app.include_router(clients.public_orders_router)
+app.include_router(client_directory.router)
 app.include_router(chat.router)
 app.include_router(announcements.router)
 app.include_router(access_control.router)
@@ -325,6 +326,9 @@ def register_member(
     db: Session = Depends(database.get_db)
 ):
     from routers.clients import validate_and_clean_email, validate_and_clean_phone
+    from routers.client_directory import generate_customer_id, generate_client_id
+    from sqlalchemy import func, or_
+    import re
     
     clean_email = validate_and_clean_email(req.email, "Email Address", required=True)
     clean_phone = validate_and_clean_phone(req.phone, "Mobile Number", required=False) if req.phone else None
@@ -359,18 +363,64 @@ def register_member(
     db.commit()
     db.refresh(new_user)
     
-    # Create Member record
-    new_member = models.Member(
-        user_id=new_user.id,
+    # Generate Sequential Customer Code (e.g. CUST-0001)
+    customer_code = generate_customer_id(db)
+
+    # Resolve linked company and order if provided
+    matched_company = None
+    matched_order = None
+
+    if req.order_number:
+        clean_ord_no = req.order_number.strip().upper()
+        matched_order = db.query(models.ClientOrder).filter(
+            func.upper(models.ClientOrder.order_number) == clean_ord_no
+        ).first()
+
+    if req.company_id:
+        raw_cid = req.company_id.strip()
+        clean_cid = re.sub(r'[^a-zA-Z0-9]', '', raw_cid).upper()
+        if raw_cid.isdigit():
+            matched_company = db.query(models.ClientCompany).filter(models.ClientCompany.id == int(raw_cid)).first()
+        if not matched_company:
+            matched_company = db.query(models.ClientCompany).filter(
+                or_(
+                    func.upper(models.ClientCompany.company_code) == raw_cid.upper(),
+                    func.upper(models.ClientCompany.company_code) == clean_cid,
+                    func.upper(models.ClientCompany.tax_number) == clean_cid
+                )
+            ).first()
+
+    if not matched_company and matched_order and matched_order.company_id:
+        matched_company = db.query(models.ClientCompany).filter(
+            models.ClientCompany.id == matched_order.company_id
+        ).first()
+
+    # Create Customer record
+    new_customer = models.Customer(
+        customer_code=customer_code,
         full_name=req.name.strip(),
         email=clean_email,
         phone=clean_phone,
         date_of_birth=req.date_of_birth,
-        status="ACTIVE"
+        status="ACTIVE",
+        user_id=new_user.id,
+        company_id=matched_company.id if matched_company else None
     )
-    db.add(new_member)
+    db.add(new_customer)
     db.commit()
-    db.refresh(new_member)
+    db.refresh(new_customer)
+
+    # Link Company and Orders to this Customer
+    if matched_company:
+        matched_company.customer_id = new_customer.id
+        db.query(models.ClientOrder).filter(
+            models.ClientOrder.company_id == matched_company.id
+        ).update({"customer_id": new_customer.id}, synchronize_session=False)
+
+    if matched_order:
+        matched_order.customer_id = new_customer.id
+
+    db.commit()
     
     # Generate Access Token
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -393,12 +443,35 @@ def register_member(
         "user": {
             "id": new_user.id,
             "email": new_user.email,
-            "name": new_member.full_name,
+            "name": new_customer.full_name,
+            "customer_code": new_customer.customer_code,
             "role": "MEMBER",
-            "phone": new_member.phone,
-            "date_of_birth": str(new_member.date_of_birth) if new_member.date_of_birth else None
+            "phone": new_customer.phone,
+            "date_of_birth": str(new_customer.date_of_birth) if new_customer.date_of_birth else None,
+            "company_id": matched_company.id if matched_company else None,
+            "company_code": matched_company.company_code if matched_company else None,
+            "company_name": matched_company.company_name if matched_company else None
         }
     }
+
+
+@app.post("/api/auth/customer-register")
+def register_customer(
+    req: schemas.CustomerRegisterRequest,
+    response: Response,
+    db: Session = Depends(database.get_db)
+):
+    member_req = schemas.MemberRegisterRequest(
+        name=req.name,
+        email=req.email,
+        password=req.password,
+        confirm_password=req.confirm_password,
+        date_of_birth=req.date_of_birth,
+        phone=req.phone,
+        company_id=req.company_id,
+        order_number=req.order_number
+    )
+    return register_member(req=member_req, response=response, db=db)
 
 
 from utils.rate_limiter import check_login_rate_limit, record_failed_attempt, clear_failed_attempts
@@ -550,21 +623,22 @@ def reset_password(req: schemas.ResetPasswordRequest, db: Session = Depends(data
         token_type: str = payload.get("type")
         
         if email is None or token_type != "password_reset":
-            raise HTTPException(status_code=400, detail="Invalid token")
+            raise HTTPException(status_code=400, detail="The password reset link is invalid. Please request a new link.")
             
     except JWTError:
-        raise HTTPException(status_code=400, detail="Invalid or expired token")
+        raise HTTPException(status_code=400, detail="The password reset link has expired or is invalid. Please request a new link.")
         
     user = auth.get_user_by_email(db, email=email)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="No registered account was found matching this request.")
         
-    # Update password
+    # Validate password strength and compute hash
     auth.validate_password_strength(req.new_password)
-    user.hashed_password = hashed_password
+    user.hashed_password = auth.get_password_hash(req.new_password)
     db.commit()
+    auth.clear_user_cache(user.email)
     
-    return {"message": "Password successfully reset."}
+    return {"message": "Your password has been successfully reset. You may now log in with your new credentials."}
 
 @app.post("/api/contact")
 async def submit_contact_form(request: Request):

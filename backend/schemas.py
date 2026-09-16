@@ -643,6 +643,7 @@ class NotificationBase(BaseModel):
     message: str
     type: str
     module: str
+    system_area: Optional[str] = "hrms"
     reference_id: Optional[int] = None
     action_url: Optional[str] = None
 
@@ -833,6 +834,17 @@ class ClientMin(BaseModel):
     class Config:
         from_attributes = True
 
+class CustomerMin(BaseModel):
+    id: int
+    customer_code: Optional[str] = None
+    full_name: str
+    email: str
+    phone: Optional[str] = None
+    status: Optional[str] = "ACTIVE"
+
+    class Config:
+        from_attributes = True
+
 
 class ClientCompanyResponse(ClientCompanyBase):
     id: int
@@ -845,6 +857,8 @@ class ClientCompanyResponse(ClientCompanyBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     client: Optional[ClientMin] = None
+    customer_id: Optional[int] = None
+    customer: Optional[CustomerMin] = None
     accurate_customer_id: Optional[str] = None
     accurate_customer_no: Optional[str] = None
     accurate_sync_status: Optional[str] = "NOT_SYNCED"
@@ -942,6 +956,8 @@ class ClientOrderResponse(BaseModel):
     client_name: Optional[str] = None
     company_name: Optional[str] = None
     billing_company_name: Optional[str] = None
+    customer_id: Optional[int] = None
+    customer: Optional[CustomerMin] = None
     company: Optional['ClientCompanyResponse'] = None
     billing_company: Optional['ClientCompanyResponse'] = None
     notary_id: Optional[int] = None
@@ -1311,6 +1327,10 @@ class ClientOrderProgressCreate(BaseModel):
     attachment_name: Optional[str] = None
 
 
+class ClientOrderProgressUpdate(BaseModel):
+    message: str
+
+
 class ClientOrderProgressResponse(BaseModel):
     id: int
     order_number: str
@@ -1452,6 +1472,82 @@ class MemberResponse(MemberBase):
         from_attributes = True
 
 
+class CustomerBase(BaseModel):
+    full_name: str
+    email: str
+    phone: Optional[str] = None
+    customer_code: Optional[str] = None
+    status: Optional[str] = "ACTIVE"
+    notes: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    nationality: Optional[str] = None
+    gender: Optional[str] = None
+    identification_number: Optional[str] = None
+    address: Optional[str] = None
+
+
+class CustomerCreate(CustomerBase):
+    create_portal_account: Optional[bool] = False
+    password: Optional[str] = None
+    company_id: Optional[int] = None
+    order_number: Optional[str] = None
+    # Optional company creation fields
+    company_name: Optional[str] = None
+    company_code: Optional[str] = None
+    company_address: Optional[str] = None
+    tax_number: Optional[str] = None
+    industry: Optional[str] = None
+    director_name: Optional[str] = None
+    director_email: Optional[str] = None
+    director_contact: Optional[str] = None
+    company_notes: Optional[str] = None
+
+
+class CustomerPasswordReset(BaseModel):
+    new_password: str
+
+
+class CustomerUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    nationality: Optional[str] = None
+    gender: Optional[str] = None
+    identification_number: Optional[str] = None
+    address: Optional[str] = None
+    company_id: Optional[int] = None
+
+
+class CustomerResponse(CustomerBase):
+    id: int
+    customer_code: str
+    user_id: Optional[int] = None
+    company_id: Optional[int] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    company: Optional[ClientCompanyResponse] = None
+    companies: List[ClientCompanyResponse] = []
+    orders_count: Optional[int] = 0
+    active_orders_count: Optional[int] = 0
+
+    class Config:
+        from_attributes = True
+
+
+class CustomerRegisterRequest(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+    confirm_password: str
+    date_of_birth: Optional[date] = None
+    phone: Optional[str] = None
+    company_id: Optional[str] = None
+    order_number: Optional[str] = None
+
+
 class MemberRegisterRequest(BaseModel):
     name: str
     email: EmailStr
@@ -1459,6 +1555,7 @@ class MemberRegisterRequest(BaseModel):
     confirm_password: str
     date_of_birth: Optional[date] = None
     phone: Optional[str] = None
+    company_id: Optional[str] = None
     order_number: Optional[str] = None
 
 

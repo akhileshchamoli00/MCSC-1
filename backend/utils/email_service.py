@@ -1840,7 +1840,7 @@ www.mcsc.co.id
             <li class="privilege-item"><strong>Fast Consultant Assistance:</strong> Simply share your Company ID so our consultants can instantly look up your orders and assist you.</li>
           </ul>
           <div class="privilege-tip">
-            💡 <strong>Helpful Tip:</strong> Bookmark your order tracking link or keep your Company ID (<strong>{effective_code}</strong>) handy whenever you need to check order status or contact our team.
+            💡 <strong>Helpful Tip:</strong> Save your order tracking link or Company ID (<strong>{effective_code}</strong>) so you can easily check your order status or contact our team whenever needed.
           </div>
         </div>
 

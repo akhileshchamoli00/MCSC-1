@@ -81,30 +81,32 @@ class CachedUser:
         class CachedEmployee:
             def __init__(self, emp_dict):
                 self.__dict__.update(emp_dict)
-        self.employee = CachedEmployee(user_dict["employee"]) if user_dict["employee"] else None
+        self.employee = CachedEmployee(user_dict["employee"]) if user_dict.get("employee") else None
+
+        class CachedPartner:
+            def __init__(self, partner_dict):
+                self.__dict__.update(partner_dict)
+        self.partner = CachedPartner(user_dict["partner"]) if user_dict.get("partner") else None
 
         class CachedClient:
             def __init__(self, client_dict):
                 self.__dict__.update(client_dict)
         self.client = CachedClient(user_dict["client"]) if user_dict.get("client") else None
-
-        class CachedMember:
-            def __init__(self, member_dict):
-                self.__dict__.update(member_dict)
-        self.member = CachedMember(user_dict["member"]) if user_dict.get("member") else None
+        self.customer = self.client
+        self.member = self.client
 
     @property
     def name(self) -> str:
+        if self.client and getattr(self.client, "full_name", None):
+            return self.client.full_name
         if self.employee:
             first = getattr(self.employee, "first_name", "") or ""
             last = getattr(self.employee, "last_name", "") or ""
             parts = [p for p in [first, last] if p]
             if parts:
                 return " ".join(parts).strip()
-        if self.member and getattr(self.member, "full_name", None):
-            return self.member.full_name
-        if self.client and getattr(self.client, "contact_person", None):
-            return self.client.contact_person
+        if self.partner and getattr(self.partner, "contact_person", None):
+            return self.partner.contact_person
         if self.email and "@" in self.email:
             prefix = self.email.split("@")[0]
             clean = " ".join([word.capitalize() for word in prefix.replace(".", " ").replace("_", " ").replace("-", " ").split()])
@@ -125,12 +127,12 @@ def get_cached_user(db: Session, email: str):
         if now < expiry:
             return CachedUser(user_dict)
             
-    # Eagerly load user, role, employee, client, and member relationships
+    # Eagerly load user, role, employee, partner, and client relationships
     db_user = db.query(models.User).options(
         joinedload(models.User.role),
         joinedload(models.User.employee),
-        joinedload(models.User.client),
-        joinedload(models.User.member)
+        joinedload(models.User.partner),
+        joinedload(models.User.client)
     ).filter(models.User.email == email).first()
     
     if not db_user:
@@ -144,6 +146,14 @@ def get_cached_user(db: Session, email: str):
         for col in mapper.columns:
             employee_dict[col.key] = getattr(db_employee, col.key)
             
+    db_partner = db_user.partner
+    partner_dict = None
+    if db_partner:
+        partner_dict = {}
+        mapper = inspect(db_partner.__class__)
+        for col in mapper.columns:
+            partner_dict[col.key] = getattr(db_partner, col.key)
+
     db_client = db_user.client
     client_dict = None
     if db_client:
@@ -151,14 +161,6 @@ def get_cached_user(db: Session, email: str):
         mapper = inspect(db_client.__class__)
         for col in mapper.columns:
             client_dict[col.key] = getattr(db_client, col.key)
-
-    db_member = db_user.member
-    member_dict = None
-    if db_member:
-        member_dict = {}
-        mapper = inspect(db_member.__class__)
-        for col in mapper.columns:
-            member_dict[col.key] = getattr(db_member, col.key)
         
     user_dict = {
         "id": db_user.id,
@@ -171,8 +173,10 @@ def get_cached_user(db: Session, email: str):
         "role_description": db_user.role.description if db_user.role else None,
         "role_id_db": db_user.role.id if db_user.role else None,
         "employee": employee_dict,
+        "partner": partner_dict,
         "client": client_dict,
-        "member": member_dict
+        "customer": client_dict,
+        "member": client_dict
     }
     
     _user_cache[email] = (user_dict, now + CACHE_TTL_SECONDS)
