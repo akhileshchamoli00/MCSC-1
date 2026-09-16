@@ -120,20 +120,62 @@ CACHE_TTL_SECONDS = 30
 def get_cached_user(db: Session, email: str):
     import time
     from sqlalchemy.orm import joinedload
-    from sqlalchemy import inspect
+    from sqlalchemy import inspect, func
+    if not email:
+        return None
+
+    clean_key = email.strip().lower()
     now = time.time()
-    if email in _user_cache:
-        user_dict, expiry = _user_cache[email]
+    if clean_key in _user_cache:
+        user_dict, expiry = _user_cache[clean_key]
         if now < expiry:
             return CachedUser(user_dict)
             
-    # Eagerly load user, role, employee, partner, and client relationships
+    # 1. Eagerly load user, role, employee, partner, and client relationships by email (case-insensitive)
     db_user = db.query(models.User).options(
         joinedload(models.User.role),
         joinedload(models.User.employee),
         joinedload(models.User.partner),
         joinedload(models.User.client)
-    ).filter(models.User.email == email).first()
+    ).filter(func.lower(models.User.email) == clean_key).first()
+
+    # 2. If not found by email, allow login by Employee Custom ID (e.g. MCS0006)
+    if not db_user:
+        emp = db.query(models.Employee).filter(
+            func.lower(models.Employee.employee_id_custom) == clean_key
+        ).first()
+        if emp and emp.user_id:
+            db_user = db.query(models.User).options(
+                joinedload(models.User.role),
+                joinedload(models.User.employee),
+                joinedload(models.User.partner),
+                joinedload(models.User.client)
+            ).filter(models.User.id == emp.user_id).first()
+
+    # 3. If not found, allow login by Partner / Client Code (e.g. CLI-0001, CUST-0001, A266500)
+    if not db_user:
+        partner = db.query(models.Partner).filter(
+            func.lower(models.Partner.client_code) == clean_key
+        ).first()
+        if partner and partner.user_id:
+            db_user = db.query(models.User).options(
+                joinedload(models.User.role),
+                joinedload(models.User.employee),
+                joinedload(models.User.partner),
+                joinedload(models.User.client)
+            ).filter(models.User.id == partner.user_id).first()
+
+    if not db_user:
+        cust = db.query(models.Customer).filter(
+            func.lower(models.Customer.customer_code) == clean_key
+        ).first()
+        if cust and cust.user_id:
+            db_user = db.query(models.User).options(
+                joinedload(models.User.role),
+                joinedload(models.User.employee),
+                joinedload(models.User.partner),
+                joinedload(models.User.client)
+            ).filter(models.User.id == cust.user_id).first()
     
     if not db_user:
         return None
@@ -179,13 +221,20 @@ def get_cached_user(db: Session, email: str):
         "member": client_dict
     }
     
-    _user_cache[email] = (user_dict, now + CACHE_TTL_SECONDS)
+    _user_cache[clean_key] = (user_dict, now + CACHE_TTL_SECONDS)
+    if db_user.email:
+        _user_cache[db_user.email.strip().lower()] = (user_dict, now + CACHE_TTL_SECONDS)
     return db_user
 
 def clear_user_cache(email: str):
     """
     Clears cached user data to force immediate re-authentication.
     """
+    if not email:
+        return
+    clean_key = email.strip().lower()
+    if clean_key in _user_cache:
+        del _user_cache[clean_key]
     if email in _user_cache:
         del _user_cache[email]
 
