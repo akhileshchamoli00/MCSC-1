@@ -532,30 +532,10 @@ def forgot_password(req: schemas.ForgotPasswordRequest, request: Request, db: Se
         expires_delta=timedelta(hours=1)
     )
     
-    # Send email
-    from utils.email_service import send_password_reset_email
+    # Send email with dynamic production origin detection
+    from utils.email_service import send_password_reset_email, get_frontend_url
     
-    # Try to get FRONTEND_URL from environment first
-    origin = os.getenv("FRONTEND_URL")
-    
-    # Next, try to get the origin from the request headers
-    if not origin:
-        origin = request.headers.get("origin")
-        
-    if not origin:
-        # Fallback to the host header if origin is missing
-        host = request.headers.get("x-forwarded-host") or request.headers.get("host", "www.mcsc.co.id")
-        protocol = request.headers.get("x-forwarded-proto", "http" if "localhost" in host else "https")
-        
-        if "hrms-backend-979749601379.asia-southeast1.run.app" in host:
-            origin = "https://hrms-backend-979749601379.asia-southeast1.run.app"
-        elif "mcsc.co.id" in host:
-            origin = "https://www.mcsc.co.id"
-        elif "127.0.0.1" in host or "localhost" in host:
-            origin = "http://localhost:3000"
-        else:
-            origin = f"{protocol}://{host}"
-        
+    origin = get_frontend_url(request)
     reset_link = f"{origin}/reset-password?token={reset_token}"
     send_password_reset_email(user.email, reset_link)
     

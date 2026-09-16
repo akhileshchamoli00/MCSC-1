@@ -79,12 +79,54 @@ def send_smtp_email(msg: MIMEMultipart, recipient_email: str, description: str =
         print(f"[{provider_label}] FAILED to send {description} to {recipient_email}{cc_log}: {str(e)}")
         return False
 
-def send_welcome_email(employee_email: str, employee_name: str, password: str):
+def get_frontend_url(request=None) -> str:
+    """
+    Returns the real public frontend URL (origin).
+    - If request headers indicate production (e.g. Origin/Referer/Host containing 'mcsc.co.id'), returns 'https://www.mcsc.co.id'.
+    - If request is provided, inspects Origin, Referer, X-Forwarded-Host.
+    - If FRONTEND_URL is explicitly set to a production/custom domain, uses that.
+    - Defaults to 'https://www.mcsc.co.id' in production, never leaking 'localhost' to external emails unless specifically running on localhost with local requests.
+    """
+    if request:
+        origin = request.headers.get("origin")
+        if origin and origin not in ("null", "undefined", ""):
+            if "mcsc.co.id" in origin:
+                return "https://www.mcsc.co.id"
+            if "localhost" in origin or "127.0.0.1" in origin:
+                return origin.rstrip("/").replace(":8000", ":3000")
+            return origin.rstrip("/")
+            
+        referer = request.headers.get("referer")
+        if referer:
+            from urllib.parse import urlparse
+            parsed = urlparse(referer)
+            if parsed.netloc:
+                if "mcsc.co.id" in parsed.netloc:
+                    return "https://www.mcsc.co.id"
+                if "localhost" in parsed.netloc or "127.0.0.1" in parsed.netloc:
+                    return f"{parsed.scheme or 'http'}://{parsed.netloc.replace(':8000', ':3000')}"
+                return f"{parsed.scheme or 'https'}://{parsed.netloc}"
+                
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+        if host:
+            if "mcsc.co.id" in host:
+                return "https://www.mcsc.co.id"
+            proto = request.headers.get("x-forwarded-proto", "http" if ("localhost" in host or "127.0.0.1" in host) else "https")
+            return f"{proto}://{host.replace(':8000', ':3000')}"
+
+    env_url = os.getenv("FRONTEND_URL", "").strip()
+    if env_url and "localhost" not in env_url and "127.0.0.1" not in env_url:
+        return env_url.rstrip("/")
+
+    # Default to production domain
+    return "https://www.mcsc.co.id"
+
+def send_welcome_email(employee_email: str, employee_name: str, password: str, frontend_url: Optional[str] = None):
     """
     Send welcome email to a new employee with their login credentials.
     """
     subject = "Welcome to MCS Consulting HRMS"
-    frontend_url = os.getenv("FRONTEND_URL", "https://www.mcsc.co.id")
+    base_url = frontend_url or get_frontend_url()
     
     body = f"""Dear {employee_name},
 
@@ -92,7 +134,7 @@ Welcome to MCS Consulting! Your HRMS employee portal account has been created.
 
 Please log in to your dashboard to complete your profile and view your employment details.
 
-URL: {frontend_url}/login
+URL: {base_url}/login
 Username: {employee_email}
 Password: {password}
 
@@ -168,26 +210,157 @@ MCS Consulting HRMS
 
 def send_password_reset_email(employee_email: str, reset_link: str):
     """
-    Send the password reset link to the employee's email.
+    Send the password reset link with a premium responsive HTML email template.
     """
-    subject = "Reset Your Password - MCS Consulting HRMS"
+    subject = "Reset Your Password - MCS Consulting Portal"
     
-    body = f"""Hello,
+    plain_text = f"""Hello,
 
-We received a request to reset your password for your HRMS account.
+We received a request to reset the password for your MCS Consulting account ({employee_email}).
 
 You can reset your password by clicking the link below:
 {reset_link}
 
-This link will expire in 1 hour. If you did not request a password reset, you can safely ignore this email.
+This link is valid for 1 hour. If you did not request a password reset, you can safely ignore this email.
 
-Regards,
-MCS Consulting HRMS
+Best regards,
+MCS Consulting
+https://www.mcsc.co.id
 """
 
-    msg = MIMEMultipart()
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Your Password - MCS Consulting</title>
+  <style>
+    body {{
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #1e293b;
+      background-color: #f8fafc;
+      margin: 0;
+      padding: 0;
+    }}
+    .container {{
+      max-width: 580px;
+      margin: 30px auto;
+      background: #ffffff;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+      border: 1px solid #e2e8f0;
+    }}
+    .header {{
+      background: #0f172a;
+      padding: 30px 40px;
+      text-align: center;
+    }}
+    .header h1 {{
+      color: #ffffff;
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: 0.5px;
+      font-weight: 700;
+    }}
+    .header p {{
+      color: #94a3b8;
+      margin: 6px 0 0;
+      font-size: 13px;
+    }}
+    .content {{
+      padding: 36px 40px;
+    }}
+    .greeting {{
+      font-size: 16px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 16px;
+    }}
+    .message {{
+      font-size: 14px;
+      color: #475569;
+      margin-bottom: 28px;
+    }}
+    .btn-container {{
+      text-align: center;
+      margin: 30px 0;
+    }}
+    .btn {{
+      display: inline-block;
+      background: #2563eb;
+      color: #ffffff !important;
+      text-decoration: none;
+      padding: 14px 32px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: 0.2px;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }}
+    .link-box {{
+      background: #f1f5f9;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      word-break: break-all;
+      color: #64748b;
+      margin-top: 24px;
+      border: 1px solid #e2e8f0;
+    }}
+    .notice {{
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 24px;
+      border-top: 1px solid #f1f5f9;
+      padding-top: 16px;
+    }}
+    .footer {{
+      background: #f8fafc;
+      padding: 20px 40px;
+      text-align: center;
+      font-size: 12px;
+      color: #94a3b8;
+      border-top: 1px solid #e2e8f0;
+    }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>PT MANDIRI CIPTA SOLUSI</h1>
+      <p>Corporate Management & Legal Advisory</p>
+    </div>
+    <div class="content">
+      <div class="greeting">Password Reset Request</div>
+      <div class="message">
+        We received a request to reset the password for your account associated with <strong>{employee_email}</strong>. Click the button below to set a new password:
+      </div>
+      <div class="btn-container">
+        <a href="{reset_link}" class="btn" target="_blank">Reset Password</a>
+      </div>
+      <div class="link-box">
+        If the button above does not work, copy and paste this link into your browser:<br>
+        <a href="{reset_link}" style="color: #2563eb;">{reset_link}</a>
+      </div>
+      <div class="notice">
+        <strong>Security Notice:</strong> This link will expire in <strong>1 hour</strong>. If you did not request this password reset, please ignore this email or contact support if you have concerns.
+      </div>
+    </div>
+    <div class="footer">
+      &copy; MCS Consulting. All rights reserved.<br>
+      Jakarta, Indonesia &bull; <a href="https://www.mcsc.co.id" style="color: #64748b; text-decoration: none;">www.mcsc.co.id</a>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+    msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
-    msg.attach(MIMEText(body, 'plain'))
+    msg.attach(MIMEText(plain_text, 'plain'))
+    msg.attach(MIMEText(html_content, 'html'))
 
     return send_smtp_email(msg, employee_email, "password reset email")
 
