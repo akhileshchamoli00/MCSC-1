@@ -213,6 +213,7 @@ def send_password_reset_email(employee_email: str, reset_link: str):
     Send the password reset link with a premium responsive HTML email template.
     """
     subject = "Reset Your Password - MCS Consulting Portal"
+    logo_url = "https://www.mcsc.co.id/logo.png"
     
     plain_text = f"""Hello,
 
@@ -253,21 +254,17 @@ https://www.mcsc.co.id
       border: 1px solid #e2e8f0;
     }}
     .header {{
-      background: #0f172a;
-      padding: 30px 40px;
+      background: #ffffff;
+      padding: 32px 40px 24px;
       text-align: center;
+      border-bottom: 1px solid #f1f5f9;
     }}
-    .header h1 {{
-      color: #ffffff;
-      margin: 0;
-      font-size: 20px;
-      letter-spacing: 0.5px;
-      font-weight: 700;
-    }}
-    .header p {{
-      color: #94a3b8;
-      margin: 6px 0 0;
-      font-size: 13px;
+    .header img {{
+      display: block;
+      margin: 0 auto;
+      max-width: 190px;
+      width: 190px;
+      height: auto;
     }}
     .content {{
       padding: 36px 40px;
@@ -329,8 +326,7 @@ https://www.mcsc.co.id
 <body>
   <div class="container">
     <div class="header">
-      <h1>PT MANDIRI CIPTA SOLUSI</h1>
-      <p>Corporate Management & Legal Advisory</p>
+      <img src="{logo_url}" alt="MCS Consulting" width="190" border="0" />
     </div>
     <div class="content">
       <div class="greeting">Password Reset Request</div>
