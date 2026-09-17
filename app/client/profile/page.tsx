@@ -674,27 +674,16 @@ export default function ClientProfilePage() {
                               </div>
                             </div>
                           </div>
-                          {doc.file_url ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7.5 px-3 text-xs font-semibold gap-1.5 rounded-xl shadow-xs shrink-0"
-                              asChild
-                            >
-                              <a
-                                href={doc.file_url.startsWith("http") ? doc.file_url : `${process.env.NEXT_PUBLIC_API_URL}${doc.file_url}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                                <span>Download</span>
-                              </a>
-                            </Button>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground font-medium px-2 py-0.5 bg-muted/40 rounded-lg border border-border/30">
-                              Archived
-                            </span>
-                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7.5 px-3 text-xs font-medium gap-1.5 rounded-xl shadow-none opacity-60 cursor-not-allowed shrink-0 text-muted-foreground bg-muted/20 border-border/40 hover:bg-muted/20"
+                            disabled
+                            title="Document download is temporarily disabled"
+                          >
+                            <Lock className="h-3.5 w-3.5 text-muted-foreground/70" />
+                            <span>Download Disabled</span>
+                          </Button>
                         </div>
                       ))}
                     </div>

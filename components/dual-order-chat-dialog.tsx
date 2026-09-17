@@ -819,6 +819,18 @@ export function DualOrderChatDialog({
                                       </p>
                                     )}
 
+                                    {(item.service_instructions || item.notes) && (
+                                      <div className="p-2 rounded-md bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 space-y-0.5">
+                                        <div className="flex items-center gap-1 font-bold text-[10px] text-amber-700 dark:text-amber-400">
+                                          <FileText className="h-3 w-3 shrink-0" />
+                                          <span>Service Instructions:</span>
+                                        </div>
+                                        <p className="text-[11px] text-foreground/90 font-medium leading-relaxed whitespace-pre-wrap">
+                                          {item.service_instructions || item.notes}
+                                        </p>
+                                      </div>
+                                    )}
+
                                     {(item.needs_notary || item.needs_gov_officer || item.needs_other_vendors) && (
                                       <div className="flex items-center gap-1 flex-wrap pt-0.5">
                                         {item.needs_notary && (

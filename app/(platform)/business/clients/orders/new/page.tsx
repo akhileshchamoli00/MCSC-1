@@ -82,6 +82,7 @@ function NewClientOrderContent() {
       job_title: "",
       branch_name: "",
       description: "",
+      service_instructions: "",
       pricing_tier: "BASE",
       unit_price: 0,
       custom_price_text: "",
@@ -141,6 +142,7 @@ function NewClientOrderContent() {
         job_title: "",
         branch_name: "",
         description: "",
+        service_instructions: "",
         pricing_tier: "BASE",
         unit_price: 0,
         custom_price_text: "",
@@ -160,9 +162,11 @@ function NewClientOrderContent() {
           job_title: "",
           branch_name: "",
           description: "",
+          service_instructions: "",
           pricing_tier: "BASE",
           unit_price: 0,
           custom_price_text: "",
+          notary_id: "",
           _raw_service: null
         }
       ]);
@@ -343,6 +347,7 @@ function NewClientOrderContent() {
         job_title: i.job_title,
         branch_name: i.branch_name ? i.branch_name.trim() : null,
         description: i.description,
+        service_instructions: i.service_instructions?.trim() || null,
         pricing_tier: i.pricing_tier,
         unit_price: i.unit_price || 0,
         custom_price_text: i.custom_price_text || null,
@@ -797,6 +802,33 @@ function NewClientOrderContent() {
                       </div>
                     )}
 
+                    {/* Service Instructions for this specific Service Item */}
+                    <div className="space-y-1 pt-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-primary">
+                          <FileText className="h-3.5 w-3.5 text-primary" />
+                          <span>Service Instructions</span>
+                        </span>
+                        <span className="text-[10px] font-mono text-muted-foreground/70 italic">
+                          Visible to assigned processing team & order chat
+                        </span>
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={item.service_instructions || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setOrderItems((prev) => {
+                            const copy = [...prev];
+                            copy[idx].service_instructions = val;
+                            return copy;
+                          });
+                        }}
+                        placeholder={`e.g. Specific document requirements, fast-track timeline, or execution instructions for ${item.job_title || "this service item"}...`}
+                        className="flex min-h-[58px] w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-xs font-normal shadow-xs placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary resize-y leading-relaxed"
+                      />
+                    </div>
+
                     {/* Reflected Price Bar */}
                     <div className="flex flex-wrap items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border/30 gap-2 text-[10px] font-mono">
                       <div className="flex items-center gap-2">
@@ -861,16 +893,19 @@ function NewClientOrderContent() {
                 </div>
               )}
 
-              {/* Notes & Instructions */}
+              {/* Internal Instructions / Notes (Order-level for Managers) */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">General Notes / Instructions</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Internal Instructions / Notes</label>
+                  <span className="text-[9px] font-mono text-muted-foreground/70 italic">For Delivery Manager</span>
+                </div>
                 <textarea
                   name="notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={isPipeline ? 5 : 3}
                   className="flex w-full rounded-lg border border-border/60 bg-background p-2.5 text-xs placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary leading-normal font-semibold transition-all"
-                  placeholder="Deliverables schedule, client requests..."
+                  placeholder="Note from order creator to delivery manager (not shown to processing team)..."
                 />
               </div>
             </CardContent>

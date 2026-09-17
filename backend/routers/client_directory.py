@@ -344,6 +344,9 @@ def delete_client(
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 
+    user_id_to_delete = client.user_id
+    client_email = client.email.strip().lower() if client.email else None
+
     # Unlink companies and orders
     db.query(models.ClientCompany).filter(models.ClientCompany.customer_id == client.id).update(
         {"customer_id": None}, synchronize_session=False
@@ -352,9 +355,58 @@ def delete_client(
         {"customer_id": None}, synchronize_session=False
     )
 
+    # Nullify client.user_id first to avoid cascade / foreign key locking issues
+    client.user_id = None
+    db.flush()
     db.delete(client)
     db.commit()
-    return {"message": "Client deleted successfully"}
+
+    # Locate the associated User account
+    target_user = None
+    if user_id_to_delete:
+        target_user = db.query(models.User).filter(models.User.id == user_id_to_delete).first()
+    elif client_email:
+        target_user = db.query(models.User).filter(func.lower(models.User.email) == client_email).first()
+
+    if target_user:
+        # Prevent accidental deletion of employee or partner accounts
+        if not target_user.employee and not target_user.partner:
+            # Nullify FK references to this user across related tables
+            db.query(models.ClientDocument).filter(models.ClientDocument.uploaded_by == target_user.id).update(
+                {"uploaded_by": None}, synchronize_session=False
+            )
+            db.query(models.ClientCompany).filter(models.ClientCompany.created_by_user_id == target_user.id).update(
+                {"created_by_user_id": None}, synchronize_session=False
+            )
+            db.query(models.ClientCompany).filter(models.ClientCompany.validated_by_user_id == target_user.id).update(
+                {"validated_by_user_id": None}, synchronize_session=False
+            )
+            db.query(models.ClientOrderProgress).filter(models.ClientOrderProgress.user_id == target_user.id).update(
+                {"user_id": None}, synchronize_session=False
+            )
+            db.query(models.ClientActivityLog).filter(models.ClientActivityLog.user_id == target_user.id).update(
+                {"user_id": None}, synchronize_session=False
+            )
+            db.query(models.Notification).filter(models.Notification.user_id == target_user.id).delete(
+                synchronize_session=False
+            )
+            db.query(models.Message).filter(models.Message.sender_id == target_user.id).delete(
+                synchronize_session=False
+            )
+            db.commit()
+
+            target_user_email = target_user.email.strip().lower() if target_user.email else None
+            db.delete(target_user)
+            db.commit()
+
+            if target_user_email:
+                auth.clear_user_cache(target_user_email)
+
+    if client_email:
+        auth.clear_user_cache(client_email)
+
+    return {"message": "Client and associated login account deleted successfully"}
+
 
 
 @router.post("/{id}/link-company")

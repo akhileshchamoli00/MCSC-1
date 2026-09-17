@@ -45,10 +45,10 @@ export default function LoginPage() {
       }
     }
     if (localStorage.getItem("user_email") && localStorage.getItem("user_role")) {
-      const role = localStorage.getItem("user_role");
+      const role = (localStorage.getItem("user_role") || "").toUpperCase();
       if (role === "MEMBER") {
         router.push("/member/track-order");
-      } else if (role === "CLIENT") {
+      } else if (role === "CLIENT" || role === "CUSTOMER" || role === "PARTNER") {
         router.push("/client/dashboard");
       } else {
         const pref = localStorage.getItem("preferred_system");
@@ -169,9 +169,10 @@ export default function LoginPage() {
         const freshPermissions = user.permissions || [];
         localStorage.setItem("hrms_permissions", JSON.stringify(freshPermissions));
 
-        if (roleName === "MEMBER") {
+        const cleanRole = (roleName || "").trim().toUpperCase();
+        if (cleanRole === "MEMBER") {
           window.location.href = "/member/track-order";
-        } else if (roleName === "CLIENT") {
+        } else if (cleanRole === "CLIENT" || cleanRole === "CUSTOMER" || cleanRole === "PARTNER") {
           window.location.href = "/client/dashboard";
         } else {
           const email = user.email || "";

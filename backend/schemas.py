@@ -827,8 +827,9 @@ class UserMin(BaseModel):
 
 class ClientMin(BaseModel):
     id: int
-    contact_person: str
-    email: str
+    contact_person: Optional[str] = None
+    full_name: Optional[str] = None
+    email: Optional[str] = None
     phone: Optional[str] = None
 
     class Config:
@@ -837,8 +838,9 @@ class ClientMin(BaseModel):
 class CustomerMin(BaseModel):
     id: int
     customer_code: Optional[str] = None
-    full_name: str
-    email: str
+    full_name: Optional[str] = None
+    contact_person: Optional[str] = None
+    email: Optional[str] = None
     phone: Optional[str] = None
     status: Optional[str] = "ACTIVE"
 
@@ -888,6 +890,8 @@ class ClientOrderItemCreate(BaseModel):
     job_title: str
     branch_name: Optional[str] = None
     description: Optional[str] = None
+    service_instructions: Optional[str] = None
+    notes: Optional[str] = None
     pricing_tier: str = "BASE"
     unit_price: float = 0.0
     custom_price_text: Optional[str] = None
@@ -900,6 +904,7 @@ class ClientOrderCreateRequest(BaseModel):
     billing_company_id: Optional[int] = None
     items: List[ClientOrderItemCreate]
     consultant_ids: Optional[List[int]] = []
+    internal_notes: Optional[str] = None
     notes: Optional[str] = None
     order_number: Optional[str] = None
     status: Optional[str] = None
@@ -912,6 +917,8 @@ class ClientOrderItemResponse(BaseModel):
     job_title: str
     branch_name: Optional[str] = None
     description: Optional[str] = None
+    service_instructions: Optional[str] = None
+    notes: Optional[str] = None
     pricing_tier: str
     unit_price: float
     custom_price_text: Optional[str] = None
@@ -935,6 +942,7 @@ class ClientOrderResponse(BaseModel):
     job_title: Optional[str] = "Service Package"
     branch_name: Optional[str] = None
     description: Optional[str] = None
+    service_instructions: Optional[str] = None
     pricing_tier: Optional[str] = "BASE"
     unit_price: Optional[float] = 0.0
     total_amount: Optional[float] = 0.0
@@ -948,6 +956,7 @@ class ClientOrderResponse(BaseModel):
     is_final_invoice_finalized: Optional[bool] = False
     consultant_ids: Optional[List[int]] = []
     consultants: Optional[List[dict]] = []
+    internal_notes: Optional[str] = None
     notes: Optional[str] = None
     payment_link: Optional[str] = None
     xendit_invoice_id: Optional[str] = None
@@ -1116,6 +1125,8 @@ class ClientOrderUpdate(BaseModel):
     billing_company_id: Optional[int] = None
     invoice_number: Optional[str] = None
     consultant_ids: Optional[List[int]] = None
+    service_instructions: Optional[str] = None
+    internal_notes: Optional[str] = None
     notes: Optional[str] = None
     service_id: Optional[int] = None
     job_id: Optional[str] = None

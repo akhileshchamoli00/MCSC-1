@@ -596,6 +596,15 @@ def run_migrations():
             conn.rollback()
             handle_migration_error("customer_id", "client_orders", e)
 
+        # Add service_instructions to client_orders
+        try:
+            conn.execute(text("ALTER TABLE client_orders ADD COLUMN service_instructions TEXT"))
+            conn.commit()
+            print("Added column 'service_instructions' to 'client_orders' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("service_instructions", "client_orders", e)
+
         # Create indexes for clients/customers and relations
         for idx_sql, idx_name in [
             ("CREATE INDEX IF NOT EXISTS ix_clients_customer_code ON clients (customer_code)", "ix_clients_customer_code"),

@@ -97,7 +97,7 @@ def seed_rbac_data(db: Session):
         ]},
         {"name": "Settings", "code": "settings", "system_area": "shared", "submodules": []},
         {"name": "MCS HRMS Platform Access", "code": "platform_hrms", "system_area": "shared", "submodules": []},
-        {"name": "MCS Business Platform Access", "code": "platform_business", "system_area": "shared", "submodules": []},
+        {"name": "MCS ERP Platform Access", "code": "platform_business", "system_area": "shared", "submodules": []},
     ]
 
     modules_by_code = {}

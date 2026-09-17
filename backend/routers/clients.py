@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 import models, schemas, auth, database
 from storage import upload_file, delete_file
 
-from sqlalchemy import func
+from sqlalchemy import func, or_, and_
 
 router = APIRouter(
     prefix="/api/clients",
@@ -263,25 +263,42 @@ def is_assigned_employee_to_company(user: models.User, company_id: int, db: Sess
     return False
 
 def is_client_themselves(user: models.User, client_id: int, db: Optional[Session] = None) -> bool:
-    if user.role is not None and user.role.name.upper() == "CLIENT":
+    if user.role is not None and user.role.name.upper() in ["CLIENT", "CUSTOMER", "MEMBER"]:
         if user.client and hasattr(user.client, "id") and user.client.id == client_id:
+            return True
+        if user.partner and hasattr(user.partner, "id") and user.partner.id == client_id:
             return True
         if db:
             c = db.query(models.Partner).filter(models.Partner.user_id == user.id).first()
             if c and c.id == client_id:
                 return True
+            cust = db.query(models.Client).filter(models.Client.user_id == user.id).first()
+            if cust and cust.id == client_id:
+                return True
     return False
 
 def is_client_themselves_for_company(user: models.User, company_id: int, db: Session) -> bool:
-    if user.role is not None and user.role.name.upper() == "CLIENT":
-        cid = user.client.id if user.client and hasattr(user.client, "id") else None
-        if not cid:
-            c = db.query(models.Partner).filter(models.Partner.user_id == user.id).first()
-            if c:
-                cid = c.id
-        if cid:
+    if user.role is not None and user.role.name.upper() in ["CLIENT", "CUSTOMER", "MEMBER"]:
+        # 1. Check via Client entity
+        client_id = user.client.id if user.client and hasattr(user.client, "id") else None
+        if not client_id:
+            cust = db.query(models.Client).filter(models.Client.user_id == user.id).first()
+            if cust:
+                client_id = cust.id
+        if client_id:
             company = db.query(models.ClientCompany).filter(models.ClientCompany.id == company_id).first()
-            if company and company.client_id == cid:
+            if company and (company.customer_id == client_id or getattr(user.client, "company_id", None) == company_id):
+                return True
+
+        # 2. Check via Partner entity
+        partner_id = user.partner.id if user.partner and hasattr(user.partner, "id") else None
+        if not partner_id:
+            p = db.query(models.Partner).filter(models.Partner.user_id == user.id).first()
+            if p:
+                partner_id = p.id
+        if partner_id:
+            company = db.query(models.ClientCompany).filter(models.ClientCompany.id == company_id).first()
+            if company and company.client_id == partner_id:
                 return True
     return False
 
@@ -295,51 +312,101 @@ def get_clients(db: Session = Depends(database.get_db), current_user: models.Use
     
     if auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_all", "view", db) or is_admin_or_hr(current_user):
         return base_query.order_by(models.Partner.contact_person).all()
-    elif role_name == "CLIENT":
-        client_id = current_user.client.id if current_user.client else None
-        if not client_id:
-            client_obj = db.query(models.Partner).filter(models.Partner.user_id == current_user.id).first()
-            if not client_obj:
-                # Try matching by user email
-                client_obj = db.query(models.Partner).filter(models.Partner.email == current_user.email).first()
-                if client_obj:
-                    client_obj.user_id = current_user.id
-                    db.commit()
-                    db.refresh(client_obj)
-                    client_id = client_obj.id
-                else:
-                    # Auto-create client profile and default company for this client user
-                    new_code = generate_client_code(db)
-                    client_name = current_user.name or (current_user.email.split("@")[0].capitalize() if current_user.email else "Client")
-                    client_obj = models.Partner(
-                        user_id=current_user.id,
-                        contact_person=client_name,
-                        email=current_user.email,
-                        phone="",
-                        client_code=new_code,
-                    )
-                    db.add(client_obj)
-                    db.commit()
-                    db.refresh(client_obj)
-                    
-                    # Also create default company
-                    new_comp_code = generate_company_code(db, f"{client_name} Entity")
-                    comp = models.ClientCompany(
-                        client_id=client_obj.id,
-                        company_name=f"{client_name} Entity",
-                        company_code=new_comp_code,
-                        key_contact_person=client_obj.contact_person,
-                        key_contact_email=client_obj.email,
-                        status="ACTIVE"
-                    )
-                    db.add(comp)
-                    db.commit()
-                    db.refresh(comp)
-                    replicate_key_contact_to_stakeholder(db, comp)
-                    client_id = client_obj.id
-            else:
-                client_id = client_obj.id
-        return base_query.filter(models.Partner.id == client_id).all()
+    elif role_name in ["CLIENT", "CUSTOMER", "MEMBER"]:
+        # 1. Check if user is a Partner
+        partner_obj = db.query(models.Partner).options(
+            joinedload(models.Partner.companies),
+            joinedload(models.Partner.user)
+        ).filter(
+            or_(
+                models.Partner.user_id == current_user.id,
+                func.lower(models.Partner.email) == current_user.email.strip().lower() if current_user.email else False
+            )
+        ).first()
+
+        if partner_obj:
+            if not partner_obj.user_id:
+                partner_obj.user_id = current_user.id
+                db.commit()
+                db.refresh(partner_obj)
+            return base_query.filter(models.Partner.id == partner_obj.id).all()
+
+        # 2. Check if user is a Client (table: clients)
+        client_obj = db.query(models.Client).options(
+            joinedload(models.Client.companies),
+            joinedload(models.Client.company),
+            joinedload(models.Client.user)
+        ).filter(
+            or_(
+                models.Client.user_id == current_user.id,
+                func.lower(models.Client.email) == current_user.email.strip().lower() if current_user.email else False
+            )
+        ).first()
+
+        if client_obj:
+            if not client_obj.user_id:
+                client_obj.user_id = current_user.id
+                db.commit()
+                db.refresh(client_obj)
+
+            # Explicitly load all companies associated with this client
+            all_comps = db.query(models.ClientCompany).filter(
+                or_(
+                    models.ClientCompany.customer_id == client_obj.id,
+                    models.ClientCompany.id == client_obj.company_id if client_obj.company_id else False
+                )
+            ).order_by(models.ClientCompany.company_name.asc()).all()
+
+            # Build ClientResponse compatible model
+            return [schemas.ClientResponse(
+                id=client_obj.id,
+                client_code=client_obj.customer_code,
+                contact_person=client_obj.full_name,
+                email=client_obj.email,
+                phone=client_obj.phone,
+                status=client_obj.status or "ACTIVE",
+                notes=client_obj.notes,
+                date_of_birth=client_obj.date_of_birth,
+                nationality=client_obj.nationality,
+                gender=client_obj.gender,
+                identification_number=client_obj.identification_number,
+                personal_address=client_obj.address,
+                user_id=client_obj.user_id,
+                companies=[schemas.ClientCompanyResponse.model_validate(c) for c in all_comps],
+                created_at=client_obj.created_at or datetime.now(timezone.utc),
+                updated_at=client_obj.updated_at
+            )]
+
+        # 3. Auto-create client profile and default company for this client user if neither exists
+        new_code = generate_client_code(db)
+        client_name = current_user.name or (current_user.email.split("@")[0].capitalize() if current_user.email else "Client")
+        partner_obj = models.Partner(
+            user_id=current_user.id,
+            contact_person=client_name,
+            email=current_user.email,
+            phone="",
+            client_code=new_code,
+        )
+        db.add(partner_obj)
+        db.commit()
+        db.refresh(partner_obj)
+        
+        # Also create default company
+        new_comp_code = generate_company_code(db, f"{client_name} Entity")
+        comp = models.ClientCompany(
+            client_id=partner_obj.id,
+            company_name=f"{client_name} Entity",
+            company_code=new_comp_code,
+            key_contact_person=partner_obj.contact_person,
+            key_contact_email=partner_obj.email,
+            status="ACTIVE"
+        )
+        db.add(comp)
+        db.commit()
+        db.refresh(comp)
+        replicate_key_contact_to_stakeholder(db, comp)
+        return base_query.filter(models.Partner.id == partner_obj.id).all()
+
     elif is_employee_role(current_user):
         if not current_user.employee:
             return []
@@ -347,7 +414,7 @@ def get_clients(db: Session = Depends(database.get_db), current_user: models.Use
         assigned_companies = db.query(models.ClientCompany).join(models.ClientConsultant).filter(
             models.ClientConsultant.employee_id == current_user.employee.id
         ).all()
-        client_ids = list(set([c.client_id for c in assigned_companies]))
+        client_ids = list(set([c.client_id for c in assigned_companies if c.client_id]))
         return base_query.filter(models.Partner.id.in_(client_ids)).order_by(models.Partner.contact_person).all()
     return []
 
@@ -480,14 +547,44 @@ def get_client_orders(db: Session = Depends(database.get_db), current_user: mode
     
     if is_admin_or_hr(current_user):
         orders = orders_query.all()
-    elif role_name == "CLIENT":
-        cid = current_user.client.id if current_user.client and hasattr(current_user.client, "id") else None
-        if not cid:
-            c = db.query(models.Partner).filter(models.Partner.user_id == current_user.id).first()
-            if c:
-                cid = c.id
-        if cid:
-            orders = orders_query.filter(models.ClientOrder.client_id == cid).all()
+    elif role_name in ["CLIENT", "CUSTOMER", "MEMBER"]:
+        conditions = []
+        company_ids = set()
+
+        # 1. Partner match
+        partner_id = current_user.partner.id if current_user.partner else None
+        if not partner_id:
+            p = db.query(models.Partner).filter(models.Partner.user_id == current_user.id).first()
+            if p:
+                partner_id = p.id
+        if partner_id:
+            conditions.append(models.ClientOrder.client_id == partner_id)
+            p_comps = db.query(models.ClientCompany.id).filter(models.ClientCompany.client_id == partner_id).all()
+            for c in p_comps:
+                company_ids.add(c[0])
+
+        # 2. Client match (table: clients)
+        cust_id = current_user.client.id if current_user.client else None
+        if not cust_id:
+            cust = db.query(models.Client).filter(models.Client.user_id == current_user.id).first()
+            if cust:
+                cust_id = cust.id
+        if cust_id:
+            conditions.append(models.ClientOrder.customer_id == cust_id)
+            c_comps = db.query(models.ClientCompany.id).filter(
+                or_(
+                    models.ClientCompany.customer_id == cust_id,
+                    models.ClientCompany.id == (current_user.client.company_id if current_user.client else None)
+                )
+            ).all()
+            for c in c_comps:
+                company_ids.add(c[0])
+
+        if company_ids:
+            conditions.append(models.ClientOrder.company_id.in_(list(company_ids)))
+
+        if conditions:
+            orders = orders_query.filter(or_(*conditions)).all()
         else:
             orders = []
     elif is_employee_role(current_user):
@@ -542,6 +639,7 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
         
     target_client_id = order_req.client_id
     target_company_id = order_req.company_id
+    target_billing_company_id = order_req.billing_company_id or target_company_id
     if not target_client_id and target_company_id:
         comp = db.query(models.ClientCompany).filter(models.ClientCompany.id == target_company_id).first()
         if comp:
@@ -583,7 +681,9 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
                 if notary_fee_rec:
                     fee = notary_fee_rec.fee or 0.0
 
-        target_billing_company_id = order_req.billing_company_id or target_company_id
+        service_inst = getattr(item, 'service_instructions', None)
+        order_internal_notes = getattr(order_req, 'internal_notes', None) or getattr(order_req, 'notes', None)
+
         db_order = models.ClientOrder(
             order_number=order_num,
             client_id=target_client_id,
@@ -601,7 +701,8 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
             status=order_status,
             payment_status=payment_status,
             consultant_ids=order_req.consultant_ids or [],
-            notes=order_req.notes,
+            service_instructions=service_inst.strip() if (service_inst and service_inst.strip()) else None,
+            notes=order_internal_notes.strip() if (order_internal_notes and order_internal_notes.strip()) else None,
             notary_id=item.notary_id,
             notary_fee=fee
         )
@@ -876,6 +977,7 @@ def create_client(client_data: schemas.ClientCreate, db: Session = Depends(datab
         target_company_id = db_company.id if 'db_company' in locals() and db_company else None
         
         for item in client_data.order_items:
+            service_inst = getattr(item, 'service_instructions', None)
             db_order = models.ClientOrder(
                 order_number=order_num,
                 client_id=db_client.id,
@@ -889,7 +991,9 @@ def create_client(client_data: schemas.ClientCreate, db: Session = Depends(datab
                 unit_price=item.unit_price,
                 total_amount=item.unit_price,
                 custom_price_text=item.custom_price_text,
-                status="CONFIRMED"
+                status="CONFIRMED",
+                service_instructions=service_inst.strip() if (service_inst and service_inst.strip()) else None,
+                notes=client_data.company_notes
             )
             db.add(db_order)
         db.commit()
@@ -982,7 +1086,8 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
                             acc_client.create_sales_receipt(db_order, payment_amount=pay_amt, payment_method="Manual / Bank Transfer")
                     except Exception as acc_e:
                         print(f"Warning: Accurate payment sync trigger error: {acc_e}")
-        if order_update.invoice_number is not None:
+        fields_set = getattr(order_update, '__fields_set__', None) or getattr(order_update, 'model_fields_set', set())
+        if "invoice_number" in fields_set:
             db_order.invoice_number = order_update.invoice_number
         if order_update.consultant_ids is not None:
             db_order.consultant_ids = order_update.consultant_ids
@@ -992,16 +1097,16 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
             db_order.job_id = order_update.job_id
         if order_update.job_title is not None:
             db_order.job_title = order_update.job_title
-        if hasattr(order_update, 'branch_name') and order_update.branch_name is not None:
+        if "branch_name" in fields_set:
             db_order.branch_name = order_update.branch_name
-        if order_update.description is not None:
+        if "description" in fields_set:
             db_order.description = order_update.description
         if order_update.pricing_tier is not None:
             db_order.pricing_tier = order_update.pricing_tier
         if order_update.unit_price is not None:
             db_order.unit_price = order_update.unit_price
             db_order.total_amount = order_update.unit_price
-        if order_update.custom_price_text is not None:
+        if "custom_price_text" in fields_set:
             db_order.custom_price_text = order_update.custom_price_text
         if order_update.notary_id is not None:
             db_order.notary_id = order_update.notary_id
@@ -1078,8 +1183,23 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
             else:
                 db_order.is_final_invoice_finalized = order_update.is_final_invoice_finalized
 
-    if order_update.notes is not None:
-        db_order.notes = order_update.notes
+    fields_set = getattr(order_update, '__fields_set__', None) or getattr(order_update, 'model_fields_set', set())
+    if "service_instructions" in fields_set:
+        db_order.service_instructions = order_update.service_instructions.strip() if (order_update.service_instructions and order_update.service_instructions.strip()) else None
+    elif hasattr(order_update, 'service_instructions') and order_update.service_instructions is not None:
+        db_order.service_instructions = order_update.service_instructions.strip() if order_update.service_instructions.strip() else None
+
+    if "notes" in fields_set or "internal_notes" in fields_set:
+        raw_n = order_update.notes if "notes" in fields_set else order_update.internal_notes
+        notes_val = raw_n.strip() if (raw_n and raw_n.strip()) else None
+        db_order.notes = notes_val
+        for o_item in orders_in_group:
+            o_item.notes = notes_val
+    elif order_update.notes is not None:
+        notes_val = order_update.notes.strip() if order_update.notes.strip() else None
+        db_order.notes = notes_val
+        for o_item in orders_in_group:
+            o_item.notes = notes_val
         
     db.commit()
     db.refresh(db_order)
@@ -2381,23 +2501,31 @@ def check_order_authorization_for_chat(user: models.User, order_number: str, db:
     if not orders_in_group:
         return False
         
-    # 1. Check if user is the client or member
-    if user.role and user.role.name.upper() == "MEMBER":
-        return True
+    # 1. Check if user is the client, customer, or member
+    if user.role and user.role.name.upper() in ["MEMBER", "CLIENT", "CUSTOMER"]:
+        partner_id = user.partner.id if user.partner else None
+        if not partner_id:
+            p = db.query(models.Partner).filter(models.Partner.user_id == user.id).first()
+            if p:
+                partner_id = p.id
 
-    if user.role and user.role.name.upper() == "CLIENT":
-        cid = user.client.id if user.client and hasattr(user.client, "id") else None
-        if not cid:
-            c = db.query(models.Partner).filter(models.Partner.user_id == user.id).first()
+        cust_id = user.client.id if user.client else None
+        if not cust_id:
+            c = db.query(models.Client).filter(models.Client.user_id == user.id).first()
             if c:
-                cid = c.id
-        if cid:
-            for o in orders_in_group:
-                if o.client_id == cid:
-                    return True
-                if o.company_id:
-                    comp = db.query(models.ClientCompany).filter(models.ClientCompany.id == o.company_id).first()
-                    if comp and comp.client_id == cid:
+                cust_id = c.id
+
+        for o in orders_in_group:
+            if partner_id and o.client_id == partner_id:
+                return True
+            if cust_id and o.customer_id == cust_id:
+                return True
+            if o.company_id:
+                comp = db.query(models.ClientCompany).filter(models.ClientCompany.id == o.company_id).first()
+                if comp:
+                    if partner_id and comp.client_id == partner_id:
+                        return True
+                    if cust_id and (comp.customer_id == cust_id or getattr(user.client, "company_id", None) == comp.id):
                         return True
         return False
         
@@ -2478,33 +2606,21 @@ def format_order_progress_response(u: models.ClientOrderProgress, db: Session) -
             is_client=False
         )
     
-    # 2. Check if sent by a Customer or Member user (user chat message)
-    if u.user and u.user.role and u.user.role.name.upper() in ["MEMBER", "CUSTOMER"]:
-        cust = db.query(models.Customer).filter(models.Customer.user_id == u.user.id).first()
-        sender_name = cust.full_name if cust and cust.full_name else u.user.name
-        return schemas.ClientOrderProgressResponse(
-            id=u.id,
-            order_number=u.order_number,
-            user_id=u.user_id,
-            message=u.message,
-            channel="CLIENT",
-            attachment_url=u.attachment_url,
-            attachment_name=u.attachment_name,
-            created_at=u.created_at,
-            sender_name=sender_name,
-            sender_role="Customer",
-            sender_avatar=None,
-            is_client=True
-        )
-
-    if u.user and u.user.role and u.user.role.name.upper() == "CLIENT":
-        c = db.query(models.Partner).filter(models.Partner.user_id == u.user.id).first()
-        if c and c.contact_person:
-            sender_name = c.contact_person
+    # 2. Check if sent by a Client, Customer, or Member user
+    if u.user and u.user.role and u.user.role.name.upper() in ["CLIENT", "CUSTOMER", "MEMBER"]:
+        sender_name = "Client"
+        # Try Partner first
+        p = db.query(models.Partner).filter(models.Partner.user_id == u.user.id).first()
+        if p and p.contact_person:
+            sender_name = p.contact_person
         else:
-            sender_name = "Client"
-        sender_role = "CLIENT"
-        is_client = True
+            # Try Client second
+            c = db.query(models.Client).filter(models.Client.user_id == u.user.id).first()
+            if c and c.full_name:
+                sender_name = c.full_name
+            elif u.user.name:
+                sender_name = u.user.name
+
         return schemas.ClientOrderProgressResponse(
             id=u.id,
             order_number=u.order_number,
@@ -2515,8 +2631,8 @@ def format_order_progress_response(u: models.ClientOrderProgress, db: Session) -
             attachment_name=u.attachment_name,
             created_at=u.created_at,
             sender_name=sender_name,
-            sender_role=sender_role,
-            sender_avatar=sender_avatar,
+            sender_role="Client",
+            sender_avatar=None,
             is_client=True
         )
 
@@ -2596,6 +2712,8 @@ def get_order_summary(
             "job_id": o.job_id or (f"JOB-{o.service_id}" if o.service_id else None),
             "job_title": o.job_title or (o.service.job_title if o.service else "Corporate Service"),
             "description": desc,
+            "service_instructions": o.service_instructions,
+            "notes": o.service_instructions,
             "unit_price": o.unit_price,
             "pricing_tier": o.pricing_tier,
             "needs_notary": o.service.needs_notary if o.service else False,
@@ -2628,6 +2746,16 @@ def get_order_summary(
             "email": first_order.partner.email,
             "phone": first_order.partner.phone
         }
+    elif first_order.customer_id:
+        cust = db.query(models.Client).filter(models.Client.id == first_order.customer_id).first()
+        if cust:
+            client_data = {
+                "id": cust.id,
+                "client_code": cust.customer_code,
+                "contact_person": cust.full_name,
+                "email": cust.email,
+                "phone": cust.phone
+            }
 
     return {
         "order_number": first_order.order_number,

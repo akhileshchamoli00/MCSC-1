@@ -2144,6 +2144,18 @@ export default function ClientOrdersPage() {
                       )}
                     </div>
 
+                    {/* Internal Instructions / Notes for Delivery Manager */}
+                    {selectedOrderGroup.notes && (
+                      <div className="p-4 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-1.5">
+                        <span className="text-zinc-500 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5 pb-2 border-b border-zinc-100">
+                          <FileText className="h-3.5 w-3.5 text-zinc-500" /> Internal Instructions / Notes
+                        </span>
+                        <p className="text-xs text-zinc-800 leading-relaxed whitespace-pre-wrap font-medium pt-0.5">
+                          {selectedOrderGroup.notes}
+                        </p>
+                      </div>
+                    )}
+
                     {/* Inline Mandatory Proforma Percentage Selector Card */}
                     <div className="p-5 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-4">
                       <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
@@ -2363,6 +2375,18 @@ export default function ClientOrdersPage() {
                                         </div>
                                       );
                                     })()}
+
+                                    {item.service_instructions && (
+                                      <div className="mt-1.5 p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 space-y-0.5">
+                                        <div className="flex items-center gap-1.5 font-bold text-[10px] text-amber-700">
+                                          <FileText className="h-3 w-3 shrink-0" />
+                                          <span>Service Instructions:</span>
+                                        </div>
+                                        <p className="text-xs font-medium leading-relaxed whitespace-pre-wrap text-zinc-900">
+                                          {item.service_instructions}
+                                        </p>
+                                      </div>
+                                    )}
                                   </div>
                                 </td>
                                 <td className="p-4 text-right font-mono font-bold text-sm text-zinc-950 align-top pt-6">

@@ -591,30 +591,18 @@ export default function SharedDocuments() {
                                 </div>
                               </TableCell>
 
-                              {/* Vault Action / Download */}
+                              {/* Vault Action / Download Disabled */}
                               <TableCell className="py-2.5 px-4 text-right whitespace-nowrap">
-                                {doc.file_url ? (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 px-2.5 text-xs font-semibold gap-1 rounded-lg shadow-xs"
-                                    asChild
-                                  >
-                                    <a
-                                      href={doc.file_url.startsWith("http") ? doc.file_url : `${process.env.NEXT_PUBLIC_API_URL}${doc.file_url}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    >
-                                      <Download className="h-3 w-3" />
-                                      <span>Download</span>
-                                    </a>
-                                  </Button>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground px-2 py-0.5 rounded-md bg-muted/40 border border-border/30">
-                                    <Lock className="h-3 w-3 text-muted-foreground/70" />
-                                    Vault Archived
-                                  </span>
-                                )}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2.5 text-xs font-medium gap-1.5 rounded-lg opacity-60 cursor-not-allowed text-muted-foreground bg-muted/20 border-border/40 shadow-none hover:bg-muted/20"
+                                  disabled
+                                  title="Document download is temporarily disabled"
+                                >
+                                  <Lock className="h-3 w-3 text-muted-foreground/70" />
+                                  <span>Download Disabled</span>
+                                </Button>
                               </TableCell>
                             </TableRow>
                           );

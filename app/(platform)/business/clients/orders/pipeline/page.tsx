@@ -733,6 +733,12 @@ export default function PipelineOrdersPage() {
                         {item.description && (
                           <p className="text-[11px] text-muted-foreground leading-relaxed">{item.description}</p>
                         )}
+                        {item.service_instructions && (
+                          <div className="mt-1 p-2 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-0.5">
+                            <span className="font-bold text-[10px] text-amber-700 dark:text-amber-400 block">Service Instructions:</span>
+                            <p className="text-[11px] font-medium leading-relaxed whitespace-pre-wrap text-foreground">{item.service_instructions}</p>
+                          </div>
+                        )}
                         <div className="text-[10px] font-mono text-muted-foreground">
                           Tier: <span className="font-semibold text-foreground">{item.pricing_tier}</span>
                         </div>
@@ -762,11 +768,11 @@ export default function PipelineOrdersPage() {
                 </div>
               )}
 
-              {/* Notes */}
+              {/* Internal Notes / Instructions */}
               {selectedOrderGroup.notes && (
                 <div>
                   <h4 className="font-bold text-xs text-foreground mb-1 flex items-center gap-1.5">
-                    <FileText className="h-3.5 w-3.5 text-primary" /> Execution Notes
+                    <FileText className="h-3.5 w-3.5 text-primary" /> Internal Instructions / Notes
                   </h4>
                   <p className="p-2.5 rounded-lg bg-muted/20 border border-border/40 text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
                     {selectedOrderGroup.notes}

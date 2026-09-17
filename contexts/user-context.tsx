@@ -157,11 +157,24 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const cachedPermissions = localStorage.getItem("hrms_permissions");
       const cachedRole = localStorage.getItem("user_role") || "";
 
-      if (cachedProfile) {
-        setProfile(JSON.parse(cachedProfile));
+      if (cachedProfile && cachedProfile.startsWith("{")) {
+        try {
+          setProfile(JSON.parse(cachedProfile));
+        } catch {
+          localStorage.removeItem("hrms_profile");
+        }
+      } else if (cachedProfile) {
+        localStorage.removeItem("hrms_profile");
       }
-      if (cachedPermissions) {
-        setPermissions(JSON.parse(cachedPermissions));
+
+      if (cachedPermissions && cachedPermissions.startsWith("[")) {
+        try {
+          setPermissions(JSON.parse(cachedPermissions));
+        } catch {
+          localStorage.removeItem("hrms_permissions");
+        }
+      } else if (cachedPermissions) {
+        localStorage.removeItem("hrms_permissions");
       }
       
       const isAdminFlag = isSuperAdminRole(cachedRole, undefined, localStorage.getItem("user_email") || undefined);

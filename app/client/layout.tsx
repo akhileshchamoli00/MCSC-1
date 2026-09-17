@@ -68,14 +68,18 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
     const isAdminOrStaff = ["ADMIN", "SUPER ADMIN", "SUPERADMIN", "SYSTEM ADMIN", "HR", "DIRECTOR", "EMPLOYEE ADMIN", "EMPLOYEE"].some(r => role.includes(r));
 
-    if (role && role !== "CLIENT" && !isAdminOrStaff) {
+    if (role && role !== "CLIENT" && role !== "CUSTOMER" && role !== "PARTNER" && !isAdminOrStaff) {
       router.push("/hrms/dashboard");
       return;
     }
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
-        credentials: "include"
+        credentials: "include",
+        headers: {
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache"
+        }
       });
 
       if (!response.ok) {
@@ -85,43 +89,44 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           router.push("/login");
           return;
         }
-        throw new Error("Failed to fetch client profile");
+        console.warn("Client layout: received non-OK response from /api/clients, falling back to cached profile", response.status);
+      } else {
+        const clients = await response.json();
+        if (clients && clients.length > 0) {
+          setClientProfile(clients[0]);
+          if (clients[0].companies && clients[0].companies.length > 0) {
+            const storedCompanyId = localStorage.getItem("active_company_id");
+            const companyToSet = clients[0].companies.find((c: any) => c.id.toString() === storedCompanyId) || clients[0].companies[0];
+            setActiveCompany(companyToSet);
+            localStorage.setItem("active_company_id", companyToSet.id.toString());
+          } else {
+            setActiveCompany({
+              id: 0,
+              company_name: clients[0].company_name || clients[0].contact_person || "Corporate Entity",
+              company_code: "CLIENT"
+            });
+          }
+          return;
+        }
       }
 
-      const clients = await response.json();
-      if (clients && clients.length > 0) {
-        setClientProfile(clients[0]);
-        if (clients[0].companies && clients[0].companies.length > 0) {
-          const storedCompanyId = localStorage.getItem("active_company_id");
-          const companyToSet = clients[0].companies.find((c: any) => c.id.toString() === storedCompanyId) || clients[0].companies[0];
-          setActiveCompany(companyToSet);
-          localStorage.setItem("active_company_id", companyToSet.id.toString());
-        } else {
-          setActiveCompany({
-            id: 0,
-            company_name: clients[0].company_name || clients[0].contact_person || "Corporate Entity",
-            company_code: "CLIENT"
-          });
-        }
-      } else {
-        // Safe resilient fallback so the client portal always renders cleanly
-        const storedEmail = localStorage.getItem("user_email") || "client@company.com";
-        const storedName = localStorage.getItem("user_name") || (storedEmail.includes("@") ? storedEmail.split("@")[0].toUpperCase() : "Client Representative");
-        const fallbackClient = {
+      // Safe resilient fallback so the client portal always renders cleanly
+      const storedEmail = localStorage.getItem("user_email") || "client@company.com";
+      const storedName = localStorage.getItem("user_name") || (storedEmail.includes("@") ? storedEmail.split("@")[0].toUpperCase() : "Client Representative");
+      const fallbackClient = {
+        id: 0,
+        contact_person: storedName,
+        email: storedEmail,
+        companies: [{
           id: 0,
-          contact_person: storedName,
-          email: storedEmail,
-          companies: [{
-            id: 0,
-            company_name: `${storedName} Entity`,
-            company_code: "CLIENT"
-          }]
-        };
-        setClientProfile(fallbackClient);
-        setActiveCompany(fallbackClient.companies[0]);
-      }
+          company_name: `${storedName} Entity`,
+          company_code: "CLIENT"
+        }]
+      };
+      setClientProfile(fallbackClient);
+      setActiveCompany(fallbackClient.companies[0]);
     } catch (error) {
-      console.error("Error loading client layout:", error);
+      console.warn("Error loading client layout:", error);
       // Safe fallback on network or API failure
       const storedEmail = localStorage.getItem("user_email") || "client@company.com";
       const storedName = localStorage.getItem("user_name") || (storedEmail.includes("@") ? storedEmail.split("@")[0].toUpperCase() : "Client Representative");

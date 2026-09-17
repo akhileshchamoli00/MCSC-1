@@ -18,7 +18,8 @@ import {
   DollarSign,
   Briefcase,
   MapPin,
-  UserCheck
+  UserCheck,
+  FileText
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -185,6 +186,8 @@ export default function EditClientOrderPage() {
           job_title: item.job_title || "",
           branch_name: item.branch_name || "",
           description: item.description || "",
+          service_instructions: item.service_instructions || "",
+          notes: item.notes || "",
           pricing_tier: item.pricing_tier || "BASE",
           unit_price: item.unit_price || 0,
           custom_price_text: item.custom_price_text || "",
@@ -310,6 +313,8 @@ export default function EditClientOrderPage() {
           job_id: "",
           job_title: "",
           description: "",
+          service_instructions: "",
+          notes: "",
           pricing_tier: "BASE",
           unit_price: 0,
           custom_price_text: "",
@@ -461,7 +466,8 @@ export default function EditClientOrderPage() {
                 billing_company_id: finalBillingId,
                 invoice_number: editForm.invoice_number || null,
                 consultant_ids: editForm.consultant_ids,
-                notes: editForm.notes || null,
+                service_instructions: item.service_instructions ? item.service_instructions.trim() : null,
+                notes: editForm.notes ? editForm.notes.trim() : null,
                 service_id: item.service_id ? Number(item.service_id) : null,
                 job_id: item.job_id || null,
                 job_title: item.job_title || null,
@@ -490,13 +496,15 @@ export default function EditClientOrderPage() {
             job_title: item.job_title,
             branch_name: item.branch_name ? item.branch_name.trim() : null,
             description: item.description,
+            service_instructions: item.service_instructions ? item.service_instructions.trim() : null,
             pricing_tier: item.pricing_tier,
             unit_price: item.unit_price || 0,
             custom_price_text: item.custom_price_text || null,
             notary_id: item.notary_id ? Number(item.notary_id) : null
           })),
           consultant_ids: editForm.consultant_ids,
-          notes: editForm.notes || null
+          notes: editForm.notes || null,
+          internal_notes: editForm.notes || null
         };
 
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
@@ -883,6 +891,33 @@ export default function EditClientOrderPage() {
                         </div>
                       )}
 
+                      {/* Specific Service Instructions for this Service Item */}
+                      <div className="space-y-1 pt-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <FileText className="h-3 w-3 text-primary" />
+                            <span>Service Instructions</span>
+                          </span>
+                          <span className="text-[10px] font-mono text-muted-foreground/70 italic">
+                            Visible to assigned processing team & order chat
+                          </span>
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={item.service_instructions || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setEditForm((prev) => {
+                              const copy = [...prev.items];
+                              copy[idx] = { ...copy[idx], service_instructions: val };
+                              return { ...prev, items: copy };
+                            });
+                          }}
+                          placeholder={`e.g. Deliverable instructions, specific requirements, or guidelines for ${item.job_title || "this service item"}...`}
+                          className="flex min-h-[58px] w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-xs font-normal shadow-xs placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary resize-y leading-relaxed"
+                        />
+                      </div>
+
                       {/* Reflected Price Bar */}
                       <div className="flex flex-wrap items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border/30 gap-2 text-[10px] font-mono">
                         <div className="flex items-center gap-2">
@@ -1077,14 +1112,17 @@ export default function EditClientOrderPage() {
 
               {/* Internal Instructions */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Internal Instructions / Notes</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                  <span>Internal Instructions / Notes</span>
+                  <span className="text-[9px] font-mono text-muted-foreground/70 italic">For Delivery Manager (not shown to processing team)</span>
+                </label>
                 <textarea
                   name="notes"
                   value={editForm.notes || ""}
                   onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
                   rows={2}
                   className="flex w-full rounded-lg border border-border/60 bg-background p-2.5 text-xs placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary leading-normal font-semibold transition-all"
-                  placeholder="Execution notes..."
+                  placeholder="Notes from order creator to delivery manager..."
                 />
               </div>
             </CardContent>

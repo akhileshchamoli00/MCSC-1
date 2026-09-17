@@ -610,6 +610,14 @@ class Client(Base):
     def client_code(self, val):
         self.customer_code = val
 
+    @property
+    def contact_person(self):
+        return self.full_name
+
+    @contact_person.setter
+    def contact_person(self, val):
+        self.full_name = val
+
 
 class Partner(Base):
     __tablename__ = "partners"
@@ -634,6 +642,22 @@ class Partner(Base):
     
     user = relationship("User", back_populates="partner")
     companies = relationship("ClientCompany", back_populates="partner", cascade="all, delete-orphan")
+
+    @property
+    def full_name(self):
+        return self.contact_person
+
+    @full_name.setter
+    def full_name(self, val):
+        self.contact_person = val
+
+    @property
+    def customer_code(self):
+        return self.client_code
+
+    @customer_code.setter
+    def customer_code(self, val):
+        self.client_code = val
 
 
 # Backward compatibility aliases
@@ -809,7 +833,8 @@ class ClientOrder(Base):
     proforma_paid_amount = Column(Float, nullable=True, default=None)
     is_final_invoice_finalized = Column(Boolean, default=False)
     consultant_ids = Column(JSON, nullable=True, default=list) # List of assigned employee/consultant IDs
-    notes = Column(String, nullable=True)
+    service_instructions = Column(String, nullable=True) # Service item specific instructions for processing team
+    notes = Column(String, nullable=True) # Internal Instructions / Notes from order creator to delivery manager
     payment_link = Column(String, nullable=True)
     xendit_invoice_id = Column(String, nullable=True)
     payment_link_created_at = Column(DateTime(timezone=True), nullable=True)

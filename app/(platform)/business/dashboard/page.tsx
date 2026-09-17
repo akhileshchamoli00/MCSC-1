@@ -95,11 +95,137 @@ export default function BusinessDashboard() {
 
   const getOrderStatusBadge = (status: string) => {
     const s = (status || "").toUpperCase();
-    if (s === "COMPLETED") return <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"><span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-emerald-500" />COMPLETED</span>;
-    if (s === "IN_PROGRESS") return <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/20"><span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-sky-500 animate-pulse" />IN PROGRESS</span>;
-    if (s === "CONFIRMED") return <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/20"><span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-indigo-500" />CONFIRMED</span>;
-    if (s === "CANCELLED") return <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/20"><span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-rose-500" />CANCELLED</span>;
-    return <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-zinc-500/10 dark:bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border-zinc-500/20"><span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-zinc-400" />DRAFT</span>;
+    switch (s) {
+      case "COMPLETED":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-emerald-500" />
+            COMPLETED
+          </span>
+        );
+      case "CONFIRMED":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-purple-500" />
+            CONFIRMED
+          </span>
+        );
+      case "ORDER_ASSIGNED":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-indigo-500" />
+            ORDER ASSIGNED
+          </span>
+        );
+      case "IN_PROGRESS":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-sky-500 animate-pulse" />
+            IN PROGRESS
+          </span>
+        );
+      case "REVIEW_DOCS":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-teal-500/10 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400 border-teal-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-teal-500" />
+            REVIEW DOCS
+          </span>
+        );
+      case "FINAL_DOCUMENT_PREPARATION":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-orange-500/10 dark:bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-orange-500" />
+            FINAL DOC PREP
+          </span>
+        );
+      case "FINAL_DOC_READY":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-lime-500/10 dark:bg-lime-500/15 text-lime-600 dark:text-lime-400 border-lime-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-lime-500" />
+            FINAL DOC READY
+          </span>
+        );
+      case "PROFORMA_GENERATED":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-cyan-500/10 dark:bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-cyan-500" />
+            PROFORMA GENERATED
+          </span>
+        );
+      case "INVOICE_GENERATED":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-pink-500/10 dark:bg-pink-500/15 text-pink-600 dark:text-pink-400 border-pink-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-pink-500" />
+            INVOICE GENERATED
+          </span>
+        );
+      case "WAITING_ON_CLIENT":
+      case "WAITING_FOR_CLIENT":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-amber-500" />
+            WAITING ON CLIENT
+          </span>
+        );
+      case "WAITING_FOR_FINAL_PAYMENT":
+      case "WAITING_ON_FINAL_PAYMENT":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-pink-500/10 dark:bg-pink-500/15 text-pink-600 dark:text-pink-400 border-pink-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-pink-500 animate-pulse" />
+            WAITING FINAL PAYMENT
+          </span>
+        );
+      case "FINAL_PAYMENT_COMPLETED":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-emerald-500" />
+            FINAL PAYMENT COMPLETED
+          </span>
+        );
+      case "SOFT_COPY_DELIVERED":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-sky-500" />
+            SOFT COPY DELIVERED
+          </span>
+        );
+      case "HARD_COPY_DELIVERED":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-violet-500/10 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-violet-500" />
+            HARD COPY DELIVERED
+          </span>
+        );
+      case "CANCELLED":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-rose-500" />
+            CANCELLED
+          </span>
+        );
+      case "PROSPECT":
+      case "PIPELINE":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-blue-500" />
+            PIPELINE
+          </span>
+        );
+      case "DRAFT":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-zinc-500/10 dark:bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border-zinc-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-zinc-400" />
+            DRAFT
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-primary/10 text-primary border-primary/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-primary" />
+            {s.replace(/_/g, " ") || "DRAFT"}
+          </span>
+        );
+    }
   };
 
   if (loading) {
@@ -124,7 +250,7 @@ export default function BusinessDashboard() {
         order_number: num,
         company_id: row.company_id,
         company_name: row.company ? row.company.company_name : "Individual",
-        client_name: row.company?.client ? row.company.client.contact_person : (row.client_name || "-"),
+        client_name: row.client_name || (row.company?.client ? row.company.client.contact_person : "-"),
         created_at: row.created_at,
         status: row.status,
         total_amount: 0,
@@ -146,9 +272,9 @@ export default function BusinessDashboard() {
   const groupedOrders = Array.from(groupedOrdersMap.values());
 
   // Calculate Metrics
-  const activeOrders = groupedOrders.filter(o => o.status === "IN_PROGRESS" || o.status === "CONFIRMED");
+  const activeOrders = groupedOrders.filter(o => !["COMPLETED", "CANCELLED", "DRAFT", "PROSPECT", "PIPELINE"].includes((o.status || "").toUpperCase()));
   const totalDeliverables = orders.length; // Each raw row is a single scope deliverable
-  const completedOrders = groupedOrders.filter(o => o.status === "COMPLETED").length;
+  const completedOrders = groupedOrders.filter(o => (o.status || "").toUpperCase() === "COMPLETED").length;
 
   const businessCards: BentoCardItem[] = [
     {

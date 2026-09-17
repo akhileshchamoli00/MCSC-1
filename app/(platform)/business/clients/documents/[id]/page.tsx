@@ -181,10 +181,6 @@ export default function CompanyDocumentsManagementPage() {
       toast.error("Please attach a file to upload.");
       return;
     }
-    if (!selectedOrderNum) {
-      toast.error("Please select a parent Order Number.");
-      return;
-    }
     if (!uploadRow.type) {
       toast.error("Please select a document category.");
       return;
@@ -196,12 +192,14 @@ export default function CompanyDocumentsManagementPage() {
       formData.append("file", uploadRow.file);
       formData.append("document_type", uploadRow.type);
       if (uploadRow.description) formData.append("description", uploadRow.description);
-      formData.append("order_number", selectedOrderNum);
+      if (selectedOrderNum && selectedOrderNum.trim()) {
+        formData.append("order_number", selectedOrderNum.trim());
+      }
       if (uploadRow.date) formData.append("document_date", uploadRow.date);
       if (uploadRow.expiry_date) formData.append("expiry_date", uploadRow.expiry_date);
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}/documents`, {
-      credentials: "include",
+        credentials: "include",
         method: "POST",
         body: formData
       });
@@ -231,9 +229,9 @@ export default function CompanyDocumentsManagementPage() {
     setIsDeleting(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}/documents/${deleteDocId}`, {
-      credentials: "include",
+        credentials: "include",
         method: "DELETE",
-        });
+      });
       if (!res.ok) throw new Error("Failed to delete document");
       setDocuments(prev => prev.filter(doc => doc.id !== deleteDocId));
       toast.success("Document deleted successfully");
@@ -280,7 +278,7 @@ export default function CompanyDocumentsManagementPage() {
       }
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/${companyId}/documents/${editDoc.id}`, {
-      credentials: "include",
+        credentials: "include",
         method: "PATCH",
         body: formData
       });
@@ -296,6 +294,7 @@ export default function CompanyDocumentsManagementPage() {
       setIsEditing(false);
     }
   };
+
   const handlePreviewClick = (doc: any) => {
     setPreviewDoc(doc);
     if (!doc.file_url || doc.file_url === "#") {
@@ -661,29 +660,53 @@ export default function CompanyDocumentsManagementPage() {
                 </div>
                 <div className="flex flex-col md:flex-row gap-3 items-end w-full">
                   <div className="w-full md:w-[160px] shrink-0 relative">
-                    <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold block mb-1">Order Number *</label>
+                    <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold block mb-1">Order Number (Optional)</label>
                     <div className="relative">
                       <Input
                         placeholder="Search orders..."
                         value={orderSearchQuery}
                         onChange={(e) => {
                           setOrderSearchQuery(e.target.value);
+                          setSelectedOrderNum(e.target.value);
                           setOrderDropdownOpen(true);
                         }}
                         onFocus={() => setOrderDropdownOpen(true)}
                         onBlur={() => setTimeout(() => setOrderDropdownOpen(false), 200)}
                         className="h-9 text-xs bg-muted/20 pr-8"
                       />
-                      <button
-                        type="button"
-                        onClick={() => setOrderDropdownOpen(!orderDropdownOpen)}
-                        className="absolute right-2 top-2.5 text-muted-foreground text-[10px]"
-                      >
-                        ▼
-                      </button>
+                      {orderSearchQuery ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOrderSearchQuery("");
+                            setSelectedOrderNum("");
+                          }}
+                          className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground text-[11px]"
+                        >
+                          ✕
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setOrderDropdownOpen(!orderDropdownOpen)}
+                          className="absolute right-2 top-2.5 text-muted-foreground text-[10px]"
+                        >
+                          ▼
+                        </button>
+                      )}
                     </div>
                     {orderDropdownOpen && (
                       <div className="absolute z-50 w-full mt-1 max-h-40 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md font-mono text-[11px]">
+                        <div
+                          onClick={() => {
+                            setSelectedOrderNum("");
+                            setOrderSearchQuery("");
+                            setOrderDropdownOpen(false);
+                          }}
+                          className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 outline-none hover:bg-accent hover:text-accent-foreground text-muted-foreground italic border-b border-border/40"
+                        >
+                          None (General Document)
+                        </div>
                         {orderNumbers
                           .filter(num => num.toLowerCase().includes(orderSearchQuery.toLowerCase()))
                           .slice(0, 30)
@@ -702,7 +725,7 @@ export default function CompanyDocumentsManagementPage() {
                           ))}
                         {orderNumbers.filter(num => num.toLowerCase().includes(orderSearchQuery.toLowerCase())).length === 0 && (
                           <div className="py-2 text-center text-muted-foreground text-[10px]">
-                            No orders found
+                            No matching orders
                           </div>
                         )}
                       </div>
@@ -784,7 +807,7 @@ export default function CompanyDocumentsManagementPage() {
                     size="sm"
                     className="h-9 gap-1.5 font-semibold shadow-sm px-6 bg-emerald-600 hover:bg-emerald-700 text-white"
                     onClick={handleUploadDocuments}
-                    disabled={uploadingDocs || !uploadRow.file || !selectedOrderNum || !uploadRow.type}
+                    disabled={uploadingDocs || !uploadRow.file || !uploadRow.type}
                   >
                     <Save className="h-4 w-4" />
                     {uploadingDocs ? "Saving..." : "Save"}

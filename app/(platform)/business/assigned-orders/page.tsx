@@ -15,7 +15,8 @@ import {
   MessageSquare,
   Lock,
   AlertCircle,
-  X
+  X,
+  FileText
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -647,6 +648,18 @@ export default function AssignedOrdersPage() {
                                     </button>
                                   </div>
                                 )}
+
+                                {item.service_instructions && (
+                                  <div className="mt-1.5 p-2 rounded-md bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-0.5">
+                                    <div className="flex items-center gap-1.5 font-bold text-[10px] text-amber-700 dark:text-amber-400">
+                                      <FileText className="h-3 w-3 shrink-0" />
+                                      <span>Service Instructions:</span>
+                                    </div>
+                                    <p className="text-[11px] font-medium leading-relaxed whitespace-pre-wrap text-foreground/90">
+                                      {item.service_instructions}
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -846,6 +859,18 @@ export default function AssignedOrdersPage() {
                             </div>
                           ) : (
                             <span className="text-xs text-muted-foreground/60 italic pl-4 block">No scope description provided.</span>
+                          )}
+
+                          {item.service_instructions && (
+                            <div className="mt-2 p-2.5 rounded-lg bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 space-y-1">
+                              <div className="flex items-center gap-1.5 font-bold text-[10px] text-amber-700 dark:text-amber-400">
+                                <FileText className="h-3.5 w-3.5 shrink-0" />
+                                <span>Service Instructions:</span>
+                              </div>
+                              <p className="text-xs font-medium leading-relaxed whitespace-pre-wrap text-foreground/90">
+                                {item.service_instructions}
+                              </p>
+                            </div>
                           )}
                         </div>
                       ))}

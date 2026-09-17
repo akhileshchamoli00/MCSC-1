@@ -23,7 +23,8 @@ import {
   Users,
   Calendar,
   CheckCircle2,
-  Layers
+  Layers,
+  Lock
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,15 +35,26 @@ import MagicBento, { BentoCardItem, BentoCard } from "@/components/magic-bento";
 import { useTheme } from "next-themes";
 
 const STATUS_LABELS: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  DRAFT: { label: "Draft", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" },
-  CONFIRMED: { label: "Confirmed", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
+  DRAFT: { label: "Draft", color: "text-zinc-600 dark:text-zinc-400", bg: "bg-zinc-500/10", border: "border-zinc-500/20" },
+  PROSPECT: { label: "Pipeline", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
+  PIPELINE: { label: "Pipeline", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
+  CONFIRMED: { label: "Confirmed", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
   ORDER_ASSIGNED: { label: "Consultant Assigned", color: "text-indigo-600 dark:text-indigo-400", bg: "bg-indigo-500/10", border: "border-indigo-500/20" },
   IN_PROGRESS: { label: "In Progress", color: "text-sky-600 dark:text-sky-400", bg: "bg-sky-500/10", border: "border-sky-500/20" },
-  REVIEW_DOCS: { label: "Reviewing", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
-  FINAL_DOCUMENT_PREPARATION: { label: "Doc Prep", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" },
-  FINAL_DOC_READY: { label: "Final Docs Ready", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
-  WAITING_ON_CLIENT: { label: "Action Needed", color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10", border: "border-rose-500/20" },
-  COMPLETED: { label: "Completed", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" }
+  REVIEW_DOCS: { label: "Reviewing", color: "text-teal-600 dark:text-teal-400", bg: "bg-teal-500/10", border: "border-teal-500/20" },
+  FINAL_DOCUMENT_PREPARATION: { label: "Doc Prep", color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
+  FINAL_DOC_READY: { label: "Final Docs Ready", color: "text-lime-600 dark:text-lime-400", bg: "bg-lime-500/10", border: "border-lime-500/20" },
+  PROFORMA_GENERATED: { label: "Proforma Generated", color: "text-cyan-600 dark:text-cyan-400", bg: "bg-cyan-500/10", border: "border-cyan-500/20" },
+  INVOICE_GENERATED: { label: "Invoice Generated", color: "text-pink-600 dark:text-pink-400", bg: "bg-pink-500/10", border: "border-pink-500/20" },
+  WAITING_ON_CLIENT: { label: "Action Needed", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" },
+  WAITING_FOR_CLIENT: { label: "Action Needed", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" },
+  WAITING_FOR_FINAL_PAYMENT: { label: "Payment Pending", color: "text-pink-600 dark:text-pink-400", bg: "bg-pink-500/10", border: "border-pink-500/20" },
+  WAITING_ON_FINAL_PAYMENT: { label: "Payment Pending", color: "text-pink-600 dark:text-pink-400", bg: "bg-pink-500/10", border: "border-pink-500/20" },
+  FINAL_PAYMENT_COMPLETED: { label: "Payment Completed", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+  SOFT_COPY_DELIVERED: { label: "Soft Copy Delivered", color: "text-sky-600 dark:text-sky-400", bg: "bg-sky-500/10", border: "border-sky-500/20" },
+  HARD_COPY_DELIVERED: { label: "Hard Copy Delivered", color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-500/10", border: "border-violet-500/20" },
+  COMPLETED: { label: "Completed", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+  CANCELLED: { label: "Cancelled", color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10", border: "border-rose-500/20" }
 };
 
 export default function ClientDashboard() {
@@ -504,10 +516,8 @@ export default function ClientDashboard() {
                         <span className="text-[9px] text-muted-foreground font-mono">{new Date(doc.uploaded_at).toLocaleDateString()}</span>
                       </div>
                     </div>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg" asChild>
-                      <a href={`${process.env.NEXT_PUBLIC_API_URL}${doc.file_url}`} download target="_blank" rel="noopener noreferrer">
-                        <Download className="h-3.5 w-3.5" />
-                      </a>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground/50 rounded-lg cursor-not-allowed opacity-60 hover:bg-transparent" disabled title="Document download is temporarily disabled">
+                      <Lock className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 ))

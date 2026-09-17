@@ -319,13 +319,26 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
   useEffect(() => {
     const r = localStorage.getItem("user_role") || "EMPLOYEE";
     setRole(r);
-    
+
     const saved = localStorage.getItem("hrms_sidebar_collapsed");
-    if (saved) setIsCollapsed(JSON.parse(saved));
+    if (saved) {
+      try {
+        setIsCollapsed(JSON.parse(saved));
+      } catch {
+        localStorage.removeItem("hrms_sidebar_collapsed");
+      }
+    }
 
     const savedModules = localStorage.getItem("hrms_expanded_modules");
     if (savedModules) {
-      setExpandedModules(JSON.parse(savedModules));
+      try {
+        setExpandedModules(JSON.parse(savedModules));
+      } catch {
+        localStorage.removeItem("hrms_expanded_modules");
+        const activeModules = r.toUpperCase() === "CLIENT" ? clientNavModules : navModules;
+        const allTrue = activeModules.reduce((acc, m) => ({ ...acc, [m.title]: true }), {});
+        setExpandedModules(allTrue);
+      }
     } else {
       const activeModules = r.toUpperCase() === "CLIENT" ? clientNavModules : navModules;
       const allTrue = activeModules.reduce((acc, m) => ({ ...acc, [m.title]: true }), {});
@@ -419,18 +432,17 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
         initial={isCollapsed ? "collapsed" : "expanded"}
         animate={isCollapsed ? "collapsed" : "expanded"}
         transition={{ type: "spring", stiffness: 450, damping: 35, mass: 0.6 }}
-        className={`fixed md:relative z-50 h-screen bg-[#0b0c10] dark:bg-[#07090e]/95 dark:backdrop-blur-xl text-zinc-100 border-r border-zinc-800/80 dark:border-zinc-800/60 shadow-[4px_0_30px_rgba(0,0,0,0.5)] dark:shadow-[4px_0_30px_rgba(0,0,0,0.7)] flex flex-col ${
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        }`}
+        className={`fixed md:relative z-50 h-screen bg-[#0b0c10] dark:bg-[#07090e]/95 dark:backdrop-blur-xl text-zinc-100 border-r border-zinc-800/80 dark:border-zinc-800/60 shadow-[4px_0_30px_rgba(0,0,0,0.5)] dark:shadow-[4px_0_30px_rgba(0,0,0,0.7)] flex flex-col ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+          }`}
       >
         {/* Header / Logo Area */}
-        <div 
+        <div
           className="h-16 flex items-center px-4 shrink-0 border-b border-zinc-800/80 dark:border-zinc-800/60 bg-black/20 dark:bg-black/40 relative overflow-visible"
           onMouseLeave={() => setIsSwitcherOpen(false)}
         >
           <div className="flex items-center gap-2.5 w-full">
             {/* Logo Icon */}
-            <div 
+            <div
               className="bg-gradient-to-tr from-emerald-500/30 via-emerald-500/20 to-teal-500/40 p-[1.5px] rounded-xl transition-transform shrink-0 hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center shadow-sm"
               onClick={toggleSidebar}
               title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
@@ -439,11 +451,11 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
                 <img src="/icon.png" alt="MCS Logo" className="w-5 h-5 object-contain" />
               </div>
             </div>
-            
+
             {/* Text & Switcher Area */}
-            <motion.div 
+            <motion.div
               initial={false}
-              animate={{ 
+              animate={{
                 opacity: isCollapsed ? 0 : 1,
                 width: isCollapsed ? 0 : "auto",
                 pointerEvents: isCollapsed ? "none" : "auto"
@@ -506,11 +518,10 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
                       router.push("/hrms/dashboard");
                     }
                   }}
-                  className={`flex items-center justify-between w-full p-2 rounded-lg font-bold text-left transition-colors ${
-                    currentMode === "hrms" 
-                      ? "bg-white/15 text-white font-extrabold border border-white/20 shadow-sm" 
+                  className={`flex items-center justify-between w-full p-2 rounded-lg font-bold text-left transition-colors ${currentMode === "hrms"
+                      ? "bg-white/15 text-white font-extrabold border border-white/20 shadow-sm"
                       : "hover:bg-white/[0.08] text-zinc-300 hover:text-white"
-                  }`}
+                    }`}
                 >
                   <span className="text-white">MCS HRMS Platform</span>
                   {currentMode === "hrms" && (
@@ -525,13 +536,12 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
                       router.push("/business/dashboard");
                     }
                   }}
-                  className={`flex items-center justify-between w-full p-2 rounded-lg font-bold text-left transition-colors ${
-                    currentMode === "business" 
-                      ? "bg-white/15 text-white font-extrabold border border-white/20 shadow-sm" 
+                  className={`flex items-center justify-between w-full p-2 rounded-lg font-bold text-left transition-colors ${currentMode === "business"
+                      ? "bg-white/15 text-white font-extrabold border border-white/20 shadow-sm"
                       : "hover:bg-white/[0.08] text-zinc-300 hover:text-white"
-                  }`}
+                    }`}
                 >
-                  <span className="text-white">MCS Business Platform</span>
+                  <span className="text-white">MCS ERP Platform</span>
                   {currentMode === "business" && (
                     <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" />
                   )}
@@ -598,21 +608,19 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
                     <TooltipTrigger asChild>
                       <Link
                         href={href}
-                        className={`flex items-center justify-between w-full p-2.5 text-sm font-semibold rounded-xl transition-colors duration-150 group ${
-                          active
+                        className={`flex items-center justify-between w-full p-2.5 text-sm font-semibold rounded-xl transition-colors duration-150 group ${active
                             ? "bg-white/10 text-white font-bold border border-white/15 shadow-[0_2px_12px_rgba(0,0,0,0.4)]"
                             : "text-zinc-400 hover:text-white hover:bg-white/[0.07] border border-transparent"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <module.icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${
-                            active 
-                              ? "text-emerald-400" 
+                          <module.icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${active
+                              ? "text-emerald-400"
                               : "text-zinc-400 group-hover:text-white"
-                          }`} />
-                          <motion.span 
+                            }`} />
+                          <motion.span
                             initial={false}
-                            animate={{ 
+                            animate={{
                               opacity: isCollapsed ? 0 : 1,
                               width: isCollapsed ? 0 : "auto"
                             }}
@@ -639,21 +647,19 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => toggleModule(module.title)}
-                      className={`flex items-center justify-between w-full p-2.5 text-sm font-semibold rounded-xl transition-colors duration-150 group ${
-                        active && !expanded
+                      className={`flex items-center justify-between w-full p-2.5 text-sm font-semibold rounded-xl transition-colors duration-150 group ${active && !expanded
                           ? "bg-white/10 text-white font-bold border border-white/15 shadow-[0_2px_12px_rgba(0,0,0,0.4)]"
                           : "text-zinc-400 hover:text-white hover:bg-white/[0.07] border border-transparent"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <module.icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${
-                          active 
-                            ? "text-emerald-400" 
+                        <module.icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${active
+                            ? "text-emerald-400"
                             : "text-zinc-400 group-hover:text-white"
-                        }`} />
-                        <motion.span 
+                          }`} />
+                        <motion.span
                           initial={false}
-                          animate={{ 
+                          animate={{
                             opacity: isCollapsed ? 0 : 1,
                             width: isCollapsed ? 0 : "auto"
                           }}
@@ -692,23 +698,21 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
                           const isSubActive = item.href === "/clients" || item.href === "/business/clients"
                             ? (pathname === "/business/clients" || pathname === "/business/clients/new")
                             : item.href === "/business/clients/orders"
-                            ? (pathname === "/business/clients/orders" || pathname === "/business/clients/orders/new")
-                            : (pathname === item.href || pathname.startsWith(item.href + '/'));
+                              ? (pathname === "/business/clients/orders" || pathname === "/business/clients/orders/new")
+                              : (pathname === item.href || pathname.startsWith(item.href + '/'));
                           return (
                             <Link
                               key={item.name}
                               href={item.href}
-                              className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-[13px] transition-colors duration-150 relative group ${
-                                isSubActive
+                              className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-[13px] transition-colors duration-150 relative group ${isSubActive
                                   ? "text-white font-bold bg-white/10 border border-white/20 shadow-[0_2px_10px_rgba(0,0,0,0.4)]"
                                   : "text-zinc-400 hover:text-white hover:bg-white/[0.06]"
-                              }`}
+                                }`}
                             >
-                              <span className={`absolute -left-[18px] top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full transition-all ${
-                                isSubActive 
-                                  ? "bg-emerald-400 shadow-[0_0_8px_#34d399]" 
+                              <span className={`absolute -left-[18px] top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full transition-all ${isSubActive
+                                  ? "bg-emerald-400 shadow-[0_0_8px_#34d399]"
                                   : "bg-transparent"
-                              }`} />
+                                }`} />
                               <span className="group-hover:translate-x-[1px] transition-transform duration-200 truncate">{item.name}</span>
                               {item.badge && (
                                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-white/10 text-white shrink-0">
@@ -733,11 +737,10 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
                 <TooltipTrigger asChild>
                   <Link
                     href="/hrms/settings"
-                    className={`flex items-center gap-3 w-full p-2.5 text-sm font-semibold rounded-xl transition-colors duration-150 group ${
-                      pathname.startsWith("/hrms/settings")
+                    className={`flex items-center gap-3 w-full p-2.5 text-sm font-semibold rounded-xl transition-colors duration-150 group ${pathname.startsWith("/hrms/settings")
                         ? "bg-white/10 text-white font-bold border border-white/15 shadow-[0_2px_12px_rgba(0,0,0,0.4)]"
                         : "text-zinc-400 hover:text-white hover:bg-white/[0.07] border border-transparent"
-                    }`}
+                      }`}
                   >
                     <Settings className={`h-[18px] w-[18px] shrink-0 transition-colors ${pathname.startsWith("/hrms/settings") ? "text-emerald-400" : "text-zinc-400 group-hover:text-white"}`} />
                     {!isCollapsed && <span className="tracking-tight group-hover:translate-x-[2px] transition-transform duration-200 truncate">Settings</span>}

@@ -76,7 +76,7 @@ function SelectSystemContent() {
     localStorage.removeItem("user_id");
     localStorage.removeItem("hrms_permissions");
     localStorage.removeItem("hrms_profile");
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/logout`, { method: "POST" }).catch(() => {});
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/logout`, { method: "POST" }).catch(() => { });
     window.location.href = "/login";
   };
 
@@ -84,7 +84,7 @@ function SelectSystemContent() {
     return (
       <div className="dark">
         <div className="flex h-screen w-full items-center justify-center bg-background text-foreground relative overflow-hidden">
-          
+
           {/* Animated Lines Background */}
           <div className="absolute inset-0 bg-grid-slate-200/20 [mask-image:linear-gradient(0deg,transparent,black)] dark:bg-grid-slate-800/10 opacity-30 z-0 pointer-events-none" />
           <div className="absolute inset-0 w-full h-full z-0">
@@ -119,7 +119,7 @@ function SelectSystemContent() {
   return (
     <div className="dark select-none">
       <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8 relative overflow-hidden text-foreground">
-        
+
         {/* Animated Lines Background */}
         <div className="absolute inset-0 bg-grid-slate-200/20 [mask-image:linear-gradient(0deg,transparent,black)] dark:bg-grid-slate-800/10 opacity-30 z-0 pointer-events-none" />
         <div className="absolute inset-0 w-full h-full z-0">
@@ -143,7 +143,7 @@ function SelectSystemContent() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] rounded-full bg-primary/10 blur-[130px] pointer-events-none -z-10" />
 
         <div className="relative z-10 w-full max-w-5xl space-y-8">
-          
+
           {/* Header */}
           <div className="flex flex-col items-center text-center space-y-4">
             <AskLogo className="h-16 w-auto" />
@@ -159,7 +159,7 @@ function SelectSystemContent() {
 
           {/* Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-            
+
             {/* Card 1: HRMS */}
             <motion.div
               whileHover={{ scale: 1.025, y: -4 }}
@@ -169,7 +169,7 @@ function SelectSystemContent() {
             >
               {/* Card Ambient Glow */}
               <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/0 via-emerald-500/0 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              
+
               <div className="flex flex-col justify-between h-full space-y-8 relative z-10">
                 <div className="space-y-4">
                   <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center group-hover:scale-110 group-hover:bg-emerald-500/20 transition-all duration-300">
@@ -204,7 +204,7 @@ function SelectSystemContent() {
             >
               {/* Card Ambient Glow */}
               <div className="absolute inset-0 bg-gradient-to-tr from-primary/0 via-primary/0 to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              
+
               <div className="flex flex-col justify-between h-full space-y-8 relative z-10">
                 <div className="space-y-4">
                   <div className="h-14 w-14 rounded-2xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center group-hover:scale-110 group-hover:bg-primary/20 transition-all duration-300">
@@ -212,7 +212,7 @@ function SelectSystemContent() {
                   </div>
                   <div>
                     <h2 className="text-2xl font-extrabold text-white tracking-tight">
-                      MCS Business Platform
+                      MCS ERP Platform
                     </h2>
                     <p className="text-slate-400 text-sm leading-relaxed mt-2.5">
                       Manage partner directories, work orders, service deliverables, consulting catalog, and project chat pipelines.
@@ -223,7 +223,7 @@ function SelectSystemContent() {
                 <div className="flex items-center justify-between border-t border-white/5 pt-5">
                   <span className="text-xs text-muted-foreground font-semibold">Daily Business</span>
                   <button className="h-10 px-5 rounded-lg text-xs font-bold bg-white text-black hover:bg-slate-100 flex items-center gap-1 shadow-sm transition-all duration-300">
-                    Open Business
+                    Open ERP
                     <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </button>
                 </div>
@@ -251,7 +251,7 @@ function SelectSystemContent() {
                 <span className="text-[10px] text-muted-foreground uppercase font-bold block">Logged In As</span>
                 <span className="text-xs text-slate-200 font-semibold block">{profile ? `${profile.first_name} ${profile.last_name}` : "User"}</span>
               </div>
-              
+
               <button
                 onClick={handleLogout}
                 className="h-9 px-4 rounded-lg border border-white/10 hover:border-red-500/20 hover:bg-red-500/10 text-slate-300 hover:text-red-400 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all duration-300 cursor-pointer"
