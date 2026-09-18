@@ -41,6 +41,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string; 
   CONFIRMED: { label: "Confirmed", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
   ORDER_ASSIGNED: { label: "Consultant Assigned", color: "text-indigo-600 dark:text-indigo-400", bg: "bg-indigo-500/10", border: "border-indigo-500/20" },
   IN_PROGRESS: { label: "In Progress", color: "text-sky-600 dark:text-sky-400", bg: "bg-sky-500/10", border: "border-sky-500/20" },
+  ON_HOLD: { label: "On Hold", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/30" },
   REVIEW_DOCS: { label: "Reviewing", color: "text-teal-600 dark:text-teal-400", bg: "bg-teal-500/10", border: "border-teal-500/20" },
   FINAL_DOCUMENT_PREPARATION: { label: "Doc Prep", color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
   FINAL_DOC_READY: { label: "Final Docs Ready", color: "text-lime-600 dark:text-lime-400", bg: "bg-lime-500/10", border: "border-lime-500/20" },

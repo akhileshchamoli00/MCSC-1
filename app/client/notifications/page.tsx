@@ -114,21 +114,31 @@ export default function ClientNotificationsPage() {
     if (!notif.is_read) {
       markAsRead(notif.id);
     }
-    if (notif.action_url) {
-      let targetUrl = notif.action_url;
+
+    let targetUrl = notif.action_url || "";
+    const orderMatch = (targetUrl + " " + (notif.title || "") + " " + (notif.message || "")).match(/(ORD-[A-Za-z0-9\-]+)/i);
+    const orderNum = orderMatch ? orderMatch[1].toUpperCase() : null;
+
+    if (!targetUrl && orderNum) {
+      targetUrl = `/client/chat?order=${encodeURIComponent(orderNum)}`;
+    }
+
+    if (targetUrl) {
       // Safeguard: map any platform/staff URLs to client portal URLs
       if (targetUrl.startsWith("/business/") || targetUrl.startsWith("/hrms/")) {
-        if (targetUrl.includes("order=")) {
-          const match = targetUrl.match(/order=([^&]+)/);
-          if (match) {
-            targetUrl = `/client/chat?order=${match[1]}`;
-          } else {
-            targetUrl = "/client/orders";
-          }
+        if (orderNum) {
+          targetUrl = `/client/chat?order=${encodeURIComponent(orderNum)}`;
         } else {
           targetUrl = "/client/orders";
         }
       }
+
+      if (orderNum) {
+        window.dispatchEvent(new CustomEvent("open-order-chat", {
+          detail: { orderNumber: orderNum, chat: true }
+        }));
+      }
+
       router.push(targetUrl);
     }
   };

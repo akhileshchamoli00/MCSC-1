@@ -19,11 +19,15 @@ import {
   Briefcase,
   MapPin,
   UserCheck,
-  FileText
+  FileText,
+  PauseCircle,
+  AlertTriangle,
+  MessageSquare
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { 
   Dialog, 
@@ -36,6 +40,7 @@ import {
 import { toast } from "sonner";
 import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
+import { cn } from "@/lib/utils";
 
 export default function EditClientOrderPage() {
   const router = useRouter();
@@ -68,9 +73,16 @@ export default function EditClientOrderPage() {
     is_final_invoice_finalized: false
   });
 
-  // Quick Create Company State
+  // Quick  // Create Company in Edit Form State
   const [isCreateCompanyOpen, setIsCreateCompanyOpen] = useState(false);
   const [creatingCompany, setCreatingCompany] = useState(false);
+
+  // On Hold Modal State
+  const [isOnHoldDialogOpen, setIsOnHoldDialogOpen] = useState(false);
+  const [holdReason, setHoldReason] = useState("");
+  const [holdChannel, setHoldChannel] = useState<"CLIENT" | "INTERNAL">("CLIENT");
+  const [prevStatusBeforeHold, setPrevStatusBeforeHold] = useState<string>("CONFIRMED");
+
   const [newCompanyForm, setNewCompanyForm] = useState({
     company_name: "",
     address: "",
@@ -415,6 +427,34 @@ export default function EditClientOrderPage() {
     }));
   };
 
+  const handleStatusChange = (newStatus: string) => {
+    if (newStatus === "ON_HOLD") {
+      setPrevStatusBeforeHold(editForm.status);
+      setHoldReason("");
+      setHoldChannel("CLIENT");
+      setIsOnHoldDialogOpen(true);
+      return;
+    }
+    setEditForm(prev => ({ ...prev, status: newStatus }));
+  };
+
+  const handleConfirmOnHold = () => {
+    if (!holdReason.trim()) {
+      toast.error("Please provide a reason for placing this order on hold.");
+      return;
+    }
+    setEditForm(prev => ({ ...prev, status: "ON_HOLD" }));
+    setIsOnHoldDialogOpen(false);
+    toast.success("Order status set to ON HOLD. Save order to finalize.");
+  };
+
+  const handleCancelOnHold = () => {
+    setIsOnHoldDialogOpen(false);
+    if (editForm.status !== "ON_HOLD") {
+      setEditForm(prev => ({ ...prev, status: prevStatusBeforeHold }));
+    }
+  };
+
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOrderGroup || !editForm.items) return;
@@ -422,6 +462,12 @@ export default function EditClientOrderPage() {
     const validItems = editForm.items.filter((i: any) => i.service_id && i.job_title);
     if (validItems.length === 0) {
       toast.error("Please add at least one valid service item.");
+      return;
+    }
+
+    if (editForm.status === "ON_HOLD" && !holdReason.trim()) {
+      toast.error("Please provide a reason for placing this order on hold.");
+      setIsOnHoldDialogOpen(true);
       return;
     }
 
@@ -460,6 +506,10 @@ export default function EditClientOrderPage() {
               body: JSON.stringify({
                 status: editForm.status,
                 payment_status: editForm.payment_status,
+                ...(editForm.status === "ON_HOLD" && holdReason.trim() ? {
+                  hold_reason: holdReason.trim(),
+                  hold_channel: holdChannel
+                } : {}),
                 ...(idx === 0 ? {
                   proforma_paid_amount: editForm.proforma_paid_amount != null ? Number(editForm.proforma_paid_amount) : null
                 } : {}),
@@ -989,7 +1039,7 @@ export default function EditClientOrderPage() {
                 <select
                   required
                   value={editForm.status}
-                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                  onChange={(e) => handleStatusChange(e.target.value)}
                   className="flex h-9 w-full rounded-lg border border-border/60 bg-background px-3 py-1 text-xs font-semibold shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
                   <option value="PIPELINE">PIPELINE</option>
@@ -1007,9 +1057,34 @@ export default function EditClientOrderPage() {
                   <option value="FINAL_PAYMENT_COMPLETED">FINAL PAYMENT COMPLETED</option>
                   <option value="SOFT_COPY_DELIVERED">SOFT COPY DELIVERED</option>
                   <option value="HARD_COPY_DELIVERED">HARD COPY DELIVERED</option>
+                  <option value="ON_HOLD">ON HOLD</option>
                   <option value="COMPLETED">COMPLETED</option>
                   <option value="CANCELLED">CANCELLED</option>
                 </select>
+
+                {editForm.status === "ON_HOLD" && (
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-1.5 mt-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1.5 text-[11px]">
+                        <PauseCircle className="h-3.5 w-3.5" /> Hold Reason:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsOnHoldDialogOpen(true)}
+                        className="text-[10px] font-bold text-amber-600 dark:text-amber-400 underline hover:text-amber-700"
+                      >
+                        Change Reason
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-foreground/90 font-medium whitespace-pre-wrap leading-relaxed">
+                      {holdReason || "No hold reason specified yet"}
+                    </p>
+                    <div className="text-[10px] text-muted-foreground flex items-center gap-1 pt-0.5 border-t border-amber-500/20">
+                      <MessageSquare className="h-3 w-3 text-amber-600" />
+                      <span>Broadcast to: {holdChannel === "CLIENT" ? "Client & Team Chat" : "Internal Staff Only"}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Payment Status */}
@@ -1335,6 +1410,166 @@ export default function EditClientOrderPage() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* POP-UP DIALOG FOR PLACING ORDER ON HOLD */}
+      <Dialog 
+        open={isOnHoldDialogOpen} 
+        onOpenChange={(open) => {
+          if (!open) handleCancelOnHold();
+        }}
+      >
+        <DialogContent className="max-w-lg p-0 overflow-hidden rounded-2xl border border-amber-500/30 shadow-2xl bg-background dark:bg-zinc-950">
+          <div className="p-6 pb-4 border-b border-border/60 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <PauseCircle className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+                  Place Order On Hold
+                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px] font-bold px-2 py-0.5">
+                    {orderNumber || "ORDER"}
+                  </Badge>
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                  {selectedOrderGroup?.company_name || selectedOrderGroup?.client_name || "Order Modification"}
+                </DialogDescription>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-5">
+            {/* Warning Banner */}
+            <div className="p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/10 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2.5">
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div className="leading-relaxed">
+                <span className="font-semibold block">Order Execution Will Be Paused</span>
+                The status will change to <span className="font-bold underline decoration-amber-500">ON HOLD</span> upon saving and your reason will be posted into the order activity log and chat stream.
+              </div>
+            </div>
+
+            {/* Quick Reason Chips */}
+            <div className="space-y-2">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                <span>Select Quick Reason</span>
+                <span className="text-[10px] font-normal lowercase text-muted-foreground/80">(click to autofill)</span>
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  "Waiting for Client Documents",
+                  "Awaiting Client Confirmation / Approval",
+                  "Pending Client Payment",
+                  "Government / OSS System Revision",
+                  "Legal / Notary Verification Pending",
+                  "Technical Clarification Required"
+                ].map((reasonChip) => (
+                  <button
+                    key={reasonChip}
+                    type="button"
+                    onClick={() => setHoldReason(reasonChip)}
+                    className={cn(
+                      "text-xs px-2.5 py-1 rounded-lg border transition-all text-left font-medium",
+                      holdReason === reasonChip
+                        ? "bg-amber-500 text-white border-amber-500 font-semibold shadow-xs"
+                        : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground border-border/60"
+                    )}
+                  >
+                    {reasonChip}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Reason Textarea */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label htmlFor="edit-hold-reason-input" className="text-xs font-bold uppercase tracking-wider text-foreground">
+                  Reason for Hold <span className="text-rose-500">*</span>
+                </label>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  {holdReason.length} characters
+                </span>
+              </div>
+              <Textarea
+                id="edit-hold-reason-input"
+                value={holdReason}
+                onChange={(e) => setHoldReason(e.target.value)}
+                rows={3}
+                placeholder="Detail why this order is being put on hold (e.g. Missing signed articles of association, waiting on response from client)..."
+                className="text-xs resize-none rounded-xl border-border/80 focus-visible:ring-amber-500"
+              />
+            </div>
+
+            {/* Chat Target Channel Toggle */}
+            <div className="space-y-2 pt-1 border-t border-border/40">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+                Broadcast Reason To Chat
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setHoldChannel("CLIENT")}
+                  className={cn(
+                    "p-3 rounded-xl border text-left transition-all flex flex-col gap-1",
+                    holdChannel === "CLIENT"
+                      ? "border-amber-500/60 bg-amber-500/10 text-foreground ring-1 ring-amber-500/40"
+                      : "border-border/60 bg-muted/20 hover:bg-muted/40 text-muted-foreground"
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 font-bold text-xs">
+                    <MessageSquare className="h-3.5 w-3.5 text-amber-500" />
+                    <span>Client & Team Chat</span>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground leading-tight">
+                    Client & internal staff both see this reason in chat
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setHoldChannel("INTERNAL")}
+                  className={cn(
+                    "p-3 rounded-xl border text-left transition-all flex flex-col gap-1",
+                    holdChannel === "INTERNAL"
+                      ? "border-amber-500/60 bg-amber-500/10 text-foreground ring-1 ring-amber-500/40"
+                      : "border-border/60 bg-muted/20 hover:bg-muted/40 text-muted-foreground"
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 font-bold text-xs">
+                    <Lock className="h-3.5 w-3.5 text-amber-500" />
+                    <span>Internal Staff Only</span>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground leading-tight">
+                    Private note logged only for processing consultants
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="p-4 border-t border-border/60 bg-muted/10 shrink-0 flex items-center justify-between sm:justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleCancelOnHold}
+              className="text-xs font-semibold"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!holdReason.trim()}
+              onClick={handleConfirmOnHold}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs gap-1.5 shadow-sm"
+            >
+              <PauseCircle className="h-3.5 w-3.5" />
+              Confirm Hold Reason
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

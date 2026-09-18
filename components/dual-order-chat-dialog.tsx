@@ -34,13 +34,133 @@ import {
   PanelLeftOpen,
   Pencil,
   Trash2,
-  Check
+  Check,
+  CheckCheck,
+  Reply,
+  Quote
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from "@/components/ui/tooltip";
 import { resolveImageUrl } from "@/lib/utils";
 import { toast } from "sonner";
+import { ChatEmojiPicker } from "@/components/chat-emoji-picker";
+import { ChatMessageReactions, WhatsAppReactionHoverBar } from "@/components/chat-message-reactions";
+
+const formatSeenTime = (dateStr?: string) => {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    if (isToday) return `Today at ${timeStr}`;
+    return `${d.toLocaleDateString([], { month: "short", day: "numeric" })} at ${timeStr}`;
+  } catch {
+    return dateStr;
+  }
+};
+
+const SeenReceiptsIndicator = ({
+  seenBy,
+  isSelf,
+  sentAt
+}: {
+  seenBy?: any[];
+  isSelf: boolean;
+  sentAt?: string;
+  colorScheme?: string;
+}) => {
+  const readers = seenBy || [];
+  const hasSeen = readers.length > 0;
+
+  if (!hasSeen) {
+    return (
+      <TooltipProvider delayDuration={100}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="flex items-center p-0.5 opacity-60 hover:opacity-100 transition-opacity focus:outline-none"
+              aria-label="Delivered"
+            >
+              <Check className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent
+            side="top"
+            align="center"
+            sideOffset={8}
+            collisionPadding={16}
+            className="z-[99999] px-2.5 py-1 rounded-lg bg-popover text-popover-foreground border border-border shadow-lg text-[11px] font-medium [&_.rotate-45]:hidden"
+          >
+            {sentAt ? `Delivered • ${formatSeenTime(sentAt)}` : "Delivered"}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="flex items-center gap-0.5 cursor-pointer p-0.5 rounded hover:bg-muted/60 transition-colors focus:outline-none"
+            aria-label={`Seen by ${readers.map(r => r.name).join(", ")}`}
+          >
+            <CheckCheck className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 transition-colors" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent
+          side="top"
+          align="center"
+          sideOffset={8}
+          collisionPadding={16}
+          className="z-[99999] min-w-[210px] max-w-[280px] p-2.5 rounded-xl bg-popover text-popover-foreground border border-border shadow-2xl backdrop-blur-md text-left [&_.rotate-45]:hidden"
+        >
+          <div className="flex items-center justify-between gap-1 pb-1.5 mb-1.5 border-b border-border/50 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+            <span className="flex items-center gap-1.5">
+              <Eye className="h-3 w-3 text-blue-500" />
+              Seen by ({readers.length})
+            </span>
+          </div>
+          <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+            {readers.map((r, idx) => (
+              <div key={r.user_id || idx} className="flex items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold text-muted-foreground shrink-0 border border-border">
+                    {r.name ? r.name.charAt(0).toUpperCase() : "U"}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="font-semibold text-[11px] text-foreground block truncate">
+                      {r.name}
+                    </span>
+                    {r.role && (
+                      <span className="text-[9px] text-muted-foreground block truncate -mt-0.5">
+                        {r.role}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span className="text-[9px] font-mono text-muted-foreground/80 shrink-0 text-right">
+                  {formatSeenTime(r.read_at)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
 
 const isSystemMessage = (msg: any) => {
   if (!msg) return false;
@@ -52,6 +172,8 @@ const isSystemMessage = (msg: any) => {
   const txt = (msg.message || "").toLowerCase();
   return (
     txt.startsWith("order execution status") ||
+    txt.includes("order placed on hold") ||
+    txt.includes("⏸️") ||
     txt.startsWith("pipeline order") ||
     txt.startsWith("order moved") ||
     txt.startsWith("payment") ||
@@ -71,6 +193,9 @@ const isSystemMessage = (msg: any) => {
 
 const getMilestoneIcon = (message: string) => {
   const txt = (message || "").toLowerCase();
+  if (txt.includes("on hold") || txt.includes("⏸️") || txt.includes("pause")) {
+    return <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />;
+  }
   if (txt.includes("payment") || txt.includes("amount received") || txt.includes("paid")) {
     return <CreditCard className="h-3.5 w-3.5 text-emerald-500 shrink-0" />;
   }
@@ -84,6 +209,67 @@ const getMilestoneIcon = (message: string) => {
     return <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />;
   }
   return <Clock className="h-3.5 w-3.5 text-primary shrink-0" />;
+};
+
+const isEmojiOnlyText = (str?: string | null) => {
+  if (!str) return false;
+  const trimmed = str.trim();
+  if (!trimmed) return false;
+  const emojiRegex = /^(\p{Extended_Pictographic}|\p{Emoji_Presentation}|\p{Emoji_Modifier}|\p{Emoji_Component}|\s)+$/u;
+  return emojiRegex.test(trimmed) && trimmed.length <= 32;
+};
+
+const renderMessageContent = (
+  text?: string,
+  isInternal: boolean = false,
+  taggableList: any[] = []
+) => {
+  if (!text) return null;
+
+  if (isEmojiOnlyText(text)) {
+    return (
+      <div className="text-[32px] sm:text-[38px] leading-none select-none py-1 px-1 tracking-wide inline-block">
+        {text}
+      </div>
+    );
+  }
+
+  if (isInternal && text.includes("@")) {
+    const names = taggableList
+      .map(u => u.displayName || (u.first_name ? `${u.first_name} ${u.last_name || ""}`.trim() : null) || u.name)
+      .filter(Boolean)
+      .sort((a: string, b: string) => b.length - a.length)
+      .map((name: string) => name.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"));
+
+    let regex: RegExp;
+    if (names.length > 0) {
+      const namesPattern = names.join("|");
+      regex = new RegExp(`(@\\[[^\\]]+\\]|@(?:${namesPattern})|@[A-Za-z0-9_.-]+(?:\\s+[A-Z][a-z0-9_.-]+)*)`, "g");
+    } else {
+      regex = /(@\[[^\]]+\]|@[A-Za-z0-9_.-]+(?:\s+[A-Z][a-z0-9_.-]+)*)/g;
+    }
+
+    const parts = text.split(regex);
+    return (
+      <span className="whitespace-pre-wrap leading-relaxed text-foreground">
+        {parts.map((part, i) => {
+          if (part && part.startsWith("@")) {
+            return (
+              <span
+                key={i}
+                className="font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/15 dark:bg-amber-950/40 border border-amber-500/20 px-1.5 py-0.5 rounded-md text-[11px] sm:text-xs inline-block align-baseline mr-0.5"
+              >
+                {part}
+              </span>
+            );
+          }
+          return <span key={i}>{part}</span>;
+        })}
+      </span>
+    );
+  }
+
+  return <span className="whitespace-pre-wrap leading-relaxed">{text}</span>;
 };
 
 interface DualOrderChatDialogProps {
@@ -134,6 +320,14 @@ export function DualOrderChatDialog({
   const [sendingClient, setSendingClient] = useState(false);
   const [sendingInternal, setSendingInternal] = useState(false);
 
+  // Quote / Reply State
+  const [quotedClientMessage, setQuotedClientMessage] = useState<any | null>(null);
+  const [quotedInternalMessage, setQuotedInternalMessage] = useState<any | null>(null);
+
+  // Input refs
+  const clientInputRef = useRef<HTMLInputElement | null>(null);
+  const internalInputRef = useRef<HTMLInputElement | null>(null);
+
   // Client Confirmation Dialog State
   const [isConfirmClientOpen, setIsConfirmClientOpen] = useState(false);
   const [pendingClientMessage, setPendingClientMessage] = useState("");
@@ -156,6 +350,20 @@ export function DualOrderChatDialog({
 
   const clientMessagesContainerRef = useRef<HTMLDivElement | null>(null);
   const internalMessagesContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const handleQuoteClientMessage = (msg: any) => {
+    setQuotedClientMessage(msg);
+    setTimeout(() => {
+      clientInputRef.current?.focus();
+    }, 50);
+  };
+
+  const handleQuoteInternalMessage = (msg: any) => {
+    setQuotedInternalMessage(msg);
+    setTimeout(() => {
+      internalInputRef.current?.focus();
+    }, 50);
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -287,6 +495,52 @@ export function DualOrderChatDialog({
     toast.success(`${label} copied to clipboard`);
   };
 
+  const lastMarkedClientMsgIdRef = useRef<number>(0);
+  const lastMarkedInternalMsgIdRef = useRef<number>(0);
+
+  const markOrderChatRead = async (orderNo: string, channel: string, lastMsgId: number) => {
+    if (!orderNo || !lastMsgId) return;
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNo}/read`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          channel,
+          last_message_id: lastMsgId
+        })
+      });
+    } catch {
+      // silent
+    }
+  };
+
+  const handleToggleReaction = async (msgId: number, emoji: string, isInternal: boolean) => {
+    if (!orderNumber || !msgId || !emoji) return;
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(orderNumber)}/progress/${msgId}/reactions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ emoji })
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.reactions) {
+          const syncUpdater = (prevMsgs: any[]) =>
+            prevMsgs.map(m => (m.id === msgId ? { ...m, reactions: data.reactions } : m));
+          if (isInternal) setInternalMessages(syncUpdater);
+          else setClientMessages(syncUpdater);
+        }
+      }
+    } catch (err) {
+      console.error("Error toggling reaction:", err);
+    }
+  };
+
   // 1. Fetch Order Summary
   const fetchOrderSummary = async (isInitial = false) => {
     if (!orderNumber) return;
@@ -324,6 +578,13 @@ export function DualOrderChatDialog({
       if (res.ok) {
         const data = await res.json();
         setClientMessages(data || []);
+        if (data && data.length > 0) {
+          const maxId = Math.max(...data.map((m: any) => m.id || 0));
+          if (maxId > lastMarkedClientMsgIdRef.current) {
+            lastMarkedClientMsgIdRef.current = maxId;
+            markOrderChatRead(orderNumber, "CLIENT", maxId);
+          }
+        }
       }
     } catch (err) {
       console.error("Error loading client messages:", err);
@@ -349,6 +610,13 @@ export function DualOrderChatDialog({
       if (res.ok) {
         const data = await res.json();
         setInternalMessages(data || []);
+        if (data && data.length > 0) {
+          const maxId = Math.max(...data.map((m: any) => m.id || 0));
+          if (maxId > lastMarkedInternalMsgIdRef.current) {
+            lastMarkedInternalMsgIdRef.current = maxId;
+            markOrderChatRead(orderNumber, "INTERNAL", maxId);
+          }
+        }
       }
     } catch (err) {
       console.error("Error loading internal messages:", err);
@@ -417,6 +685,8 @@ export function DualOrderChatDialog({
 
   useEffect(() => {
     if (isOpen && orderNumber) {
+      lastMarkedClientMsgIdRef.current = 0;
+      lastMarkedInternalMsgIdRef.current = 0;
       fetchOrderSummary(true);
       fetchClientMessages(true);
       fetchInternalMessages(true);
@@ -477,6 +747,12 @@ export function DualOrderChatDialog({
     try {
       setSendingClient(true);
       setIsConfirmClientOpen(false);
+      const quotePayload = quotedClientMessage ? {
+        quoted_message_id: quotedClientMessage.id,
+        quoted_message_text: quotedClientMessage.message || quotedClientMessage.attachment_name || "Attachment",
+        quoted_sender_name: quotedClientMessage.sender_name || (quotedClientMessage.is_client ? "Client" : "Consultant")
+      } : {};
+
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/progress`,
         {
@@ -487,7 +763,8 @@ export function DualOrderChatDialog({
           },
           body: JSON.stringify({
             message: pendingClientMessage,
-            channel: "CLIENT"
+            channel: "CLIENT",
+            ...quotePayload
           })
         }
       );
@@ -496,6 +773,7 @@ export function DualOrderChatDialog({
         setClientMessages(prev => [...prev, newMsg]);
         setClientInput("");
         setPendingClientMessage("");
+        setQuotedClientMessage(null);
         toast.success("Message sent to Client successfully!");
       } else {
         const err = await res.json();
@@ -514,6 +792,12 @@ export function DualOrderChatDialog({
     if (e) e.preventDefault();
     if (!internalInput.trim() || !orderNumber || sendingInternal) return;
     const msgToSend = internalInput.trim();
+    const quotePayload = quotedInternalMessage ? {
+      quoted_message_id: quotedInternalMessage.id,
+      quoted_message_text: quotedInternalMessage.message || quotedInternalMessage.attachment_name || "Attachment",
+      quoted_sender_name: quotedInternalMessage.sender_name || "Team Member"
+    } : {};
+
     try {
       setSendingInternal(true);
       setInternalInput("");
@@ -528,13 +812,15 @@ export function DualOrderChatDialog({
           },
           body: JSON.stringify({
             message: msgToSend,
-            channel: "INTERNAL"
+            channel: "INTERNAL",
+            ...quotePayload
           })
         }
       );
       if (res.ok) {
         const newMsg = await res.json();
         setInternalMessages(prev => [...prev, newMsg]);
+        setQuotedInternalMessage(null);
       } else {
         const err = await res.json();
         toast.error(err.detail || "Failed to post internal message");
@@ -633,12 +919,12 @@ export function DualOrderChatDialog({
               className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[70]"
             />
 
-            {/* Fullscreen Dynamic Order Chat Dialog */}
+            {/* Fullscreen Dynamic Order Chat Dialog Flier */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.99 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.99 }}
-              transition={{ duration: 0.2, ease: "easeInOut" }}
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "tween", ease: "easeInOut", duration: 0.3 }}
               className="fixed inset-0 z-[75] h-screen h-[100dvh] max-h-screen max-h-[100dvh] w-screen w-[100vw] max-w-[100vw] bg-background text-foreground shadow-2xl flex flex-col overflow-hidden"
             >
               {/* Top Header Bar - Fixed & Pinned */}
@@ -973,10 +1259,9 @@ export function DualOrderChatDialog({
                       </div>
                     ) : (
                       clientMessages
-                        .filter(msg => (msg.channel || "").toUpperCase() !== "INTERNAL" || isSystemMessage(msg))
-                        .map((msg, idx) => {
+                        .filter(msg => isSystemMessage(msg) || msg.channel === "CLIENT" || msg.is_client || (msg.sender_role || "").toUpperCase() === "CLIENT")
+                        .map((msg, idx, arr) => {
                         const isSystem = isSystemMessage(msg);
-                        const isClientSender = msg.is_client || (msg.sender_role || "").toUpperCase() === "CLIENT";
 
                         if (isSystem) {
                           return (
@@ -994,62 +1279,47 @@ export function DualOrderChatDialog({
                           );
                         }
 
+                        const isClientSender = msg.is_client || (msg.sender_role || "").toUpperCase() === "CLIENT";
+                        const prevMsg = idx > 0 ? arr[idx - 1] : null;
+                        const isPrevClientSender = prevMsg ? (prevMsg.is_client || (prevMsg.sender_role || "").toUpperCase() === "CLIENT") : null;
+                        const isSameSenderAsPrev = !isSystemMessage(prevMsg) && !!prevMsg && (
+                          (Boolean(msg.user_id || msg.sender_id) && (msg.user_id || msg.sender_id) === (prevMsg.user_id || prevMsg.sender_id)) ||
+                          (isClientSender === isPrevClientSender && Boolean(msg.sender_name) && msg.sender_name === prevMsg.sender_name)
+                        );
+
                         const isEditing = editingMessageId === msg.id;
                         const isDeleting = confirmDeleteId === msg.id;
                         const canModify = canModifyMessage(msg);
+                        const emojiOnly = isEmojiOnlyText(msg.message) && !msg.quoted_message_text && !msg.attachment_name && (!msg.attachment_url || msg.attachment_url === "uploading...");
 
                         return (
                           <div
                             key={msg.id || idx}
                             className={`group flex flex-col ${isClientSender ? "items-start" : "items-end"} max-w-[85%] ${
                               isClientSender ? "mr-auto" : "ml-auto"
-                            }`}
+                            } ${isSameSenderAsPrev ? "mt-1" : "mt-3.5"}`}
                           >
-                            <div className="flex items-center gap-1.5 mb-1 px-1">
-                              {isClientSender ? (
-                                <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 font-semibold border border-emerald-500/20">
-                                  Client
-                                </Badge>
-                              ) : (
-                                <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-sky-500/10 text-sky-600 dark:text-sky-400 font-semibold border border-sky-500/20">
-                                  Staff / Team
-                                </Badge>
-                              )}
-                              <span className="text-[11px] font-bold text-foreground">
-                                {msg.sender_name || (isClientSender ? "Client" : "Consultant")}
-                              </span>
-                              {msg.sender_role && !isClientSender && (
-                                <span className="text-[10px] text-muted-foreground">
-                                  ({msg.sender_role})
+                            {!isSameSenderAsPrev && (
+                              <div className="flex items-center gap-1.5 mb-1 px-1">
+                                {isClientSender ? (
+                                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 font-semibold border border-emerald-500/20">
+                                    Client
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-sky-500/10 text-sky-600 dark:text-sky-400 font-semibold border border-sky-500/20">
+                                    Staff / Team
+                                  </Badge>
+                                )}
+                                <span className="text-[11px] font-bold text-foreground">
+                                  {msg.sender_name || (isClientSender ? "Client" : "Consultant")}
                                 </span>
-                              )}
-                              <span className="text-[10px] text-muted-foreground">
-                                {msg.created_at
-                                  ? new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                                  : ""}
-                              </span>
-
-                              {canModify && !isEditing && !isDeleting && (
-                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleStartEdit(msg)}
-                                    className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
-                                    title="Edit message"
-                                  >
-                                    <Pencil className="h-3 w-3" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setConfirmDeleteId(msg.id)}
-                                    className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 transition-colors"
-                                    title="Delete message"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
+                                {msg.sender_role && !isClientSender && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    ({msg.sender_role})
+                                  </span>
+                                )}
+                              </div>
+                            )}
 
                             {isEditing ? (
                               <div className="w-full space-y-2 p-2.5 rounded-xl bg-background border border-sky-500/40 shadow-md">
@@ -1112,64 +1382,185 @@ export function DualOrderChatDialog({
                                 </div>
                               </div>
                             ) : (
-                              <div
-                                className={`p-3.5 rounded-2xl text-xs sm:text-[13px] leading-relaxed shadow-xs ${
-                                  isClientSender
-                                    ? "bg-emerald-500/10 dark:bg-emerald-950/30 text-foreground border border-emerald-500/25 dark:border-emerald-500/30 rounded-tl-sm"
-                                    : "bg-sky-600 dark:bg-sky-600 text-white rounded-tr-sm shadow-sm"
-                                }`}
-                              >
-                                {msg.message}
+                              <div className={`flex flex-col max-w-full ${isClientSender ? "self-start" : "self-end"}`}>
+                                <div className="flex items-center gap-1.5 max-w-full">
+                                  {/* For outgoing (staff) message, show WhatsApp reaction trigger + actions on left */}
+                                  {!isClientSender && (
+                                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      {canModify && (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleStartEdit(msg)}
+                                            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+                                            title="Edit message"
+                                          >
+                                            <Pencil className="h-3 w-3" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => setConfirmDeleteId(msg.id)}
+                                            className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 transition-colors"
+                                            title="Delete message"
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </button>
+                                        </>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleQuoteClientMessage(msg)}
+                                        className="p-1 rounded-md text-muted-foreground hover:text-sky-600 hover:bg-sky-500/10 transition-colors"
+                                        title="Quote / Reply"
+                                      >
+                                        <Reply className="h-3 w-3" />
+                                      </button>
+                                      <WhatsAppReactionHoverBar
+                                        onToggleReaction={emoji => handleToggleReaction(msg.id, emoji, false)}
+                                        align="end"
+                                        side="top"
+                                      />
+                                    </div>
+                                  )}
 
-                                {/* Client Uploaded Document Preview Button (Preview Only - No Download) */}
-                                {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
                                   <div
-                                    className={`mt-2.5 p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs shadow-2xs ${
+                                    className={`rounded-2xl leading-relaxed shadow-xs ${
+                                      emojiOnly
+                                        ? "px-2.5 py-1"
+                                        : "px-3.5 py-2 text-xs sm:text-[13px]"
+                                    } ${
                                       isClientSender
-                                        ? "bg-background/90 border-border/60 text-foreground"
-                                        : "bg-sky-700/80 border-sky-500/30 text-white"
+                                        ? "bg-emerald-500/10 dark:bg-emerald-950/30 text-foreground border border-emerald-500/25 dark:border-emerald-500/30 rounded-tl-sm"
+                                        : "bg-sky-600 dark:bg-sky-600 text-white rounded-tr-sm shadow-sm"
                                     }`}
                                   >
-                                    <div className="flex items-center gap-2 min-w-0">
+                                    {/* Quoted / Replied Message Header */}
+                                    {msg.quoted_message_text && (
                                       <div
-                                        className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 border ${
+                                        className={`mb-2 p-2 rounded-lg border-l-2 text-left text-xs select-none ${
                                           isClientSender
-                                            ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20"
-                                            : "bg-white/10 text-white border-white/20"
+                                            ? "bg-emerald-500/15 dark:bg-emerald-950/50 border-l-emerald-600 text-foreground"
+                                            : "bg-sky-700/80 border-l-white text-sky-100"
                                         }`}
                                       >
-                                        <FileText className="h-3.5 w-3.5" />
+                                        <div className="flex items-center gap-1 font-bold text-[10px] opacity-90">
+                                          <Reply className="h-2.5 w-2.5" />
+                                          <span>{msg.quoted_sender_name || "Quoted Message"}</span>
+                                        </div>
+                                        <p className="text-[11px] opacity-80 truncate italic mt-0.5">
+                                          "{msg.quoted_message_text}"
+                                        </p>
                                       </div>
-                                      <div className="min-w-0">
-                                        <span className="font-bold truncate block text-xs">
-                                          {msg.attachment_name || "Client Document"}
-                                        </span>
-                                        <span
-                                          className={`text-[10px] block truncate ${
-                                            isClientSender ? "text-muted-foreground" : "text-sky-200"
+                                    )}
+
+                                    <div>{renderMessageContent(msg.message, false)}</div>
+
+                                    {/* Client Uploaded Document Preview Button (Preview Only - No Download) */}
+                                    {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
+                                      <div
+                                        className={`mt-2 p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs shadow-2xs ${
+                                          isClientSender
+                                            ? "bg-background/90 border-border/60 text-foreground"
+                                            : "bg-sky-700/80 border-sky-500/30 text-white"
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <div
+                                            className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 border ${
+                                              isClientSender
+                                                ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20"
+                                                : "bg-white/10 text-white border-white/20"
+                                            }`}
+                                          >
+                                            <FileText className="h-3.5 w-3.5" />
+                                          </div>
+                                          <div className="min-w-0">
+                                            <span className="font-bold truncate block text-xs">
+                                              {msg.attachment_name || "Client Document"}
+                                            </span>
+                                            <span
+                                              className={`text-[10px] block truncate ${
+                                                isClientSender ? "text-muted-foreground" : "text-sky-200"
+                                              }`}
+                                            >
+                                              Stored in Company Vault (Client Shared Docs)
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handlePreviewAttachment(msg)}
+                                          className={`h-7 text-[11px] font-bold gap-1 px-2.5 shrink-0 shadow-2xs ${
+                                            isClientSender
+                                              ? "text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 border-sky-500/30"
+                                              : "text-white bg-white/10 hover:bg-white/20 border-white/30"
                                           }`}
                                         >
-                                          Stored in Company Vault (Client Shared Docs)
-                                        </span>
+                                          <Eye className="h-3 w-3" />
+                                          Preview
+                                        </Button>
                                       </div>
-                                    </div>
-
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handlePreviewAttachment(msg)}
-                                      className={`h-7 text-[11px] font-bold gap-1 px-2.5 shrink-0 shadow-2xs ${
-                                        isClientSender
-                                          ? "text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 border-sky-500/30"
-                                          : "text-white bg-white/10 hover:bg-white/20 border-white/30"
-                                      }`}
-                                    >
-                                      <Eye className="h-3 w-3" />
-                                      Preview
-                                    </Button>
+                                    )}
                                   </div>
-                                )}
+
+                                  {/* For incoming (client) message, show WhatsApp reaction trigger + actions on right */}
+                                  {isClientSender && (
+                                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <WhatsAppReactionHoverBar
+                                        onToggleReaction={emoji => handleToggleReaction(msg.id, emoji, false)}
+                                        align="start"
+                                        side="top"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleQuoteClientMessage(msg)}
+                                        className="p-1 rounded-md text-muted-foreground hover:text-sky-600 hover:bg-sky-500/10 transition-colors"
+                                        title="Quote / Reply"
+                                      >
+                                        <Reply className="h-3 w-3" />
+                                      </button>
+                                      {canModify && (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleStartEdit(msg)}
+                                            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+                                            title="Edit message"
+                                          >
+                                            <Pencil className="h-3 w-3" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => setConfirmDeleteId(msg.id)}
+                                            className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 transition-colors"
+                                            title="Delete message"
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Outside on the right side, vertically centered in the middle */}
+                                  <div className="flex items-center justify-center shrink-0 self-center select-none">
+                                    <SeenReceiptsIndicator
+                                      seenBy={msg.seen_by}
+                                      isSelf={!isClientSender}
+                                      sentAt={msg.created_at}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* WhatsApp style reaction badges at the bottom of the message */}
+                                <ChatMessageReactions
+                                  reactions={msg.reactions}
+                                  onToggleReaction={emoji => handleToggleReaction(msg.id, emoji, false)}
+                                  isSelf={!isClientSender}
+                                />
                               </div>
                             )}
                           </div>
@@ -1178,29 +1569,66 @@ export function DualOrderChatDialog({
                     )}
                   </div>
 
-                  {/* Client Chat Input Bar (With Confirmation Trigger) */}
-                  <form
-                    onSubmit={handleClientSendClick}
-                    className="p-3 border-t border-border/60 bg-muted/20 flex items-center gap-2 shrink-0"
-                  >
-                    <input
-                      type="text"
-                      placeholder="Message the Client (confirmation will be requested)..."
-                      value={clientInput}
-                      onChange={e => setClientInput(e.target.value)}
-                      className="flex-1 text-xs sm:text-sm bg-background border border-input rounded-xl px-3.5 py-2 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                      disabled={sendingClient}
-                    />
-                    <Button
-                      type="submit"
-                      size="sm"
-                      disabled={!clientInput.trim() || sendingClient}
-                      className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold gap-1.5 px-3.5 h-9 shrink-0 shadow-xs"
+                  {/* Client Chat Input Bar (With Confirmation Trigger & Quote Preview Banner) */}
+                  <div className="p-3 border-t border-border/60 bg-muted/20 space-y-2 shrink-0">
+                    {quotedClientMessage && (
+                      <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-sky-500/10 border-l-4 border-l-sky-500 border-t border-r border-b border-sky-500/20 rounded-lg text-xs shadow-xs animate-in fade-in slide-in-from-bottom-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Reply className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+                          <div className="min-w-0">
+                            <span className="font-bold text-sky-700 dark:text-sky-300 block text-[10px] sm:text-[11px]">
+                              Replying to {quotedClientMessage.sender_name || (quotedClientMessage.is_client ? "Client" : "Consultant")}
+                            </span>
+                            <p className="text-muted-foreground text-[11px] truncate max-w-sm italic">
+                              "{quotedClientMessage.message || quotedClientMessage.attachment_name || "Attachment"}"
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setQuotedClientMessage(null)}
+                          className="h-5 w-5 rounded-full text-muted-foreground hover:text-foreground"
+                          title="Cancel reply"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+
+                    <form
+                      onSubmit={handleClientSendClick}
+                      className="flex items-center gap-2"
                     >
-                      <Send className="h-3.5 w-3.5" />
-                      Send to Client
-                    </Button>
-                  </form>
+                      <ChatEmojiPicker
+                        onSelectEmoji={emoji => {
+                          setClientInput(prev => prev + emoji);
+                          clientInputRef.current?.focus();
+                        }}
+                        side="top"
+                        align="start"
+                      />
+                      <input
+                        ref={clientInputRef}
+                        type="text"
+                        placeholder="Message the Client (confirmation will be requested)..."
+                        value={clientInput}
+                        onChange={e => setClientInput(e.target.value)}
+                        className="flex-1 text-xs sm:text-sm bg-background border border-input rounded-xl px-3.5 py-2 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                        disabled={sendingClient}
+                      />
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={!clientInput.trim() || sendingClient}
+                        className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold gap-1.5 px-3.5 h-9 shrink-0 shadow-xs"
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        Send to Client
+                      </Button>
+                    </form>
+                  </div>
                 </div>
 
                 {/* ============================================================ */}
@@ -1255,7 +1683,7 @@ export function DualOrderChatDialog({
                     ) : (
                       internalMessages
                         .filter(msg => isSystemMessage(msg) || (!msg.is_client && (msg.sender_role || "").toUpperCase() !== "CLIENT"))
-                        .map((msg, idx) => {
+                        .map((msg, idx, arr) => {
                         const isSystem = isSystemMessage(msg);
 
                         if (isSystem) {
@@ -1274,48 +1702,34 @@ export function DualOrderChatDialog({
                           );
                         }
 
+                        const prevMsg = idx > 0 ? arr[idx - 1] : null;
+                        const isSameSenderAsPrev = !isSystemMessage(prevMsg) && !!prevMsg && (
+                          (Boolean(msg.user_id || msg.sender_id) && (msg.user_id || msg.sender_id) === (prevMsg.user_id || prevMsg.sender_id)) ||
+                          (Boolean(msg.sender_name) && msg.sender_name === prevMsg.sender_name)
+                        );
+
                         const isEditing = editingMessageId === msg.id;
                         const isDeleting = confirmDeleteId === msg.id;
                         const canModify = canModifyMessage(msg);
+                        const emojiOnly = isEmojiOnlyText(msg.message) && !msg.quoted_message_text && !msg.attachment_name && (!msg.attachment_url || msg.attachment_url === "uploading...");
 
                         return (
-                          <div key={msg.id || idx} className="group flex flex-col items-start max-w-[90%] mr-auto">
-                            <div className="flex items-center gap-1.5 mb-1 px-1">
-                              <span className="text-[11px] font-bold text-foreground">
-                                {msg.sender_name || "Team Member"}
-                              </span>
-                              {msg.sender_role && (
-                                <span className="text-[10px] text-muted-foreground">
-                                  ({msg.sender_role})
+                          <div
+                            key={msg.id || idx}
+                            className={`group flex flex-col items-start max-w-[90%] mr-auto ${isSameSenderAsPrev ? "mt-1" : "mt-3.5"}`}
+                          >
+                            {!isSameSenderAsPrev && (
+                              <div className="flex items-center gap-1.5 mb-1 px-1">
+                                <span className="text-[11px] font-bold text-foreground">
+                                  {msg.sender_name || "Team Member"}
                                 </span>
-                              )}
-                              <span className="text-[10px] text-muted-foreground ml-1">
-                                {msg.created_at
-                                  ? new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                                  : ""}
-                              </span>
-
-                              {canModify && !isEditing && !isDeleting && (
-                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleStartEdit(msg)}
-                                    className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
-                                    title="Edit note"
-                                  >
-                                    <Pencil className="h-3 w-3" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setConfirmDeleteId(msg.id)}
-                                    className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 transition-colors"
-                                    title="Delete note"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
+                                {msg.sender_role && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    ({msg.sender_role})
+                                  </span>
+                                )}
+                              </div>
+                            )}
 
                             {isEditing ? (
                               <div className="w-full space-y-2 p-2.5 rounded-xl bg-background border border-amber-500/40 shadow-md">
@@ -1378,38 +1792,114 @@ export function DualOrderChatDialog({
                                 </div>
                               </div>
                             ) : (
-                              <div className="p-3.5 rounded-2xl text-xs sm:text-[13px] leading-relaxed shadow-xs bg-amber-500/10 dark:bg-amber-950/30 text-foreground border border-amber-500/25 dark:border-amber-500/30 rounded-tl-sm">
-                                {renderInternalMessageText(msg.message)}
-
-                                {/* Attached Document Card (Preview Only) */}
-                                {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
-                                  <div className="mt-2.5 p-2.5 rounded-xl bg-background/90 border border-border/60 flex items-center justify-between gap-3 text-xs shadow-2xs">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <div className="h-7 w-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
-                                        <FileText className="h-3.5 w-3.5" />
+                              <div className="flex flex-col max-w-full self-start">
+                                <div className="flex items-center gap-1.5 max-w-full">
+                                  <div
+                                    className={`rounded-2xl leading-relaxed shadow-xs bg-muted/40 dark:bg-zinc-900/60 text-foreground border border-border/60 dark:border-zinc-800 rounded-tl-sm ${
+                                      emojiOnly
+                                        ? "px-2.5 py-1"
+                                        : "px-3.5 py-2 text-xs sm:text-[13px]"
+                                    }`}
+                                  >
+                                    {/* Quoted Message Header */}
+                                    {msg.quoted_message_text && (
+                                      <div className="mb-2 p-2 rounded-lg border-l-2 border-l-amber-600 bg-amber-500/15 dark:bg-amber-950/50 text-foreground text-left text-xs select-none">
+                                        <div className="flex items-center gap-1 font-bold text-[10px] text-amber-700 dark:text-amber-400">
+                                          <Reply className="h-2.5 w-2.5" />
+                                          <span>{msg.quoted_sender_name || "Quoted Message"}</span>
+                                        </div>
+                                        <p className="text-[11px] text-muted-foreground truncate italic mt-0.5">
+                                          "{msg.quoted_message_text}"
+                                        </p>
                                       </div>
-                                      <div className="min-w-0">
-                                        <span className="font-bold text-foreground truncate block text-xs">
-                                          {msg.attachment_name || "Document"}
-                                        </span>
-                                        <span className="text-[10px] text-muted-foreground block">
-                                          Stored in Company Vault
-                                        </span>
-                                      </div>
-                                    </div>
+                                    )}
 
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handlePreviewAttachment(msg)}
-                                      className="h-7 text-[11px] font-bold gap-1 px-2.5 shrink-0 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 border-amber-500/30 shadow-2xs"
-                                    >
-                                      <Eye className="h-3 w-3" />
-                                      Preview
-                                    </Button>
+                                    <div>{renderMessageContent(msg.message, true, taggableUsers)}</div>
+
+                                    {/* Attached Document Card (Preview Only) */}
+                                    {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
+                                      <div className="mt-2 p-2.5 rounded-xl bg-background/90 border border-border/60 flex items-center justify-between gap-3 text-xs shadow-2xs">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <div className="h-7 w-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
+                                            <FileText className="h-3.5 w-3.5" />
+                                          </div>
+                                          <div className="min-w-0">
+                                            <span className="font-bold text-foreground truncate block text-xs">
+                                              {msg.attachment_name || "Document"}
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground block">
+                                              Stored in Company Vault
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handlePreviewAttachment(msg)}
+                                          className="h-7 text-[11px] font-bold gap-1 px-2.5 shrink-0 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 border-amber-500/30 shadow-2xs"
+                                        >
+                                          <Eye className="h-3 w-3" />
+                                          Preview
+                                        </Button>
+                                      </div>
+                                    )}
                                   </div>
-                                )}
+
+                                  {/* Actions & WhatsApp Reaction Hover Trigger right next to bubble */}
+                                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <WhatsAppReactionHoverBar
+                                      onToggleReaction={emoji => handleToggleReaction(msg.id, emoji, true)}
+                                      align="start"
+                                      side="top"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleQuoteInternalMessage(msg)}
+                                      className="p-1 rounded-md text-muted-foreground hover:text-amber-600 hover:bg-amber-500/10 transition-colors"
+                                      title="Quote / Reply"
+                                    >
+                                      <Reply className="h-3 w-3" />
+                                    </button>
+                                    {canModify && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleStartEdit(msg)}
+                                          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+                                          title="Edit note"
+                                        >
+                                          <Pencil className="h-3 w-3" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setConfirmDeleteId(msg.id)}
+                                          className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 transition-colors"
+                                          title="Delete note"
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+
+                                  {/* Outside on the right side, vertically centered in the middle */}
+                                  <div className="flex items-center justify-center shrink-0 self-center select-none">
+                                    <SeenReceiptsIndicator
+                                      seenBy={msg.seen_by}
+                                      isSelf={true}
+                                      sentAt={msg.created_at}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Reactions Badges at the Bottom of Message */}
+                                <ChatMessageReactions
+                                  reactions={msg.reactions}
+                                  onToggleReaction={emoji => handleToggleReaction(msg.id, emoji, true)}
+                                  isSelf={false}
+                                />
                               </div>
                             )}
                           </div>
@@ -1418,8 +1908,35 @@ export function DualOrderChatDialog({
                     )}
                   </div>
 
-                  {/* Internal Chat Input Bar (With @Tagging Support) */}
-                  <div className="p-3 border-t border-border/60 bg-muted/20 relative shrink-0">
+                  {/* Internal Chat Input Bar (With @Tagging Support & Quote Banner) */}
+                  <div className="p-3 border-t border-border/60 bg-muted/20 relative space-y-2 shrink-0">
+                    {/* Quoted Internal Note Banner */}
+                    {quotedInternalMessage && (
+                      <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-amber-500/10 border-l-4 border-l-amber-500 border-t border-r border-b border-amber-500/20 rounded-lg text-xs shadow-xs animate-in fade-in slide-in-from-bottom-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Reply className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                          <div className="min-w-0">
+                            <span className="font-bold text-amber-700 dark:text-amber-300 block text-[10px] sm:text-[11px]">
+                              Replying to {quotedInternalMessage.sender_name || "Team Member"}
+                            </span>
+                            <p className="text-muted-foreground text-[11px] truncate max-w-sm italic">
+                              "{quotedInternalMessage.message || quotedInternalMessage.attachment_name || "Attachment"}"
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setQuotedInternalMessage(null)}
+                          className="h-5 w-5 rounded-full text-muted-foreground hover:text-foreground"
+                          title="Cancel reply"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+
                     {/* Suggestions Popover for @mentions */}
                     {showSuggestions && (
                       <div className="absolute bottom-full left-3 right-3 mb-2 bg-popover border border-border rounded-xl shadow-xl p-1 z-50 max-h-48 overflow-y-auto">
@@ -1445,7 +1962,16 @@ export function DualOrderChatDialog({
                     )}
 
                     <form onSubmit={handleInternalSend} className="flex items-center gap-2">
+                      <ChatEmojiPicker
+                        onSelectEmoji={emoji => {
+                          setInternalInput(prev => prev + emoji);
+                          internalInputRef.current?.focus();
+                        }}
+                        side="top"
+                        align="start"
+                      />
                       <input
+                        ref={internalInputRef}
                         type="text"
                         placeholder="Internal team note (use @ to tag teammates)..."
                         value={internalInput}
@@ -1470,7 +1996,7 @@ export function DualOrderChatDialog({
                         ) : (
                           <Send className="h-3.5 w-3.5" />
                         )}
-                        Post Note
+                        <span>Send</span>
                       </Button>
                     </form>
                   </div>

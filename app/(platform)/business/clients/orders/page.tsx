@@ -474,7 +474,42 @@ export default function ClientOrdersPage() {
     };
   }, [isViewOpen, isChatOpen, isProformaPreviewOpen, isFinalInvoicePreviewOpen]);
 
-  // Auto-open chat from URL query parameter (for notifications)
+  const [highlightedOrderNum, setHighlightedOrderNum] = useState<string | null>(null);
+
+  const openOrderDirectly = (orderNum: string, openChat: boolean = true) => {
+    if (!orderNum || orders.length === 0) return;
+
+    const matched = groupedOrdersMap.get(orderNum) || Array.from(groupedOrdersMap.values()).find(g => g.order_number?.toUpperCase() === orderNum.toUpperCase());
+    if (matched) {
+      setSearchTerm("");
+      const orderIdx = Array.from(groupedOrdersMap.values()).findIndex(o => o.order_number?.toUpperCase() === orderNum.toUpperCase());
+      if (orderIdx !== -1) {
+        const targetPage = Math.floor(orderIdx / 10) + 1;
+        setCurrentPage(targetPage);
+      }
+      setSelectedOrderGroup(matched);
+      if (openChat) {
+        setIsChatOpen(true);
+        fetchProgressUpdates(matched.order_number);
+      } else {
+        setIsViewOpen(true);
+      }
+
+      setHighlightedOrderNum(matched.order_number);
+      setTimeout(() => {
+        const el = document.getElementById(`order-row-${matched.order_number}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 300);
+
+      setTimeout(() => {
+        setHighlightedOrderNum(null);
+      }, 4000);
+    }
+  };
+
+  // Auto-open chat from URL query parameter (for notifications) & custom event
   useEffect(() => {
     if (orders.length === 0) return;
 
@@ -484,28 +519,26 @@ export default function ClientOrdersPage() {
       const orderNum = params.get("order");
       const openChat = params.get("chat");
       if (orderNum) {
-        // Find order in list
-        const matched = orders.find(o => o.order_number === orderNum);
-        if (matched) {
-          setSelectedOrderGroup(matched);
-          if (openChat === "true") {
-            setIsChatOpen(true);
-            fetchProgressUpdates(orderNum);
-          } else {
-            setIsViewOpen(true);
-          }
-          // Clean up search params
-          const url = new URL(window.location.href);
-          url.searchParams.delete("order");
-          url.searchParams.delete("chat");
-          window.history.replaceState({}, "", url.pathname + url.search);
-        }
+        openOrderDirectly(orderNum, openChat === "true" || openChat === null);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("order");
+        url.searchParams.delete("chat");
+        window.history.replaceState({}, "", url.pathname + url.search);
       }
     };
 
     checkParams();
-    const interval = setInterval(checkParams, 500);
-    return () => clearInterval(interval);
+
+    const handleCustomOpen = (e: any) => {
+      if (e.detail?.orderNumber) {
+        openOrderDirectly(e.detail.orderNumber, e.detail.chat ?? true);
+      }
+    };
+    window.addEventListener("open-order-chat", handleCustomOpen);
+
+    return () => {
+      window.removeEventListener("open-order-chat", handleCustomOpen);
+    };
   }, [orders]);
 
   const [deletedItemIds, setDeletedItemIds] = useState<number[]>([]);
@@ -723,6 +756,7 @@ export default function ClientOrdersPage() {
       case "WAITING_ON_CLIENT": return "bg-amber-500/15 text-amber-600 border-amber-500/30";
       case "ORDER_ASSIGNED": return "bg-indigo-500/15 text-indigo-600 border-indigo-500/30";
       case "IN_PROGRESS": return "bg-blue-500/15 text-blue-600 border-blue-500/30";
+      case "ON_HOLD": return "bg-amber-500/15 text-amber-600 border-amber-500/30 font-bold";
       case "REVIEW_DOCS": return "bg-teal-500/15 text-teal-600 border-teal-500/30";
       case "FINAL_DOCUMENT_PREPARATION": return "bg-orange-500/15 text-orange-600 border-orange-500/30";
       case "FINAL_DOC_READY": return "bg-lime-500/15 text-lime-600 border-lime-500/30";
@@ -1573,8 +1607,18 @@ export default function ClientOrdersPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/30">
-                      {paginatedOrders.map((ord, index) => (
-                        <tr key={ord.order_number || index} className="hover:bg-muted/40 transition-colors border-b border-border/30 last:border-0">
+                      {paginatedOrders.map((ord, index) => {
+                        const isHighlighted = highlightedOrderNum === ord.order_number;
+                        return (
+                        <tr 
+                          key={ord.order_number || index} 
+                          id={`order-row-${ord.order_number}`} 
+                          className={`transition-all duration-300 border-b border-border/30 last:border-0 ${
+                            isHighlighted 
+                              ? "bg-emerald-500/20 dark:bg-emerald-500/25 ring-2 ring-emerald-500 ring-inset shadow-md" 
+                              : "hover:bg-muted/40"
+                          }`}
+                        >
                           <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5">
                             #{startIndex + index + 1}
                           </td>
@@ -1893,7 +1937,8 @@ export default function ClientOrdersPage() {
                             </Button>
                           </td>
                         </tr>
-                      ))}
+                      );
+                    })}
                     </tbody>
                   </table>
                 </div>

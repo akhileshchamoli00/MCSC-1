@@ -37,15 +37,136 @@ import {
   Lock,
   UploadCloud,
   Pencil,
-  Trash2
+  Trash2,
+  Reply,
+  Quote,
+  Eye,
+  Smile
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from "@/components/ui/tooltip";
 import { resolveImageUrl } from "@/lib/utils";
 import Link from "next/link";
 import { toast } from "sonner";
+import { ChatEmojiPicker } from "@/components/chat-emoji-picker";
+import { ChatMessageReactions, WhatsAppReactionHoverBar } from "@/components/chat-message-reactions";
+
+const formatSeenTime = (dateStr?: string) => {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    if (isToday) return `Today at ${timeStr}`;
+    return `${d.toLocaleDateString([], { month: "short", day: "numeric" })} at ${timeStr}`;
+  } catch {
+    return dateStr;
+  }
+};
+
+const SeenReceiptsIndicator = ({
+  seenBy,
+  isSelf,
+  sentAt
+}: {
+  seenBy?: any[];
+  isSelf: boolean;
+  sentAt?: string;
+  colorScheme?: string;
+}) => {
+  const readers = seenBy || [];
+  const hasSeen = readers.length > 0;
+
+  if (!hasSeen) {
+    return (
+      <TooltipProvider delayDuration={100}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="flex items-center p-0.5 opacity-60 hover:opacity-100 transition-opacity focus:outline-none"
+              aria-label="Delivered"
+            >
+              <Check className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent
+            side="top"
+            align="center"
+            sideOffset={8}
+            collisionPadding={16}
+            className="z-[99999] px-2.5 py-1 rounded-lg bg-popover text-popover-foreground border border-border shadow-lg text-[11px] font-medium [&_.rotate-45]:hidden"
+          >
+            {sentAt ? `Delivered • ${formatSeenTime(sentAt)}` : "Delivered"}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="flex items-center gap-0.5 cursor-pointer p-0.5 rounded hover:bg-muted/60 transition-colors focus:outline-none"
+            aria-label={`Seen by ${readers.map(r => r.name).join(", ")}`}
+          >
+            <CheckCheck className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 transition-colors" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent
+          side="top"
+          align="center"
+          sideOffset={8}
+          collisionPadding={16}
+          className="z-[99999] min-w-[210px] max-w-[280px] p-2.5 rounded-xl bg-popover text-popover-foreground border border-border shadow-2xl backdrop-blur-md text-left [&_.rotate-45]:hidden"
+        >
+          <div className="flex items-center justify-between gap-1 pb-1.5 mb-1.5 border-b border-border/50 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+            <span className="flex items-center gap-1.5">
+              <Eye className="h-3 w-3 text-blue-500" />
+              Seen by ({readers.length})
+            </span>
+          </div>
+          <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+            {readers.map((r, idx) => (
+              <div key={r.user_id || idx} className="flex items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold text-muted-foreground shrink-0 border border-border">
+                    {r.name ? r.name.charAt(0).toUpperCase() : "U"}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="font-semibold text-[11px] text-foreground block truncate">
+                      {r.name}
+                    </span>
+                    {r.role && (
+                      <span className="text-[9px] text-muted-foreground block truncate -mt-0.5">
+                        {r.role}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span className="text-[9px] font-mono text-muted-foreground/80 shrink-0 text-right">
+                  {formatSeenTime(r.read_at)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
 
 const isSystemMessage = (msg: any) => {
   if (!msg) return false;
@@ -99,6 +220,7 @@ const STATUS_CONFIG: Record<
   CONFIRMED: { label: "Confirmed", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20", step: 1 },
   ORDER_ASSIGNED: { label: "Assigned", color: "text-indigo-600 dark:text-indigo-400", bg: "bg-indigo-500/10", border: "border-indigo-500/20", step: 1 },
   IN_PROGRESS: { label: "In Progress", color: "text-sky-600 dark:text-sky-400", bg: "bg-sky-500/10", border: "border-sky-500/20", step: 2 },
+  ON_HOLD: { label: "On Hold", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", step: 2 },
   REVIEW_DOCS: { label: "Reviewing", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20", step: 3 },
   FINAL_DOCUMENT_PREPARATION: { label: "Doc Prep", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", step: 4 },
   FINAL_DOC_READY: { label: "Final Docs Ready", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", step: 4 },
@@ -118,6 +240,28 @@ const ORDER_STAGES = [
   { id: 4, name: "Final Prep" },
   { id: 5, name: "Delivered" }
 ];
+
+const isEmojiOnlyText = (str?: string | null) => {
+  if (!str) return false;
+  const trimmed = str.trim();
+  if (!trimmed) return false;
+  const emojiRegex = /^(\p{Extended_Pictographic}|\p{Emoji_Presentation}|\p{Emoji_Modifier}|\p{Emoji_Component}|\s)+$/u;
+  return emojiRegex.test(trimmed) && trimmed.length <= 32;
+};
+
+const renderMessageContent = (text?: string) => {
+  if (!text) return null;
+
+  if (isEmojiOnlyText(text)) {
+    return (
+      <div className="text-[32px] sm:text-[38px] leading-none select-none py-1 px-1 tracking-wide inline-block">
+        {text}
+      </div>
+    );
+  }
+
+  return <span className="whitespace-pre-wrap leading-relaxed">{text}</span>;
+};
 
 export default function ClientOrderChatPage() {
   const router = useRouter();
@@ -143,10 +287,36 @@ export default function ClientOrderChatPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [deletingMessageId, setDeletingMessageId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [quotedMessage, setQuotedMessage] = useState<any | null>(null);
 
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const lastMarkedMsgIdRef = useRef<number>(0);
+
+  const markOrderChatRead = async (orderNo: string, lastMsgId: number) => {
+    if (!orderNo || !lastMsgId) return;
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNo}/read`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          channel: "CLIENT",
+          last_message_id: lastMsgId
+        })
+      });
+    } catch {
+      // silent
+    }
+  };
+
+  const handleQuoteMessage = (msg: any) => {
+    setQuotedMessage(msg);
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 50);
+  };
 
   const handleStartEdit = (msg: any) => {
     setEditingMessageId(msg.id);
@@ -167,29 +337,24 @@ export default function ClientOrderChatPage() {
         `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(selectedOrderGroup.orderNumber)}/progress/${msgId}`,
         {
           method: "PUT",
+          headers: { "Content-Type": "application/json" },
           credentials: "include",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            message: editingMessageText.trim()
-          })
+          body: JSON.stringify({ message: editingMessageText.trim() })
         }
       );
-
       if (res.ok) {
         const updated = await res.json();
         setMessages(prev => prev.map(m => (m.id === msgId ? updated : m)));
         setEditingMessageId(null);
         setEditingMessageText("");
-        toast.success("Message updated successfully");
+        toast.success("Message updated");
       } else {
-        const err = await res.json();
-        toast.error(err.detail || "Failed to update message");
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.detail || "Failed to update message");
       }
     } catch (err) {
-      console.error("Error updating message:", err);
-      toast.error("Error updating message");
+      console.error("Error editing message:", err);
+      toast.error("Failed to edit message");
     } finally {
       setSavingEdit(false);
     }
@@ -206,37 +371,61 @@ export default function ClientOrderChatPage() {
           credentials: "include"
         }
       );
-
       if (res.ok) {
         setMessages(prev => prev.filter(m => m.id !== msgId));
         setConfirmDeleteId(null);
-        toast.success("Message deleted successfully");
+        toast.success("Message deleted");
       } else {
-        const err = await res.json();
-        toast.error(err.detail || "Failed to delete message");
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.detail || "Failed to delete message");
       }
     } catch (err) {
       console.error("Error deleting message:", err);
-      toast.error("Error deleting message");
+      toast.error("Failed to delete message");
     } finally {
       setDeletingMessageId(null);
     }
   };
 
-  // 1. Fetch Orders
-  const fetchOrders = async () => {
+  const handleToggleReaction = async (msgId: number, emoji: string) => {
+    if (!selectedOrderGroup) return;
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(selectedOrderGroup.orderNumber)}/progress/${msgId}/reactions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ emoji })
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(prev =>
+          prev.map(m => (m.id === msgId ? { ...m, reactions: data.reactions } : m))
+        );
+      } else {
+        toast.error("Failed to update reaction");
+      }
+    } catch (err) {
+      console.error("Error toggling reaction:", err);
+      toast.error("Failed to toggle reaction");
+    }
+  };
 
+  // 1. Fetch Orders for active company
+  const fetchOrders = async () => {
     try {
       setLoadingOrders(true);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
-      credentials: "include",
-        });
+        credentials: "include"
+      });
       if (res.ok) {
         const data = await res.json();
         setOrders(data || []);
       }
     } catch (err) {
-      console.error("Error fetching orders:", err);
+      console.error("Error fetching client orders:", err);
     } finally {
       setLoadingOrders(false);
     }
@@ -244,7 +433,7 @@ export default function ClientOrderChatPage() {
 
   useEffect(() => {
     fetchOrders();
-  }, [clientProfile, activeCompany]);
+  }, [activeCompany]);
 
   // Group orders by order_number
   const orderGroups = React.useMemo(() => {
@@ -268,35 +457,62 @@ export default function ClientOrderChatPage() {
     }));
   }, [orders, activeCompany]);
 
-  // Auto-select order from query param or default to first
+  // Auto-select order from query param or custom event
+  const openOrderDirectly = (orderNum: string) => {
+    if (!orderNum || orderGroups.length === 0) return;
+    const matched = orderGroups.find(g => g.orderNumber?.toUpperCase() === orderNum.toUpperCase());
+    if (matched) {
+      const isCompleted = ["COMPLETED", "HARD_COPY_DELIVERED"].includes(matched.status);
+      if (isCompleted && statusFilter === "ACTIVE") {
+        setStatusFilter("ALL");
+      }
+      setSelectedOrderGroup(matched);
+      lastMarkedMsgIdRef.current = 0;
+      setSearchTerm("");
+      setTimeout(() => {
+        const el = document.getElementById(`client-order-item-${matched.orderNumber}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 200);
+    }
+  };
+
   useEffect(() => {
     if (orderGroups.length === 0) return;
 
     const orderParam = searchParams.get("order");
     if (orderParam) {
-      const matched = orderGroups.find(g => g.orderNumber === orderParam);
-      if (matched) {
-        setSelectedOrderGroup(matched);
-        return;
-      }
+      openOrderDirectly(orderParam);
+      return;
     }
 
     if (!selectedOrderGroup) {
       setSelectedOrderGroup(orderGroups[0]);
+      lastMarkedMsgIdRef.current = 0;
     }
+
+    const handleCustomOpen = (e: any) => {
+      if (e.detail?.orderNumber) {
+        openOrderDirectly(e.detail.orderNumber);
+      }
+    };
+    window.addEventListener("open-order-chat", handleCustomOpen);
+
+    return () => {
+      window.removeEventListener("open-order-chat", handleCustomOpen);
+    };
   }, [orderGroups, searchParams]);
 
   // 2. Fetch Messages for selected order (channel=CLIENT)
   const fetchMessages = async (orderNumber: string, isInitial = false) => {
-
     try {
       if (isInitial) {
         setLoadingMessages(true);
       }
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/progress?channel=CLIENT`, {
-      credentials: "include",
-          }
-      );
+        credentials: "include",
+      });
       if (res.ok) {
         const data = await res.json();
         setMessages(prev => {
@@ -305,6 +521,13 @@ export default function ClientOrderChatPage() {
           }
           return prev;
         });
+        if (data && data.length > 0) {
+          const maxId = Math.max(...data.map((m: any) => m.id || 0));
+          if (maxId > lastMarkedMsgIdRef.current) {
+            lastMarkedMsgIdRef.current = maxId;
+            markOrderChatRead(orderNumber, maxId);
+          }
+        }
       }
     } catch (err) {
       console.error("Error fetching order messages:", err);
@@ -324,6 +547,7 @@ export default function ClientOrderChatPage() {
 
   useEffect(() => {
     if (!selectedOrderGroup) return;
+    lastMarkedMsgIdRef.current = 0;
     fetchMessages(selectedOrderGroup.orderNumber, true);
 
     const interval = setInterval(() => {
@@ -359,10 +583,12 @@ export default function ClientOrderChatPage() {
 
     const messageText = inputText.trim();
     const fileToUpload = selectedFile;
+    const quoteToAttach = quotedMessage;
 
     // Immediate optimistic clearing
     setInputText("");
     setSelectedFile(null);
+    setQuotedMessage(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
 
     // Optimistic message entry
@@ -374,6 +600,13 @@ export default function ClientOrderChatPage() {
       channel: "CLIENT",
       attachment_url: fileToUpload ? "uploading..." : null,
       attachment_name: fileToUpload ? fileToUpload.name : null,
+      quoted_message_id: quoteToAttach?.id || null,
+      quoted_message_text: quoteToAttach
+        ? quoteToAttach.message || quoteToAttach.attachment_name || "Attachment"
+        : null,
+      quoted_sender_name: quoteToAttach
+        ? quoteToAttach.sender_name || (quoteToAttach.is_client ? "Client" : "Consultant")
+        : null,
       created_at: new Date().toISOString(),
       sender_name: clientProfile?.contact_person || clientProfile?.email || "You (Client)",
       sender_role: "CLIENT",
@@ -392,6 +625,15 @@ export default function ClientOrderChatPage() {
         formData.append("file", fileToUpload);
         if (messageText) {
           formData.append("message", messageText);
+        }
+        if (quoteToAttach) {
+          if (quoteToAttach.id) formData.append("quoted_message_id", String(quoteToAttach.id));
+          if (quoteToAttach.message || quoteToAttach.attachment_name) {
+            formData.append("quoted_message_text", quoteToAttach.message || quoteToAttach.attachment_name || "Attachment");
+          }
+          if (quoteToAttach.sender_name || quoteToAttach.is_client) {
+            formData.append("quoted_sender_name", quoteToAttach.sender_name || (quoteToAttach.is_client ? "Client" : "Consultant"));
+          }
         }
 
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.orderNumber}/upload-attachment`, {
@@ -413,6 +655,7 @@ export default function ClientOrderChatPage() {
           setMessages(prev => prev.filter(m => m.id !== tempId));
           setInputText(messageText);
           setSelectedFile(fileToUpload);
+          setQuotedMessage(quoteToAttach);
         }
       } else {
         // Plain text message endpoint
@@ -424,7 +667,14 @@ export default function ClientOrderChatPage() {
             },
             body: JSON.stringify({
               message: messageText,
-              channel: "CLIENT"
+              channel: "CLIENT",
+              quoted_message_id: quoteToAttach?.id || undefined,
+              quoted_message_text: quoteToAttach
+                ? quoteToAttach.message || quoteToAttach.attachment_name || "Attachment"
+                : undefined,
+              quoted_sender_name: quoteToAttach
+                ? quoteToAttach.sender_name || (quoteToAttach.is_client ? "Client" : "Consultant")
+                : undefined
             })
           }
         );
@@ -439,6 +689,7 @@ export default function ClientOrderChatPage() {
           toast.error(err.detail || "Failed to deliver message");
           setMessages(prev => prev.filter(m => m.id !== tempId));
           setInputText(messageText);
+          setQuotedMessage(quoteToAttach);
         }
       }
     } catch (err) {
@@ -447,6 +698,7 @@ export default function ClientOrderChatPage() {
       setMessages(prev => prev.filter(m => m.id !== tempId));
       setInputText(messageText);
       setSelectedFile(fileToUpload);
+      setQuotedMessage(quoteToAttach);
     } finally {
       setSending(false);
       textareaRef.current?.focus();
@@ -553,6 +805,7 @@ export default function ClientOrderChatPage() {
                 return (
                   <button
                     key={group.orderNumber}
+                    id={`client-order-item-${group.orderNumber}`}
                     onClick={() => setSelectedOrderGroup(group)}
                     className={`w-full text-left p-3 rounded-xl transition-all relative ${
                       isSelected
@@ -763,7 +1016,7 @@ export default function ClientOrderChatPage() {
                     </p>
                   </div>
                 ) : (
-                  messages.map((msg, idx) => {
+                  messages.map((msg, idx, arr) => {
                     const isSystem = isSystemMessage(msg);
                     const isSelf = msg.is_client || (msg.sender_role || "").toUpperCase() === "CLIENT";
 
@@ -783,73 +1036,55 @@ export default function ClientOrderChatPage() {
                       );
                     }
 
+                    const prevMsg = idx > 0 ? arr[idx - 1] : null;
+                    const isPrevSelf = prevMsg ? (prevMsg.is_client || (prevMsg.sender_role || "").toUpperCase() === "CLIENT") : null;
+                    const isSameSenderAsPrev = !isSystemMessage(prevMsg) && !!prevMsg && (
+                      (Boolean(msg.user_id || msg.sender_id) && (msg.user_id || msg.sender_id) === (prevMsg.user_id || prevMsg.sender_id)) ||
+                      (isSelf === isPrevSelf && Boolean(msg.sender_name) && msg.sender_name === prevMsg.sender_name)
+                    );
+
                     const isEditing = editingMessageId === msg.id;
                     const isDeleting = confirmDeleteId === msg.id;
+                    const canModify = isSelf;
+                    const emojiOnly = isEmojiOnlyText(msg.message) && !msg.quoted_message_text && !msg.attachment_name && (!msg.attachment_url || msg.attachment_url === "uploading...");
 
                     return (
                       <div
                         key={msg.id || idx}
                         className={`group flex flex-col ${isSelf ? "items-end" : "items-start"} max-w-[85%] sm:max-w-[75%] ${
                           isSelf ? "ml-auto" : "mr-auto"
-                        }`}
+                        } ${isSameSenderAsPrev ? "mt-1" : "mt-3.5"}`}
                       >
-                        <div className="flex items-center gap-1.5 mb-1 px-1">
-                          {isSelf ? (
-                            <span className="text-[11px] font-bold text-foreground">
-                              You (Client)
-                            </span>
-                          ) : (
-                            <>
-                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border-emerald-500/20 rounded-full">
-                                Consultant
-                              </Badge>
+                        {!isSameSenderAsPrev && (
+                          <div className="flex items-center gap-1.5 mb-1 px-1">
+                            {isSelf ? (
                               <span className="text-[11px] font-bold text-foreground">
-                                {msg.sender_name || "Consultant"}
+                                You (Client)
                               </span>
-                              {msg.sender_role && msg.sender_role !== "Milestone" && msg.sender_role !== "SYSTEM" && msg.sender_role.toUpperCase() !== "CLIENT" && (
-                                <span className="text-[10px] text-muted-foreground font-normal">
-                                  ({msg.sender_role})
+                            ) : (
+                              <>
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border-emerald-500/20 rounded-full">
+                                  Consultant
+                                </Badge>
+                                <span className="text-[11px] font-bold text-foreground">
+                                  {msg.sender_name || "Consultant"}
                                 </span>
-                              )}
-                            </>
-                          )}
-                          <span className="text-[10px] text-muted-foreground">
-                            {msg.created_at
-                              ? new Date(msg.created_at).toLocaleTimeString([], {
-                                  hour: "2-digit",
-                                  minute: "2-digit"
-                                })
-                              : ""}
-                          </span>
-
-                          {isSelf && !isEditing && !isDeleting && (
-                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
-                              <button
-                                type="button"
-                                onClick={() => handleStartEdit(msg)}
-                                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
-                                title="Edit message"
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeleteId(msg.id)}
-                                className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 transition-colors"
-                                title="Delete message"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                                {msg.sender_role && msg.sender_role !== "Milestone" && msg.sender_role !== "SYSTEM" && msg.sender_role.toUpperCase() !== "CLIENT" && (
+                                  <span className="text-[10px] text-muted-foreground font-normal">
+                                    ({msg.sender_role})
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
 
                         {isEditing ? (
                           <div className="w-full space-y-2 p-2.5 rounded-xl bg-background border border-emerald-500/40 shadow-md text-foreground">
                             <textarea
                               value={editingMessageText}
                               onChange={e => setEditingMessageText(e.target.value)}
-                              className="w-full text-xs sm:text-sm bg-muted/40 border border-border rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 min-h-[60px] text-foreground resize-y"
+                              className="w-full text-xs sm:text-[13px] bg-muted/40 border border-border rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 min-h-[60px] text-foreground resize-y"
                               autoFocus
                               placeholder="Edit message..."
                             />
@@ -905,48 +1140,149 @@ export default function ClientOrderChatPage() {
                             </div>
                           </div>
                         ) : (
-                          <div
-                            className={`p-3.5 sm:p-4 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-xs ${
-                              isSelf
-                                ? "bg-emerald-600 text-white rounded-tr-xs shadow-sm shadow-emerald-600/20"
-                                : "bg-background/80 dark:bg-zinc-900/80 text-foreground border border-border/50 rounded-tl-xs backdrop-blur-md"
-                            }`}
-                          >
-                            <div className="whitespace-pre-wrap">{msg.message}</div>
+                          <div className={`flex flex-col max-w-full ${isSelf ? "self-end" : "self-start"}`}>
+                            <div className="flex items-center gap-1.5 max-w-full">
+                              {/* For outgoing (client) messages, show actions & WhatsApp reaction trigger on left */}
+                              {isSelf && (
+                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  {canModify && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStartEdit(msg)}
+                                        className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+                                        title="Edit message"
+                                      >
+                                        <Pencil className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setConfirmDeleteId(msg.id)}
+                                        className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 transition-colors"
+                                        title="Delete message"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    </>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleQuoteMessage(msg)}
+                                    className="p-1 rounded-md text-muted-foreground hover:text-emerald-600 hover:bg-emerald-500/10 transition-colors"
+                                    title="Quote / Reply"
+                                  >
+                                    <Reply className="h-3 w-3" />
+                                  </button>
+                                  <WhatsAppReactionHoverBar
+                                    onToggleReaction={emoji => handleToggleReaction(msg.id, emoji)}
+                                    align="end"
+                                    side="top"
+                                  />
+                                </div>
+                              )}
 
-                            {/* Client Uploaded Attachment Receipt */}
-                            {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
                               <div
-                                className={`mt-2.5 flex items-center gap-2.5 p-2.5 rounded-xl border text-xs shadow-2xs backdrop-blur-xs ${
+                                className={`rounded-2xl leading-relaxed shadow-xs ${
+                                  emojiOnly
+                                    ? "px-2.5 py-1"
+                                    : "px-3.5 py-2 text-xs sm:text-[13px]"
+                                } ${
                                   isSelf
-                                    ? "bg-white/10 dark:bg-black/25 border-white/20 text-white"
-                                    : "bg-background dark:bg-zinc-950/70 border-border/50 text-foreground"
+                                    ? "bg-emerald-600 text-white rounded-tr-sm shadow-sm shadow-emerald-600/20"
+                                    : "bg-background/80 dark:bg-zinc-900/80 text-foreground border border-border/50 rounded-tl-sm backdrop-blur-md"
                                 }`}
                               >
-                                <div
-                                  className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${
-                                    isSelf
-                                      ? "bg-white/20 text-white border-white/30"
-                                      : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                                  }`}
-                                >
-                                  <ShieldCheck className="h-4 w-4" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <span className="font-bold truncate block text-[11px] sm:text-xs">
-                                    {msg.attachment_name || "Shared Document"}
-                                  </span>
-                                  <span
-                                    className={`text-[9px] sm:text-[10px] flex items-center gap-1 mt-0.5 ${
-                                      isSelf ? "text-white/80" : "text-muted-foreground"
+                                {/* Quoted Message Header Preview */}
+                                {(msg.quoted_message_text || msg.quoted_sender_name) && (
+                                  <div
+                                    className={`mb-2 p-2 rounded-lg border-l-2 text-xs flex flex-col gap-0.5 ${
+                                      isSelf
+                                        ? "bg-black/20 border-white/80 text-white/90"
+                                        : "bg-muted/50 border-emerald-500 text-muted-foreground"
                                     }`}
                                   >
-                                    <Lock className="h-2.5 w-2.5 shrink-0 text-emerald-400" />
-                                    Stored in Company Vault (Order #{selectedOrderGroup.orderNumber})
-                                  </span>
-                                </div>
+                                    <div className="flex items-center gap-1 font-semibold text-[11px] opacity-90">
+                                      <Quote className="h-3 w-3 shrink-0" />
+                                      <span>{msg.quoted_sender_name || "Original Message"}</span>
+                                    </div>
+                                    <div className="text-[11px] truncate line-clamp-1 italic">
+                                      {msg.quoted_message_text}
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div>{renderMessageContent(msg.message)}</div>
+
+                                {/* Client Uploaded Attachment Receipt */}
+                                {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
+                                  <div
+                                    className={`mt-2 flex items-center gap-2.5 p-2 rounded-xl border text-xs shadow-2xs backdrop-blur-xs ${
+                                      isSelf
+                                        ? "bg-white/10 dark:bg-black/25 border-white/20 text-white"
+                                        : "bg-background dark:bg-zinc-950/70 border-border/50 text-foreground"
+                                    }`}
+                                  >
+                                    <div
+                                      className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 border ${
+                                        isSelf
+                                          ? "bg-white/20 text-white border-white/30"
+                                          : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                      }`}
+                                    >
+                                      <ShieldCheck className="h-3.5 w-3.5" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <span className="font-bold truncate block text-[11px] sm:text-xs">
+                                        {msg.attachment_name || "Shared Document"}
+                                      </span>
+                                      <span
+                                        className={`text-[9px] sm:text-[10px] flex items-center gap-1 mt-0.5 ${
+                                          isSelf ? "text-white/80" : "text-muted-foreground"
+                                        }`}
+                                      >
+                                        <Lock className="h-2.5 w-2.5 shrink-0 text-emerald-400" />
+                                        Stored in Company Vault (Order #{selectedOrderGroup.orderNumber})
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                            )}
+
+                              {/* For incoming (consultant) messages, show actions & WhatsApp reaction trigger on right */}
+                              {!isSelf && (
+                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <WhatsAppReactionHoverBar
+                                    onToggleReaction={emoji => handleToggleReaction(msg.id, emoji)}
+                                    align="start"
+                                    side="top"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleQuoteMessage(msg)}
+                                    className="p-1 rounded-md text-muted-foreground hover:text-emerald-600 hover:bg-emerald-500/10 transition-colors"
+                                    title="Quote / Reply"
+                                  >
+                                    <Reply className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Outside on the right side, vertically centered in the middle */}
+                              <div className="flex items-center justify-center shrink-0 self-center select-none">
+                                <SeenReceiptsIndicator
+                                  seenBy={msg.seen_by}
+                                  isSelf={isSelf}
+                                  sentAt={msg.created_at}
+                                />
+                              </div>
+                            </div>
+
+                            {/* WhatsApp style reaction badges at the bottom of the message */}
+                            <ChatMessageReactions
+                              reactions={msg.reactions}
+                              onToggleReaction={emoji => handleToggleReaction(msg.id, emoji)}
+                              isSelf={isSelf}
+                            />
                           </div>
                         )}
                       </div>
@@ -957,6 +1293,33 @@ export default function ClientOrderChatPage() {
 
               {/* Message Input Dock */}
               <div className="p-3.5 sm:p-4 border-t border-border/40 bg-background/80 backdrop-blur-md space-y-2">
+                {/* Quoted Message Preview Banner */}
+                {quotedMessage && (
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-muted/60 border-l-4 border-emerald-500 text-xs shadow-xs animate-in fade-in">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Quote className="h-4 w-4 text-emerald-500 shrink-0" />
+                      <div className="min-w-0">
+                        <span className="font-semibold text-foreground truncate block text-xs">
+                          Replying to {quotedMessage.sender_name || (quotedMessage.is_client ? "Client" : "Consultant")}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground truncate block">
+                          {quotedMessage.message || quotedMessage.attachment_name || "Attachment"}
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setQuotedMessage(null)}
+                      className="h-5 w-5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
+                      title="Cancel Quote"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+
                 {/* Selected File Indicator Chip */}
                 {selectedFile && (
                   <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs shadow-xs animate-in fade-in">
@@ -1018,6 +1381,25 @@ export default function ClientOrderChatPage() {
                   >
                     <Paperclip className="h-4 w-4" />
                   </Button>
+
+                  {/* Insert Emoji Button on Left */}
+                  <ChatEmojiPicker
+                    onSelectEmoji={emoji => {
+                      setInputText(prev => prev + emoji);
+                      textareaRef.current?.focus();
+                    }}
+                    side="top"
+                    align="start"
+                    trigger={
+                      <button
+                        type="button"
+                        className="h-[46px] w-[46px] rounded-xl border border-border/50 bg-background/70 text-muted-foreground hover:text-foreground flex items-center justify-center shrink-0 transition-colors focus:outline-none"
+                        title="Insert Emoji"
+                      >
+                        <Smile className="h-4 w-4" />
+                      </button>
+                    }
+                  />
 
                   <textarea
                     ref={textareaRef}

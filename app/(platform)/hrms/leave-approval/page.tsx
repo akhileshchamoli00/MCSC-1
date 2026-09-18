@@ -9,7 +9,7 @@ import {
   Loader2, CheckCircle, XCircle, Clock, FileText, Eye, Paperclip, 
   Pencil, Trash2, Plus, Search, FileCheck2, UserCheck, Calendar, 
   CalendarDays, Send, Building2, User, Sparkles, CheckCircle2, 
-  AlertCircle, ShieldCheck, Tag, Briefcase
+  AlertCircle, ShieldCheck, Tag, Briefcase, Mail, Info, ChevronDown, ChevronUp, ExternalLink, Check
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { KpiCard } from "@/components/kpi-card";
+import { SearchableEmployeeSelect } from "@/components/searchable-employee-select";
 
 const QUICK_LEAVE_REASONS = [
   "Annual Vacation",
@@ -95,6 +96,63 @@ export default function LeaveApprovalPage() {
     is_half_day: false,
     half_day_session: "MORNING"
   });
+
+  // Leave Application Reminder State
+  const [isLeaveReminderOpen, setIsLeaveReminderOpen] = useState(false);
+  const [reminderEmployeeId, setReminderEmployeeId] = useState("");
+  const [reminderCustomNote, setReminderCustomNote] = useState("");
+  const [isSendingReminder, setIsSendingReminder] = useState(false);
+
+  const handleSendLeaveReminder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reminderEmployeeId) {
+      showAlert("Please select an employee to receive the reminder notice.", "Selection Required");
+      return;
+    }
+
+    try {
+      setIsSendingReminder(true);
+      const payload = {
+        employee_id: parseInt(reminderEmployeeId),
+        custom_note: reminderCustomNote.trim() || undefined,
+      };
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/leave/send-reminder`, {
+        credentials: "include",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setIsLeaveReminderOpen(false);
+        setReminderEmployeeId("");
+        setReminderCustomNote("");
+        showAlert(
+          `Official leave application reminder has been successfully dispatched to ${data.employee_name || "the employee"} (${data.recipient_email}).`,
+          "Reminder Email Sent"
+        );
+      } else {
+        let errorDetail = "Failed to send leave reminder.";
+        try {
+          const errorJson = await res.json();
+          errorDetail = errorJson.detail || errorJson.message || errorDetail;
+        } catch {
+          const rawText = await res.text().catch(() => "");
+          if (rawText) errorDetail = rawText;
+        }
+        showAlert(errorDetail, "Error Sending Reminder");
+      }
+    } catch (err: any) {
+      console.error(err);
+      showAlert(err?.message || "An unexpected error occurred while communicating with the server.", "Error");
+    } finally {
+      setIsSendingReminder(false);
+    }
+  };
 
   const fetchEmployees = async () => {
     try {
@@ -351,13 +409,28 @@ export default function LeaveApprovalPage() {
           </div>
         </div>
 
-        {/* Apply Leave on Behalf Button */}
-        <Button 
-          onClick={() => setIsApplyingOnBehalf(true)} 
-          className="gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm shrink-0"
-        >
-          <Plus className="h-4 w-4" /> Apply Leave on Behalf
-        </Button>
+        {/* Actions Button Group */}
+        <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
+          {/* Remind to Apply Leave Button */}
+          <Button 
+            onClick={() => {
+              setIsLeaveReminderOpen(true);
+              setReminderEmployeeId("");
+              setReminderCustomNote("");
+            }} 
+            className="gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm shrink-0 cursor-pointer"
+          >
+            <Mail className="h-4 w-4" /> Remind to Apply Leave
+          </Button>
+
+          {/* Apply Leave on Behalf Button */}
+          <Button 
+            onClick={() => setIsApplyingOnBehalf(true)} 
+            className="gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm shrink-0 cursor-pointer"
+          >
+            <Plus className="h-4 w-4" /> Apply Leave on Behalf
+          </Button>
+        </div>
       </div>
 
       {/* TEXT FILTER */}
@@ -780,26 +853,13 @@ export default function LeaveApprovalPage() {
                 )}
               </div>
 
-              <Select 
+              <SearchableEmployeeSelect 
+                employees={employeesList}
                 value={adminLeaveForm.employee_id} 
-                onValueChange={(val) => setAdminLeaveForm({...adminLeaveForm, employee_id: val})}
-              >
-                <SelectTrigger className="h-11 rounded-2xl border-border/60 bg-background/60 shadow-xs text-xs font-semibold hover:border-emerald-500/50 transition-colors">
-                  <SelectValue placeholder="Search or select an employee..." />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl max-h-64 border-border/50 shadow-xl">
-                  {employeesList.map(emp => (
-                    <SelectItem key={emp.id} value={emp.id.toString()} className="text-xs cursor-pointer py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-foreground">{emp.first_name} {emp.last_name}</span>
-                        <span className="text-[11px] text-muted-foreground">
-                          ({getDeptName(emp.department || emp.department_name)} • {getJobTitle(emp.job_title, emp.role)})
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(empId) => setAdminLeaveForm({...adminLeaveForm, employee_id: empId})}
+                placeholder="Search or select team member..."
+                accentColor="emerald"
+              />
 
               {/* Live Selected Employee Preview Card */}
               {(() => {
@@ -1046,6 +1106,257 @@ export default function LeaveApprovalPage() {
                 ) : (
                   <>
                     <Send className="h-3.5 w-3.5" /> Submit Leave on Behalf
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Leave Application Reminder Dialog */}
+      <Dialog open={isLeaveReminderOpen} onOpenChange={setIsLeaveReminderOpen}>
+        <DialogContent className="sm:max-w-4xl lg:max-w-5xl w-[95vw] max-h-[92vh] overflow-y-auto border border-indigo-500/30 bg-background/95 backdrop-blur-xl shadow-2xl rounded-3xl p-6 sm:p-7">
+          <DialogHeader className="space-y-2 border-b border-border/40 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/30 shrink-0">
+                <Mail className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 dark:from-indigo-400 dark:to-violet-400 bg-clip-text text-transparent">
+                  Send Leave Application Reminder
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                  Send an official email reminder to an employee who has taken unlogged time off to submit their formal leave application for HR attendance & payroll compliance.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <form onSubmit={handleSendLeaveReminder} className="space-y-6 pt-2">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Left Column: Selection & Manager Note */}
+              <div className="lg:col-span-5 space-y-4">
+                {/* Employee Selector */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-indigo-500" />
+                    Select Employee <span className="text-rose-500">*</span>
+                  </label>
+
+                  <SearchableEmployeeSelect 
+                    employees={employeesList}
+                    value={reminderEmployeeId} 
+                    onChange={(empId) => setReminderEmployeeId(empId)}
+                    placeholder="Search employee by name, email, department or ID..."
+                    accentColor="indigo"
+                  />
+
+                  {/* Selected Employee Highlight Card */}
+                  {(() => {
+                    const selectedEmp = employeesList.find(e => e.id.toString() === reminderEmployeeId);
+                    if (!selectedEmp) return null;
+                    const deptDisplay = getDeptName(selectedEmp.department || selectedEmp.department_name);
+                    const titleDisplay = getJobTitle(selectedEmp.job_title, selectedEmp.role);
+                    const empEmail = selectedEmp.email || selectedEmp.user?.email || "No email on record";
+
+                    return (
+                      <div className="flex items-center justify-between p-3.5 rounded-2xl bg-indigo-500/5 dark:bg-indigo-500/10 border border-indigo-500/20 text-xs animate-in fade-in duration-300">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-violet-500/20 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-600 dark:text-indigo-400 shrink-0 text-xs shadow-xs">
+                            {selectedEmp.first_name?.[0]}{selectedEmp.last_name?.[0]}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold text-foreground text-xs truncate">
+                              {selectedEmp.first_name} {selectedEmp.last_name}
+                            </p>
+                            <p className="text-muted-foreground text-[11px] truncate flex items-center gap-1.5 mt-0.5">
+                              <span className="text-foreground/80 font-medium">{titleDisplay}</span>
+                              <span>•</span>
+                              <span>{deptDisplay}</span>
+                              {selectedEmp.employee_id_custom && (
+                                <>
+                                  <span>•</span>
+                                  <span className="font-mono text-[10px] text-muted-foreground">#{selectedEmp.employee_id_custom}</span>
+                                </>
+                              )}
+                            </p>
+                            <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium flex items-center gap-1 mt-0.5">
+                              <Mail className="h-3 w-3 inline shrink-0" />
+                              <span className="truncate">{empEmail}</span>
+                            </p>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 text-[10px] shrink-0 font-semibold px-2.5 py-1 rounded-lg">
+                          Recipient
+                        </Badge>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Optional Custom Manager Note */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5 text-indigo-500" />
+                      Personal Manager / HR Note
+                    </span>
+                    <span className="text-[10px] text-muted-foreground font-normal">Optional</span>
+                  </label>
+                  
+                  <Textarea 
+                    value={reminderCustomNote}
+                    onChange={(e) => setReminderCustomNote(e.target.value)}
+                    placeholder="Add specific context or deadline (e.g., 'Please ensure this is submitted before this Friday's payroll cut-off so that your attendance and pay remain accurate.')..."
+                    className="min-h-[90px] rounded-2xl border-border/60 bg-background/60 text-xs leading-relaxed focus:border-indigo-500/50 p-3"
+                  />
+
+                  {/* Quick Note Chips */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase mr-1">Quick:</span>
+                    {[
+                      "Please submit before payroll cut-off.",
+                      "Noticed your absence earlier this month.",
+                      "Please ensure leave records remain updated."
+                    ].map((note) => (
+                      <button
+                        key={note}
+                        type="button"
+                        onClick={() => setReminderCustomNote(note)}
+                        className="text-[11px] px-2.5 py-1 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/40 transition-colors cursor-pointer font-medium"
+                      >
+                        {note}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Live Email Preview (Shown by Default) */}
+              <div className="lg:col-span-7 space-y-2.5">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                    <Eye className="h-3.5 w-3.5" />
+                    Live Email Preview (Recipient View)
+                  </span>
+                  {(() => {
+                    const selectedEmp = employeesList.find(e => e.id.toString() === reminderEmployeeId);
+                    return (
+                      <span className="text-[11px] text-muted-foreground truncate max-w-[240px]">
+                        To: <strong className="text-foreground">{selectedEmp?.email || selectedEmp?.user?.email || "employee@company.com"}</strong>
+                      </span>
+                    );
+                  })()}
+                </div>
+
+                <div className="rounded-2xl border border-indigo-500/30 bg-card/90 shadow-sm p-4 sm:p-5 space-y-3.5 text-xs">
+                  {/* Mock Email Header */}
+                  <div className="flex items-center justify-between border-b border-border/50 pb-3">
+                    <div className="relative flex items-center">
+                      <img
+                        src="/logo.png"
+                        alt="MCS Logo"
+                        className="h-8 w-auto object-contain dark:hidden"
+                      />
+                      <img
+                        src="/logo-dark.png"
+                        alt="MCS Logo"
+                        className="h-8 w-auto object-contain hidden dark:block"
+                      />
+                    </div>
+                    <Badge className="bg-indigo-600 text-white text-[10px] px-2.5 py-0.5 rounded-md font-semibold">
+                      Official Notice
+                    </Badge>
+                  </div>
+
+                  {/* Greeting */}
+                  {(() => {
+                    const selectedEmp = employeesList.find(e => e.id.toString() === reminderEmployeeId);
+                    return (
+                      <p className="font-semibold text-foreground text-sm">
+                        Dear {selectedEmp?.first_name || "Team Member"},
+                      </p>
+                    );
+                  })()}
+
+                  <p className="text-muted-foreground leading-relaxed text-xs">
+                    Our attendance records indicate that you have taken time off / leave this month, but an official leave request has not yet been submitted in the company HR portal.
+                  </p>
+
+                  {/* Details Card */}
+                  {(() => {
+                    const selectedEmp = employeesList.find(e => e.id.toString() === reminderEmployeeId);
+                    const deptDisplay = selectedEmp ? getDeptName(selectedEmp.department || selectedEmp.department_name) : "General Operations";
+
+                    return (
+                      <div className="p-3.5 rounded-xl bg-muted/50 border border-border/50 space-y-1.5 text-xs">
+                        <div className="flex justify-between items-center py-0.5">
+                          <span className="text-muted-foreground font-medium">Employee Name:</span>
+                          <span className="font-bold text-foreground">{selectedEmp ? `${selectedEmp.first_name} ${selectedEmp.last_name}` : "—"}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-0.5">
+                          <span className="text-muted-foreground font-medium">Department:</span>
+                          <span className="font-semibold text-foreground">{deptDisplay}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-0.5">
+                          <span className="text-muted-foreground font-medium">Action Required:</span>
+                          <span className="font-bold text-indigo-600 dark:text-indigo-400">Submit Formal Leave Request</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Dynamic Manager Note in preview */}
+                  {reminderCustomNote && (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-950 dark:text-amber-200 text-xs animate-in fade-in duration-200">
+                      <p className="font-bold text-[11px] uppercase tracking-wider mb-0.5 text-amber-800 dark:text-amber-300">Manager / HR Note:</p>
+                      <p className="italic">"{reminderCustomNote}"</p>
+                    </div>
+                  )}
+
+                  {/* Action CTA Button Mockup */}
+                  <div className="text-center py-2">
+                    <span className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-500/20">
+                      Submit Leave Request in Portal →
+                    </span>
+                  </div>
+
+                  {/* Policy Compliance Callout */}
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-950 dark:text-emerald-200 text-[11px] leading-relaxed">
+                    <p className="font-bold flex items-center gap-1 text-emerald-800 dark:text-emerald-300 mb-0.5">
+                      <ShieldCheck className="h-3.5 w-3.5 inline" /> Important HR Policy Reminder:
+                    </p>
+                    <p>
+                      Please make sure not to forget applying for your leave. In accordance with company policy, all absences and leaves must be formally recorded and approved through the portal to maintain accurate attendance records and ensure smooth payroll processing.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <DialogFooter className="border-t border-border/40 pt-4 flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5">
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full sm:w-auto h-11 px-5 rounded-2xl border-border/60 text-xs font-semibold hover:bg-muted cursor-pointer" 
+                onClick={() => setIsLeaveReminderOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={isSendingReminder || !reminderEmployeeId} 
+                className="w-full sm:w-auto h-11 px-6 rounded-2xl text-xs font-bold bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/20 gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isSendingReminder ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Sending Email Reminder...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-3.5 w-3.5" /> Send Leave Reminder Email
                   </>
                 )}
               </Button>

@@ -124,6 +124,13 @@ export default function BusinessDashboard() {
             IN PROGRESS
           </span>
         );
+      case "ON_HOLD":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-amber-500" />
+            ON HOLD
+          </span>
+        );
       case "REVIEW_DOCS":
         return (
           <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-teal-500/10 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400 border-teal-500/20">

@@ -508,11 +508,14 @@ def run_migrations():
                 conn.rollback()
                 handle_migration_error(col, "notaries", e)
 
-        # Add channel, attachment_url, and attachment_name columns to client_order_progress
+        # Add channel, attachment_url, attachment_name, and quote columns to client_order_progress
         progress_cols = [
             ("channel", "VARCHAR(50) DEFAULT 'INTERNAL'"),
             ("attachment_url", "VARCHAR(500) DEFAULT NULL"),
-            ("attachment_name", "VARCHAR(255) DEFAULT NULL")
+            ("attachment_name", "VARCHAR(255) DEFAULT NULL"),
+            ("quoted_message_id", "INTEGER DEFAULT NULL"),
+            ("quoted_message_text", "TEXT DEFAULT NULL"),
+            ("quoted_sender_name", "VARCHAR(255) DEFAULT NULL")
         ]
         for col, col_type in progress_cols:
             try:
@@ -605,12 +608,34 @@ def run_migrations():
             conn.rollback()
             handle_migration_error("service_instructions", "client_orders", e)
 
+        # Create client_order_progress_reactions table if not exists
+        try:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS client_order_progress_reactions (
+                    id SERIAL PRIMARY KEY,
+                    progress_id INTEGER NOT NULL REFERENCES client_order_progress(id) ON DELETE CASCADE,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    emoji VARCHAR(32) NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    CONSTRAINT uq_client_order_msg_user_emoji UNIQUE (progress_id, user_id, emoji)
+                )
+            """))
+            conn.commit()
+            print("Verified/created table 'client_order_progress_reactions'.")
+        except Exception as e:
+            conn.rollback()
+            print(f"Notice on client_order_progress_reactions table: {e}")
+
         # Create indexes for clients/customers and relations
         for idx_sql, idx_name in [
             ("CREATE INDEX IF NOT EXISTS ix_clients_customer_code ON clients (customer_code)", "ix_clients_customer_code"),
             ("CREATE INDEX IF NOT EXISTS ix_clients_company_id ON clients (company_id)", "ix_clients_company_id"),
             ("CREATE INDEX IF NOT EXISTS ix_client_companies_customer_id ON client_companies (customer_id)", "ix_client_companies_customer_id"),
             ("CREATE INDEX IF NOT EXISTS ix_client_orders_customer_id ON client_orders (customer_id)", "ix_client_orders_customer_id"),
+            ("CREATE UNIQUE INDEX IF NOT EXISTS uq_order_user_reads_order_chan_user ON client_order_user_reads (order_number, channel, user_id)", "uq_order_user_reads_order_chan_user"),
+            ("CREATE INDEX IF NOT EXISTS ix_order_user_reads_order_chan ON client_order_user_reads (order_number, channel)", "ix_order_user_reads_order_chan"),
+            ("CREATE INDEX IF NOT EXISTS ix_order_msg_reactions_progress_id ON client_order_progress_reactions (progress_id)", "ix_order_msg_reactions_progress_id"),
+            ("CREATE INDEX IF NOT EXISTS ix_order_msg_reactions_user_id ON client_order_progress_reactions (user_id)", "ix_order_msg_reactions_user_id"),
         ]:
             try:
                 conn.execute(text(idx_sql))

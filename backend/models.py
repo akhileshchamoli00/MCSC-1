@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Date, Enum, Float, JSON, Table, Text
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Date, Enum, Float, JSON, Table, Text, UniqueConstraint
 import enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -893,7 +893,41 @@ class ClientOrderProgress(Base):
     channel = Column(String, default="INTERNAL", index=True)  # "CLIENT" or "INTERNAL"
     attachment_url = Column(String, nullable=True)
     attachment_name = Column(String, nullable=True)
+    quoted_message_id = Column(Integer, nullable=True)
+    quoted_message_text = Column(String, nullable=True)
+    quoted_sender_name = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User")
+    reactions = relationship("ClientOrderProgressReaction", back_populates="progress", cascade="all, delete-orphan")
+
+
+class ClientOrderProgressReaction(Base):
+    __tablename__ = "client_order_progress_reactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    progress_id = Column(Integer, ForeignKey("client_order_progress.id", ondelete="CASCADE"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    emoji = Column(String(32), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("progress_id", "user_id", "emoji", name="uq_client_order_msg_user_emoji"),
+    )
+
+    user = relationship("User")
+    progress = relationship("ClientOrderProgress", back_populates="reactions")
+
+
+class ClientOrderUserRead(Base):
+    __tablename__ = "client_order_user_reads"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_number = Column(String, index=True, nullable=False)
+    channel = Column(String, default="CLIENT", index=True, nullable=False)  # "CLIENT" or "INTERNAL"
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    last_read_message_id = Column(Integer, nullable=False, default=0)
+    read_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     user = relationship("User")
 

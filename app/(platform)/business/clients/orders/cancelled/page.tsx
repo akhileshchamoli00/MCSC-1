@@ -259,6 +259,42 @@ export default function CancelledOrdersPage() {
   // Filter ONLY Cancelled orders
   const allCancelledOrders = groupedOrders.filter((ord) => (ord.status || "").toUpperCase() === "CANCELLED");
 
+  const [highlightedOrderNum, setHighlightedOrderNum] = useState<string | null>(null);
+
+  const openOrderDirectly = (orderNum: string, openChat: boolean = true) => {
+    if (!orderNum || allCancelledOrders.length === 0) return;
+
+    const matched = allCancelledOrders.find((o) => o.order_number?.toUpperCase() === orderNum.toUpperCase());
+    if (matched) {
+      setSearchTerm("");
+      const orderIdx = allCancelledOrders.findIndex(o => o.order_number?.toUpperCase() === orderNum.toUpperCase());
+      if (orderIdx !== -1) {
+        const targetPage = Math.floor(orderIdx / 10) + 1;
+        setCurrentPage(targetPage);
+      }
+      setSelectedOrderGroup(matched);
+      if (openChat) {
+        setIsChatOpen(true);
+        fetchProgressUpdates(matched.order_number);
+      } else {
+        setIsViewOpen(true);
+        fetchProgressUpdates(matched.order_number);
+      }
+
+      setHighlightedOrderNum(matched.order_number);
+      setTimeout(() => {
+        const el = document.getElementById(`order-row-${matched.order_number}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 300);
+
+      setTimeout(() => {
+        setHighlightedOrderNum(null);
+      }, 4000);
+    }
+  };
+
   // Auto-open chat or view from URL query parameter (for notifications / deep links)
   useEffect(() => {
     if (allCancelledOrders.length === 0) return;
@@ -269,25 +305,26 @@ export default function CancelledOrdersPage() {
       const orderNum = params.get("order");
       const openChat = params.get("chat");
       if (orderNum) {
-        const matched = allCancelledOrders.find((o) => o.order_number === orderNum);
-        if (matched) {
-          setSelectedOrderGroup(matched);
-          if (openChat === "true") {
-            setIsChatOpen(true);
-            fetchProgressUpdates(orderNum);
-          } else {
-            setIsViewOpen(true);
-            fetchProgressUpdates(orderNum);
-          }
-          const url = new URL(window.location.href);
-          url.searchParams.delete("order");
-          url.searchParams.delete("chat");
-          window.history.replaceState({}, "", url.pathname + url.search);
-        }
+        openOrderDirectly(orderNum, openChat === "true" || openChat === null);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("order");
+        url.searchParams.delete("chat");
+        window.history.replaceState({}, "", url.pathname + url.search);
       }
     };
 
     checkParams();
+
+    const handleCustomOpen = (e: any) => {
+      if (e.detail?.orderNumber) {
+        openOrderDirectly(e.detail.orderNumber, e.detail.chat ?? true);
+      }
+    };
+    window.addEventListener("open-order-chat", handleCustomOpen);
+
+    return () => {
+      window.removeEventListener("open-order-chat", handleCustomOpen);
+    };
   }, [allCancelledOrders]);
 
   const filteredOrders = allCancelledOrders.filter((ord) => {
@@ -709,8 +746,18 @@ export default function CancelledOrdersPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {paginatedOrders.map((ord, index) => (
-                        <tr key={ord.order_number || index} className="hover:bg-muted/30 transition-colors border-b last:border-0">
+                      {paginatedOrders.map((ord, index) => {
+                        const isHighlighted = highlightedOrderNum === ord.order_number;
+                        return (
+                        <tr 
+                          key={ord.order_number || index} 
+                          id={`order-row-${ord.order_number}`}
+                          className={`transition-all duration-300 border-b last:border-0 ${
+                            isHighlighted 
+                              ? "bg-emerald-500/20 dark:bg-emerald-500/25 ring-2 ring-emerald-500 ring-inset shadow-md" 
+                              : "hover:bg-muted/30"
+                          }`}
+                        >
                           <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5">
                             #{startIndex + index + 1}
                           </td>
@@ -880,7 +927,8 @@ export default function CancelledOrdersPage() {
                             )}
                           </td>
                         </tr>
-                      ))}
+                      );
+                    })}
                     </tbody>
                   </table>
                 </div>

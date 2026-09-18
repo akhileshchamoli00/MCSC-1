@@ -344,6 +344,19 @@ class LeaveBalanceAuditResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class LeaveReminderRequest(BaseModel):
+    employee_id: int
+    leave_type: Optional[str] = "Annual Leave"
+    approximate_dates: Optional[str] = None
+    custom_note: Optional[str] = None
+    cc_emails: Optional[List[str]] = None
+
+class LeaveReminderResponse(BaseModel):
+    success: bool
+    message: str
+    recipient_email: str
+    employee_name: str
+
 class PayrollBase(BaseModel):
     payroll_month: int
     payroll_year: int
@@ -1143,6 +1156,8 @@ class ClientOrderUpdate(BaseModel):
     payment_link: Optional[str] = None
     xendit_invoice_id: Optional[str] = None
     notary_id: Optional[int] = None
+    hold_reason: Optional[str] = None
+    hold_channel: Optional[str] = "CLIENT"
 
 class CompanyStakeholderCreate(BaseModel):
     name: str
@@ -1336,10 +1351,47 @@ class ClientOrderProgressCreate(BaseModel):
     channel: Optional[str] = "INTERNAL"  # "CLIENT" or "INTERNAL"
     attachment_url: Optional[str] = None
     attachment_name: Optional[str] = None
+    quoted_message_id: Optional[int] = None
+    quoted_message_text: Optional[str] = None
+    quoted_sender_name: Optional[str] = None
 
 
 class ClientOrderProgressUpdate(BaseModel):
     message: str
+
+
+class MessageSeenUser(BaseModel):
+    user_id: int
+    name: str
+    role: Optional[str] = None
+    avatar: Optional[str] = None
+    is_client: Optional[bool] = False
+    read_at: Optional[datetime] = None
+
+
+class MessageReactionUser(BaseModel):
+    user_id: int
+    name: str
+    role: Optional[str] = None
+    avatar: Optional[str] = None
+    is_client: Optional[bool] = False
+    is_self: Optional[bool] = False
+
+
+class MessageReactionGroup(BaseModel):
+    emoji: str
+    count: int
+    has_reacted: bool = False
+    users: List[MessageReactionUser] = []
+
+
+class MessageReactionToggleRequest(BaseModel):
+    emoji: str
+
+
+class OrderMarkReadRequest(BaseModel):
+    channel: str = "CLIENT"  # "CLIENT" or "INTERNAL"
+    last_message_id: int
 
 
 class ClientOrderProgressResponse(BaseModel):
@@ -1350,11 +1402,16 @@ class ClientOrderProgressResponse(BaseModel):
     channel: str = "INTERNAL"
     attachment_url: Optional[str] = None
     attachment_name: Optional[str] = None
+    quoted_message_id: Optional[int] = None
+    quoted_message_text: Optional[str] = None
+    quoted_sender_name: Optional[str] = None
     created_at: datetime
     sender_name: Optional[str] = None
     sender_role: Optional[str] = None
     sender_avatar: Optional[str] = None
     is_client: Optional[bool] = False
+    seen_by: List[MessageSeenUser] = []
+    reactions: List[MessageReactionGroup] = []
 
     class Config:
         from_attributes = True

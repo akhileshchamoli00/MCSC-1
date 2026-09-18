@@ -175,16 +175,32 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
       markAsRead(notif.id);
     }
     setOpen(false);
-    if (notif.action_url) {
-      let targetUrl = notif.action_url;
+
+    let targetUrl = notif.action_url || "";
+
+    // Extract order number from action_url, title, or message if present
+    const orderMatch = (targetUrl + " " + (notif.title || "") + " " + (notif.message || "")).match(/(ORD-[A-Za-z0-9\-]+)/i);
+    const orderNum = orderMatch ? orderMatch[1].toUpperCase() : null;
+
+    if (!targetUrl && orderNum) {
+      if (isClientUser) {
+        targetUrl = `/client/chat?order=${encodeURIComponent(orderNum)}`;
+      } else if (isAdmin || hasPermission("clients_orders_active", "view")) {
+        targetUrl = `/business/assigned-orders?order=${encodeURIComponent(orderNum)}&chat=true`;
+      } else {
+        targetUrl = `/business/assigned-orders?order=${encodeURIComponent(orderNum)}&chat=true`;
+      }
+    }
+
+    if (targetUrl) {
+      // Ensure chat=true is included for order navigation
+      if (orderNum && !targetUrl.includes("chat=")) {
+        targetUrl += targetUrl.includes("?") ? "&chat=true" : "?chat=true";
+      }
+
       if (isClientUser && (targetUrl.startsWith("/business/") || targetUrl.startsWith("/hrms/"))) {
-        if (targetUrl.includes("order=")) {
-          const match = targetUrl.match(/order=([^&]+)/);
-          if (match) {
-            targetUrl = `/client/chat?order=${match[1]}`;
-          } else {
-            targetUrl = "/client/orders";
-          }
+        if (orderNum) {
+          targetUrl = `/client/chat?order=${encodeURIComponent(orderNum)}`;
         } else {
           targetUrl = "/client/orders";
         }
@@ -192,9 +208,8 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
         // Staff user - check module permissions before navigating
         if (targetUrl.startsWith("/business/clients/orders/completed")) {
           if (!hasPermission("clients_orders_completed", "view")) {
-            if (hasPermission("clients_my", "view") && targetUrl.includes("order=")) {
-              const match = targetUrl.match(/order=([^&]+)/);
-              targetUrl = `/business/assigned-orders?order=${match ? match[1] : ""}&chat=true`;
+            if (hasPermission("clients_my", "view") && orderNum) {
+              targetUrl = `/business/assigned-orders?order=${encodeURIComponent(orderNum)}&chat=true`;
             } else {
               toast.error("Access Denied: You do not have permission to access Completed Orders.");
               return;
@@ -202,9 +217,8 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
           }
         } else if (targetUrl.startsWith("/business/clients/orders/cancelled")) {
           if (!hasPermission("clients_orders_cancelled", "view")) {
-            if (hasPermission("clients_my", "view") && targetUrl.includes("order=")) {
-              const match = targetUrl.match(/order=([^&]+)/);
-              targetUrl = `/business/assigned-orders?order=${match ? match[1] : ""}&chat=true`;
+            if (hasPermission("clients_my", "view") && orderNum) {
+              targetUrl = `/business/assigned-orders?order=${encodeURIComponent(orderNum)}&chat=true`;
             } else {
               toast.error("Access Denied: You do not have permission to access Cancelled Orders.");
               return;
@@ -212,9 +226,8 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
           }
         } else if (targetUrl.startsWith("/business/clients/orders/pipeline")) {
           if (!hasPermission("clients_orders_pipeline", "view")) {
-            if (hasPermission("clients_my", "view") && targetUrl.includes("order=")) {
-              const match = targetUrl.match(/order=([^&]+)/);
-              targetUrl = `/business/assigned-orders?order=${match ? match[1] : ""}&chat=true`;
+            if (hasPermission("clients_my", "view") && orderNum) {
+              targetUrl = `/business/assigned-orders?order=${encodeURIComponent(orderNum)}&chat=true`;
             } else {
               toast.error("Access Denied: You do not have permission to access Pipeline Orders.");
               return;
@@ -222,9 +235,8 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
           }
         } else if (targetUrl.startsWith("/business/clients/orders")) {
           if (!hasPermission("clients_orders_active", "view")) {
-            if (hasPermission("clients_my", "view") && targetUrl.includes("order=")) {
-              const match = targetUrl.match(/order=([^&]+)/);
-              targetUrl = `/business/assigned-orders?order=${match ? match[1] : ""}&chat=true`;
+            if (hasPermission("clients_my", "view") && orderNum) {
+              targetUrl = `/business/assigned-orders?order=${encodeURIComponent(orderNum)}&chat=true`;
             } else {
               toast.error("Access Denied: You do not have permission to access Active Orders.");
               return;
@@ -237,6 +249,14 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
           }
         }
       }
+
+      // Dispatch custom event in case user is already viewing the target orders page
+      if (orderNum) {
+        window.dispatchEvent(new CustomEvent("open-order-chat", {
+          detail: { orderNumber: orderNum, chat: true }
+        }));
+      }
+
       router.push(targetUrl);
     }
   };

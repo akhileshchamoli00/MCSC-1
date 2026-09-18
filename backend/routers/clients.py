@@ -98,7 +98,14 @@ def validate_and_clean_phone(phone_str: Optional[str], field_name: str = "Phone 
         )
     return cleaned
 
-def update_order_group_status(db: Session, orders: List[models.ClientOrder], new_status: str, user_id: Optional[int] = None):
+def update_order_group_status(
+    db: Session, 
+    orders: List[models.ClientOrder], 
+    new_status: str, 
+    user_id: Optional[int] = None,
+    hold_reason: Optional[str] = None,
+    hold_channel: Optional[str] = "CLIENT"
+):
     if not orders:
         return
         
@@ -118,9 +125,14 @@ def update_order_group_status(db: Session, orders: List[models.ClientOrder], new
             order.status = new_status
             
         # If the status actually changed, log a single progress message in the order chat
-        if old_status != new_status:
+        if old_status != new_status or (new_status == "ON_HOLD" and hold_reason):
             status_label = new_status.replace("_", " ").upper()
-            msg = f"Order execution status has been updated to {status_label}."
+            if new_status == "ON_HOLD" and hold_reason:
+                msg = f"⏸️ Order placed ON HOLD. Reason: {hold_reason.strip()}"
+            else:
+                msg = f"Order execution status has been updated to {status_label}."
+            
+            target_channel = hold_channel if (new_status == "ON_HOLD" and hold_channel in ["CLIENT", "INTERNAL"]) else "CLIENT"
             
             # Prevent duplicate status change entries in concurrent requests
             existing = db.query(models.ClientOrderProgress).filter(
@@ -133,7 +145,7 @@ def update_order_group_status(db: Session, orders: List[models.ClientOrder], new
                     order_number=first_order.order_number,
                     message=msg,
                     user_id=user_id,
-                    channel="CLIENT"
+                    channel=target_channel
                 )
                 db.add(progress)
                 try:
@@ -513,6 +525,7 @@ def get_my_assigned_orders(db: Session = Depends(database.get_db), current_user:
         "CONFIRMED",
         "ORDER_ASSIGNED",
         "IN_PROGRESS",
+        "ON_HOLD",
         "REVIEW_DOCS",
         "FINAL_DOCUMENT_PREPARATION",
         "FINAL_DOC_READY",
@@ -1059,7 +1072,14 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
         raise HTTPException(status_code=400, detail="This order is completed and its status is locked.")
 
     if order_update.status:
-        update_order_group_status(db, orders_in_group, order_update.status, current_user.id)
+        update_order_group_status(
+            db, 
+            orders_in_group, 
+            order_update.status, 
+            current_user.id,
+            hold_reason=order_update.hold_reason,
+            hold_channel=order_update.hold_channel
+        )
         
     can_manage_finance = is_admin_hr or auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders_active", "edit", db) or auth.has_permission(current_user, "clients_orders", "edit", db)
     if can_manage_finance:
@@ -2561,6 +2581,8 @@ def is_automated_milestone_message(message: Optional[str]) -> bool:
     msg = message.strip().lower()
     return (
         msg.startswith("order execution status")
+        or "order placed on hold" in msg
+        or "⏸️" in msg
         or msg.startswith("pipeline order")
         or msg.startswith("order moved")
         or msg.startswith("payment")
@@ -2578,7 +2600,12 @@ def is_automated_milestone_message(message: Optional[str]) -> bool:
     )
 
 
-def format_order_progress_response(u: models.ClientOrderProgress, db: Session) -> schemas.ClientOrderProgressResponse:
+def format_order_progress_response(
+    u: models.ClientOrderProgress, 
+    db: Session,
+    seen_by: Optional[List[schemas.MessageSeenUser]] = None,
+    reactions: Optional[List[schemas.MessageReactionGroup]] = None
+) -> schemas.ClientOrderProgressResponse:
     sender_name = "System"
     sender_role = "Milestone"
     sender_avatar = None
@@ -2596,14 +2623,19 @@ def format_order_progress_response(u: models.ClientOrderProgress, db: Session) -
             order_number=u.order_number,
             user_id=u.user_id,
             message=u.message,
-            channel="CLIENT",
+            channel=u.channel or "CLIENT",
             attachment_url=u.attachment_url,
             attachment_name=u.attachment_name,
+            quoted_message_id=getattr(u, "quoted_message_id", None),
+            quoted_message_text=getattr(u, "quoted_message_text", None),
+            quoted_sender_name=getattr(u, "quoted_sender_name", None),
             created_at=u.created_at,
             sender_name="System",
             sender_role="Milestone",
             sender_avatar=None,
-            is_client=False
+            is_client=False,
+            seen_by=[],
+            reactions=[]
         )
     
     # 2. Check if sent by a Client, Customer, or Member user
@@ -2629,11 +2661,16 @@ def format_order_progress_response(u: models.ClientOrderProgress, db: Session) -
             channel="CLIENT",
             attachment_url=u.attachment_url,
             attachment_name=u.attachment_name,
+            quoted_message_id=getattr(u, "quoted_message_id", None),
+            quoted_message_text=getattr(u, "quoted_message_text", None),
+            quoted_sender_name=getattr(u, "quoted_sender_name", None),
             created_at=u.created_at,
             sender_name=sender_name,
             sender_role="Client",
             sender_avatar=None,
-            is_client=True
+            is_client=True,
+            seen_by=seen_by or [],
+            reactions=reactions or []
         )
 
     # 3. Staff user
@@ -2663,11 +2700,16 @@ def format_order_progress_response(u: models.ClientOrderProgress, db: Session) -
         channel=u.channel or "INTERNAL",
         attachment_url=u.attachment_url,
         attachment_name=u.attachment_name,
+        quoted_message_id=getattr(u, "quoted_message_id", None),
+        quoted_message_text=getattr(u, "quoted_message_text", None),
+        quoted_sender_name=getattr(u, "quoted_sender_name", None),
         created_at=u.created_at,
         sender_name=sender_name,
         sender_role=sender_role,
         sender_avatar=sender_avatar,
-        is_client=is_client
+        is_client=is_client,
+        seen_by=seen_by or [],
+        reactions=reactions or []
     )
 
 
@@ -2783,14 +2825,20 @@ def get_order_progress(
     if not check_order_authorization_for_chat(current_user, order_number, db):
         raise HTTPException(status_code=403, detail="Not authorized to view chat/progress for this order")
 
+    clean_order_no = (order_number or "").strip().upper()
+
     query = db.query(models.ClientOrderProgress).options(
         joinedload(models.ClientOrderProgress.user).joinedload(models.User.employee),
-        joinedload(models.ClientOrderProgress.user).joinedload(models.User.role)
-    ).filter(models.ClientOrderProgress.order_number == order_number)
+        joinedload(models.ClientOrderProgress.user).joinedload(models.User.role),
+        joinedload(models.ClientOrderProgress.user).joinedload(models.User.client),
+        joinedload(models.ClientOrderProgress.user).joinedload(models.User.partner)
+    ).filter(func.upper(models.ClientOrderProgress.order_number) == clean_order_no)
 
     auto_status_filter = (
         (models.ClientOrderProgress.user_id == None) |
         (models.ClientOrderProgress.message.ilike("Order execution status has been updated to%")) |
+        (models.ClientOrderProgress.message.ilike("⏸️ Order placed ON HOLD%")) |
+        (models.ClientOrderProgress.message.ilike("%Order placed ON HOLD%")) |
         (models.ClientOrderProgress.message.ilike("Pipeline order has been moved to Active Orders%")) |
         (models.ClientOrderProgress.message.ilike("%payment completed successfully via Xendit%")) |
         (models.ClientOrderProgress.message.ilike("Additional payment received via Xendit%")) |
@@ -2801,19 +2849,139 @@ def get_order_progress(
         (models.ClientOrderProgress.message.ilike("Amount Received / Proforma Paid manually updated%"))
     )
     
+    is_client_user = bool(current_user.role and current_user.role.name.upper() in ["CLIENT", "CUSTOMER", "MEMBER"])
+
     # 1. CLIENT user or channel == "CLIENT" (Client & Consultant Chat)
-    if current_user.role and current_user.role.name.upper() == "CLIENT" or (channel and channel.upper() == "CLIENT"):
+    if is_client_user or (channel and channel.upper() == "CLIENT"):
         query = query.filter(
-            (models.ClientOrderProgress.channel == "CLIENT") | auto_status_filter
+            models.ClientOrderProgress.channel != "INTERNAL"
+        ).filter(
+            (models.ClientOrderProgress.channel == "CLIENT") | (models.ClientOrderProgress.channel == None) | auto_status_filter
         )
     # 2. INTERNAL channel (Internal Team Chat)
     elif channel and channel.upper() == "INTERNAL":
         query = query.filter(
-            (models.ClientOrderProgress.channel == "INTERNAL") | auto_status_filter
+            (models.ClientOrderProgress.channel == "INTERNAL") | (models.ClientOrderProgress.channel == "CLIENT") | auto_status_filter
         )
         
     updates = query.order_by(models.ClientOrderProgress.created_at.asc(), models.ClientOrderProgress.id.asc()).all()
     
+    # Query user reads for this order
+    all_user_reads = db.query(models.ClientOrderUserRead).options(
+        joinedload(models.ClientOrderUserRead.user).joinedload(models.User.employee),
+        joinedload(models.ClientOrderUserRead.user).joinedload(models.User.client),
+        joinedload(models.ClientOrderUserRead.user).joinedload(models.User.partner),
+        joinedload(models.ClientOrderUserRead.user).joinedload(models.User.role)
+    ).filter(
+        func.upper(models.ClientOrderUserRead.order_number) == clean_order_no
+    ).all()
+
+    # Pre-format read records
+    formatted_readers = []
+    for r in all_user_reads:
+        if not r.user:
+            continue
+        r_user = r.user
+        r_is_client = bool(r_user.role and r_user.role.name.upper() in ["CLIENT", "CUSTOMER", "MEMBER"])
+        
+        # Determine display name & role
+        if r_is_client:
+            r_name = "Client"
+            if r_user.partner and r_user.partner.contact_person:
+                r_name = r_user.partner.contact_person
+            elif r_user.client and r_user.client.full_name:
+                r_name = r_user.client.full_name
+            elif r_user.name:
+                r_name = r_user.name
+            r_role = "Client"
+            r_avatar = None
+        elif r_user.employee:
+            fn = r_user.employee.first_name or ""
+            ln = r_user.employee.last_name or ""
+            r_name = f"{fn} {ln}".strip() or (r_user.role.name.title() if r_user.role else "Consultant")
+            r_role = r_user.employee.job_title or (r_user.role.name.title() if r_user.role else "Consultant")
+            r_avatar = r_user.employee.profile_photo
+        elif r_user.role:
+            r_name = r_user.role.name.title()
+            r_role = r_user.role.name.upper()
+            r_avatar = None
+        else:
+            r_name = "Staff"
+            r_role = "Team"
+            r_avatar = None
+
+        formatted_readers.append({
+            "user_id": r.user_id,
+            "channel": (r.channel or "CLIENT").upper(),
+            "last_read_message_id": r.last_read_message_id,
+            "read_at": r.read_at,
+            "seen_item": schemas.MessageSeenUser(
+                user_id=r.user_id,
+                name=r_name,
+                role=r_role,
+                avatar=r_avatar,
+                is_client=r_is_client,
+                read_at=r.read_at
+            )
+        })
+
+    # Batch query all reactions for messages in this order
+    update_ids = [u.id for u in updates]
+    reactions_by_msg = {}
+    if update_ids:
+        all_reactions = db.query(models.ClientOrderProgressReaction).options(
+            joinedload(models.ClientOrderProgressReaction.user).joinedload(models.User.employee),
+            joinedload(models.ClientOrderProgressReaction.user).joinedload(models.User.client),
+            joinedload(models.ClientOrderProgressReaction.user).joinedload(models.User.partner),
+            joinedload(models.ClientOrderProgressReaction.user).joinedload(models.User.role)
+        ).filter(
+            models.ClientOrderProgressReaction.progress_id.in_(update_ids)
+        ).order_by(models.ClientOrderProgressReaction.id.asc()).all()
+
+        for r in all_reactions:
+            if not r.user:
+                continue
+            r_user = r.user
+            r_is_client = bool(r_user.role and r_user.role.name.upper() in ["CLIENT", "CUSTOMER", "MEMBER"])
+            if r_is_client:
+                r_name = "Client"
+                if r_user.partner and r_user.partner.contact_person:
+                    r_name = r_user.partner.contact_person
+                elif r_user.client and r_user.client.full_name:
+                    r_name = r_user.client.full_name
+                elif r_user.name:
+                    r_name = r_user.name
+                r_role = "Client"
+                r_avatar = None
+            elif r_user.employee:
+                fn = r_user.employee.first_name or ""
+                ln = r_user.employee.last_name or ""
+                r_name = f"{fn} {ln}".strip() or (r_user.role.name.title() if r_user.role else "Consultant")
+                r_role = r_user.employee.job_title or (r_user.role.name.title() if r_user.role else "Consultant")
+                r_avatar = r_user.employee.profile_photo
+            elif r_user.role:
+                r_name = r_user.role.name.title()
+                r_role = r_user.role.name.upper()
+                r_avatar = None
+            else:
+                r_name = "Staff"
+                r_role = "Team"
+                r_avatar = None
+
+            user_item = schemas.MessageReactionUser(
+                user_id=r.user_id,
+                name=r_name,
+                role=r_role,
+                avatar=r_avatar,
+                is_client=r_is_client,
+                is_self=(r.user_id == current_user.id)
+            )
+            if r.progress_id not in reactions_by_msg:
+                reactions_by_msg[r.progress_id] = {}
+            if r.emoji not in reactions_by_msg[r.progress_id]:
+                reactions_by_msg[r.progress_id][r.emoji] = []
+            reactions_by_msg[r.progress_id][r.emoji].append(user_item)
+
     res = []
     seen_system_messages = set()
     for u in updates:
@@ -2831,9 +2999,237 @@ def get_order_progress(
             if msg_key in seen_system_messages:
                 continue
             seen_system_messages.add(msg_key)
+            res.append(format_order_progress_response(u, db, seen_by=[], reactions=[]))
+            continue
             
-        res.append(format_order_progress_response(u, db))
+        # Match readers
+        msg_channel = (u.channel or "CLIENT").upper()
+        msg_seen_by = []
+        for fr in formatted_readers:
+            # Client users should not see internal channel read info
+            if is_client_user and fr["channel"] == "INTERNAL":
+                continue
+            # Match channel and read watermark
+            if fr["channel"] == msg_channel and fr["last_read_message_id"] >= u.id and fr["user_id"] != u.user_id:
+                msg_seen_by.append(fr["seen_item"])
+
+        # Match reactions
+        msg_reactions = []
+        if u.id in reactions_by_msg:
+            for emoji, users in reactions_by_msg[u.id].items():
+                has_reacted = any(usr.user_id == current_user.id for usr in users)
+                msg_reactions.append(schemas.MessageReactionGroup(
+                    emoji=emoji,
+                    count=len(users),
+                    has_reacted=has_reacted,
+                    users=users
+                ))
+
+        res.append(format_order_progress_response(u, db, seen_by=msg_seen_by, reactions=msg_reactions))
     return res
+
+
+def get_formatted_message_reactions(progress_id: int, current_user_id: int, db: Session) -> List[schemas.MessageReactionGroup]:
+    reactions = db.query(models.ClientOrderProgressReaction).options(
+        joinedload(models.ClientOrderProgressReaction.user).joinedload(models.User.employee),
+        joinedload(models.ClientOrderProgressReaction.user).joinedload(models.User.client),
+        joinedload(models.ClientOrderProgressReaction.user).joinedload(models.User.partner),
+        joinedload(models.ClientOrderProgressReaction.user).joinedload(models.User.role)
+    ).filter(
+        models.ClientOrderProgressReaction.progress_id == progress_id
+    ).order_by(models.ClientOrderProgressReaction.id.asc()).all()
+
+    grouped = {}
+    for r in reactions:
+        if not r.user:
+            continue
+        r_user = r.user
+        r_is_client = bool(r_user.role and r_user.role.name.upper() in ["CLIENT", "CUSTOMER", "MEMBER"])
+        if r_is_client:
+            r_name = "Client"
+            if r_user.partner and r_user.partner.contact_person:
+                r_name = r_user.partner.contact_person
+            elif r_user.client and r_user.client.full_name:
+                r_name = r_user.client.full_name
+            elif r_user.name:
+                r_name = r_user.name
+            r_role = "Client"
+            r_avatar = None
+        elif r_user.employee:
+            fn = r_user.employee.first_name or ""
+            ln = r_user.employee.last_name or ""
+            r_name = f"{fn} {ln}".strip() or (r_user.role.name.title() if r_user.role else "Consultant")
+            r_role = r_user.employee.job_title or (r_user.role.name.title() if r_user.role else "Consultant")
+            r_avatar = r_user.employee.profile_photo
+        elif r_user.role:
+            r_name = r_user.role.name.title()
+            r_role = r_user.role.name.upper()
+            r_avatar = None
+        else:
+            r_name = "Staff"
+            r_role = "Team"
+            r_avatar = None
+
+        user_item = schemas.MessageReactionUser(
+            user_id=r.user_id,
+            name=r_name,
+            role=r_role,
+            avatar=r_avatar,
+            is_client=r_is_client,
+            is_self=(r.user_id == current_user_id)
+        )
+        if r.emoji not in grouped:
+            grouped[r.emoji] = []
+        grouped[r.emoji].append(user_item)
+
+    result = []
+    for emoji, users in grouped.items():
+        has_reacted = any(usr.user_id == current_user_id for usr in users)
+        result.append(schemas.MessageReactionGroup(
+            emoji=emoji,
+            count=len(users),
+            has_reacted=has_reacted,
+            users=users
+        ))
+    return result
+
+
+@router.post("/orders/{order_number}/progress/{progress_id}/reactions")
+def toggle_order_chat_reaction(
+    order_number: str,
+    progress_id: int,
+    payload: schemas.MessageReactionToggleRequest,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if not check_order_authorization_for_chat(current_user, order_number, db):
+        raise HTTPException(status_code=403, detail="Not authorized to access chat for this order")
+
+    clean_no = (order_number or "").strip().upper()
+    emoji = (payload.emoji or "").strip()
+    if not emoji:
+        raise HTTPException(status_code=400, detail="Emoji cannot be empty")
+
+    msg = db.query(models.ClientOrderProgress).filter(
+        models.ClientOrderProgress.id == progress_id,
+        func.upper(models.ClientOrderProgress.order_number) == clean_no
+    ).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    is_client_user = bool(current_user.role and current_user.role.name.upper() in ["CLIENT", "CUSTOMER", "MEMBER"])
+    if is_client_user and (msg.channel or "").upper() == "INTERNAL":
+        raise HTTPException(status_code=403, detail="Client users cannot react to internal messages")
+
+    existing = db.query(models.ClientOrderProgressReaction).filter(
+        models.ClientOrderProgressReaction.progress_id == progress_id,
+        models.ClientOrderProgressReaction.user_id == current_user.id,
+        models.ClientOrderProgressReaction.emoji == emoji
+    ).first()
+
+    if existing:
+        db.delete(existing)
+        action = "removed"
+    else:
+        new_rxn = models.ClientOrderProgressReaction(
+            progress_id=progress_id,
+            user_id=current_user.id,
+            emoji=emoji
+        )
+        db.add(new_rxn)
+        action = "added"
+
+    db.commit()
+
+    reactions = get_formatted_message_reactions(progress_id, current_user.id, db)
+    return {
+        "status": "success",
+        "action": action,
+        "progress_id": progress_id,
+        "reactions": reactions
+    }
+
+
+@router.post("/orders/{order_number}/read")
+def mark_order_chat_as_read(
+    order_number: str,
+    payload: schemas.OrderMarkReadRequest,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if not check_order_authorization_for_chat(current_user, order_number, db):
+        raise HTTPException(status_code=403, detail="Not authorized to access chat for this order")
+
+    clean_no = (order_number or "").strip().upper()
+    channel_clean = (payload.channel or "CLIENT").strip().upper()
+    if channel_clean not in ["CLIENT", "INTERNAL"]:
+        channel_clean = "CLIENT"
+
+    # Client role cannot mark INTERNAL channel as read
+    is_client_user = bool(current_user.role and current_user.role.name.upper() in ["CLIENT", "CUSTOMER", "MEMBER"])
+    if is_client_user and channel_clean == "INTERNAL":
+        raise HTTPException(status_code=403, detail="Client users cannot access internal channel")
+
+    read_record = db.query(models.ClientOrderUserRead).filter(
+        func.upper(models.ClientOrderUserRead.order_number) == clean_no,
+        func.upper(models.ClientOrderUserRead.channel) == channel_clean,
+        models.ClientOrderUserRead.user_id == current_user.id
+    ).first()
+
+    now = datetime.utcnow()
+    if not read_record:
+        read_record = models.ClientOrderUserRead(
+            order_number=clean_no,
+            channel=channel_clean,
+            user_id=current_user.id,
+            last_read_message_id=payload.last_message_id,
+            read_at=now
+        )
+        db.add(read_record)
+    else:
+        if payload.last_message_id > read_record.last_read_message_id:
+            read_record.last_read_message_id = payload.last_message_id
+            read_record.read_at = now
+
+    db.commit()
+    return {
+        "status": "success",
+        "order_number": clean_no,
+        "channel": channel_clean,
+        "last_read_message_id": read_record.last_read_message_id,
+        "read_at": read_record.read_at
+    }
+
+
+def record_sender_read_watermark(order_number: str, channel: str, user_id: int, message_id: int, db: Session):
+    if not order_number or not user_id or not message_id:
+        return
+    try:
+        clean_no = (order_number or "").strip().upper()
+        target_channel = (channel or "CLIENT").strip().upper()
+        read_rec = db.query(models.ClientOrderUserRead).filter(
+            func.upper(models.ClientOrderUserRead.order_number) == clean_no,
+            func.upper(models.ClientOrderUserRead.channel) == target_channel,
+            models.ClientOrderUserRead.user_id == user_id
+        ).first()
+        now = datetime.utcnow()
+        if not read_rec:
+            read_rec = models.ClientOrderUserRead(
+                order_number=clean_no,
+                channel=target_channel,
+                user_id=user_id,
+                last_read_message_id=message_id,
+                read_at=now
+            )
+            db.add(read_rec)
+        else:
+            if message_id > read_rec.last_read_message_id:
+                read_rec.last_read_message_id = message_id
+                read_rec.read_at = now
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Warning: Failed to auto-update sender read watermark: {e}")
 
 
 def get_taggable_users_for_order(order_number: str, db: Session) -> List[models.User]:
@@ -2937,11 +3333,17 @@ def add_order_progress(
         message=progress_data.message or "",
         channel=target_channel,
         attachment_url=progress_data.attachment_url,
-        attachment_name=progress_data.attachment_name
+        attachment_name=progress_data.attachment_name,
+        quoted_message_id=progress_data.quoted_message_id,
+        quoted_message_text=progress_data.quoted_message_text,
+        quoted_sender_name=progress_data.quoted_sender_name
     )
     db.add(db_progress)
     db.commit()
     db.refresh(db_progress)
+
+    # Immediately record the sender's read watermark for this channel
+    record_sender_read_watermark(order_number, target_channel, current_user.id, db_progress.id, db)
     
     formatted_resp = format_order_progress_response(db_progress, db)
     
@@ -3156,6 +3558,9 @@ async def upload_order_attachment(
     order_number: str,
     file: UploadFile = File(...),
     message: Optional[str] = Form(None),
+    quoted_message_id: Optional[int] = Form(None),
+    quoted_message_text: Optional[str] = Form(None),
+    quoted_sender_name: Optional[str] = Form(None),
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
@@ -3236,11 +3641,17 @@ async def upload_order_attachment(
         message=chat_message,
         channel="CLIENT",
         attachment_url=destination_path,
-        attachment_name=sanitized_filename
+        attachment_name=sanitized_filename,
+        quoted_message_id=quoted_message_id,
+        quoted_message_text=quoted_message_text,
+        quoted_sender_name=quoted_sender_name
     )
     db.add(db_progress)
     db.commit()
     db.refresh(db_progress)
+
+    # Immediately record the sender's read watermark for this channel
+    record_sender_read_watermark(order_number, "CLIENT", current_user.id, db_progress.id, db)
     
     formatted_resp = format_order_progress_response(db_progress, db)
     
@@ -4666,6 +5077,9 @@ def post_public_order_chat(
     db.commit()
     db.refresh(db_progress)
     
+    # Immediately record the sender's read watermark for this channel
+    record_sender_read_watermark(first_order.order_number, "CLIENT", current_user.id, db_progress.id, db)
+    
     # Notify assigned consultants
     c_ids = parse_consultant_ids(first_order.consultant_ids)
     sender_display = current_user.name
@@ -4694,6 +5108,9 @@ async def upload_public_order_attachment(
     order_number: str,
     file: UploadFile = File(...),
     message: Optional[str] = Form(None),
+    quoted_message_id: Optional[int] = Form(None),
+    quoted_message_text: Optional[str] = Form(None),
+    quoted_sender_name: Optional[str] = Form(None),
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
@@ -4769,11 +5186,17 @@ async def upload_public_order_attachment(
         message=chat_text,
         channel="CLIENT",
         attachment_url=attachment_url,
-        attachment_name=sanitized_filename
+        attachment_name=sanitized_filename,
+        quoted_message_id=quoted_message_id,
+        quoted_message_text=quoted_message_text,
+        quoted_sender_name=quoted_sender_name
     )
     db.add(db_progress)
     db.commit()
     db.refresh(db_progress)
+    
+    # Immediately record the sender's read watermark for this channel
+    record_sender_read_watermark(first_order.order_number, "CLIENT", current_user.id, db_progress.id, db)
     
     # 5. Notify assigned consultants
     c_ids = parse_consultant_ids(first_order.consultant_ids)
@@ -4858,6 +5281,55 @@ def delete_public_order_chat(
     db.delete(progress)
     db.commit()
     return {"message": "Message deleted successfully", "id": progress_id}
+
+
+@public_orders_router.post("/{order_number}/chat/{progress_id}/reactions")
+def toggle_public_order_chat_reaction(
+    order_number: str,
+    progress_id: int,
+    payload: schemas.MessageReactionToggleRequest,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    clean_order_no = order_number.strip().upper()
+    progress = db.query(models.ClientOrderProgress).filter(
+        models.ClientOrderProgress.id == progress_id,
+        func.upper(models.ClientOrderProgress.order_number) == clean_order_no
+    ).first()
+    if not progress:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    emoji = (payload.emoji or "").strip()
+    if not emoji:
+        raise HTTPException(status_code=400, detail="Emoji cannot be empty")
+
+    existing = db.query(models.ClientOrderProgressReaction).filter(
+        models.ClientOrderProgressReaction.progress_id == progress_id,
+        models.ClientOrderProgressReaction.user_id == current_user.id,
+        models.ClientOrderProgressReaction.emoji == emoji
+    ).first()
+
+    if existing:
+        db.delete(existing)
+        action = "removed"
+    else:
+        new_rxn = models.ClientOrderProgressReaction(
+            progress_id=progress_id,
+            user_id=current_user.id,
+            emoji=emoji
+        )
+        db.add(new_rxn)
+        action = "added"
+
+    db.commit()
+
+    reactions = get_formatted_message_reactions(progress_id, current_user.id, db)
+    return {
+        "status": "success",
+        "action": action,
+        "progress_id": progress_id,
+        "reactions": reactions
+    }
 
 
 

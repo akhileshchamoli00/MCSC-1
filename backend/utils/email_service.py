@@ -2023,6 +2023,168 @@ def send_trademark_query_email(brand_name: str, owner_name: str, email: str, app
     return send_smtp_email(msg, "admin@mcsc.co.id", f"trademark query for {brand_name} ({email})")
 
 
+def send_leave_application_reminder_email(
+    employee_email: str,
+    employee_name: str,
+    department_name: Optional[str] = None,
+    leave_type: Optional[str] = None,
+    approximate_dates: Optional[str] = None,
+    custom_note: Optional[str] = None,
+    cc_emails: Optional[List[str]] = None,
+    frontend_url: Optional[str] = None
+) -> bool:
+    """
+    Sends an ultra-professional, branded email reminder to an employee to submit their official leave request.
+    """
+    if not employee_email or not employee_email.strip():
+        print("WARNING: Cannot send leave reminder email without a valid recipient email address.")
+        return False
+
+    # Ensure email links always point to the production HR portal and never localhost
+    base_url = "https://www.mcsc.co.id"
+    if frontend_url and "localhost" not in frontend_url and "127.0.0.1" not in frontend_url:
+        base_url = frontend_url.rstrip("/")
+    else:
+        env_url = (os.getenv("PROD_FRONTEND_URL") or os.getenv("FRONTEND_URL") or "").strip()
+        if env_url and "localhost" not in env_url and "127.0.0.1" not in env_url:
+            base_url = env_url.rstrip("/")
+
+    apply_leave_url = f"{base_url}/hrms/apply-leave"
+
+    dept_display = department_name.strip() if (department_name and department_name.strip()) else "General Operations"
+
+    subject = f"Action Required: Please Submit Your Leave Request - MCS Consulting HR Portal"
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    sender_email = os.getenv("SENDER_EMAIL") or os.getenv("SMTP_USER") or "admin@mcsc.co.id"
+    sender_name = os.getenv("SENDER_NAME", "PT Mandiri Cipta Solusi - HR")
+    msg["From"] = f"{sender_name} <{sender_email}>"
+    msg["To"] = employee_email
+
+    custom_note_text = f"\nManager / HR Note:\n\"{custom_note.strip()}\"\n" if (custom_note and custom_note.strip()) else ""
+
+    plain_text = f"""Dear {employee_name},
+
+Our attendance records indicate that you have taken leave / time off this month, but an official leave request has not yet been submitted in the HR Portal.
+
+Details:
+- Employee Name: {employee_name}
+- Department: {dept_display}
+- Action Required: Submit Formal Leave Application
+- Portal Link: {apply_leave_url}{custom_note_text}
+
+Please log in to the HR portal and submit your leave request as soon as possible:
+{apply_leave_url}
+
+IMPORTANT HR POLICY NOTICE:
+Please make sure not to forget applying for your leave. In accordance with company policy, all absences and leaves must be officially recorded and approved through the portal to maintain accurate attendance records and ensure seamless payroll processing.
+
+Best regards,
+People Operations & Human Resources
+PT Mandiri Cipta Solusi
+{base_url}
+"""
+    msg.attach(MIMEText(plain_text, "plain"))
+
+    custom_note_html = f"""
+    <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 14px 18px; margin: 20px 0;">
+      <p style="margin: 0; font-size: 13px; font-weight: 700; color: #b45309;">Note from HR / Management:</p>
+      <p style="margin: 6px 0 0 0; font-size: 14px; color: #78350f; font-style: italic;">"{custom_note.strip()}"</p>
+    </div>
+    """ if (custom_note and custom_note.strip()) else ""
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{subject}</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b; background-color: #f1f5f9; margin: 0; padding: 24px 12px;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01); border: 1px solid #e2e8f0;">
+    
+    <!-- Top Brand Header Banner -->
+    <div style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); padding: 24px 36px; text-align: center;">
+      <div style="background-color: #ffffff; display: inline-block; padding: 8px 18px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.08);">
+        <img src="https://www.mcsc.co.id/logo.png" alt="MCS Logo" style="height: 36px; width: auto; display: block;" />
+      </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div style="padding: 36px 36px 28px;">
+      
+      <!-- Greeting & Notice Badge -->
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+        <h2 style="color: #0f172a; margin: 0; font-size: 18px; font-weight: 700;">Dear {employee_name},</h2>
+      </div>
+
+      <p style="color: #334155; font-size: 15px; margin: 0 0 20px 0; line-height: 1.6;">
+        Our attendance records indicate that you have taken leave / time off this month, but an official leave request has not yet been submitted in the HR portal.
+      </p>
+
+      <!-- Details Summary Card -->
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <tr>
+            <td style="padding: 6px 0; color: #64748b; font-weight: 600; width: 140px;">Employee Name:</td>
+            <td style="padding: 6px 0; color: #0f172a; font-weight: 700;">{employee_name}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Department:</td>
+            <td style="padding: 6px 0; color: #0f172a; font-weight: 600;">{dept_display}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Action Required:</td>
+            <td style="padding: 6px 0; color: #0284c7; font-weight: 700;">Submit Leave Request</td>
+          </tr>
+        </table>
+      </div>
+
+      {custom_note_html}
+
+      <p style="color: #334155; font-size: 14px; margin: 0 0 24px 0;">
+        Please take a moment to submit your formal leave application via the link below so your supervisor can review and approve it:
+      </p>
+
+      <!-- Action Button -->
+      <div style="text-align: center; margin: 28px 0;">
+        <a href="{apply_leave_url}" style="display: inline-block; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 14px 32px; border-radius: 12px; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);">
+          Submit Leave Request in Portal &rarr;
+        </a>
+      </div>
+
+      <!-- Compliance & Policy Callout -->
+      <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px 20px; margin-top: 28px;">
+        <p style="margin: 0; font-size: 13px; font-weight: 700; color: #166534; display: flex; align-items: center; gap: 6px;">
+          📋 Official HR Policy Reminder:
+        </p>
+        <p style="margin: 6px 0 0 0; font-size: 12px; color: #15803d; line-height: 1.5;">
+          Please make sure not to forget applying for your leave. In accordance with company policy, all absences and leaves must be formally recorded and approved through the portal to maintain accurate attendance records and ensure smooth payroll processing.
+        </p>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 24px 36px; text-align: center;">
+      <p style="margin: 0; font-size: 12px; color: #64748b; font-weight: 600;">
+        PT Mandiri Cipta Solusi • People Operations Department
+      </p>
+      <p style="margin: 4px 0 0 0; font-size: 11px; color: #94a3b8;">
+        This automated notification was generated from the MCS Consulting HR Portal.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>
+"""
+    msg.attach(MIMEText(html_content, "html"))
+    return send_smtp_email(msg, employee_email, f"leave reminder to {employee_name} ({employee_email})", cc_emails=cc_emails)
+
+
+
 
 
 

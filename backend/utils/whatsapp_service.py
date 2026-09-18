@@ -4,12 +4,18 @@ import httpx
 from dotenv import load_dotenv
 from pathlib import Path
 
+root_env = Path(__file__).resolve().parent.parent.parent / ".env.local"
 backend_env = Path(__file__).resolve().parent.parent / ".env"
+
+if root_env.exists():
+    load_dotenv(dotenv_path=root_env, override=True)
 if backend_env.exists():
     load_dotenv(dotenv_path=backend_env, override=True)
 load_dotenv(override=True)
 
 def get_whatsapp_config():
+    if root_env.exists():
+        load_dotenv(dotenv_path=root_env, override=True)
     if backend_env.exists():
         load_dotenv(dotenv_path=backend_env, override=True)
     token = os.getenv("WHATSAPP_ACCESS_TOKEN")
@@ -45,7 +51,7 @@ def send_whatsapp_text(recipient_phone: str, message: str) -> dict:
     if not target:
         return {"success": False, "error": "Invalid recipient phone number"}
 
-    url = f"https://graph.facebook.com/{WHATSAPP_API_VERSION}/{phone_id}/messages"
+    url = f"https://graph.facebook.com/{version}/{phone_id}/messages"
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
@@ -158,7 +164,7 @@ def send_whatsapp_document(
             media_id = upload_data["id"]
 
             # Dispatch document message
-            msg_url = f"https://graph.facebook.com/{WHATSAPP_API_VERSION}/{phone_id}/messages"
+            msg_url = f"https://graph.facebook.com/{version}/{phone_id}/messages"
             msg_headers = {
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json"

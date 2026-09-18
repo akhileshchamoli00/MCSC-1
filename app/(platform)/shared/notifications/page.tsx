@@ -121,14 +121,26 @@ export default function NotificationsPage() {
     if (!notif.is_read) {
       markAsRead(notif.id);
     }
-    if (notif.action_url) {
-      let targetUrl = notif.action_url;
+
+    let targetUrl = notif.action_url || "";
+
+    const orderMatch = (targetUrl + " " + (notif.title || "") + " " + (notif.message || "")).match(/(ORD-[A-Za-z0-9\-]+)/i);
+    const orderNum = orderMatch ? orderMatch[1].toUpperCase() : null;
+
+    if (!targetUrl && orderNum) {
+      targetUrl = `/business/assigned-orders?order=${encodeURIComponent(orderNum)}&chat=true`;
+    }
+
+    if (targetUrl) {
+      if (orderNum && !targetUrl.includes("chat=")) {
+        targetUrl += targetUrl.includes("?") ? "&chat=true" : "?chat=true";
+      }
+
       if (!isAdmin) {
         if (targetUrl.startsWith("/business/clients/orders/completed")) {
           if (!hasPermission("clients_orders_completed", "view")) {
-            if (hasPermission("clients_my", "view") && targetUrl.includes("order=")) {
-              const match = targetUrl.match(/order=([^&]+)/);
-              targetUrl = `/business/assigned-orders?order=${match ? match[1] : ""}&chat=true`;
+            if (hasPermission("clients_my", "view") && orderNum) {
+              targetUrl = `/business/assigned-orders?order=${encodeURIComponent(orderNum)}&chat=true`;
             } else {
               toast.error("Access Denied: You do not have permission to access Completed Orders.");
               return;
@@ -136,9 +148,8 @@ export default function NotificationsPage() {
           }
         } else if (targetUrl.startsWith("/business/clients/orders/cancelled")) {
           if (!hasPermission("clients_orders_cancelled", "view")) {
-            if (hasPermission("clients_my", "view") && targetUrl.includes("order=")) {
-              const match = targetUrl.match(/order=([^&]+)/);
-              targetUrl = `/business/assigned-orders?order=${match ? match[1] : ""}&chat=true`;
+            if (hasPermission("clients_my", "view") && orderNum) {
+              targetUrl = `/business/assigned-orders?order=${encodeURIComponent(orderNum)}&chat=true`;
             } else {
               toast.error("Access Denied: You do not have permission to access Cancelled Orders.");
               return;
@@ -146,9 +157,8 @@ export default function NotificationsPage() {
           }
         } else if (targetUrl.startsWith("/business/clients/orders/pipeline")) {
           if (!hasPermission("clients_orders_pipeline", "view")) {
-            if (hasPermission("clients_my", "view") && targetUrl.includes("order=")) {
-              const match = targetUrl.match(/order=([^&]+)/);
-              targetUrl = `/business/assigned-orders?order=${match ? match[1] : ""}&chat=true`;
+            if (hasPermission("clients_my", "view") && orderNum) {
+              targetUrl = `/business/assigned-orders?order=${encodeURIComponent(orderNum)}&chat=true`;
             } else {
               toast.error("Access Denied: You do not have permission to access Pipeline Orders.");
               return;
@@ -156,9 +166,8 @@ export default function NotificationsPage() {
           }
         } else if (targetUrl.startsWith("/business/clients/orders")) {
           if (!hasPermission("clients_orders_active", "view")) {
-            if (hasPermission("clients_my", "view") && targetUrl.includes("order=")) {
-              const match = targetUrl.match(/order=([^&]+)/);
-              targetUrl = `/business/assigned-orders?order=${match ? match[1] : ""}&chat=true`;
+            if (hasPermission("clients_my", "view") && orderNum) {
+              targetUrl = `/business/assigned-orders?order=${encodeURIComponent(orderNum)}&chat=true`;
             } else {
               toast.error("Access Denied: You do not have permission to access Active Orders.");
               return;
@@ -171,6 +180,13 @@ export default function NotificationsPage() {
           }
         }
       }
+
+      if (orderNum) {
+        window.dispatchEvent(new CustomEvent("open-order-chat", {
+          detail: { orderNumber: orderNum, chat: true }
+        }));
+      }
+
       router.push(targetUrl);
     }
   };

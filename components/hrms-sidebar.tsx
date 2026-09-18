@@ -472,7 +472,7 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
                     onClick={() => setIsSwitcherOpen(!isSwitcherOpen)}
                     className="flex items-center gap-1 text-xs font-bold text-white hover:text-emerald-400 transition-colors mt-0.5"
                   >
-                    <span>{currentMode === "business" ? "Business" : "HRMS"}</span>
+                    <span>{currentMode === "business" ? "ERP" : "HRMS"}</span>
                     <ChevronDown className="h-3 w-3 opacity-60 shrink-0" />
                   </button>
                 </>
@@ -482,7 +482,7 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
                     MCS
                   </span>
                   <span className="text-[9px] text-zinc-400 tracking-widest uppercase font-bold mt-0.5">
-                    {role === "CLIENT" ? "Client Portal" : currentMode === "business" ? "Business" : "HRMS"}
+                    {role === "CLIENT" ? "Client Portal" : currentMode === "business" ? "ERP" : "HRMS"}
                   </span>
                 </div>
               )}

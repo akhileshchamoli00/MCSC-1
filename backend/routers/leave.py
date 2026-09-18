@@ -762,3 +762,75 @@ async def upload_leave_attachment(id: int, file: UploadFile = File(...), db: Ses
     db.commit()
     
     return {"message": "Attachment uploaded successfully", "attachment_url": leave_req.attachment_url}
+
+
+from utils.email_service import send_leave_application_reminder_email
+
+@router.post("/send-reminder", response_model=schemas.LeaveReminderResponse)
+def send_leave_reminder(
+    reminder: schemas.LeaveReminderRequest,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if not (
+        auth.is_super_admin(current_user)
+        or auth.has_permission(current_user, "leave_overview", "edit", db)
+        or auth.has_permission(current_user, "leave_overview", "view", db)
+        or (current_user.role and current_user.role.name.upper() in ["SUPER_ADMIN", "ADMIN", "HR", "MANAGER"])
+    ):
+        raise HTTPException(status_code=403, detail="Not authorized to send leave application reminders")
+
+    employee = db.query(models.Employee).filter(models.Employee.id == reminder.employee_id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    recipient_email = getattr(employee, "email", None) or (employee.user.email if employee.user else None)
+
+    if not recipient_email or not str(recipient_email).strip():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Employee {employee.first_name} {employee.last_name} does not have a registered email address."
+        )
+
+    recipient_email = str(recipient_email).strip()
+    employee_name = f"{employee.first_name or ''} {employee.last_name or ''}".strip() or "Employee"
+    dept_name = employee.department.name if employee.department else None
+
+    # 1. Send professional email
+    success = send_leave_application_reminder_email(
+        employee_email=recipient_email,
+        employee_name=employee_name,
+        department_name=dept_name,
+        custom_note=reminder.custom_note,
+        cc_emails=reminder.cc_emails
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to dispatch email to {recipient_email}. Please check SMTP configuration."
+        )
+
+    # 2. In-App Notification (if employee has user account)
+    if employee.user_id:
+        try:
+            manager.notify_user_sync(
+                db=db,
+                user_id=employee.user_id,
+                title="Action Required: Submit Leave Request",
+                message="Reminder to submit your formal leave application for absence taken this month.",
+                type="leave_reminder",
+                module="Leave",
+                reference_id=employee.id,
+                action_url="/hrms/apply-leave"
+            )
+        except Exception as e:
+            print(f"Non-critical error sending in-app notification: {e}")
+
+    return schemas.LeaveReminderResponse(
+        success=True,
+        message=f"Leave application reminder email successfully sent to {employee_name} ({recipient_email}).",
+        recipient_email=recipient_email,
+        employee_name=employee_name
+    )
+
