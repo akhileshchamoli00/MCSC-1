@@ -515,7 +515,8 @@ def run_migrations():
             ("attachment_name", "VARCHAR(255) DEFAULT NULL"),
             ("quoted_message_id", "INTEGER DEFAULT NULL"),
             ("quoted_message_text", "TEXT DEFAULT NULL"),
-            ("quoted_sender_name", "VARCHAR(255) DEFAULT NULL")
+            ("quoted_sender_name", "VARCHAR(255) DEFAULT NULL"),
+            ("is_deleted", "BOOLEAN DEFAULT FALSE")
         ]
         for col, col_type in progress_cols:
             try:

@@ -37,7 +37,8 @@ import {
   Check,
   CheckCheck,
   Reply,
-  Quote
+  Quote,
+  Ban
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -461,15 +462,24 @@ export function DualOrderChatDialog({
       );
 
       if (res.ok) {
+        const data = await res.json().catch(() => null);
+        const deletedRecord = (data && data.id) ? data : {
+          is_deleted: true,
+          message: "This message was deleted",
+          attachment_url: null,
+          attachment_name: null,
+          reactions: []
+        };
+
         if (channel === "CLIENT") {
-          setClientMessages(prev => prev.filter(m => m.id !== msgId));
+          setClientMessages(prev => prev.map(m => (m.id === msgId ? { ...m, ...deletedRecord, is_deleted: true } : m)));
         } else {
-          setInternalMessages(prev => prev.filter(m => m.id !== msgId));
+          setInternalMessages(prev => prev.map(m => (m.id === msgId ? { ...m, ...deletedRecord, is_deleted: true } : m)));
         }
         setConfirmDeleteId(null);
-        toast.success("Message deleted successfully");
+        toast.success("Message deleted");
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         toast.error(err.detail || "Failed to delete message");
       }
     } catch (err) {
@@ -1290,7 +1300,8 @@ export function DualOrderChatDialog({
                         const isEditing = editingMessageId === msg.id;
                         const isDeleting = confirmDeleteId === msg.id;
                         const canModify = canModifyMessage(msg);
-                        const emojiOnly = isEmojiOnlyText(msg.message) && !msg.quoted_message_text && !msg.attachment_name && (!msg.attachment_url || msg.attachment_url === "uploading...");
+                        const isDeleted = Boolean(msg.is_deleted || msg.message === "This message was deleted");
+                        const emojiOnly = !isDeleted && isEmojiOnlyText(msg.message) && !msg.quoted_message_text && !msg.attachment_name && (!msg.attachment_url || msg.attachment_url === "uploading...");
 
                         return (
                           <div
@@ -1356,7 +1367,7 @@ export function DualOrderChatDialog({
                             ) : isDeleting ? (
                               <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs space-y-2">
                                 <p className="text-rose-600 dark:text-rose-400 font-semibold text-[11px]">
-                                  Delete this message permanently?
+                                  Delete this message?
                                 </p>
                                 <div className="flex items-center justify-end gap-1.5">
                                   <Button
@@ -1381,6 +1392,27 @@ export function DualOrderChatDialog({
                                   </Button>
                                 </div>
                               </div>
+                            ) : isDeleted ? (
+                              /* Empty / Deleted Message Box */
+                              <div className={`flex flex-col max-w-full ${isClientSender ? "self-start" : "self-end"}`}>
+                                <div className="flex items-center gap-1.5 max-w-full">
+                                  <div
+                                    className={`rounded-2xl shadow-xs px-3.5 py-2 text-xs sm:text-[13px] italic flex items-center gap-2 border border-dashed border-border/70 dark:border-border/60 bg-muted/20 dark:bg-muted/10 text-muted-foreground/80 select-none ${
+                                      isClientSender ? "rounded-tl-sm" : "rounded-tr-sm"
+                                    }`}
+                                  >
+                                    <Ban className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
+                                    <span>This message was deleted</span>
+                                  </div>
+                                  <div className="flex items-center justify-center shrink-0 self-center select-none">
+                                    <SeenReceiptsIndicator
+                                      seenBy={msg.seen_by}
+                                      isSelf={!isClientSender}
+                                      sentAt={msg.created_at}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
                             ) : (
                               <div className={`flex flex-col max-w-full ${isClientSender ? "self-start" : "self-end"}`}>
                                 <div className="flex items-center gap-1.5 max-w-full">
@@ -1389,14 +1421,15 @@ export function DualOrderChatDialog({
                                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                       {canModify && (
                                         <>
-                                          <button
+                                          {/* Edit button hidden for now - can be re-enabled later */}
+                                          {/* <button
                                             type="button"
                                             onClick={() => handleStartEdit(msg)}
                                             className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
                                             title="Edit message"
                                           >
                                             <Pencil className="h-3 w-3" />
-                                          </button>
+                                          </button> */}
                                           <button
                                             type="button"
                                             onClick={() => setConfirmDeleteId(msg.id)}
@@ -1524,14 +1557,15 @@ export function DualOrderChatDialog({
                                       </button>
                                       {canModify && (
                                         <>
-                                          <button
+                                          {/* Edit button hidden for now - can be re-enabled later */}
+                                          {/* <button
                                             type="button"
                                             onClick={() => handleStartEdit(msg)}
                                             className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
                                             title="Edit message"
                                           >
                                             <Pencil className="h-3 w-3" />
-                                          </button>
+                                          </button> */}
                                           <button
                                             type="button"
                                             onClick={() => setConfirmDeleteId(msg.id)}
@@ -1711,7 +1745,8 @@ export function DualOrderChatDialog({
                         const isEditing = editingMessageId === msg.id;
                         const isDeleting = confirmDeleteId === msg.id;
                         const canModify = canModifyMessage(msg);
-                        const emojiOnly = isEmojiOnlyText(msg.message) && !msg.quoted_message_text && !msg.attachment_name && (!msg.attachment_url || msg.attachment_url === "uploading...");
+                        const isDeleted = Boolean(msg.is_deleted || msg.message === "This message was deleted");
+                        const emojiOnly = !isDeleted && isEmojiOnlyText(msg.message) && !msg.quoted_message_text && !msg.attachment_name && (!msg.attachment_url || msg.attachment_url === "uploading...");
 
                         return (
                           <div
@@ -1791,6 +1826,23 @@ export function DualOrderChatDialog({
                                   </Button>
                                 </div>
                               </div>
+                            ) : isDeleted ? (
+                              /* Empty / Deleted Note Box */
+                              <div className="flex flex-col max-w-full self-start">
+                                <div className="flex items-center gap-1.5 max-w-full">
+                                  <div className="rounded-2xl shadow-xs px-3.5 py-2 text-xs sm:text-[13px] italic flex items-center gap-2 border border-dashed border-amber-500/30 bg-amber-500/5 text-amber-800/70 dark:text-amber-300/70 rounded-tl-sm select-none">
+                                    <Ban className="h-3.5 w-3.5 text-amber-600/60 dark:text-amber-400/60 shrink-0" />
+                                    <span>This note was deleted</span>
+                                  </div>
+                                  <div className="flex items-center justify-center shrink-0 self-center select-none">
+                                    <SeenReceiptsIndicator
+                                      seenBy={msg.seen_by}
+                                      isSelf={true}
+                                      sentAt={msg.created_at}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
                             ) : (
                               <div className="flex flex-col max-w-full self-start">
                                 <div className="flex items-center gap-1.5 max-w-full">
@@ -1864,14 +1916,15 @@ export function DualOrderChatDialog({
                                     </button>
                                     {canModify && (
                                       <>
-                                        <button
+                                        {/* Edit button hidden for now - can be re-enabled later */}
+                                        {/* <button
                                           type="button"
                                           onClick={() => handleStartEdit(msg)}
                                           className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
                                           title="Edit note"
                                         >
                                           <Pencil className="h-3 w-3" />
-                                        </button>
+                                        </button> */}
                                         <button
                                           type="button"
                                           onClick={() => setConfirmDeleteId(msg.id)}

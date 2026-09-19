@@ -2634,6 +2634,7 @@ def format_order_progress_response(
             sender_role="Milestone",
             sender_avatar=None,
             is_client=False,
+            is_deleted=bool(getattr(u, "is_deleted", False)),
             seen_by=[],
             reactions=[]
         )
@@ -2669,6 +2670,7 @@ def format_order_progress_response(
             sender_role="Client",
             sender_avatar=None,
             is_client=True,
+            is_deleted=bool(getattr(u, "is_deleted", False)),
             seen_by=seen_by or [],
             reactions=reactions or []
         )
@@ -2708,6 +2710,7 @@ def format_order_progress_response(
         sender_role=sender_role,
         sender_avatar=sender_avatar,
         is_client=is_client,
+        is_deleted=bool(getattr(u, "is_deleted", False)),
         seen_by=seen_by or [],
         reactions=reactions or []
     )
@@ -3547,10 +3550,21 @@ def delete_order_progress(
     if not (is_author or is_admin):
         raise HTTPException(status_code=403, detail="You can only delete your own messages")
 
-    db.delete(progress)
-    db.commit()
+    # Soft delete: mark as deleted, clear original text and attachment
+    progress.is_deleted = True
+    progress.message = "This message was deleted"
+    progress.attachment_url = None
+    progress.attachment_name = None
 
-    return {"message": "Message deleted successfully", "id": progress_id}
+    # Clear reactions for this deleted message
+    db.query(models.ClientOrderProgressReaction).filter(
+        models.ClientOrderProgressReaction.progress_id == progress.id
+    ).delete()
+
+    db.commit()
+    db.refresh(progress)
+
+    return format_order_progress_response(progress, db)
 
 
 @router.post("/orders/{order_number}/upload-attachment", response_model=schemas.ClientOrderProgressResponse)

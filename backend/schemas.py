@@ -1418,6 +1418,7 @@ class ClientOrderProgressResponse(BaseModel):
     sender_role: Optional[str] = None
     sender_avatar: Optional[str] = None
     is_client: Optional[bool] = False
+    is_deleted: Optional[bool] = False
     seen_by: List[MessageSeenUser] = []
     reactions: List[MessageReactionGroup] = []
 
