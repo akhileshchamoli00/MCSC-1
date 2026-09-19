@@ -218,9 +218,17 @@ class AttendanceClockInRequest(BaseModel):
     latitude: float
     longitude: float
 
+class AttendanceCreateAdmin(BaseModel):
+    employee_id: int
+    attendance_date: date
+    clock_in_time: Optional[datetime] = None
+    clock_out_time: Optional[datetime] = None
+    status: Optional[str] = None
+
 class AttendanceUpdateAdmin(BaseModel):
     clock_in_time: Optional[datetime] = None
     clock_out_time: Optional[datetime] = None
+    status: Optional[str] = None
 
 class AttendanceClockOutRequest(BaseModel):
     latitude: float

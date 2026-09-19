@@ -348,6 +348,59 @@ def get_all_attendance(skip: int = 0, limit: int = 100, db: Session = Depends(da
         joinedload(models.Attendance.employee).joinedload(models.Employee.department)
     ).order_by(desc(models.Attendance.attendance_date)).offset(skip).limit(limit).all()
 
+@router.post("/manual", response_model=schemas.AttendanceResponse)
+def create_attendance_manual(
+    req: schemas.AttendanceCreateAdmin,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if not (is_admin_or_hr(current_user, db, "create") or is_admin_or_hr(current_user, db, "edit")):
+        raise HTTPException(status_code=403, detail="Admin access required to record manual attendance")
+
+    # 1. Validate employee exists
+    employee = db.query(models.Employee).filter(models.Employee.id == req.employee_id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    emp_name = f"{employee.first_name or ''} {employee.last_name or ''}".strip() or f"Employee #{employee.id}"
+
+    # 2. Strict Duplicate Check
+    existing = db.query(models.Attendance).filter(
+        models.Attendance.employee_id == req.employee_id,
+        models.Attendance.attendance_date == req.attendance_date
+    ).first()
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"An attendance record already exists for {emp_name} on {req.attendance_date}."
+        )
+
+    # 3. Create new attendance entry
+    attendance = models.Attendance(
+        employee_id=req.employee_id,
+        attendance_date=req.attendance_date,
+        clock_in_time=req.clock_in_time,
+        clock_out_time=req.clock_out_time,
+        status="Present"
+    )
+
+    recalculate_attendance(attendance)
+
+    # If explicit status was specified and not 'Auto', allow override
+    if req.status and req.status.strip() and req.status.lower() != "auto":
+        attendance.status = req.status.strip()
+
+    db.add(attendance)
+    db.commit()
+    db.refresh(attendance)
+
+    attendance_full = db.query(models.Attendance).options(
+        joinedload(models.Attendance.employee).joinedload(models.Employee.department)
+    ).filter(models.Attendance.id == attendance.id).first()
+
+    return attendance_full or attendance
+
 @router.put("/{attendance_id}", response_model=schemas.AttendanceResponse)
 def update_attendance_admin(attendance_id: int, req: schemas.AttendanceUpdateAdmin, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     if not is_admin_or_hr(current_user, db, "edit"):
@@ -363,6 +416,9 @@ def update_attendance_admin(attendance_id: int, req: schemas.AttendanceUpdateAdm
         attendance.clock_out_time = req.clock_out_time
         
     recalculate_attendance(attendance)
+
+    if req.status and req.status.strip() and req.status.lower() != "auto":
+        attendance.status = req.status.strip()
             
     db.commit()
     db.refresh(attendance)
