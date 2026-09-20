@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useUser } from "@/contexts/user-context";
+import { formatPhoneNumber } from "@/lib/utils";
 
 interface CustomerData {
   id: number;
@@ -521,7 +522,7 @@ export default function ClientsPage() {
                               {customer.phone && (
                                 <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                                   <Phone className="h-3 w-3 opacity-70" />
-                                  <span>{customer.phone}</span>
+                                  <span>{formatPhoneNumber(customer.phone)}</span>
                                 </div>
                               )}
                             </div>

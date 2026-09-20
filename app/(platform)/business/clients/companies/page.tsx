@@ -46,6 +46,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/contexts/user-context";
+import { formatPhoneNumber } from "@/lib/utils";
 
 const formatUserName = (userObj: any, fallback = "Staff") => {
   if (!userObj) return fallback;
@@ -533,7 +534,7 @@ export default function CompaniesDirectory() {
                               {company.key_contact_phone && (
                                 <div className="flex items-center gap-1.5 text-[10px]">
                                   <Phone className="h-3 w-3 opacity-70" />
-                                  <span>{company.key_contact_phone}</span>
+                                  <span>{formatPhoneNumber(company.key_contact_phone)}</span>
                                 </div>
                               )}
                               {company.invitation_sent_at ? (

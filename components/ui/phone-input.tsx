@@ -59,6 +59,32 @@ export const COUNTRY_DIAL_CODES: CountryDialCode[] = [
   { code: "+973", country: "Bahrain", flag: "🇧🇭", iso: "BH" }
 ];
 
+// Format local number with standard hyphen separation as typed.
+export function formatLocalPhoneNumber(rawNumber: string): string {
+  if (!rawNumber) return "";
+  let clean = rawNumber.replace(/\D/g, "");
+  if (clean.startsWith("0")) {
+    clean = clean.slice(1);
+  }
+  if (!clean) return "";
+
+  if (clean.length <= 3) {
+    return clean;
+  }
+  if (clean.length <= 7) {
+    return `${clean.slice(0, 3)}-${clean.slice(3)}`;
+  }
+  if (clean.length === 8) {
+    return `${clean.slice(0, 4)}-${clean.slice(4)}`;
+  }
+  if (clean.length <= 11) {
+    return `${clean.slice(0, 3)}-${clean.slice(3, 7)}-${clean.slice(7)}`;
+  }
+  return `${clean.slice(0, 3)}-${clean.slice(3, 7)}-${clean.slice(7, 11)}-${clean.slice(11)}`;
+}
+
+export { formatPhoneNumber } from "@/lib/utils";
+
 // Helper to parse a full international phone string into { countryCode, localNumber, iso }
 export function parsePhoneNumber(raw: string = "", defaultCountryCode = "+62"): { countryCode: string; localNumber: string; iso: string } {
   if (!raw) {
@@ -74,10 +100,9 @@ export function parsePhoneNumber(raw: string = "", defaultCountryCode = "+62"): 
     for (const item of sortedCodes) {
       if (trimmed.startsWith(item.code)) {
         let remainder = trimmed.slice(item.code.length).trim();
-        if (remainder.startsWith("0")) remainder = remainder.slice(1);
         return {
           countryCode: item.code,
-          localNumber: remainder.replace(/[^0-9\s-]/g, ""),
+          localNumber: formatLocalPhoneNumber(remainder),
           iso: item.iso
         };
       }
@@ -86,11 +111,10 @@ export function parsePhoneNumber(raw: string = "", defaultCountryCode = "+62"): 
     const match = trimmed.match(/^(\+\d{1,4})(.*)$/);
     if (match) {
       let remainder = match[2].trim();
-      if (remainder.startsWith("0")) remainder = remainder.slice(1);
       const found = COUNTRY_DIAL_CODES.find(c => c.code === match[1]);
       return {
         countryCode: match[1],
-        localNumber: remainder.replace(/[^0-9\s-]/g, ""),
+        localNumber: formatLocalPhoneNumber(remainder),
         iso: found ? found.iso : "INT"
       };
     }
@@ -101,7 +125,7 @@ export function parsePhoneNumber(raw: string = "", defaultCountryCode = "+62"): 
     const defaultCountry = COUNTRY_DIAL_CODES.find(c => c.code === defaultCountryCode) || COUNTRY_DIAL_CODES[0];
     return {
       countryCode: defaultCountry.code,
-      localNumber: trimmed.slice(1).replace(/[^0-9\s-]/g, ""),
+      localNumber: formatLocalPhoneNumber(trimmed),
       iso: defaultCountry.iso
     };
   }
@@ -109,7 +133,7 @@ export function parsePhoneNumber(raw: string = "", defaultCountryCode = "+62"): 
   const defaultCountry = COUNTRY_DIAL_CODES.find(c => c.code === defaultCountryCode) || COUNTRY_DIAL_CODES[0];
   return {
     countryCode: defaultCountry.code,
-    localNumber: trimmed.replace(/[^0-9\s-]/g, ""),
+    localNumber: formatLocalPhoneNumber(trimmed),
     iso: defaultCountry.iso
   };
 }
@@ -143,7 +167,7 @@ export function PhoneInput({
   id = "phone-input",
   value,
   onChange,
-  placeholder = "812 3456 789",
+  placeholder = "812-3456-7890",
   required = false,
   disabled = false,
   className = "",
@@ -207,18 +231,25 @@ export function PhoneInput({
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let raw = e.target.value;
-    
+
+    const oldDigits = localNumber.replace(/\D/g, "");
+    let newDigits = raw.replace(/\D/g, "");
+
     // Automatically strip leading 0 if user enters domestic format like 0812...
-    if (raw.startsWith("0")) {
-      raw = raw.slice(1);
+    if (newDigits.startsWith("0")) {
+      newDigits = newDigits.slice(1);
     }
 
-    // Only allow digits, spaces, and hyphens
-    const cleanNumber = raw.replace(/[^0-9\s-]/g, "");
-    setLocalNumber(cleanNumber);
+    // If user hit backspace on a hyphen in the middle, drop the digit before it
+    if (raw.length < localNumber.length && oldDigits === newDigits && newDigits.length > 0) {
+      newDigits = newDigits.slice(0, -1);
+    }
+
+    const formatted = formatLocalPhoneNumber(newDigits);
+    setLocalNumber(formatted);
     setTouched(true);
 
-    const combined = cleanNumber.trim() ? `${countryCode} ${cleanNumber.trim()}` : "";
+    const combined = formatted ? `${countryCode} ${formatted}` : "";
     onChange(combined);
   };
 

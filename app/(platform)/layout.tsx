@@ -417,20 +417,26 @@ function HRMSLayoutContent({ children }: { children: React.ReactNode }) {
 
       if (isHrmsRoute && !allowedModes.includes("hrms")) {
         router.push("/select-system");
+        return;
       } else if (isBusinessRoute && !allowedModes.includes("business")) {
         router.push("/select-system");
+        return;
       }
     }
   }, [loading, userProfile, isAdmin, allowedModes, pathname, router]);
 
-  // Sync mode with pathname
+  // Sync mode with pathname safely
   useEffect(() => {
-    if (pathname.startsWith("/business") && currentMode !== "business") {
-      setMode("business");
-    } else if (pathname.startsWith("/hrms") && currentMode !== "hrms") {
-      setMode("hrms");
+    if (pathname.startsWith("/business")) {
+      if (allowedModes.includes("business")) {
+        setMode("business");
+      }
+    } else if (pathname.startsWith("/hrms")) {
+      if (allowedModes.includes("hrms")) {
+        setMode("hrms");
+      }
     }
-  }, [pathname, currentMode, setMode]);
+  }, [pathname, allowedModes, setMode]);
 
   if (loading) {
     return (

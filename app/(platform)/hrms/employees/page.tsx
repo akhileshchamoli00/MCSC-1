@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, User, Mail, Phone, Briefcase, Loader2, Eye, Edit, Download, Filter, ChevronUp, ChevronDown, Users, UserCheck, Clock, Building2 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { resolveImageUrl } from "@/lib/utils";
+import { resolveImageUrl, formatPhoneNumber } from "@/lib/utils";
 import { KpiCard } from "@/components/kpi-card";
 
 export default function EmployeesPage() {
@@ -362,7 +362,7 @@ export default function EmployeesPage() {
                         </div>
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <Phone className="h-3.5 w-3.5 shrink-0" />
-                          <span className="text-xs">{employee.phone || "No phone"}</span>
+                          <span className="text-xs">{employee.phone ? formatPhoneNumber(employee.phone) : "No phone"}</span>
                         </div>
                       </div>
                     </td>

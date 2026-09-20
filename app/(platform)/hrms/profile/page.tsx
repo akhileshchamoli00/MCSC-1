@@ -10,7 +10,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useUser } from "@/contexts/user-context";
 import { toast } from "sonner";
-import { resolveImageUrl } from "@/lib/utils";
+import { resolveImageUrl, formatPhoneNumber } from "@/lib/utils";
 import { PhoneInput, isValidPhoneNumber } from "@/components/ui/phone-input";
 
 export default function MyProfilePage() {
@@ -354,7 +354,7 @@ export default function MyProfilePage() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider">Phone</p>
-                    <p className="font-medium text-foreground text-xs truncate">{employee.phone || "Not provided"}</p>
+                    <p className="font-medium text-foreground text-xs truncate">{employee.phone ? formatPhoneNumber(employee.phone) : "Not provided"}</p>
                   </div>
                 </div>
 

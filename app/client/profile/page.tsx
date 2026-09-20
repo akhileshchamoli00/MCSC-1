@@ -32,7 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
-import { resolveImageUrl } from "@/lib/utils";
+import { resolveImageUrl, formatPhoneNumber } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -403,7 +403,7 @@ export default function ClientProfilePage() {
                 </div>
                 <div className="overflow-hidden">
                   <div className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">Phone</div>
-                  <span className="text-foreground text-xs font-medium truncate block">{clientProfile?.phone || "No phone listed"}</span>
+                  <span className="text-foreground text-xs font-medium truncate block">{clientProfile?.phone ? formatPhoneNumber(clientProfile.phone) : "No phone listed"}</span>
                 </div>
               </div>
 

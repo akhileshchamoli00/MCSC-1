@@ -258,30 +258,40 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           list.push("hrms");
         }
         
-        const hasBusiness = permissions.includes("platform_business:view") || permissions.includes("platform_business:*") || permissions.includes("*:*");
+        const hasBusiness = permissions.includes("platform_business:view") || 
+          permissions.includes("platform_business:*") || 
+          permissions.includes("*:*") ||
+          permissions.some((p) => p.startsWith("clients_") || p.startsWith("business_"));
         if (hasBusiness) {
           list.push("business");
         }
 
-        // Default fallback if no specific permission but employee
+        // Default fallback if no specific restriction found for employee
         if (list.length === 0) {
-          list.push("hrms");
+          list.push("hrms", "business");
         }
       }
     }
     return list;
-  }, [profile, isAdmin, roleName, email, permissions]);
+  }, [isAdmin, roleName, email, permissions]);
 
-  // If only one mode is allowed, force it as currentMode automatically
+  const allowedModesKey = allowedModes.join(",");
+
+  // If only one mode is allowed, force it as currentMode automatically without looping
   useEffect(() => {
     if (!loading && allowedModes.length === 1) {
       const singleMode = allowedModes[0];
-      if (currentMode !== singleMode) {
-        setCurrentModeState(singleMode);
-        localStorage.setItem("current_mode", singleMode);
-      }
+      setCurrentModeState((prev) => {
+        if (prev !== singleMode) {
+          if (typeof window !== "undefined") {
+            localStorage.setItem("current_mode", singleMode);
+          }
+          return singleMode;
+        }
+        return prev;
+      });
     }
-  }, [loading, allowedModes, currentMode]);
+  }, [loading, allowedModesKey]);
 
   const value = React.useMemo(() => ({
     profile, 

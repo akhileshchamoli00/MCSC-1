@@ -62,7 +62,7 @@ import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/ph
 import { EmailInput } from "@/components/ui/email-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { cn, formatNumberWithCommas, parseNumberFromCommas } from "@/lib/utils";
 import domToImage from "dom-to-image";
 import { jsPDF } from "jspdf";
 import { motion, AnimatePresence } from "framer-motion";
@@ -2372,20 +2372,24 @@ export default function ClientOrdersPage() {
                               IDR
                             </div>
                             <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
+                              type="text"
+                              inputMode="decimal"
                               disabled={editForm.is_proforma_finalized}
-                              value={item.unit_price === 0 || item.unit_price === "" || item.unit_price === null ? "" : item.unit_price}
+                              value={
+                                item.custom_price_text !== undefined && item.custom_price_text !== ""
+                                  ? item.custom_price_text
+                                  : (item.unit_price ? formatNumberWithCommas(item.unit_price) : "")
+                              }
                               onChange={(e) => {
-                                const val = e.target.value;
-                                const numVal = val === "" ? 0 : parseFloat(val);
+                                const rawInput = e.target.value;
+                                const formatted = formatNumberWithCommas(rawInput);
+                                const numVal = parseNumberFromCommas(formatted);
                                 setEditForm((prev) => {
                                   const itemsCopy = [...prev.items];
                                   itemsCopy[idx] = { 
                                     ...itemsCopy[idx], 
-                                    unit_price: isNaN(numVal) ? 0 : numVal, 
-                                    custom_price_text: "" 
+                                    unit_price: numVal, 
+                                    custom_price_text: formatted 
                                   };
                                   return { ...prev, items: itemsCopy };
                                 });
@@ -3305,8 +3309,7 @@ export default function ClientOrdersPage() {
                           <tr className="bg-slate-100 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
                             <th className="p-2 w-12 text-center">#</th>
                             <th className="p-2">Service Line Item</th>
-                            <th className="p-2 w-32">Branch / Reference</th>
-                            <th className="p-2 w-28">Pricing Tier</th>
+                            <th className="p-2 w-60">Memo</th>
                             <th className="p-2 text-right">Contract Price</th>
                             <th className="p-2 text-right text-emerald-700 font-extrabold">Proforma Amount ({proformaPercent}%)</th>
                           </tr>
@@ -3333,16 +3336,15 @@ export default function ClientOrdersPage() {
                                     return formatInvoiceDescription(desc);
                                   })()}
                                 </td>
-                                <td className="p-2 text-xs font-semibold text-slate-700 w-32">
+                                <td className="p-2 text-xs font-semibold text-slate-700 w-60">
                                   {item.branch_name ? (
-                                    <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800 font-mono text-[10px] font-bold">
+                                    <span className="inline-block px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800 font-mono text-[10px] font-medium whitespace-normal break-words max-w-full">
                                       {item.branch_name}
                                     </span>
                                   ) : (
                                     <span className="text-slate-400 font-mono text-xs">-</span>
                                   )}
                                 </td>
-                                <td className="p-2 font-mono font-semibold text-slate-600 w-28">{item.pricing_tier}</td>
                                 <td className="p-2 text-right font-mono font-bold text-slate-700">{formatCurrency(lineFullPrice)}</td>
                                 <td className="p-2 text-right font-mono font-bold text-emerald-700 bg-emerald-50/50">
                                   {formatCurrency(lineProformaPrice)}
@@ -3583,8 +3585,7 @@ export default function ClientOrdersPage() {
                           <tr className="bg-slate-100 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
                             <th className="p-2.5 w-12 text-center">#</th>
                             <th className="p-2.5">Service Line Item</th>
-                            <th className="p-2.5 w-32">Branch / Reference</th>
-                            <th className="p-2.5 w-28">Pricing Tier</th>
+                            <th className="p-2.5 w-60">Memo</th>
                             <th className="p-2.5 text-right">Contract Price</th>
                           </tr>
                         </thead>
@@ -3609,16 +3610,15 @@ export default function ClientOrdersPage() {
                                     return formatInvoiceDescription(desc);
                                   })()}
                                 </td>
-                                <td className="p-2.5 text-xs font-semibold text-slate-700 w-32">
+                                <td className="p-2.5 text-xs font-semibold text-slate-700 w-60">
                                   {item.branch_name ? (
-                                    <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800 font-mono text-[10px] font-bold">
+                                    <span className="inline-block px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800 font-mono text-[10px] font-medium whitespace-normal break-words max-w-full">
                                       {item.branch_name}
                                     </span>
                                   ) : (
                                     <span className="text-slate-400 font-mono text-xs">-</span>
                                   )}
                                 </td>
-                                <td className="p-2.5 font-mono font-semibold text-slate-600 w-28">{item.pricing_tier}</td>
                                 <td className="p-2.5 text-right font-mono font-bold text-slate-700">{formatCurrency(lineFullPrice)}</td>
                               </tr>
                             );

@@ -1420,8 +1420,7 @@ export default function CancelledOrdersPage() {
                           <tr className="bg-slate-100 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px] tracking-wider">
                             <th className="p-2 w-12 text-center">#</th>
                             <th className="p-2">Service Line Item</th>
-                            <th className="p-2 w-32">Branch / Reference</th>
-                            <th className="p-2 w-28">Pricing Tier</th>
+                            <th className="p-2 w-60">Memo</th>
                             <th className="p-2 text-right">Contract Price</th>
                             <th className="p-2 text-right text-red-600 font-extrabold">Proforma Amount ({proformaPercent}%)</th>
                           </tr>
@@ -1436,10 +1435,15 @@ export default function CancelledOrdersPage() {
                                 <td className="p-2">
                                   <span className="font-bold text-slate-900 text-sm leading-tight line-through">{item.job_title}</span>
                                 </td>
-                                <td className="p-2 text-xs font-semibold text-slate-700 w-32">
-                                  {item.branch_name || "-"}
+                                <td className="p-2 text-xs font-semibold text-slate-700 w-60">
+                                  {item.branch_name ? (
+                                    <span className="inline-block px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800 font-mono text-[10px] font-medium whitespace-normal break-words max-w-full">
+                                      {item.branch_name}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 font-mono text-xs">-</span>
+                                  )}
                                 </td>
-                                <td className="p-2 font-mono font-semibold text-slate-600 w-28">{item.pricing_tier}</td>
                                 <td className="p-2 text-right font-mono font-bold text-slate-400 line-through">{formatCurrency(lineFullPrice)}</td>
                                 <td className="p-2 text-right font-mono font-bold text-red-600 line-through bg-red-50/30">
                                   {formatCurrency(lineProformaPrice)}

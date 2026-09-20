@@ -9,19 +9,18 @@ import {
   Phone, 
   MapPin, 
   User, 
-  ArrowLeft,
   Building2,
   FileText,
   CheckCircle
 } from "lucide-react";
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { KpiCard } from "@/components/kpi-card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useUser } from "@/contexts/user-context";
+import { formatPhoneNumber } from "@/lib/utils";
 
 export default function CompanyDocumentsDirectory() {
   const router = useRouter();
@@ -54,8 +53,8 @@ export default function CompanyDocumentsDirectory() {
     try {
       setLoading(true);
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, {
-      credentials: "include", 
-        });
+        credentials: "include", 
+      });
       
       if (response.ok) {
         setCompanies(await response.json());
@@ -258,7 +257,7 @@ export default function CompanyDocumentsDirectory() {
                               {company.key_contact_phone && (
                                 <div className="flex items-center gap-1.5 text-[10px]">
                                   <Phone className="h-3 w-3 opacity-70" />
-                                  <span>{company.key_contact_phone}</span>
+                                  <span>{formatPhoneNumber(company.key_contact_phone)}</span>
                                 </div>
                               )}
                             </>

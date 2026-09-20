@@ -49,7 +49,7 @@ import {
 import { toast } from "sonner";
 import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
-import { cn } from "@/lib/utils";
+import { cn, formatNumberWithCommas, parseNumberFromCommas } from "@/lib/utils";
 
 export default function EditClientOrderPage() {
   const router = useRouter();
@@ -331,7 +331,7 @@ export default function EditClientOrderPage() {
           description: itemsCopy[index].description || "One-time custom service",
           pricing_tier: "PARTNER_A3",
           unit_price: itemsCopy[index].unit_price || 0,
-          custom_price_text: "",
+          custom_price_text: itemsCopy[index].unit_price ? formatNumberWithCommas(itemsCopy[index].unit_price) : "",
           notary_id: "",
           _raw_service: null
         };
@@ -358,7 +358,7 @@ export default function EditClientOrderPage() {
         price = selectedService.partner_a2_price ?? (selectedService.base_price * 0.5);
       } else if (tier === "PARTNER_A3") {
         price = itemsCopy[index].unit_price || 0;
-        customText = "";
+        customText = price ? formatNumberWithCommas(price) : "";
       }
 
       itemsCopy[index] = {
@@ -396,7 +396,7 @@ export default function EditClientOrderPage() {
           price = s.partner_a2_price ?? (s.base_price * 0.5);
         } else if (tier === "PARTNER_A3") {
           price = (item.pricing_tier === "PARTNER_A3" && item.unit_price) ? item.unit_price : 0;
-          customText = "";
+          customText = price ? formatNumberWithCommas(price) : "";
         }
       }
 
@@ -1028,8 +1028,8 @@ export default function EditClientOrderPage() {
                         {/* Primary Configuration Grid: Service Package, Pricing Tier, Branch Reference */}
                         <div className="grid grid-cols-1 md:grid-cols-12 xl:grid-cols-12 gap-2.5 items-start">
                           
-                          {/* Service Package Selector (Full width on md, 5 cols on xl) */}
-                          <div className="col-span-1 md:col-span-12 xl:col-span-5 space-y-1">
+                          {/* Service Package Selector (Full width on md, 7 cols on xl) */}
+                          <div className="col-span-1 md:col-span-12 xl:col-span-7 space-y-1">
                             <label className="text-[10.5px] font-bold text-foreground flex items-center gap-1">
                               <span>Service Package Catalog</span>
                               <span className="text-destructive font-black">*</span>
@@ -1066,8 +1066,8 @@ export default function EditClientOrderPage() {
                             )}
                           </div>
 
-                          {/* Pricing Tier Selector (6 cols on md, 4 cols on xl) */}
-                          <div className="col-span-1 md:col-span-6 xl:col-span-4 space-y-1">
+                          {/* Pricing Tier Selector (6 cols on md, 5 cols on xl) */}
+                          <div className="col-span-1 md:col-span-6 xl:col-span-5 space-y-1">
                             <label className="text-[10.5px] font-bold text-foreground flex items-center gap-1">
                               <span>Pricing Tier & Rate</span>
                               <span className="text-destructive font-black">*</span>
@@ -1107,10 +1107,10 @@ export default function EditClientOrderPage() {
                             )}
                           </div>
 
-                          {/* Branch / Project Reference (6 cols on md, 3 cols on xl) */}
-                          <div className="col-span-1 md:col-span-6 xl:col-span-3 space-y-1">
+                          {/* Line Item Memo (Full width 12 cols, larger input size) */}
+                          <div className="col-span-1 md:col-span-12 xl:col-span-12 space-y-1">
                             <label className="text-[10.5px] font-semibold text-muted-foreground flex items-center justify-between">
-                              <span>Branch / Ref</span>
+                              <span>Memo</span>
                               <span className="text-[9px] text-muted-foreground/70 font-mono">Optional</span>
                             </label>
                             <Input
@@ -1123,8 +1123,8 @@ export default function EditClientOrderPage() {
                                   return { ...prev, items: copy };
                                 });
                               }}
-                              placeholder="e.g. Bali Branch / Ref #12"
-                              className="h-8 text-xs font-medium rounded-lg border-border/70 bg-background placeholder:text-muted-foreground/50 truncate"
+                              placeholder="e.g. Reference number, branch location, client memo, or internal reference notes..."
+                              className="h-9 text-xs font-medium rounded-lg border-border/70 bg-background placeholder:text-muted-foreground/50 w-full"
                             />
                           </div>
                         </div>
@@ -1144,20 +1144,24 @@ export default function EditClientOrderPage() {
                                 IDR
                               </div>
                               <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
+                                type="text"
+                                inputMode="decimal"
                                 required
-                                value={item.unit_price === 0 || item.unit_price === "" || item.unit_price === null ? "" : item.unit_price}
+                                value={
+                                  item.custom_price_text !== undefined && item.custom_price_text !== ""
+                                    ? item.custom_price_text
+                                    : (item.unit_price ? formatNumberWithCommas(item.unit_price) : "")
+                                }
                                 onChange={(e) => {
-                                  const val = e.target.value;
-                                  const numVal = val === "" ? 0 : parseFloat(val);
+                                  const rawInput = e.target.value;
+                                  const formatted = formatNumberWithCommas(rawInput);
+                                  const numVal = parseNumberFromCommas(formatted);
                                   setEditForm((prev) => {
                                     const copy = [...prev.items];
                                     copy[idx] = { 
                                       ...copy[idx], 
-                                      unit_price: isNaN(numVal) ? 0 : numVal, 
-                                      custom_price_text: "" 
+                                      unit_price: numVal, 
+                                      custom_price_text: formatted 
                                     };
                                     return { ...prev, items: copy };
                                   });
@@ -1616,13 +1620,12 @@ export default function EditClientOrderPage() {
 
       </form>
 
-      {/* Quick Create Company Modal - Spacious, Clean & Elegant */}
       {/* Create Company Modal - Fully Consistent with Add New Company Entity Form */}
       <CreateCompanyDialog
         open={isCreateCompanyOpen}
         onOpenChange={setIsCreateCompanyOpen}
         target={createCompanyTarget}
-        initialClientId={filterClientId || (selectedOrderGroup?.client_id ? String(selectedOrderGroup.client_id) : "")}
+        initialClientId=""
         clients={clients}
         onSuccess={handleCompanyCreated}
       />

@@ -2964,8 +2964,7 @@ export default function ClientOrdersPage() {
                           <tr className="bg-slate-100 border-b border-slate-200 text-slate-600 font-bold uppercase text-xs tracking-wider">
                             <th className="p-3 w-12 text-center">#</th>
                             <th className="p-3">Service Line Item</th>
-                            <th className="p-3 w-36">Branch / Reference</th>
-                            <th className="p-3 w-28">Pricing Tier</th>
+                            <th className="p-3 w-64">Memo</th>
                             <th className="p-3 text-right">Contract Price</th>
                             <th className="p-3 text-right text-emerald-700 font-extrabold">Proforma Amount ({proformaPercent}%)</th>
                           </tr>
@@ -2992,16 +2991,15 @@ export default function ClientOrdersPage() {
                                     return formatInvoiceDescription(desc);
                                   })()}
                                 </td>
-                                <td className="p-3 text-xs font-semibold text-slate-700 w-36">
+                                <td className="p-3 text-xs font-semibold text-slate-700 w-64">
                                   {item.branch_name ? (
-                                    <span className="inline-block px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800 font-mono text-[11px] font-bold">
+                                    <span className="inline-block px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-slate-800 font-mono text-[11px] font-medium whitespace-normal break-words max-w-full">
                                       {item.branch_name}
                                     </span>
                                   ) : (
                                     <span className="text-slate-400 font-mono text-xs">-</span>
                                   )}
                                 </td>
-                                <td className="p-3 font-mono font-semibold text-slate-600 w-28">{item.pricing_tier}</td>
                                 <td className="p-3 text-right font-mono font-bold text-slate-700">{formatCurrency(lineFullPrice)}</td>
                                 <td className="p-3 text-right font-mono font-bold text-emerald-700 bg-emerald-50/50">
                                   {formatCurrency(lineProformaPrice)}
@@ -3242,8 +3240,7 @@ export default function ClientOrdersPage() {
                           <tr className="bg-slate-100 border-b border-slate-200 text-slate-600 font-bold uppercase text-xs tracking-wider">
                             <th className="p-3 w-12 text-center">#</th>
                             <th className="p-3">Service Line Item</th>
-                            <th className="p-3 w-36">Branch / Reference</th>
-                            <th className="p-3 w-28">Pricing Tier</th>
+                            <th className="p-3 w-64">Memo</th>
                             <th className="p-3 text-right">Contract Price</th>
                           </tr>
                         </thead>
@@ -3268,16 +3265,15 @@ export default function ClientOrdersPage() {
                                     return formatInvoiceDescription(desc);
                                   })()}
                                 </td>
-                                <td className="p-3 text-xs font-semibold text-slate-700 w-36">
+                                <td className="p-3 text-xs font-semibold text-slate-700 w-64">
                                   {item.branch_name ? (
-                                    <span className="inline-block px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800 font-mono text-[11px] font-bold">
+                                    <span className="inline-block px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-slate-800 font-mono text-[11px] font-medium whitespace-normal break-words max-w-full">
                                       {item.branch_name}
                                     </span>
                                   ) : (
                                     <span className="text-slate-400 font-mono text-xs">-</span>
                                   )}
                                 </td>
-                                <td className="p-3 font-mono font-semibold text-slate-600 w-28">{item.pricing_tier}</td>
                                 <td className="p-3 text-right font-mono font-bold text-slate-700">{formatCurrency(lineFullPrice)}</td>
                               </tr>
                             );

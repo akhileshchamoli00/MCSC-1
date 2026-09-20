@@ -31,6 +31,7 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useUser } from "@/contexts/user-context";
+import { formatPhoneNumber } from "@/lib/utils";
 
 export default function PartnerListPage() {
   const router = useRouter();
@@ -323,7 +324,7 @@ export default function PartnerListPage() {
                             {client.phone && (
                               <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                                 <Phone className="h-3 w-3 opacity-70" />
-                                <span>{client.phone}</span>
+                                <span>{formatPhoneNumber(client.phone)}</span>
                               </div>
                             )}
                           </div>

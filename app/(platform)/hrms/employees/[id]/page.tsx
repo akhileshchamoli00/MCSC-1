@@ -10,7 +10,7 @@ import { ArrowLeft, Edit, Mail, Phone, Calendar, Briefcase, MapPin, Building, Us
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { resolveImageUrl } from "@/lib/utils";
+import { resolveImageUrl, formatPhoneNumber } from "@/lib/utils";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
@@ -325,7 +325,7 @@ export default function EmployeeProfilePage() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider">Phone</p>
-                    <p className="font-medium text-foreground text-xs truncate">{employee.phone || "No phone listed"}</p>
+                    <p className="font-medium text-foreground text-xs truncate">{employee.phone ? formatPhoneNumber(employee.phone) : "No phone listed"}</p>
                   </div>
                 </div>
 
@@ -406,7 +406,7 @@ export default function EmployeeProfilePage() {
                   </div>
                   <div className="space-y-1">
                     <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Emergency Contact</div>
-                    <p className="font-semibold text-xs sm:text-sm text-foreground">{employee.emergency_contact || "Not provided"}</p>
+                    <p className="font-semibold text-xs sm:text-sm text-foreground">{employee.emergency_contact ? formatPhoneNumber(employee.emergency_contact) : "Not provided"}</p>
                   </div>
                 </CardContent>
               </Card>
