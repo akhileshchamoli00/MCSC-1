@@ -1,6 +1,7 @@
 "use client";
 // Force Next.js rebuild: totalOrdersCount defined and checked
 import { Button } from "@/components/ui/button";
+import { TablePagination } from "@/components/ui/pagination";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +56,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
@@ -672,10 +673,6 @@ export default function ClientOrdersPage() {
 
   const groupedOrders = Array.from(groupedOrdersMap.values());
 
-
-
-
-
   const handlePctChange = (valStr: string) => {
     setTempPercent(valStr);
     const pct = Number(valStr) || 0;
@@ -704,8 +701,6 @@ export default function ClientOrdersPage() {
     if (!dateStr) return "-";
     return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
-
-
 
   const handleDeleteSubmit = async () => {
     if (!selectedOrderGroup) return;
@@ -736,13 +731,40 @@ export default function ClientOrdersPage() {
     }
   };
 
+  // Map of order_number -> running chronological sequence number (1, 2, ..., N)
+  // Oldest order = 1, latest order = N
+  const orderSeqMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const sorted = [...groupedOrders].sort((a, b) => {
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      if (timeA !== timeB) return timeA - timeB;
+      return (a.id || 0) - (b.id || 0);
+    });
+    sorted.forEach((ord, index) => {
+      const key = ord.order_number || `SINGLE-${ord.id}`;
+      map.set(key, index + 1);
+    });
+    return map;
+  }, [groupedOrders]);
+
   // Active Orders: Exclude completed & paid orders from Active Orders Management, exclude PIPELINE orders, and exclude CANCELLED orders
-  const activeOrders = groupedOrders.filter((ord) => {
-    const isCompletedAndPaid = ord.status === "COMPLETED" && ord.payment_status === "PAID";
-    const isPipeline = (ord.status || "").toUpperCase() === "PIPELINE";
-    const isCancelled = (ord.status || "").toUpperCase() === "CANCELLED";
-    return !isCompletedAndPaid && !isPipeline && !isCancelled;
-  });
+  // Sorted reverse-chronologically (newest first) so the latest order is at the top of the list
+  const activeOrders = useMemo(() => {
+    return groupedOrders
+      .filter((ord) => {
+        const isCompletedAndPaid = ord.status === "COMPLETED" && ord.payment_status === "PAID";
+        const isPipeline = (ord.status || "").toUpperCase() === "PIPELINE";
+        const isCancelled = (ord.status || "").toUpperCase() === "CANCELLED";
+        return !isCompletedAndPaid && !isPipeline && !isCancelled;
+      })
+      .sort((a, b) => {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        if (timeA !== timeB) return timeB - timeA;
+        return (b.id || 0) - (a.id || 0);
+      });
+  }, [groupedOrders]);
 
   const filteredOrders = activeOrders.filter((ord) => {
     const term = searchTerm.toLowerCase();
@@ -1837,7 +1859,7 @@ export default function ClientOrdersPage() {
                               }`}
                           >
                             <td className="py-2 px-2 text-center font-mono font-medium text-muted-foreground align-top pt-2.5 text-xs">
-                              #{startIndex + index + 1}
+                              #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + index))}
                             </td>
                             <td className="py-2 px-2 align-top pt-2.5 whitespace-nowrap">
                               {ord.company_id ? (
@@ -1888,21 +1910,30 @@ export default function ClientOrdersPage() {
                               {ord.items && ord.items.length > 0 ? (
                                 <div className="space-y-1.5 w-full">
                                   {ord.items.map((item: any, idx: number) => (
-                                    <div key={idx} className="flex flex-wrap items-center gap-1.5 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
-                                      <span className="font-semibold text-foreground text-xs leading-normal break-words">
-                                        {item.job_title}
-                                      </span>
-                                      {item.job_id && (
-                                        <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-primary/5 text-primary border-primary/20 shrink-0">
-                                          {item.job_id}
-                                        </Badge>
-                                      )}
+                                    <div key={idx} className="space-y-1 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className="font-semibold text-foreground text-xs leading-normal break-words">
+                                          {item.job_title}
+                                        </span>
+                                        {item.job_id && (
+                                          <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                            {item.job_id}
+                                          </Badge>
+                                        )}
+                                        {renderVendorBadge(item)}
+                                      </div>
                                       {item.branch_name && (
-                                        <Badge variant="outline" className="text-[9px] font-medium py-0 px-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 shrink-0">
-                                          {item.branch_name}
-                                        </Badge>
+                                        <div className="flex items-center">
+                                          <Badge 
+                                            variant="outline" 
+                                            className="text-[9px] font-medium py-0.5 px-1.5 bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30 max-w-[240px] inline-flex items-center gap-1 overflow-hidden"
+                                            title={`Memo: ${item.branch_name}`}
+                                          >
+                                            <span className="font-bold uppercase tracking-wider text-[8px] opacity-75 shrink-0">Memo:</span>
+                                            <span className="truncate min-w-0">{item.branch_name}</span>
+                                          </Badge>
+                                        </div>
                                       )}
-                                      {renderVendorBadge(item)}
                                     </div>
                                   ))}
                                 </div>
@@ -2209,38 +2240,14 @@ export default function ClientOrdersPage() {
                 </div>
 
                 {/* Pagination Controls */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
-                    <div className="text-xs text-muted-foreground">
-                      Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
-                      <span className="font-medium text-foreground">{Math.min(filteredOrders.length, endIndex)}</span> of{" "}
-                      <span className="font-medium text-foreground">{filteredOrders.length}</span> entries
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                        disabled={currentPage === 1}
-                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
-                      >
-                        Previous
-                      </Button>
-                      <span className="text-xs text-muted-foreground px-2">
-                        Page {currentPage} of {totalPages}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                        disabled={currentPage === totalPages}
-                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                <TablePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  startIndex={startIndex}
+                  endIndex={endIndex}
+                  totalEntries={filteredOrders.length}
+                />
               </>
             )}
           </CardContent>

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { TablePagination } from "@/components/ui/pagination";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +48,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import domToImage from "dom-to-image";
 import { jsPDF } from "jspdf";
@@ -256,8 +257,34 @@ export default function CancelledOrdersPage() {
 
   const groupedOrders = Array.from(groupedOrdersMap.values());
 
-  // Filter ONLY Cancelled orders
-  const allCancelledOrders = groupedOrders.filter((ord) => (ord.status || "").toUpperCase() === "CANCELLED");
+  // Map of order_number -> running chronological sequence number (1, 2, ..., N)
+  // Oldest order = 1, latest order = N
+  const orderSeqMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const sorted = [...groupedOrders].sort((a, b) => {
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      if (timeA !== timeB) return timeA - timeB;
+      return (a.id || 0) - (b.id || 0);
+    });
+    sorted.forEach((ord, index) => {
+      const key = ord.order_number || `SINGLE-${ord.id}`;
+      map.set(key, index + 1);
+    });
+    return map;
+  }, [groupedOrders]);
+
+  // Filter ONLY Cancelled orders (sorted reverse-chronologically so latest cancelled order is at top)
+  const allCancelledOrders = useMemo(() => {
+    return groupedOrders
+      .filter((ord) => (ord.status || "").toUpperCase() === "CANCELLED")
+      .sort((a, b) => {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        if (timeA !== timeB) return timeB - timeA;
+        return (b.id || 0) - (a.id || 0);
+      });
+  }, [groupedOrders]);
 
   const [highlightedOrderNum, setHighlightedOrderNum] = useState<string | null>(null);
 
@@ -770,7 +797,7 @@ export default function CancelledOrdersPage() {
                           }`}
                         >
                           <td className="py-2 px-2 text-center font-mono font-medium text-muted-foreground align-top pt-2.5 text-xs">
-                            #{startIndex + index + 1}
+                            #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + index))}
                           </td>
                           <td className="py-2 px-2 align-top pt-2.5 whitespace-nowrap">
                             {ord.company_id ? (
@@ -949,38 +976,14 @@ export default function CancelledOrdersPage() {
                 </div>
 
                 {/* Pagination Controls */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
-                    <div className="text-xs text-muted-foreground">
-                      Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
-                      <span className="font-medium text-foreground">{Math.min(filteredOrders.length, endIndex)}</span> of{" "}
-                      <span className="font-medium text-foreground">{filteredOrders.length}</span> entries
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                        disabled={currentPage === 1}
-                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
-                      >
-                        Previous
-                      </Button>
-                      <span className="text-xs text-muted-foreground px-2">
-                        Page {currentPage} of {totalPages}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                        disabled={currentPage === totalPages}
-                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                <TablePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  startIndex={startIndex}
+                  endIndex={endIndex}
+                  totalEntries={filteredOrders.length}
+                />
               </>
             )}
           </CardContent>

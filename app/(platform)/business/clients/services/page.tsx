@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TablePagination } from "@/components/ui/pagination";
 import { Input } from "@/components/ui/input";
 import { 
   Dialog, 
@@ -351,38 +352,14 @@ export default function ClientServicesPage() {
             </div>
 
             {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
-                <div className="text-xs text-muted-foreground">
-                  Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
-                  <span className="font-medium text-foreground">{Math.min(filteredServices.length, endIndex)}</span> of{" "}
-                  <span className="font-medium text-foreground">{filteredServices.length}</span> entries
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                    className="h-8 text-xs font-bold rounded-lg"
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-xs text-muted-foreground px-2">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                    className="h-8 text-xs font-bold rounded-lg"
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            )}
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              startIndex={startIndex}
+              endIndex={endIndex}
+              totalEntries={filteredServices.length}
+            />
           </>
           )}
         </CardContent>

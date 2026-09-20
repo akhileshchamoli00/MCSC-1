@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TablePagination } from "@/components/ui/pagination";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -168,8 +169,34 @@ export default function PipelineOrdersPage() {
 
   const groupedOrders = Array.from(groupedOrdersMap.values());
 
-  // Filter ONLY PIPELINE orders
-  const pipelineOrders = groupedOrders.filter((ord) => (ord.status || "").toUpperCase() === "PIPELINE");
+  // Map of order_number -> running chronological sequence number (1, 2, ..., N)
+  // Oldest order = 1, latest order = N
+  const orderSeqMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const sorted = [...groupedOrders].sort((a, b) => {
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      if (timeA !== timeB) return timeA - timeB;
+      return (a.id || 0) - (b.id || 0);
+    });
+    sorted.forEach((ord, index) => {
+      const key = ord.order_number || `SINGLE-${ord.id}`;
+      map.set(key, index + 1);
+    });
+    return map;
+  }, [groupedOrders]);
+
+  // Filter ONLY PIPELINE orders (sorted reverse-chronologically so latest pipeline order is at top)
+  const pipelineOrders = useMemo(() => {
+    return groupedOrders
+      .filter((ord) => (ord.status || "").toUpperCase() === "PIPELINE")
+      .sort((a, b) => {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        if (timeA !== timeB) return timeB - timeA;
+        return (b.id || 0) - (a.id || 0);
+      });
+  }, [groupedOrders]);
 
   const filteredOrders = pipelineOrders.filter((ord) => {
     const term = searchTerm.toLowerCase();
@@ -399,7 +426,7 @@ export default function PipelineOrdersPage() {
                       {paginatedOrders.map((ord, index) => (
                         <tr key={ord.order_number || index} className="hover:bg-muted/30 transition-colors border-b last:border-0">
                           <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5">
-                            #{startIndex + index + 1}
+                            #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + index))}
                           </td>
                           <td className="p-4 align-top pt-5">
                             {ord.company_id ? (
@@ -450,22 +477,31 @@ export default function PipelineOrdersPage() {
                             {ord.items && ord.items.length > 0 ? (
                               <div className="space-y-1.5 max-w-sm">
                                 {ord.items.map((item: any, idx: number) => (
-                                  <div key={idx} className="flex flex-wrap items-center gap-1.5 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
-                                    <span className="font-semibold text-foreground text-xs leading-normal break-words">
-                                      {item.job_title}
-                                    </span>
-                                    {item.job_id && (
-                                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 bg-primary/5 text-primary border-primary/20 shrink-0">
-                                        {item.job_id}
-                                      </Badge>
-                                    )}
-                                    {item.branch_name && (
-                                      <Badge variant="outline" className="text-[9px] font-medium py-0 px-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 shrink-0">
-                                        {item.branch_name}
-                                      </Badge>
-                                    )}
-                                    {renderVendorBadge(item)}
-                                  </div>
+                                    <div key={idx} className="space-y-1 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className="font-semibold text-foreground text-xs leading-normal break-words">
+                                          {item.job_title}
+                                        </span>
+                                        {item.job_id && (
+                                          <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                            {item.job_id}
+                                          </Badge>
+                                        )}
+                                        {renderVendorBadge(item)}
+                                      </div>
+                                      {item.branch_name && (
+                                        <div className="flex items-center">
+                                          <Badge 
+                                            variant="outline" 
+                                            className="text-[9px] font-medium py-0.5 px-1.5 bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/30 max-w-[240px] inline-flex items-center gap-1 overflow-hidden"
+                                            title={`Memo: ${item.branch_name}`}
+                                          >
+                                            <span className="font-bold uppercase tracking-wider text-[8px] opacity-75 shrink-0">Memo:</span>
+                                            <span className="truncate min-w-0">{item.branch_name}</span>
+                                          </Badge>
+                                        </div>
+                                      )}
+                                    </div>
                                 ))}
                               </div>
                             ) : (
@@ -538,30 +574,14 @@ export default function PipelineOrdersPage() {
                 </div>
 
                 {/* Pagination */}
-                <div className="p-4 border-t border-border/30 flex items-center justify-between">
-                  <div className="text-xs text-muted-foreground">
-                    Page <span className="font-medium text-foreground">{currentPage}</span> of{" "}
-                    <span className="font-medium text-foreground">{totalPages}</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={currentPage === 1}
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    >
-                      Previous
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={currentPage === totalPages || totalPages === 0}
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
+                <TablePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  startIndex={startIndex}
+                  endIndex={endIndex}
+                  totalEntries={filteredOrders.length}
+                />
               </>
             )}
           </CardContent>

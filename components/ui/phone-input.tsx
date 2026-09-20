@@ -297,12 +297,12 @@ export function PhoneInput({
             setIsOpen((prev) => !prev);
             setSearchQuery("");
           }}
-          className={`h-full min-h-[36px] px-2.5 sm:px-3 flex items-center gap-1.5 bg-zinc-100/70 hover:bg-zinc-200/80 dark:bg-zinc-800/60 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-r border-border/60 rounded-l-xl transition-colors shrink-0 focus:outline-none select-none ${
+          className={`h-full min-h-[36px] px-2 sm:px-2.5 flex items-center gap-1 bg-zinc-100/70 hover:bg-zinc-200/80 dark:bg-zinc-800/60 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-r border-border/60 rounded-l-xl transition-colors shrink-0 focus:outline-none select-none ${
             disabled ? "opacity-70 cursor-not-allowed" : ""
           }`}
           title={disabled ? "Locked" : "Select Country Dial Code"}
         >
-          <span className="font-mono font-bold text-[10px] px-1.5 py-0.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 shadow-xs">
+          <span className="font-mono font-bold text-[10px] px-1 py-0.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 shadow-xs">
             {activeCountry.iso}
           </span>
           <span className="font-mono text-xs font-bold tracking-tight text-foreground">
@@ -323,7 +323,7 @@ export function PhoneInput({
             onChange={handleNumberChange}
             onBlur={() => setTouched(true)}
             placeholder={placeholder}
-            className={`h-full min-h-[36px] border-0 bg-transparent rounded-r-xl rounded-l-none focus-visible:ring-0 focus-visible:ring-offset-0 px-3.5 text-sm font-medium placeholder:text-muted-foreground/40 font-mono text-foreground ${
+            className={`h-full min-h-[36px] border-0 bg-transparent rounded-r-xl rounded-l-none focus-visible:ring-0 focus-visible:ring-offset-0 px-2.5 sm:px-3 text-sm font-medium placeholder:text-muted-foreground/40 font-mono text-foreground ${
               disabled ? "opacity-80 cursor-not-allowed select-none" : ""
             }`}
           />

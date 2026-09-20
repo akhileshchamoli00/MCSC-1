@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TablePagination } from "@/components/ui/pagination";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -636,33 +637,14 @@ export default function ClientsPage() {
           )}
 
           {/* Pagination Footer */}
-          {filteredCustomers.length > 0 && (
-            <div className="p-4 border-t border-border/30 flex items-center justify-between text-xs text-muted-foreground">
-              <span>
-                Page {currentPage} of {totalPages}
-              </span>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((p) => p - 1)}
-                  className="h-7 text-xs rounded-lg"
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setCurrentPage((p) => p + 1)}
-                  className="h-7 text-xs rounded-lg"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            startIndex={(currentPage - 1) * itemsPerPage}
+            endIndex={currentPage * itemsPerPage}
+            totalEntries={filteredCustomers.length}
+          />
         </CardContent>
       </Card>
 

@@ -30,6 +30,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TablePagination } from "@/components/ui/pagination";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -651,42 +652,68 @@ export default function AssignedOrdersPage() {
     return checkIsReviewer(ord) && !checkIsExecuting(ord);
   };
 
-  const filteredOrders = groupedOrders.filter(ord => {
-    const status = (ord.status || "").toUpperCase();
-    if (!ALLOWED_EXECUTION_STATUSES.includes(status)) return false;
+  // Map of order_number -> running chronological sequence number (1, 2, ..., N)
+  // Oldest order = 1, latest order = N
+  const orderSeqMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const sorted = [...groupedOrders].sort((a, b) => {
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      if (timeA !== timeB) return timeA - timeB;
+      return (a.id || 0) - (b.id || 0);
+    });
+    sorted.forEach((ord, index) => {
+      const key = ord.order_number || `SINGLE-${ord.id}`;
+      map.set(key, index + 1);
+    });
+    return map;
+  }, [groupedOrders]);
 
-    const isReviewOnly = checkIsReviewOnly(ord);
-    const isExecuting = checkIsExecuting(ord);
-    const isReviewer = checkIsReviewer(ord);
+  const filteredOrders = useMemo(() => {
+    return groupedOrders
+      .filter((ord) => {
+        const status = (ord.status || "").toUpperCase();
+        if (!ALLOWED_EXECUTION_STATUSES.includes(status)) return false;
 
-    // 1. Newly Assigned Orders: Followed by allocated consultant / admin
-    if (activeTab === "ASSIGNED") {
-      if (isReviewOnly || !isExecuting || !ASSIGNED_STATUSES.includes(status)) return false;
-    }
-    // 2. In-Progress Orders: Followed by allocated consultant / admin through execution lifecycle
-    if (activeTab === "IN_PROGRESS") {
-      if (isReviewOnly || !isExecuting || !IN_PROGRESS_STATUSES.includes(status)) return false;
-    }
-    // 3. Review Order: Stays in Review Order card throughout entire active lifecycle until completed or cancelled
-    if (activeTab === "REVIEW_ORDER") {
-      if (!isReviewer || COMPLETED_STATUSES.includes(status) || status === "CANCELLED") return false;
-    }
-    // 4. On-Hold Orders: Followed by allocated consultant / admin
-    if (activeTab === "ON_HOLD") {
-      if (isReviewOnly || !isExecuting || !ON_HOLD_STATUSES.includes(status)) return false;
-    }
-    // 5. Completed Orders: Concluded archive for executing consultants / admins
-    if (activeTab === "COMPLETED") {
-      if (isReviewOnly || !isExecuting || !COMPLETED_STATUSES.includes(status)) return false;
-    }
+        const isReviewOnly = checkIsReviewOnly(ord);
+        const isExecuting = checkIsExecuting(ord);
+        const isReviewer = checkIsReviewer(ord);
 
-    const term = searchTerm.toLowerCase();
-    const orderNum = (ord.order_number || "").toLowerCase();
-    const clientName = (ord.client_name || "").toLowerCase();
-    const compName = (ord.company_name || "").toLowerCase();
-    const itemsStr = (ord.items || []).map((i: any) => `${i.job_title} ${i.job_id}`).join(" ").toLowerCase();
-    return orderNum.includes(term) || clientName.includes(term) || compName.includes(term) || itemsStr.includes(term);
-  });
+        // 1. Newly Assigned Orders: Followed by allocated consultant / admin
+        if (activeTab === "ASSIGNED") {
+          if (isReviewOnly || !isExecuting || !ASSIGNED_STATUSES.includes(status)) return false;
+        }
+        // 2. In-Progress Orders: Followed by allocated consultant / admin through execution lifecycle
+        if (activeTab === "IN_PROGRESS") {
+          if (isReviewOnly || !isExecuting || !IN_PROGRESS_STATUSES.includes(status)) return false;
+        }
+        // 3. Review Order: Stays in Review Order card throughout entire active lifecycle until completed or cancelled
+        if (activeTab === "REVIEW_ORDER") {
+          if (!isReviewer || COMPLETED_STATUSES.includes(status) || status === "CANCELLED") return false;
+        }
+        // 4. On-Hold Orders: Followed by allocated consultant / admin
+        if (activeTab === "ON_HOLD") {
+          if (isReviewOnly || !isExecuting || !ON_HOLD_STATUSES.includes(status)) return false;
+        }
+        // 5. Completed Orders: Concluded archive for executing consultants / admins
+        if (activeTab === "COMPLETED") {
+          if (isReviewOnly || !isExecuting || !COMPLETED_STATUSES.includes(status)) return false;
+        }
+
+        const term = searchTerm.toLowerCase();
+        const orderNum = (ord.order_number || "").toLowerCase();
+        const clientName = (ord.client_name || "").toLowerCase();
+        const compName = (ord.company_name || "").toLowerCase();
+        const itemsStr = (ord.items || []).map((i: any) => `${i.job_title} ${i.job_id}`).join(" ").toLowerCase();
+        return orderNum.includes(term) || clientName.includes(term) || compName.includes(term) || itemsStr.includes(term);
+      })
+      .sort((a, b) => {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        if (timeA !== timeB) return timeB - timeA;
+        return (b.id || 0) - (a.id || 0);
+      });
+  }, [groupedOrders, activeTab, searchTerm, myEmpId, isAdmin]);
 
   const totalPages = Math.ceil(filteredOrders.length / 10);
   const startIndex = (currentPage - 1) * 10;
@@ -1329,7 +1356,7 @@ export default function AssignedOrdersPage() {
                               }`}
                           >
                             <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5">
-                              #{startIndex + idx + 1}
+                              #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + idx))}
                             </td>
                             <td className="p-4 align-top pt-5">
                               {ord.company_id ? (
@@ -1527,38 +1554,14 @@ export default function AssignedOrdersPage() {
                 </div>
 
                 {/* Pagination Controls */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
-                    <div className="text-xs text-muted-foreground">
-                      Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
-                      <span className="font-medium text-foreground">{Math.min(filteredOrders.length, endIndex)}</span> of{" "}
-                      <span className="font-medium text-foreground">{filteredOrders.length}</span> entries
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                        disabled={currentPage === 1}
-                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
-                      >
-                        Previous
-                      </Button>
-                      <span className="text-xs text-muted-foreground px-2">
-                        Page {currentPage} of {totalPages}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                        disabled={currentPage === totalPages}
-                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                <TablePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  startIndex={startIndex}
+                  endIndex={endIndex}
+                  totalEntries={filteredOrders.length}
+                />
               </>
             )}
           </CardContent>

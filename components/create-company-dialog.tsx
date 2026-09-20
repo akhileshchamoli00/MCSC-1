@@ -238,7 +238,7 @@ export function CreateCompanyDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl sm:max-w-3xl w-full max-h-[92vh] overflow-y-auto p-0 border border-border/80 shadow-2xl rounded-2xl bg-card">
+      <DialogContent className="max-w-5xl sm:max-w-5xl w-[96vw] max-h-[92vh] overflow-y-auto p-0 border border-border/80 shadow-2xl rounded-2xl bg-card">
         {/* Header Banner */}
         <div className="p-5 sm:p-6 pb-4 bg-muted/40 border-b border-border/60">
           <div className="flex items-center justify-between">
@@ -425,7 +425,7 @@ export function CreateCompanyDialog({
                     Primary operational representative. Automatically registered under the company&apos;s Board &amp; Stakeholders records.
                   </p>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 items-start">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1 items-start">
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                         <span>Contact Name</span>
@@ -483,6 +483,7 @@ export function CreateCompanyDialog({
                           setPhoneTouched(true);
                         }}
                         required
+                        className="h-10"
                       />
                     </div>
                   </div>
@@ -505,7 +506,7 @@ export function CreateCompanyDialog({
                     If entered, this director is automatically registered under the company&apos;s Board and Stakeholders records.
                   </p>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 items-start">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1 items-start">
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold text-foreground">
                         Director Full Name
@@ -557,6 +558,7 @@ export function CreateCompanyDialog({
                           setFormData((prev) => ({ ...prev, director_contact: val }));
                           setDirPhoneTouched(true);
                         }}
+                        className="h-10"
                       />
                     </div>
                   </div>

@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useUser } from "@/contexts/user-context";
 import { formatPhoneNumber } from "@/lib/utils";
+import { TablePagination } from "@/components/ui/pagination";
 
 export default function CompanyDocumentsDirectory() {
   const router = useRouter();
@@ -297,38 +298,14 @@ export default function CompanyDocumentsDirectory() {
             </div>
           )}
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
-              <div className="text-xs text-muted-foreground">
-                Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
-                <span className="font-medium text-foreground">{Math.min(filteredCompanies.length, endIndex)}</span> of{" "}
-                <span className="font-medium text-foreground">{filteredCompanies.length}</span> entries
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
-                >
-                  Previous
-                </Button>
-                <span className="text-xs text-muted-foreground px-2">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            totalEntries={filteredCompanies.length}
+          />
         </CardContent>
       </Card>
     </div>
