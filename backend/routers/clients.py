@@ -5343,9 +5343,9 @@ def find_order_signed_documents(db: Session, order_number: str, company: models.
         d_order = (d.order_number or "").strip().upper()
         
         is_signed_or_pre = (
-            "pre doc" in dtype or "predoc" in dtype or "pre-doc" in dtype or "pre doc" in dtype or "signed" in dtype or
-            "pre doc" in furl or "predoc" in furl or "pre-doc" in furl or "signed" in furl or
-            "pre doc" in desc or "predoc" in desc or "pre-doc" in desc or "signed" in desc or "signature" in desc or
+            "pre doc" in dtype or "predoc" in dtype or "pre-doc" in dtype or "pre-signature" in dtype or "pre signature" in dtype or "signed" in dtype or
+            "pre doc" in furl or "predoc" in furl or "pre-doc" in furl or "pre-signature" in furl or "signed" in furl or
+            "pre doc" in desc or "predoc" in desc or "pre-doc" in desc or "pre-signature" in desc or "signed" in desc or "signature" in desc or
             (d_order == order_folder.upper() and ("pre" in dtype or "sign" in dtype or "pre" in furl or "sign" in furl))
         )
         
@@ -5375,17 +5375,23 @@ def find_order_signed_documents(db: Session, order_number: str, company: models.
         candidate_folders = []
         for ccode in company_codes:
             candidate_folders.extend([
+                f"/Clients/{ccode}/{order_folder}/Pre-Signature Documents",
+                f"/Clients/{ccode}/{order_folder}/Pre-Signature Docs",
                 f"/Clients/{ccode}/{order_folder}/Pre Docs",
                 f"/Clients/{ccode}/{order_folder}/Pre-Docs",
                 f"/Clients/{ccode}/{order_folder}/Pre_Docs",
                 f"/Clients/{ccode}/{order_folder}/PreDocs",
                 f"/Clients/{ccode}/{order_folder}/Pre Documents",
+                f"/Clients/{ccode}/{order_folder}/Signed Documents",
                 f"/Clients/{ccode}/{order_folder}/Signed Docs",
                 f"/Clients/{ccode}/{order_folder}/Signed-Docs",
-                f"/Clients/{ccode}/{order_folder}/Signed Documents",
+                f"/Clients/{ccode}/Pre-Signature Documents",
                 f"/Clients/{ccode}/Pre Docs",
+                f"/Clients/{ccode}/Signed Documents",
                 f"/Clients/{ccode}/Signed Docs",
+                f"/Clients/{ccode}/No_Order/Pre-Signature Documents",
                 f"/Clients/{ccode}/No_Order/Pre Docs",
+                f"/Clients/{ccode}/No_Order/Signed Documents",
                 f"/Clients/{ccode}/No_Order/Signed Docs"
             ])
         

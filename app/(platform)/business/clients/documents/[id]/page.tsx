@@ -1245,10 +1245,12 @@ export default function CompanyDocumentsManagementPage() {
                         <SelectItem value="Client ID">Client ID</SelectItem>
                         <SelectItem value="Photo">Photo</SelectItem>
                         <SelectItem value="Invoice">Invoice</SelectItem>
-                        <SelectItem value="Misc Docs">Misc Docs</SelectItem>
-                        <SelectItem value="Pre Docs">Pre Docs</SelectItem>
-                        <SelectItem value="Signed Docs">Signed Docs</SelectItem>
-                        <SelectItem value="Final Docs">Final Docs</SelectItem>
+                        <SelectItem value="Deeds and Approval">Deeds and Approval</SelectItem>
+                        <SelectItem value="Brand Certificate">Brand Certificate</SelectItem>
+                        <SelectItem value="Miscellaneous Documents">Miscellaneous Documents</SelectItem>
+                        <SelectItem value="Pre-Signature Documents">Pre-Signature Documents</SelectItem>
+                        <SelectItem value="Signed Documents">Signed Documents</SelectItem>
+                        <SelectItem value="Final Documents">Final Documents</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
