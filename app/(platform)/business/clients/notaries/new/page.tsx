@@ -134,7 +134,7 @@ export default function NewNotaryPage() {
         email: formData.email || null,
         phone: formData.phone || null,
         address: formData.address || null,
-        city: formData.city,
+        city: formData.city ? formData.city.trim() : null,
         status: formData.status,
         vendor_type: formData.vendor_type,
         is_notary: formData.vendor_type === "NOTARY",
@@ -264,14 +264,13 @@ export default function NewNotaryPage() {
 
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/90">
-                      City / Jurisdiction *
+                      City / Jurisdiction
                     </label>
                     <Input
-                      required
                       name="city"
                       value={formData.city}
                       onChange={handleInputChange}
-                      placeholder="e.g. Jakarta Selatan"
+                      placeholder="e.g. Jakarta Selatan (Optional)"
                       className="h-10 text-sm font-medium bg-background border-border/60 focus:border-primary/50 focus:ring-primary/25 rounded-xl transition-all"
                     />
                   </div>

@@ -538,6 +538,7 @@ const FloatingLines: FC<FloatingLinesProps> = ({
   return (
     <div
       ref={containerRef}
+      suppressHydrationWarning
       className="relative w-full h-full overflow-hidden floating-lines-container"
       style={{
         mixBlendMode: mixBlendMode as any

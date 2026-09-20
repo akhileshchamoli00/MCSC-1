@@ -3,17 +3,17 @@
 import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { 
-  ShoppingCart, 
-  Loader2, 
-  ArrowLeft, 
-  Check, 
-  Building2, 
-  Building, 
-  UserCheck, 
-  Users, 
-  Tag, 
-  Plus, 
+import {
+  ShoppingCart,
+  Loader2,
+  ArrowLeft,
+  Check,
+  Building2,
+  Building,
+  UserCheck,
+  Users,
+  Tag,
+  Plus,
   Trash2,
   Briefcase,
   MapPin,
@@ -30,13 +30,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription, 
-  DialogFooter 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
@@ -388,7 +388,7 @@ function NewClientOrderContent() {
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/standalone`, {
-      credentials: "include",
+        credentials: "include",
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -484,7 +484,7 @@ function NewClientOrderContent() {
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
-      credentials: "include",
+        credentials: "include",
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -523,34 +523,34 @@ function NewClientOrderContent() {
   }
 
   return (
-    <div className="w-full max-w-none space-y-3.5 pb-12 animate-in fade-in duration-300">
+    <div className="w-full max-w-none space-y-3.5 pb-8 animate-in fade-in duration-300">
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 pb-2.5">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
           <Button
             variant="outline"
             size="icon"
             onClick={() => router.back()}
-            className="h-8 w-8 rounded-lg border-border/60 hover:bg-muted/50"
+            className="h-8 w-8 rounded-lg border-border/60 hover:bg-muted/50 shrink-0"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
           </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold tracking-tight text-foreground">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-base sm:text-lg font-bold tracking-tight text-foreground truncate">
                 {isPipeline ? "Create Pipeline Prospect Order" : "Issue New Client Order"}
               </h1>
-              <Badge variant="outline" className="font-mono text-[10px] uppercase px-1.5 py-0.5 bg-primary/10 border-primary/20 text-primary">
+              <Badge variant="outline" className="font-mono text-[10px] uppercase px-1.5 py-0.5 bg-primary/10 border-primary/20 text-primary shrink-0">
                 {isPipeline ? "Pipeline" : "Active Workflow"}
               </Badge>
             </div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
+            <p className="text-[11px] text-muted-foreground mt-0.5 truncate sm:whitespace-normal">
               Select a client company, configure service line items, and allocate team members.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
           <Button
             type="button"
             variant="outline"
@@ -581,26 +581,26 @@ function NewClientOrderContent() {
       </div>
 
       <form onSubmit={handleCreateSubmit} className="space-y-3.5">
-        
+
         {/* Main 2-Column Responsive Split */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
-          
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-3.5 items-start">
+
           {/* LEFT COLUMN: Entity Info & Service Line Items */}
-          <div className="lg:col-span-7 xl:col-span-7 2xl:col-span-8 space-y-3.5">
-            
+          <div className="xl:col-span-7 2xl:col-span-8 space-y-3.5 min-w-0">
+
             {/* STEP 1: ENTITY & GENERAL INFORMATION */}
             <Card className="border-border/60 shadow-2xs rounded-xl overflow-hidden bg-card/60 backdrop-blur-md">
-              <CardHeader className="py-2 px-3.5 border-b border-border/40 bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
+              <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="min-w-0">
                   <CardTitle className="text-xs font-bold flex items-center gap-1.5 text-foreground uppercase tracking-wider">
-                    <Building2 className="h-3.5 w-3.5 text-primary" /> Step 1: Corporate Entity & Order Details
+                    <Building2 className="h-3.5 w-3.5 text-primary shrink-0" /> Step 1: Corporate Entity & Order Details
                   </CardTitle>
                   <CardDescription className="text-[10px] text-muted-foreground mt-0.5">
                     Designate the company entity receiving services and unique order reference ID.
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Client Partner Filter:</span>
+                <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-auto">
+                  <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider whitespace-nowrap">Client Partner:</span>
                   <select
                     value={filterClientId}
                     onChange={(e) => {
@@ -609,7 +609,7 @@ function NewClientOrderContent() {
                       setSelectedCompanyId("");
                       setBillingCompanyId("");
                     }}
-                    className="h-6.5 rounded-md border border-border/60 bg-background px-2 text-[11px] font-medium"
+                    className="h-7 rounded-md border border-border/60 bg-background px-2 text-[11px] font-medium max-w-[180px] truncate"
                   >
                     <option value="">All Client Partners</option>
                     {clients.map((cli) => (
@@ -620,23 +620,23 @@ function NewClientOrderContent() {
                   </select>
                 </div>
               </CardHeader>
-              
+
               <CardContent className="p-3">
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-start">
-                  
-                  {/* Col 1: Order Reference ID (3 cols) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 gap-3 items-start">
+
+                  {/* Col 1: Order Reference ID */}
                   <div className={cn(
-                    "md:col-span-3 space-y-1 p-2 rounded-lg border transition-all duration-200",
-                    orderNumberStatus === "taken" 
-                      ? "bg-rose-500/10 border-rose-500/40 ring-1 ring-rose-500/20" 
+                    "col-span-1 sm:col-span-2 xl:col-span-4 2xl:col-span-3 space-y-1.5 p-2.5 rounded-lg border transition-all duration-200",
+                    orderNumberStatus === "taken"
+                      ? "bg-rose-500/10 border-rose-500/40 ring-1 ring-rose-500/20"
                       : orderNumberStatus === "available"
                         ? "bg-emerald-500/5 border-emerald-500/30"
                         : "bg-muted/20 border-border/60"
                   )}>
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1">
-                        <Tag className="h-3 w-3 text-amber-600 dark:text-amber-400" />
-                        <span>Order Reference ID *</span>
+                    <div className="flex items-center justify-between gap-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1 min-w-0 truncate">
+                        <Tag className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <span className="truncate">Order Ref ID *</span>
                       </label>
                       <Button
                         type="button"
@@ -644,7 +644,7 @@ function NewClientOrderContent() {
                         size="sm"
                         disabled={fetchingNumber}
                         onClick={fetchNextOrderNumber}
-                        className="h-4.5 px-1 text-[9px] gap-0.5 font-bold text-primary hover:text-primary hover:bg-primary/10"
+                        className="h-5 px-1.5 text-[9px] gap-1 font-bold text-primary hover:text-primary hover:bg-primary/10 shrink-0"
                         title="Auto-generate next unique Order ID"
                       >
                         <RefreshCw className={cn("h-2.5 w-2.5", fetchingNumber && "animate-spin")} />
@@ -691,36 +691,36 @@ function NewClientOrderContent() {
                     </div>
                     <div className="flex items-center justify-between text-[9px] pt-0.5">
                       {orderNumberStatus === "taken" ? (
-                        <span className="font-bold text-rose-600 dark:text-rose-400 line-clamp-1">
+                        <span className="font-bold text-rose-600 dark:text-rose-400 truncate">
                           {orderNumberFeedback || "Order ID already taken!"}
                         </span>
                       ) : orderNumberStatus === "available" ? (
-                        <span className="font-semibold text-emerald-600 dark:text-emerald-400 line-clamp-1">
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400 truncate">
                           {orderNumberFeedback || "Order ID is available"}
                         </span>
                       ) : orderNumberStatus === "checking" ? (
-                        <span className="text-muted-foreground line-clamp-1">Checking ID availability...</span>
+                        <span className="text-muted-foreground truncate">Checking ID availability...</span>
                       ) : (
-                        <span className="text-muted-foreground line-clamp-1">Unique Order ID</span>
+                        <span className="text-muted-foreground truncate">Unique Order ID</span>
                       )}
                     </div>
                   </div>
 
-                  {/* Col 2: Target Corporate Entity (5 cols) */}
-                  <div className="md:col-span-5 space-y-1 bg-muted/20 p-2 rounded-lg border border-border/60">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1">
-                        <Building className="h-3 w-3 text-primary" />
-                        <span>Target Corporate Entity *</span>
+                  {/* Col 2: Target Corporate Entity */}
+                  <div className="col-span-1 sm:col-span-1 xl:col-span-4 2xl:col-span-5 space-y-1.5 bg-muted/20 p-2.5 rounded-lg border border-border/60">
+                    <div className="flex items-center justify-between gap-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1 min-w-0 truncate">
+                        <Building className="h-3 w-3 text-primary shrink-0" />
+                        <span className="truncate">Target Corporate Entity *</span>
                       </label>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         onClick={() => handleOpenCreateCompany("target")}
-                        className="h-4.5 px-1 text-[9px] gap-0.5 font-bold text-primary hover:text-primary hover:bg-primary/10"
+                        className="h-5 px-1.5 text-[9px] gap-0.5 font-bold text-primary hover:text-primary hover:bg-primary/10 shrink-0"
                       >
-                        <Plus className="h-2.5 w-2.5" /> New Company
+                        <Plus className="h-2.5 w-2.5" /> New
                       </Button>
                     </div>
                     <select
@@ -733,18 +733,18 @@ function NewClientOrderContent() {
                           setBillingCompanyId(val);
                         }
                       }}
-                      className="flex h-8 w-full rounded-md border border-border/70 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      className="flex h-8 w-full rounded-md border border-border/70 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary truncate"
                     >
                       <option value="">Choose Target Company Entity...</option>
                       {(filterClientId
                         ? companies.filter(c => c.client_id === parseInt(filterClientId) || String(c.id) === String(selectedCompanyId))
                         : companies
                       ).map((comp) => {
-                        const valSuffix = comp.validation_status === "PENDING_VALIDATION" 
-                          ? " • [Pending Validation]" 
-                          : comp.validation_status === "NEEDS_REVISION" 
-                          ? " • [Revision Needed]" 
-                          : "";
+                        const valSuffix = comp.validation_status === "PENDING_VALIDATION"
+                          ? " • [Pending Validation]"
+                          : comp.validation_status === "NEEDS_REVISION"
+                            ? " • [Revision Needed]"
+                            : "";
                         return (
                           <option key={comp.id} value={String(comp.id)}>
                             {comp.company_name} ({comp.company_code}){valSuffix}
@@ -764,21 +764,21 @@ function NewClientOrderContent() {
                               setBillingCompanyId(selectedCompanyId);
                             }
                           }}
-                          className="h-3 w-3 rounded border-gray-300 text-primary focus:ring-primary accent-primary cursor-pointer"
+                          className="h-3 w-3 rounded border-gray-300 text-primary focus:ring-primary accent-primary cursor-pointer shrink-0"
                         />
-                        <span className="text-[10px] font-medium text-muted-foreground">
-                          Billing recipient is the same as Target Company
+                        <span className="text-[10px] font-medium text-muted-foreground leading-tight">
+                          Billing recipient is same as Target
                         </span>
                       </label>
                     </div>
                   </div>
 
-                  {/* Col 3: Invoicing / Billing Recipient Entity (4 cols) */}
-                  <div className="md:col-span-4 space-y-1 bg-muted/20 p-2 rounded-lg border border-border/60">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1">
-                        <Building className="h-3 w-3 text-primary" />
-                        <span>Invoicing Recipient / Billed Entity</span>
+                  {/* Col 3: Invoicing / Billing Recipient Entity */}
+                  <div className="col-span-1 sm:col-span-1 xl:col-span-4 2xl:col-span-4 space-y-1.5 bg-muted/20 p-2.5 rounded-lg border border-border/60">
+                    <div className="flex items-center justify-between gap-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1 min-w-0 truncate">
+                        <Building className="h-3 w-3 text-primary shrink-0" />
+                        <span className="truncate">Invoicing / Billed Entity</span>
                       </label>
                       {!sameBillingCompany && (
                         <Button
@@ -786,17 +786,17 @@ function NewClientOrderContent() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleOpenCreateCompany("billing")}
-                          className="h-4.5 px-1 text-[9px] gap-0.5 font-bold text-primary hover:text-primary hover:bg-primary/10"
+                          className="h-5 px-1.5 text-[9px] gap-0.5 font-bold text-primary hover:text-primary hover:bg-primary/10 shrink-0"
                         >
-                          <Plus className="h-2.5 w-2.5" /> Add Entity
+                          <Plus className="h-2.5 w-2.5" /> Add
                         </Button>
                       )}
                     </div>
 
                     {sameBillingCompany ? (
                       <div className="h-8 flex items-center px-2.5 rounded-md border border-border/50 bg-background/60 text-xs text-muted-foreground font-medium truncate">
-                        <span>
-                          {selectedCompanyId 
+                        <span className="truncate">
+                          {selectedCompanyId
                             ? `Same: ${(companies.find(c => String(c.id) === selectedCompanyId)?.company_name) || "Selected Company"}`
                             : "Same as Target Corporate Entity"}
                         </span>
@@ -806,18 +806,18 @@ function NewClientOrderContent() {
                         required
                         value={billingCompanyId}
                         onChange={(e) => setBillingCompanyId(e.target.value)}
-                        className="flex h-8 w-full rounded-md border border-primary/50 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                        className="flex h-8 w-full rounded-md border border-primary/50 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary truncate"
                       >
                         <option value="">Choose Billing Entity...</option>
                         {(filterClientId
                           ? companies.filter(c => c.client_id === parseInt(filterClientId) || String(c.id) === String(billingCompanyId))
                           : companies
                         ).map((comp) => {
-                          const valSuffix = comp.validation_status === "PENDING_VALIDATION" 
-                            ? " • [Pending Validation]" 
-                            : comp.validation_status === "NEEDS_REVISION" 
-                            ? " • [Revision Needed]" 
-                            : "";
+                          const valSuffix = comp.validation_status === "PENDING_VALIDATION"
+                            ? " • [Pending Validation]"
+                            : comp.validation_status === "NEEDS_REVISION"
+                              ? " • [Revision Needed]"
+                              : "";
                           return (
                             <option key={comp.id} value={String(comp.id)}>
                               {comp.company_name} ({comp.company_code}){valSuffix}
@@ -826,7 +826,7 @@ function NewClientOrderContent() {
                         })}
                       </select>
                     )}
-                    <p className="text-[9px] text-muted-foreground line-clamp-1">
+                    <p className="text-[9px] text-muted-foreground truncate">
                       Tax & Proforma invoices will be addressed to this entity
                     </p>
                   </div>
@@ -837,49 +837,49 @@ function NewClientOrderContent() {
 
             {/* Section 2: Service Line Items Card (Full Width Horizontal Matrix) */}
             <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
-              <CardHeader className="py-2 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Briefcase className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+              <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Briefcase className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
                     2. Billed Service Line Items ({orderItems.length})
                   </CardTitle>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={handleAddOrderItem}
-                    className="h-6.5 px-2 border-dashed border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 gap-1 font-bold rounded-md text-[11px]"
+                    className="h-7 px-2.5 border-dashed border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 gap-1 font-bold rounded-md text-[11px]"
                   >
                     <Plus className="h-3 w-3" /> Add Service Line
                   </Button>
                 </div>
               </CardHeader>
-              
+
               <CardContent className="p-2.5 sm:p-3 space-y-2.5">
                 {orderItems.map((item, idx) => (
                   <div key={idx} className="p-3 rounded-xl border border-border/70 bg-card/80 dark:bg-card/40 hover:border-primary/40 shadow-2xs transition-all space-y-2.5 relative">
-                    
+
                     {/* Line Item Header: Number Badge, Job Title / ID info, Price Pill & Delete Button */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border/50">
-                      <div className="flex items-center gap-1.5 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                         <span className="flex h-5 px-2 items-center justify-center rounded-md bg-primary/10 text-primary text-[11px] font-bold font-mono shrink-0">
                           #{idx + 1}
                         </span>
                         {item.job_id && (
-                          <Badge variant="outline" className="font-mono text-[10px] font-bold bg-muted/50 border-border/70 text-foreground py-0 px-1.5">
+                          <Badge variant="outline" className="font-mono text-[10px] font-bold bg-muted/50 border-border/70 text-foreground py-0 px-1.5 shrink-0">
                             {item.job_id}
                           </Badge>
                         )}
                         {item.job_title && (
-                          <span className="text-xs font-bold text-foreground truncate max-w-[280px] sm:max-w-md">
+                          <span className="text-xs font-bold text-foreground truncate max-w-[200px] sm:max-w-xs md:max-w-md">
                             {item.job_title}
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center justify-between sm:justify-end gap-2">
+                      <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
                         <div className="px-2.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 font-mono text-[11px] font-black text-emerald-700 dark:text-emerald-300">
                           {formatCurrency(item.unit_price)}
                         </div>
@@ -899,10 +899,10 @@ function NewClientOrderContent() {
                     </div>
 
                     {/* Primary Configuration Grid: Service Package, Pricing Tier, Branch Reference */}
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start">
-                      
-                      {/* Service Package Selector (5 cols) */}
-                      <div className="sm:col-span-5 space-y-1">
+                    <div className="grid grid-cols-1 md:grid-cols-12 xl:grid-cols-12 gap-2.5 items-start">
+
+                      {/* Service Package Selector (Full width on md, 5 cols on xl) */}
+                      <div className="col-span-1 md:col-span-12 xl:col-span-5 space-y-1">
                         <label className="text-[10.5px] font-bold text-foreground flex items-center gap-1">
                           <span>Service Package Catalog</span>
                           <span className="text-destructive font-black">*</span>
@@ -922,8 +922,8 @@ function NewClientOrderContent() {
                         </select>
                       </div>
 
-                      {/* Pricing Tier Selector (4 cols) */}
-                      <div className="sm:col-span-4 space-y-1">
+                      {/* Pricing Tier Selector (6 cols on md, 4 cols on xl) */}
+                      <div className="col-span-1 md:col-span-6 xl:col-span-4 space-y-1">
                         <label className="text-[10.5px] font-bold text-foreground flex items-center gap-1">
                           <span>Pricing Tier & Rate</span>
                           <span className="text-destructive font-black">*</span>
@@ -932,7 +932,7 @@ function NewClientOrderContent() {
                           required
                           value={item.pricing_tier}
                           onChange={(e) => handleTierSelect(idx, e.target.value)}
-                          className="flex h-8 w-full rounded-lg border border-border/70 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                          className="flex h-8 w-full rounded-lg border border-border/70 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary truncate"
                         >
                           <option value="BASE">
                             Base ({item._raw_service ? formatCurrency(item._raw_service.base_price) : "Default"})
@@ -952,8 +952,8 @@ function NewClientOrderContent() {
                         </select>
                       </div>
 
-                      {/* Branch / Project Reference (3 cols) */}
-                      <div className="sm:col-span-3 space-y-1">
+                      {/* Branch / Project Reference (6 cols on md, 3 cols on xl) */}
+                      <div className="col-span-1 md:col-span-6 xl:col-span-3 space-y-1">
                         <label className="text-[10.5px] font-semibold text-muted-foreground flex items-center justify-between">
                           <span>Branch / Ref</span>
                           <span className="text-[9px] text-muted-foreground/70 font-mono">Optional</span>
@@ -969,7 +969,7 @@ function NewClientOrderContent() {
                             });
                           }}
                           placeholder="e.g. Bali Branch / Ref #12"
-                          className="h-8 text-xs font-medium rounded-lg border-border/70 bg-background placeholder:text-muted-foreground/50"
+                          className="h-8 text-xs font-medium rounded-lg border-border/70 bg-background placeholder:text-muted-foreground/50 truncate"
                         />
                       </div>
                     </div>
@@ -999,10 +999,10 @@ function NewClientOrderContent() {
                               const numVal = val === "" ? 0 : parseFloat(val);
                               setOrderItems((prev) => {
                                 const copy = [...prev];
-                                copy[idx] = { 
-                                  ...copy[idx], 
-                                  unit_price: isNaN(numVal) ? 0 : numVal, 
-                                  custom_price_text: "" 
+                                copy[idx] = {
+                                  ...copy[idx],
+                                  unit_price: isNaN(numVal) ? 0 : numVal,
+                                  custom_price_text: ""
                                 };
                                 return copy;
                               });
@@ -1014,106 +1014,106 @@ function NewClientOrderContent() {
                       </div>
                     )}
 
-                      {/* Designated Vendor / Notary Selection (if required or configured) */}
-                      {(item._raw_service?.needs_notary || item._raw_service?.needs_gov_officer || item._raw_service?.needs_other_vendors) && (
-                        <div className="sm:col-span-12 space-y-1">
-                          <label className="text-[10.5px] font-semibold text-muted-foreground flex items-center justify-between">
-                            <span>
-                              {item._raw_service?.needs_notary 
-                                ? "Assigned Notary Officer" 
-                                : item._raw_service?.needs_gov_officer 
-                                ? "Assigned Government Official Body" 
+                    {/* Designated Vendor / Notary Selection (if required or configured) */}
+                    {(item._raw_service?.needs_notary || item._raw_service?.needs_gov_officer || item._raw_service?.needs_other_vendors) && (
+                      <div className="sm:col-span-12 space-y-1">
+                        <label className="text-[10.5px] font-semibold text-muted-foreground flex items-center justify-between">
+                          <span>
+                            {item._raw_service?.needs_notary
+                              ? "Assigned Notary Officer"
+                              : item._raw_service?.needs_gov_officer
+                                ? "Assigned Government Official Body"
                                 : "Assigned External Vendor"}
-                            </span>
-                            <span className="text-[9px] text-muted-foreground/70 font-mono">Optional</span>
-                          </label>
-                          <select
-                            value={item.notary_id || ""}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setOrderItems((prev) => {
-                                const copy = [...prev];
-                                copy[idx].notary_id = val ? parseInt(val) : "";
-                                return copy;
-                              });
-                            }}
-                            className="flex h-8 w-full rounded-lg border border-border/70 bg-background px-2.5 py-1 text-xs font-medium shadow-2xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-                          >
-                            <option value="">
-                              {item._raw_service?.needs_notary 
-                                ? "-- Select Notary Officer (Optional) --" 
-                                : item._raw_service?.needs_gov_officer 
-                                ? "-- Select Government Body (Optional) --" 
-                                : "-- Select External Vendor (Optional) --"}
-                            </option>
-                            {(() => {
-                              const serviceId = Number(item.service_id);
-                              const isNotaryReq = Boolean(item._raw_service?.needs_notary);
-                              const isGovReq = Boolean(item._raw_service?.needs_gov_officer);
-                              const isOtherReq = Boolean(item._raw_service?.needs_other_vendors);
-
-                              const filtered = notaries.filter((n) => {
-                                const hasConfiguredFee = n.service_fees && n.service_fees.some((sf: any) => sf.service_id === serviceId);
-                                if (hasConfiguredFee) return true;
-
-                                if (isGovReq) return n.vendor_type === "GOVERNMENT_OFFICER" || n.is_gov_officer;
-                                if (isOtherReq) return n.vendor_type === "OTHER_VENDORS" || n.is_other_vendor;
-                                if (isNotaryReq) return n.vendor_type === "NOTARY" || n.is_notary || (!n.vendor_type && !n.is_gov_officer && !n.is_other_vendor);
-                                return true;
-                              });
-
-                              return filtered.map((n) => (
-                                <option key={n.id} value={n.id}>
-                                  {n.name} ({n.city || "General"})
-                                </option>
-                              ));
-                            })()}
-                          </select>
-                        </div>
-                      )}
-
-                      {/* Service Execution Instructions (Textarea) */}
-                      <div className="sm:col-span-12 space-y-1 pt-0.5">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[10.5px] font-bold text-foreground flex items-center gap-1">
-                            <FileText className="h-3 w-3 text-primary" />
-                            <span>Service Execution Instructions</span>
-                          </label>
-                          <span className="text-[9px] text-muted-foreground font-mono">Visible to assigned consultants & review team</span>
-                        </div>
-                        <textarea
-                          value={item.service_instructions || ""}
+                          </span>
+                          <span className="text-[9px] text-muted-foreground/70 font-mono">Optional</span>
+                        </label>
+                        <select
+                          value={item.notary_id || ""}
                           onChange={(e) => {
                             const val = e.target.value;
                             setOrderItems((prev) => {
                               const copy = [...prev];
-                              copy[idx].service_instructions = val;
+                              copy[idx].notary_id = val ? parseInt(val) : "";
                               return copy;
                             });
                           }}
-                          rows={2}
-                          placeholder="Enter detailed service execution instructions, specific document checklists, government portal credentials/details, or processing requirements for this line item..."
-                          className="flex w-full rounded-lg border border-border/70 bg-background p-2 text-xs placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary leading-relaxed font-normal resize-y min-h-[48px]"
-                        />
-                      </div>
+                          className="flex h-8 w-full rounded-lg border border-border/70 bg-background px-2.5 py-1 text-xs font-medium shadow-2xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                        >
+                          <option value="">
+                            {item._raw_service?.needs_notary
+                              ? "-- Select Notary Officer (Optional) --"
+                              : item._raw_service?.needs_gov_officer
+                                ? "-- Select Government Body (Optional) --"
+                                : "-- Select External Vendor (Optional) --"}
+                          </option>
+                          {(() => {
+                            const serviceId = Number(item.service_id);
+                            const isNotaryReq = Boolean(item._raw_service?.needs_notary);
+                            const isGovReq = Boolean(item._raw_service?.needs_gov_officer);
+                            const isOtherReq = Boolean(item._raw_service?.needs_other_vendors);
 
+                            const filtered = notaries.filter((n) => {
+                              const hasConfiguredFee = n.service_fees && n.service_fees.some((sf: any) => sf.service_id === serviceId);
+                              if (hasConfiguredFee) return true;
+
+                              if (isGovReq) return n.vendor_type === "GOVERNMENT_OFFICER" || n.is_gov_officer;
+                              if (isOtherReq) return n.vendor_type === "OTHER_VENDORS" || n.is_other_vendor;
+                              if (isNotaryReq) return n.vendor_type === "NOTARY" || n.is_notary || (!n.vendor_type && !n.is_gov_officer && !n.is_other_vendor);
+                              return true;
+                            });
+
+                            return filtered.map((n) => (
+                              <option key={n.id} value={n.id}>
+                                {n.name} ({n.city || "General"})
+                              </option>
+                            ));
+                          })()}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Service Execution Instructions (Textarea) */}
+                    <div className="sm:col-span-12 space-y-1 pt-0.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10.5px] font-bold text-foreground flex items-center gap-1">
+                          <FileText className="h-3 w-3 text-primary" />
+                          <span>Service Execution Instructions</span>
+                        </label>
+                        <span className="text-[9px] text-muted-foreground font-mono">Visible to assigned consultants & review team</span>
+                      </div>
+                      <textarea
+                        value={item.service_instructions || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setOrderItems((prev) => {
+                            const copy = [...prev];
+                            copy[idx].service_instructions = val;
+                            return copy;
+                          });
+                        }}
+                        rows={2}
+                        placeholder="Enter detailed service execution instructions, specific document checklists, government portal credentials/details, or processing requirements for this line item..."
+                        className="flex w-full rounded-lg border border-border/70 bg-background p-2 text-xs placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary leading-relaxed font-normal resize-y min-h-[48px]"
+                      />
                     </div>
-                  ))}
+
+                  </div>
+                ))}
               </CardContent>
             </Card>
 
           </div>
 
           {/* RIGHT COLUMN: Frequently Changed Operational Modules (Roster, Reviewer, Notes) */}
-          <div className="lg:col-span-5 xl:col-span-5 2xl:col-span-4 space-y-3 lg:sticky lg:top-4">
-            
+          <div className="xl:col-span-5 2xl:col-span-4 space-y-3 min-w-0 xl:sticky xl:top-2 xl:max-h-[calc(100vh-5.5rem)] xl:overflow-y-auto pr-0.5">
+
             {/* Licensing Roster Allocation */}
             {!isPipeline && (
               <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
-                <CardHeader className="py-2 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5 text-primary" />
-                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+                <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Users className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
                       3. Consultant Roster ({selectedConsultantIds.length})
                     </CardTitle>
                   </div>
@@ -1123,14 +1123,14 @@ function NewClientOrderContent() {
                       variant="ghost"
                       size="sm"
                       onClick={() => setSelectedConsultantIds([])}
-                      className="h-4.5 px-1.5 text-[9px] text-muted-foreground hover:text-destructive gap-0.5 font-medium"
+                      className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-destructive gap-0.5 font-medium shrink-0"
                     >
                       Clear All
                     </Button>
                   )}
                 </CardHeader>
                 <CardContent className="p-2.5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
                     {(() => {
                       const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
                       const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
@@ -1147,13 +1147,12 @@ function NewClientOrderContent() {
                           <label
                             key={emp.id}
                             title={isReviewer ? `${emp.first_name} ${emp.last_name} is currently selected as the Designated Order Reviewer.` : undefined}
-                            className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-[10.5px] transition-colors ${
-                              isReviewer
+                            className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-[10.5px] transition-colors ${isReviewer
                                 ? "opacity-50 border-dashed border-purple-300 dark:border-purple-800 bg-purple-50/40 dark:bg-purple-950/20 cursor-not-allowed"
-                                : isSelected 
-                                  ? "border-primary bg-primary/10 text-primary font-bold shadow-2xs cursor-pointer" 
+                                : isSelected
+                                  ? "border-primary bg-primary/10 text-primary font-bold shadow-2xs cursor-pointer"
                                   : "border-border/60 bg-background/50 hover:bg-muted/40 cursor-pointer"
-                            }`}
+                              }`}
                           >
                             <input
                               type="checkbox"
@@ -1185,10 +1184,10 @@ function NewClientOrderContent() {
             {/* Designated Order Reviewer Selection */}
             {!isPipeline && (
               <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
-                <CardHeader className="py-2 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+                <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
                       4. Designated Reviewer ({selectedReviewerId ? "1 Selected" : "Optional"})
                     </CardTitle>
                   </div>
@@ -1198,14 +1197,14 @@ function NewClientOrderContent() {
                       variant="ghost"
                       size="sm"
                       onClick={() => setSelectedReviewerId(null)}
-                      className="h-4.5 px-1.5 text-[9px] text-muted-foreground hover:text-destructive gap-0.5 font-medium"
+                      className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-destructive gap-0.5 font-medium shrink-0"
                     >
                       <X className="h-2.5 w-2.5" /> Clear Reviewer
                     </Button>
                   )}
                 </CardHeader>
                 <CardContent className="p-2.5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto pr-1">
                     {(() => {
                       const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
                       const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
@@ -1223,21 +1222,19 @@ function NewClientOrderContent() {
                             key={emp.id}
                             title={isConsultant ? `${emp.first_name} ${emp.last_name} is already allocated as an executing consultant.` : undefined}
                             onClick={() => handleSelectReviewer(emp.id)}
-                            className={`flex items-center gap-1.5 p-1.5 rounded-lg border select-none text-[10.5px] transition-all ${
-                              isConsultant
+                            className={`flex items-center gap-1.5 p-1.5 rounded-lg border select-none text-[10.5px] transition-all ${isConsultant
                                 ? "opacity-50 border-dashed border-primary/40 bg-primary/5 cursor-not-allowed"
-                                : isSelected 
-                                  ? "border-purple-500/80 bg-purple-500/15 text-purple-800 dark:text-purple-300 font-bold shadow-2xs ring-1 ring-purple-500/40 cursor-pointer" 
+                                : isSelected
+                                  ? "border-purple-500/80 bg-purple-500/15 text-purple-800 dark:text-purple-300 font-bold shadow-2xs ring-1 ring-purple-500/40 cursor-pointer"
                                   : "border-border/60 bg-background/50 hover:bg-muted/40 hover:border-border cursor-pointer"
-                            }`}
+                              }`}
                           >
-                            <div className={`h-3 w-3 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
-                              isSelected 
-                                ? "border-purple-600 bg-purple-600 text-white" 
+                            <div className={`h-3 w-3 rounded-full border flex items-center justify-center shrink-0 transition-colors ${isSelected
+                                ? "border-purple-600 bg-purple-600 text-white"
                                 : isConsultant
                                   ? "border-primary/40 bg-transparent text-primary"
                                   : "border-gray-400 bg-background"
-                            }`}>
+                              }`}>
                               {isSelected && <div className="h-1 w-1 rounded-full bg-white" />}
                               {isConsultant && <div className="h-1 w-1 rounded-full bg-primary" />}
                             </div>
@@ -1263,14 +1260,14 @@ function NewClientOrderContent() {
 
             {/* Internal Delivery Notes */}
             <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
-              <CardHeader className="py-2 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <FileText className="h-3.5 w-3.5 text-primary" />
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+              <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
                     {isPipeline ? "3. Pipeline Lead Notes" : "5. Internal Delivery Notes"}
                   </CardTitle>
                 </div>
-                <span className="text-[9px] text-muted-foreground font-mono italic">For Delivery Manager</span>
+                <span className="text-[9px] text-muted-foreground font-mono italic shrink-0">For Delivery Manager</span>
               </CardHeader>
               <CardContent className="p-2.5">
                 <textarea
@@ -1289,27 +1286,27 @@ function NewClientOrderContent() {
         </div>
 
         {/* Bottom Sticky Action Controls Bar */}
-        <div className="flex items-center justify-between gap-3 p-2.5 sm:p-3 rounded-xl bg-card/80 border border-border/60 shadow-xs backdrop-blur-md">
-          <div className="flex items-center gap-2.5">
-            <span className="text-xs font-bold text-muted-foreground">Order Summary:</span>
-            <Badge variant="secondary" className="font-mono text-xs font-semibold px-2 py-0.5">
+        <div className="sticky bottom-0 z-30 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-xl bg-card/95 border border-border/70 shadow-[0_-4px_20px_rgba(0,0,0,0.12)] backdrop-blur-md transition-all">
+          <div className="flex items-center justify-between sm:justify-start gap-2.5 flex-wrap min-w-0">
+            <span className="text-xs font-bold text-muted-foreground whitespace-nowrap">Order Summary:</span>
+            <Badge variant="secondary" className="font-mono text-xs font-semibold px-2 py-0.5 shrink-0">
               {orderItems.length} {orderItems.length === 1 ? "Line Item" : "Line Items"}
             </Badge>
-            <span className="font-mono font-black text-sm text-foreground">
+            <span className="font-mono font-black text-sm text-foreground truncate">
               {formatCurrency(orderGrandTotal)}
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-end gap-2 shrink-0">
             <Link href={isPipeline ? "/business/clients/orders/pipeline" : "/business/clients/orders"}>
               <Button type="button" variant="outline" className="rounded-lg h-8 px-3.5 font-bold text-xs">
                 Cancel
               </Button>
             </Link>
-            <Button 
-              type="submit" 
-              disabled={saving} 
-              className="font-bold shadow-xs gap-1.5 rounded-lg h-8 px-4 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+            <Button
+              type="submit"
+              disabled={saving}
+              className="font-bold shadow-xs gap-1.5 rounded-lg h-8 px-4 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
             >
               {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
               {saving ? "Saving..." : isPipeline ? "Create Pipeline Order" : "Issue Client Order"}
@@ -1345,7 +1342,7 @@ function NewClientOrderContent() {
           </div>
 
           <form onSubmit={handleCreateCompanySubmit} className="p-6 sm:p-7 space-y-6">
-            
+
             {/* Section 1: Company Profile */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b border-border/50">

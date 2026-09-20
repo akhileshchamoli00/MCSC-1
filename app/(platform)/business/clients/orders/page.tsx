@@ -1726,12 +1726,12 @@ export default function ClientOrdersPage() {
       <div className="space-y-6 animate-in fade-in duration-500 w-full max-w-none pb-12">
 
         {/* Minimalist Metrics Strip & Action Button Row */}
-        <div className="flex flex-col md:flex-row items-stretch gap-3 w-full">
+        <div className="flex flex-col xl:flex-row items-stretch gap-3 w-full">
           {/* Minimalist Metric Strip - Expanded Horizontally */}
-          <div className="grid grid-cols-2 md:grid-cols-4 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs flex-1 gap-2 sm:gap-0 divide-y md:divide-y-0 md:divide-x divide-border/50">
+          <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-xs flex-1 gap-3 sm:gap-4">
 
             {/* Total Orders */}
-            <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0 justify-start sm:justify-center">
               <div className="h-9 w-9 rounded-xl bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/20 shrink-0">
                 <ShoppingCart className="h-4 w-4" />
               </div>
@@ -1742,7 +1742,7 @@ export default function ClientOrdersPage() {
             </div>
 
             {/* Confirmed Value */}
-            <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0 justify-start sm:justify-center">
               <div className="h-9 w-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
                 <DollarSign className="h-4 w-4" />
               </div>
@@ -1753,7 +1753,7 @@ export default function ClientOrdersPage() {
             </div>
 
             {/* Pending Collection */}
-            <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0 justify-start sm:justify-center">
               <div className="h-9 w-9 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
                 <Receipt className="h-4 w-4" />
               </div>
@@ -1764,7 +1764,7 @@ export default function ClientOrdersPage() {
             </div>
 
             {/* Staff Allocated */}
-            <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+            <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0 justify-start sm:justify-center">
               <div className="h-9 w-9 rounded-xl bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
                 <Users className="h-4 w-4" />
               </div>
@@ -1777,7 +1777,7 @@ export default function ClientOrdersPage() {
 
           {/* Create New Order Button */}
           <Link href="/business/clients/orders/new" className="shrink-0 flex items-stretch">
-            <Button className="gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm">
+            <Button className="w-full sm:w-auto gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm">
               <Plus className="h-4 w-4" /> Create New Order
             </Button>
           </Link>

@@ -1,27 +1,27 @@
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef } from "react";
-import { 
-  Building, 
-  Search, 
-  Loader2, 
-  ShoppingCart, 
-  UserCheck, 
-  Eye, 
-  Receipt, 
-  CheckCircle2, 
-  Clock, 
-  Users, 
-  MessageSquare, 
-  Lock, 
-  AlertCircle, 
-  X, 
-  FileText, 
-  Folder, 
-  FolderOpen, 
-  FolderCheck, 
-  FolderClock, 
-  FolderKanban, 
+import {
+  Building,
+  Search,
+  Loader2,
+  ShoppingCart,
+  UserCheck,
+  Eye,
+  Receipt,
+  CheckCircle2,
+  Clock,
+  Users,
+  MessageSquare,
+  Lock,
+  AlertCircle,
+  X,
+  FileText,
+  Folder,
+  FolderOpen,
+  FolderCheck,
+  FolderClock,
+  FolderKanban,
   ChevronRight,
   PauseCircle,
   AlertTriangle,
@@ -135,16 +135,16 @@ export default function AssignedOrdersPage() {
       const filteredEmps = (employees || []).filter((emp: any) => {
         const isLicensingMember = licensingMemberIds.includes(emp.id);
         if (!isLicensingMember) return false;
-        
+
         const fullName = `${emp.first_name} ${emp.last_name}`.toLowerCase();
         return fullName.includes(query);
       }).map(emp => ({ ...emp, type: "employee" }));
 
       // Also filter active teams (include Licensing Team in suggestions)
-      const filteredTeams = (teams || []).filter((t: any) => 
+      const filteredTeams = (teams || []).filter((t: any) =>
         t.is_active && t.name.toLowerCase() === "licensing team" && t.name.toLowerCase().includes(query)
       ).map(t => ({ ...t, type: "team" }));
-      
+
       const merged = [...filteredEmps, ...filteredTeams];
       setFilteredEmployees(merged);
       setShowSuggestions(merged.length > 0);
@@ -166,11 +166,11 @@ export default function AssignedOrdersPage() {
       const mentionText = item.type === "team" ? `@${item.name}` : `@${item.first_name} ${item.last_name}`;
       const before = val.slice(0, lastAtIdx);
       const after = val.slice(selectionStart);
-      
+
       const newVal = `${before}${mentionText} ${after}`;
       setNewProgressMessage(newVal);
       setShowSuggestions(false);
-      
+
       // Put focus back and position cursor after inserted mention + trailing space
       setTimeout(() => {
         textarea.focus();
@@ -182,7 +182,7 @@ export default function AssignedOrdersPage() {
 
   const renderMessageContent = (msg: string) => {
     if (!msg) return null;
-    
+
     // Create mapping of name/team -> color/type
     const teamMap = new Map();
     (teams || []).forEach((t: any) => {
@@ -199,7 +199,7 @@ export default function AssignedOrdersPage() {
 
     const allPatterns = [...namePatterns, ...teamPatterns]
       .map((name: string) => name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
-      
+
     if (allPatterns.length === 0) {
       const parts = msg.split(/(@[^\s,.:;!?]+)/g);
       return parts.map((part, index) => {
@@ -213,17 +213,17 @@ export default function AssignedOrdersPage() {
         return part;
       });
     }
-    
+
     const escapedNamesPattern = allPatterns.join('|');
     const emailPattern = '[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+';
     const pattern = new RegExp(`(@(?:${escapedNamesPattern}|${emailPattern}))`, 'g');
-    
+
     const parts = msg.split(pattern);
     return parts.map((part, index) => {
       if (part.startsWith("@")) {
         const entityName = part.slice(1);
         const matchedTeam = teamMap.get(entityName.toLowerCase());
-        
+
         if (matchedTeam) {
           const tColor = matchedTeam.color || "#10b981";
           return (
@@ -242,7 +242,7 @@ export default function AssignedOrdersPage() {
             </button>
           );
         }
-        
+
         return (
           <span key={index} className="bg-emerald-500/10 text-emerald-600 font-bold px-1.5 py-0.5 rounded-md border border-emerald-500/25 text-[10px] inline-block">
             {part}
@@ -252,7 +252,7 @@ export default function AssignedOrdersPage() {
       return part;
     });
   };
-  
+
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [pendingConfirmGroup, setPendingConfirmGroup] = useState<any>(null);
   const [pendingConfirmStatus, setPendingConfirmStatus] = useState<string>("");
@@ -270,8 +270,8 @@ export default function AssignedOrdersPage() {
     setLoadingProgress(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNum}/progress`, {
-      credentials: "include",
-        });
+        credentials: "include",
+      });
       if (res.ok) {
         setProgressUpdates(await res.json());
       }
@@ -288,7 +288,7 @@ export default function AssignedOrdersPage() {
     setPostingProgress(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedGroup.order_number}/progress`, {
-      credentials: "include",
+        credentials: "include",
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -317,8 +317,8 @@ export default function AssignedOrdersPage() {
     try {
       setLoading(true);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/my-assigned`, {
-      credentials: "include",
-        });
+        credentials: "include",
+      });
       if (res.ok) {
         const data = await res.json();
         setOrders(Array.isArray(data) ? data : []);
@@ -335,9 +335,11 @@ export default function AssignedOrdersPage() {
     try {
       const [empRes, teamRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, {
-      credentials: "include", }),
+          credentials: "include",
+        }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, {
-      credentials: "include", })
+          credentials: "include",
+        })
       ]);
       if (empRes.ok) setEmployees(await empRes.json());
       if (teamRes.ok) setTeams(await teamRes.json());
@@ -382,7 +384,7 @@ export default function AssignedOrdersPage() {
       if (typeof ord.document_count === "number" && ord.document_count > (group.document_count || 0)) {
         group.document_count = ord.document_count;
       }
-      
+
       if (ord.reviewer_id && !group.reviewer_id) {
         group.reviewer_id = ord.reviewer_id;
       }
@@ -493,7 +495,7 @@ export default function AssignedOrdersPage() {
             headers: {
               "Content-Type": "application/json"
             },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
               status: "ON_HOLD",
               hold_reason: cleanedReason,
               hold_channel: holdChannel
@@ -905,669 +907,668 @@ export default function AssignedOrdersPage() {
     <>
       <div className="space-y-6 animate-in fade-in duration-500 w-full max-w-none pb-12">
 
-      {/* 📁 WORKSPACE FOLDERS OVERVIEW (ABOVE SEARCH) */}
-      <div className="space-y-4">
-        {/* Header Title & Global Summary */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-              <FolderKanban className="h-6 w-6 text-primary" />
-              Allocated Orders Workspace
-            </h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Select a workflow folder below to inspect queue items, monitor execution progress, and access client documents.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <Badge variant="outline" className="text-xs font-mono font-semibold px-2.5 py-1 bg-muted/40 border-border/60 flex items-center gap-1.5">
-              <Folder className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>{totalAllocatedCount} Total Orders Allocated</span>
-            </Badge>
-          </div>
-        </div>
-
-        {/* 5 Interactive Workflow Folders */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
-          
-          {/* FOLDER 1: NEWLY ASSIGNED */}
-          <div
-            onClick={() => setActiveTab("ASSIGNED")}
-            className={cn(
-              "group relative rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
-              "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
-              activeTab === "ASSIGNED"
-                ? "border-purple-500/60 ring-2 ring-purple-500/20 bg-gradient-to-br from-purple-500/10 via-purple-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-purple-500/5 -translate-y-0.5"
-                : "border-border/60 hover:border-purple-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
-            )}
-          >
-            {/* Top Ear Tab Accent */}
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div className="flex items-center gap-3">
-                <div className={cn(
-                  "p-3 rounded-xl transition-all duration-200 shrink-0",
-                  activeTab === "ASSIGNED"
-                    ? "bg-purple-600 text-white shadow-xs scale-105"
-                    : "bg-purple-500/10 text-purple-600 dark:text-purple-400 group-hover:bg-purple-500/20"
-                )}>
-                  {activeTab === "ASSIGNED" ? <FolderOpen className="h-5 w-5" /> : <Folder className="h-5 w-5" />}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-sm tracking-tight text-foreground">
-                      Assigned Orders
-                    </h3>
-                    {activeTab === "ASSIGNED" && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/30 uppercase tracking-wider">
-                        Active
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Newly assigned orders pending execution</p>
-                </div>
-              </div>
-              <Badge 
-                variant={activeTab === "ASSIGNED" ? "default" : "secondary"} 
-                className={cn(
-                  "font-mono text-xs font-bold px-2.5 py-0.5 shrink-0",
-                  activeTab === "ASSIGNED" ? "bg-purple-600 text-white hover:bg-purple-600" : "bg-muted text-muted-foreground"
-                )}
-              >
-                {assignedOrdersCount}
-              </Badge>
-            </div>
-
-            {/* Folder Footer Metadata */}
-            <div className="pt-2.5 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-purple-600 dark:text-purple-400 font-semibold">
-                <ShoppingCart className="h-3 w-3" /> New Queue
-              </span>
-              <span className="font-medium text-foreground/80">{assignedOrdersCount} {assignedOrdersCount === 1 ? "order" : "orders"}</span>
-            </div>
-          </div>
-
-          {/* FOLDER 2: IN PROGRESS */}
-          <div
-            onClick={() => setActiveTab("IN_PROGRESS")}
-            className={cn(
-              "group relative rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
-              "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
-              activeTab === "IN_PROGRESS"
-                ? "border-sky-500/60 ring-2 ring-sky-500/20 bg-gradient-to-br from-sky-500/10 via-sky-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-sky-500/5 -translate-y-0.5"
-                : "border-border/60 hover:border-sky-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
-            )}
-          >
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div className="flex items-center gap-3">
-                <div className={cn(
-                  "p-3 rounded-xl transition-all duration-200 shrink-0",
-                  activeTab === "IN_PROGRESS"
-                    ? "bg-sky-600 text-white shadow-xs scale-105"
-                    : "bg-sky-500/10 text-sky-600 dark:text-sky-400 group-hover:bg-sky-500/20"
-                )}>
-                  {activeTab === "IN_PROGRESS" ? <FolderClock className="h-5 w-5" /> : <Folder className="h-5 w-5" />}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-sm tracking-tight text-foreground">
-                      In-Progress
-                    </h3>
-                    {activeTab === "IN_PROGRESS" && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/30 uppercase tracking-wider">
-                        Active
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Execution, prep & payment stages</p>
-                </div>
-              </div>
-              <Badge 
-                variant={activeTab === "IN_PROGRESS" ? "default" : "secondary"} 
-                className={cn(
-                  "font-mono text-xs font-bold px-2.5 py-0.5 shrink-0",
-                  activeTab === "IN_PROGRESS" ? "bg-sky-600 text-white hover:bg-sky-600" : "bg-muted text-muted-foreground"
-                )}
-              >
-                {inProgressOrdersCount}
-              </Badge>
-            </div>
-
-            <div className="pt-2.5 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-sky-600 dark:text-sky-400 font-semibold">
-                <Clock className="h-3 w-3" /> {reviewPrepOrdersCount} In Review/Prep
-              </span>
-              <span className="font-medium text-foreground/80">{inProgressOrdersCount} active</span>
-            </div>
-          </div>
-
-          {/* FOLDER 3: REVIEW ORDER */}
-          <div
-            onClick={() => setActiveTab("REVIEW_ORDER")}
-            className={cn(
-              "group relative rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
-              "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
-              activeTab === "REVIEW_ORDER"
-                ? "border-indigo-500/60 ring-2 ring-indigo-500/20 bg-gradient-to-br from-indigo-500/10 via-indigo-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-indigo-500/5 -translate-y-0.5"
-                : "border-border/60 hover:border-indigo-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
-            )}
-          >
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div className="flex items-center gap-3">
-                <div className={cn(
-                  "p-3 rounded-xl transition-all duration-200 shrink-0",
-                  activeTab === "REVIEW_ORDER"
-                    ? "bg-indigo-600 text-white shadow-xs scale-105"
-                    : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-500/20"
-                )}>
-                  <ShieldCheck className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-sm tracking-tight text-foreground">
-                      Review Order
-                    </h3>
-                    {activeTab === "REVIEW_ORDER" && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border border-indigo-500/30 uppercase tracking-wider">
-                        Active
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Continuous review throughout order lifecycle</p>
-                </div>
-              </div>
-              <Badge 
-                variant={activeTab === "REVIEW_ORDER" ? "default" : "secondary"} 
-                className={cn(
-                  "font-mono text-xs font-bold px-2.5 py-0.5 shrink-0",
-                  activeTab === "REVIEW_ORDER" ? "bg-indigo-600 text-white hover:bg-indigo-600" : "bg-muted text-muted-foreground"
-                )}
-              >
-                {reviewOrdersCount}
-              </Badge>
-            </div>
-
-            <div className="pt-2.5 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold">
-                <ShieldCheck className="h-3 w-3" /> Continuous Review
-              </span>
-              <span className="font-medium text-foreground/80">{reviewOrdersCount} active {reviewOrdersCount === 1 ? "review" : "reviews"}</span>
-            </div>
-          </div>
-
-          {/* FOLDER 4: ON-HOLD ORDERS */}
-          <div
-            onClick={() => setActiveTab("ON_HOLD")}
-            className={cn(
-              "group relative rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
-              "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
-              activeTab === "ON_HOLD"
-                ? "border-amber-500/60 ring-2 ring-amber-500/20 bg-gradient-to-br from-amber-500/10 via-amber-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-amber-500/5 -translate-y-0.5"
-                : "border-border/60 hover:border-amber-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
-            )}
-          >
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div className="flex items-center gap-3">
-                <div className={cn(
-                  "p-3 rounded-xl transition-all duration-200 shrink-0",
-                  activeTab === "ON_HOLD"
-                    ? "bg-amber-600 text-white shadow-xs scale-105"
-                    : "bg-amber-500/10 text-amber-600 dark:text-amber-400 group-hover:bg-amber-500/20"
-                )}>
-                  {activeTab === "ON_HOLD" ? <PauseCircle className="h-5 w-5" /> : <Folder className="h-5 w-5" />}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-sm tracking-tight text-foreground">
-                      On-Hold Orders
-                    </h3>
-                    {activeTab === "ON_HOLD" && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30 uppercase tracking-wider">
-                        Active
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Paused orders with documented reasons</p>
-                </div>
-              </div>
-              <Badge 
-                variant={activeTab === "ON_HOLD" ? "default" : "secondary"} 
-                className={cn(
-                  "font-mono text-xs font-bold px-2.5 py-0.5 shrink-0",
-                  activeTab === "ON_HOLD" ? "bg-amber-600 text-white hover:bg-amber-600" : "bg-muted text-muted-foreground"
-                )}
-              >
-                {onHoldOrdersCount}
-              </Badge>
-            </div>
-
-            <div className="pt-2.5 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-semibold">
-                <AlertTriangle className="h-3 w-3" /> Awaiting Action
-              </span>
-              <span className="font-medium text-foreground/80">{onHoldOrdersCount} {onHoldOrdersCount === 1 ? "order" : "orders"}</span>
-            </div>
-          </div>
-
-          {/* FOLDER 5: COMPLETED ORDERS */}
-          <div
-            onClick={() => setActiveTab("COMPLETED")}
-            className={cn(
-              "group relative rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
-              "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
-              activeTab === "COMPLETED"
-                ? "border-emerald-500/60 ring-2 ring-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-emerald-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-emerald-500/5 -translate-y-0.5"
-                : "border-border/60 hover:border-emerald-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
-            )}
-          >
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div className="flex items-center gap-3">
-                <div className={cn(
-                  "p-3 rounded-xl transition-all duration-200 shrink-0",
-                  activeTab === "COMPLETED"
-                    ? "bg-emerald-600 text-white shadow-xs scale-105"
-                    : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-500/20"
-                )}>
-                  {activeTab === "COMPLETED" ? <FolderCheck className="h-5 w-5" /> : <Folder className="h-5 w-5" />}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-sm tracking-tight text-foreground">
-                      Completed Orders
-                    </h3>
-                    {activeTab === "COMPLETED" && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 uppercase tracking-wider">
-                        Active
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Delivered & finalized orders archive</p>
-                </div>
-              </div>
-              <Badge 
-                variant={activeTab === "COMPLETED" ? "default" : "secondary"} 
-                className={cn(
-                  "font-mono text-xs font-bold px-2.5 py-0.5 shrink-0",
-                  activeTab === "COMPLETED" ? "bg-emerald-600 text-white hover:bg-emerald-600" : "bg-muted text-muted-foreground"
-                )}
-              >
-                {completedOrdersCount}
-              </Badge>
-            </div>
-
-            <div className="pt-2.5 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-semibold">
-                <CheckCircle2 className="h-3 w-3" /> 100% Concluded
-              </span>
-              <span className="font-medium text-foreground/80">{completedOrdersCount} archived</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Orders List Card with Folder Breadcrumbs & Search Toolbar */}
-      <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
-        <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
-          
-          {/* Active Folder Directory Breadcrumb */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground w-full sm:w-auto">
-            <div className="flex items-center gap-2 font-semibold text-foreground bg-card/90 dark:bg-zinc-900/90 px-3 py-1.5 rounded-xl border border-border/60 shadow-2xs">
-              {activeTab === "ASSIGNED" && (
-                <>
-                  <FolderOpen className="h-4 w-4 text-purple-500 shrink-0" />
-                  <span>Assigned Orders Folder</span>
-                </>
-              )}
-              {activeTab === "IN_PROGRESS" && (
-                <>
-                  <FolderClock className="h-4 w-4 text-sky-500 shrink-0" />
-                  <span>In-Progress Orders Folder</span>
-                </>
-              )}
-              {activeTab === "REVIEW_ORDER" && (
-                <>
-                  <ShieldCheck className="h-4 w-4 text-indigo-500 shrink-0" />
-                  <span>Review Orders Folder</span>
-                </>
-              )}
-              {activeTab === "ON_HOLD" && (
-                <>
-                  <PauseCircle className="h-4 w-4 text-amber-500 shrink-0" />
-                  <span>On-Hold Orders Folder</span>
-                </>
-              )}
-              {activeTab === "COMPLETED" && (
-                <>
-                  <FolderCheck className="h-4 w-4 text-emerald-500 shrink-0" />
-                  <span>Completed Orders Folder</span>
-                </>
-              )}
-            </div>
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
-            <span className="text-[11px] font-mono text-muted-foreground font-medium">
-              {filteredOrders.length} {filteredOrders.length === 1 ? "order" : "orders"} listed
-            </span>
-          </div>
-
-          {/* Search bar & Filter actions */}
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={`Search inside ${activeTab === "ASSIGNED" ? "assigned orders" : activeTab === "IN_PROGRESS" ? "in-progress orders" : activeTab === "REVIEW_ORDER" ? "review orders" : activeTab === "ON_HOLD" ? "on-hold orders" : "completed orders"}...`}
-                className="pl-8 h-9 text-xs rounded-lg bg-background/80"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            {searchTerm && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSearchTerm("")}
-                className="h-9 px-2.5 text-xs text-muted-foreground hover:text-foreground"
-              >
-                Clear
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <CardContent className="p-0">
-          {filteredOrders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <ShoppingCart className="h-12 w-12 text-muted-foreground/35 mb-3" />
-              <h3 className="font-bold text-lg">
-                {activeTab === "ASSIGNED" ? "No Newly Assigned Orders" : activeTab === "IN_PROGRESS" ? "No In-Progress Orders" : activeTab === "REVIEW_ORDER" ? "No Review Orders" : activeTab === "ON_HOLD" ? "No On-Hold Orders" : "No Completed Orders"}
-              </h3>
-              <p className="text-sm text-muted-foreground max-w-sm mt-1">
-                {searchTerm
-                  ? "No results match your search query."
-                  : activeTab === "ASSIGNED"
-                    ? "There are currently no new unstarted orders waiting in the assigned queue."
-                    : activeTab === "IN_PROGRESS"
-                      ? "There are currently no orders in active progress in your queue."
-                      : activeTab === "REVIEW_ORDER"
-                        ? "There are currently no active orders allocated to you for continuous lifecycle review."
-                        : activeTab === "ON_HOLD"
-                          ? "There are currently no paused orders placed on hold."
-                          : "There are currently no completed orders in your archive."}
+        {/* 📁 WORKSPACE FOLDERS OVERVIEW (ABOVE SEARCH) */}
+        <div className="space-y-4">
+          {/* Header Title & Global Summary */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+                <FolderKanban className="h-6 w-6 text-primary" />
+                Allocated Orders Workspace
+              </h1>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Select a workflow folder below to inspect queue items, monitor execution progress, and access client documents.
               </p>
             </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                  <th className="p-4 w-10 text-center">No.</th>
-                  <th className="p-4 w-28 whitespace-nowrap">Order ID</th>
-                  <th className="p-4 min-w-[170px]">Client & Company</th>
-                  <th className="p-4 min-w-[260px] lg:min-w-[320px]">Service Scope</th>
-                  <th className="p-4 w-44 min-w-[150px]">Consultant & Reviewer</th>
-                  <th className="p-4 w-32 whitespace-nowrap">Created Date</th>
-                  <th className="p-4 w-40 text-center whitespace-nowrap">Execution Stage</th>
-                  <th className="p-4 w-28 text-right whitespace-nowrap">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {paginatedOrders.map((ord, idx) => {
-                  const isHighlighted = highlightedOrderNum === ord.order_number;
-                  return (
-                  <tr 
-                    key={ord.order_number} 
-                    id={`order-row-${ord.order_number}`} 
-                    onClick={() => {
-                      setHighlightedOrderNum(ord.order_number);
-                      if (typeof window !== "undefined") {
-                        sessionStorage.setItem("assigned_orders_highlighted_order", ord.order_number);
-                      }
-                    }}
-                    className={`transition-all duration-300 border-b last:border-0 ${
-                      isHighlighted 
-                        ? "bg-blue-500/15 dark:bg-blue-500/20 ring-2 ring-blue-500 ring-inset shadow-md" 
-                        : "hover:bg-muted/30 cursor-pointer"
-                    }`}
-                  >
-                    <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5">
-                      #{startIndex + idx + 1}
-                    </td>
-                    <td className="p-4 align-top pt-5">
-                      {ord.company_id ? (
-                        <Link 
-                          href={`/business/clients/documents/${ord.company_id}?order=${ord.order_number}&from=assigned-orders&tab=${activeTab}`}
-                          onClick={() => {
-                            setHighlightedOrderNum(ord.order_number);
-                            if (typeof window !== "undefined") {
-                              sessionStorage.setItem("assigned_orders_highlighted_order", ord.order_number);
-                            }
-                          }}
-                        >
-                          <Badge 
-                            variant="outline" 
-                            className="font-mono font-bold text-xs bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary cursor-pointer transition-colors"
-                            title="Navigate to Company Documents Folder for this Order"
-                          >
-                            {ord.order_number}
-                          </Badge>
-                        </Link>
-                      ) : (
-                        <Badge variant="outline" className="font-mono font-bold text-xs bg-primary/10 border-primary/30 text-primary">
-                          {ord.order_number}
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="p-4 text-muted-foreground space-y-1 align-top pt-5">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-foreground font-semibold text-sm">{ord.company_name || "Personal Client"}</span>
-                        {(() => {
-                          const vStatus = ord.company?.validation_status;
-                          if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
-                            return (
-                              <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 flex items-center gap-0.5" title="Company pending admin validation">
-                                <Clock className="h-2.5 w-2.5" /> Pending Company
-                              </Badge>
-                            );
-                          }
-                          if (vStatus === "NEEDS_REVISION") {
-                            return (
-                              <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 flex items-center gap-0.5" title="Company needs revision">
-                                <AlertCircle className="h-2.5 w-2.5" /> Revision Required
-                              </Badge>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
-                        <Building className="h-3.5 w-3.5 shrink-0" />
-                        <span>{ord.client_name || "Representative"}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 text-muted-foreground align-top">
-                      {ord.items && ord.items.length > 0 ? (
-                        <div className="space-y-2.5 max-w-md my-1">
-                          {ord.items.map((item: any, idx: number) => {
-                            const itemKey = `${ord.order_number}-${idx}`;
-                            const isExpanded = !!expandedItems[itemKey];
-                            return (
-                              <div 
-                                key={idx} 
-                                className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-950/20 shadow-none space-y-1.5 transition-all duration-200"
-                              >
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  <span className="font-bold text-foreground text-xs leading-normal break-words">
-                                    {item.job_title}
-                                  </span>
-                                  {item.job_id && (
-                                    <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-primary/5 text-primary border-primary/20 shrink-0">
-                                      {item.job_id}
-                                    </Badge>
-                                  )}
-                                  {item.pricing_tier && (
-                                    <Badge variant="secondary" className="text-[9px] py-0 px-1.5 font-medium capitalize shrink-0">
-                                      {item.pricing_tier.toLowerCase().replace('_', ' ')}
-                                    </Badge>
-                                  )}
-                                </div>
-                                {item.description && (
-                                  <div className="space-y-1">
-                                    {isExpanded && (
-                                      <div className="text-[10px] text-muted-foreground leading-relaxed whitespace-pre-wrap transition-all duration-200 mt-1 border-l-2 border-zinc-300 dark:border-zinc-700 pl-2 py-0.5">
-                                        {item.description}
-                                      </div>
-                                    )}
-                                    <button
-                                      type="button"
-                                      onClick={() => toggleItemExpansion(itemKey)}
-                                      className="text-[9.5px] text-primary hover:text-primary/80 font-bold hover:underline block"
-                                    >
-                                      {isExpanded ? "Hide details" : "Show details"}
-                                    </button>
-                                  </div>
-                                )}
-
-                                {item.service_instructions && (
-                                  <div className="mt-1.5 p-2 rounded-md bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-0.5">
-                                    <div className="flex items-center gap-1.5 font-bold text-[10px] text-amber-700 dark:text-amber-400">
-                                      <FileText className="h-3 w-3 shrink-0" />
-                                      <span>Service Instructions:</span>
-                                    </div>
-                                    <p className="text-[11px] font-medium leading-relaxed whitespace-pre-wrap text-foreground/90">
-                                      {item.service_instructions}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground italic text-xs">-</span>
-                      )}
-                    </td>
-                    <td className="p-4 align-top pt-5 w-44 min-w-[150px]">
-                      <div className="flex flex-col items-start gap-1.5 w-full">
-                        {ord.consultants && ord.consultants.length > 0 ? (
-                          ord.consultants.map((c: any) => (
-                            <Badge 
-                              key={c.id} 
-                              variant="outline" 
-                              className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-semibold flex items-center gap-1.5 py-0.5 px-2 max-w-full truncate shadow-none"
-                              title={`Assigned Consultant: ${c.name}`}
-                            >
-                              <UserCheck className="h-3 w-3 text-emerald-600 shrink-0" />
-                              <span className="truncate">{c.name}</span>
-                            </Badge>
-                          ))
-                        ) : (
-                          <span className="text-muted-foreground italic text-[11px]">Unassigned</span>
-                        )}
-                        {ord.reviewer && (
-                          <Badge 
-                            variant="outline" 
-                            className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/25 font-semibold flex items-center gap-1.5 py-0.5 px-2 max-w-full truncate shadow-none"
-                            title={`Designated Reviewer: ${ord.reviewer.name}`}
-                          >
-                            <ShieldCheck className="h-3 w-3 text-purple-600 dark:text-purple-400 shrink-0" />
-                            <span className="truncate">Rev: {ord.reviewer.name}</span>
-                          </Badge>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4 font-mono font-medium text-muted-foreground align-top pt-5">
-                      {formatDate(ord.created_at)}
-                    </td>
-                    <td className="p-4 text-center align-top pt-5">
-                      {CONSULTANT_EDITABLE_STATUSES.includes((ord.status || "").toUpperCase()) ? (
-                        <select
-                          value={ord.status}
-                          disabled={savingStatus}
-                          onChange={(e) => handleUpdateStatus(ord, e.target.value)}
-                          className={`h-8 px-2.5 py-1 text-xs font-bold rounded-md border shadow-xs bg-background transition-colors cursor-pointer ${getOrderStatusColor(ord.status)}`}
-                        >
-                          <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
-                          <option value="IN_PROGRESS">IN PROGRESS</option>
-                          <option value="REVIEW_DOCS">REVIEW DOCS</option>
-                          <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
-                          <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
-                          <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
-                          <option value="FINAL_DOC_READY">FINAL DOC READY</option>
-                          <option value="ON_HOLD">ON HOLD</option>
-                        </select>
-                      ) : ord.status === "COMPLETED" ? (
-                        <Badge variant="outline" className="text-xs font-bold py-1 px-2.5 uppercase shadow-xs whitespace-nowrap bg-emerald-500/15 text-emerald-600 border-emerald-500/30 flex items-center justify-center gap-1 mx-auto">
-                          <Lock className="h-3 w-3 text-emerald-600 shrink-0" />
-                          COMPLETED
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className={`text-xs font-bold py-1 px-2.5 uppercase shadow-xs whitespace-nowrap ${getOrderStatusColor(ord.status)}`}>
-                          {(ord.status || "").replace(/_/g, " ")}
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="p-4 text-right align-top pt-5">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1.5 font-bold border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30 shadow-sm"
-                        onClick={() => {
-                          setSelectedGroup(ord);
-                          setIsChatOpen(true);
-                          fetchProgressUpdates(ord.order_number);
-                        }}
-                      >
-                        <MessageSquare className="h-3.5 w-3.5" /> Chat
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-              </tbody>
-            </table>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <Badge variant="outline" className="text-xs font-mono font-semibold px-2.5 py-1 bg-muted/40 border-border/60 flex items-center gap-1.5">
+                <Folder className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>{totalAllocatedCount} Total Orders Allocated</span>
+              </Badge>
+            </div>
           </div>
 
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
-              <div className="text-xs text-muted-foreground">
-                Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
-                <span className="font-medium text-foreground">{Math.min(filteredOrders.length, endIndex)}</span> of{" "}
-                <span className="font-medium text-foreground">{filteredOrders.length}</span> entries
+          {/* 5 Interactive Workflow Folders */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3.5">
+
+            {/* FOLDER 1: NEWLY ASSIGNED */}
+            <div
+              onClick={() => setActiveTab("ASSIGNED")}
+              className={cn(
+                "group relative rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
+                "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
+                activeTab === "ASSIGNED"
+                  ? "border-purple-500/60 ring-2 ring-purple-500/20 bg-gradient-to-br from-purple-500/10 via-purple-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-purple-500/5 -translate-y-0.5"
+                  : "border-border/60 hover:border-purple-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
+              )}
+            >
+              {/* Top Ear Tab Accent */}
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "p-3 rounded-xl transition-all duration-200 shrink-0",
+                    activeTab === "ASSIGNED"
+                      ? "bg-purple-600 text-white shadow-xs scale-105"
+                      : "bg-purple-500/10 text-purple-600 dark:text-purple-400 group-hover:bg-purple-500/20"
+                  )}>
+                    {activeTab === "ASSIGNED" ? <FolderOpen className="h-5 w-5" /> : <Folder className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-sm tracking-tight text-foreground">
+                        Assigned Orders
+                      </h3>
+                      {activeTab === "ASSIGNED" && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/30 uppercase tracking-wider">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Newly assigned orders pending execution</p>
+                  </div>
+                </div>
+                <Badge
+                  variant={activeTab === "ASSIGNED" ? "default" : "secondary"}
+                  className={cn(
+                    "font-mono text-xs font-bold px-2.5 py-0.5 shrink-0",
+                    activeTab === "ASSIGNED" ? "bg-purple-600 text-white hover:bg-purple-600" : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {assignedOrdersCount}
+                </Badge>
               </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
-                >
-                  Previous
-                </Button>
-                <span className="text-xs text-muted-foreground px-2">
-                  Page {currentPage} of {totalPages}
+
+              {/* Folder Footer Metadata */}
+              <div className="pt-2.5 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-purple-600 dark:text-purple-400 font-semibold">
+                  <ShoppingCart className="h-3 w-3" /> New Queue
                 </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
-                >
-                  Next
-                </Button>
+                <span className="font-medium text-foreground/80">{assignedOrdersCount} {assignedOrdersCount === 1 ? "order" : "orders"}</span>
               </div>
             </div>
-          )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+
+            {/* FOLDER 2: IN PROGRESS */}
+            <div
+              onClick={() => setActiveTab("IN_PROGRESS")}
+              className={cn(
+                "group relative rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
+                "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
+                activeTab === "IN_PROGRESS"
+                  ? "border-sky-500/60 ring-2 ring-sky-500/20 bg-gradient-to-br from-sky-500/10 via-sky-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-sky-500/5 -translate-y-0.5"
+                  : "border-border/60 hover:border-sky-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
+              )}
+            >
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "p-3 rounded-xl transition-all duration-200 shrink-0",
+                    activeTab === "IN_PROGRESS"
+                      ? "bg-sky-600 text-white shadow-xs scale-105"
+                      : "bg-sky-500/10 text-sky-600 dark:text-sky-400 group-hover:bg-sky-500/20"
+                  )}>
+                    {activeTab === "IN_PROGRESS" ? <FolderClock className="h-5 w-5" /> : <Folder className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-sm tracking-tight text-foreground">
+                        In-Progress
+                      </h3>
+                      {activeTab === "IN_PROGRESS" && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/30 uppercase tracking-wider">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Execution, prep & payment stages</p>
+                  </div>
+                </div>
+                <Badge
+                  variant={activeTab === "IN_PROGRESS" ? "default" : "secondary"}
+                  className={cn(
+                    "font-mono text-xs font-bold px-2.5 py-0.5 shrink-0",
+                    activeTab === "IN_PROGRESS" ? "bg-sky-600 text-white hover:bg-sky-600" : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {inProgressOrdersCount}
+                </Badge>
+              </div>
+
+              <div className="pt-2.5 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-sky-600 dark:text-sky-400 font-semibold">
+                  <Clock className="h-3 w-3" /> {reviewPrepOrdersCount} In Review/Prep
+                </span>
+                <span className="font-medium text-foreground/80">{inProgressOrdersCount} active</span>
+              </div>
+            </div>
+
+            {/* FOLDER 3: REVIEW ORDER */}
+            <div
+              onClick={() => setActiveTab("REVIEW_ORDER")}
+              className={cn(
+                "group relative rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
+                "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
+                activeTab === "REVIEW_ORDER"
+                  ? "border-indigo-500/60 ring-2 ring-indigo-500/20 bg-gradient-to-br from-indigo-500/10 via-indigo-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-indigo-500/5 -translate-y-0.5"
+                  : "border-border/60 hover:border-indigo-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
+              )}
+            >
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "p-3 rounded-xl transition-all duration-200 shrink-0",
+                    activeTab === "REVIEW_ORDER"
+                      ? "bg-indigo-600 text-white shadow-xs scale-105"
+                      : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-500/20"
+                  )}>
+                    <ShieldCheck className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-sm tracking-tight text-foreground">
+                        Review Order
+                      </h3>
+                      {activeTab === "REVIEW_ORDER" && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border border-indigo-500/30 uppercase tracking-wider">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Continuous review throughout order lifecycle</p>
+                  </div>
+                </div>
+                <Badge
+                  variant={activeTab === "REVIEW_ORDER" ? "default" : "secondary"}
+                  className={cn(
+                    "font-mono text-xs font-bold px-2.5 py-0.5 shrink-0",
+                    activeTab === "REVIEW_ORDER" ? "bg-indigo-600 text-white hover:bg-indigo-600" : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {reviewOrdersCount}
+                </Badge>
+              </div>
+
+              <div className="pt-2.5 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold">
+                  <ShieldCheck className="h-3 w-3" /> Continuous Review
+                </span>
+                <span className="font-medium text-foreground/80">{reviewOrdersCount} active {reviewOrdersCount === 1 ? "review" : "reviews"}</span>
+              </div>
+            </div>
+
+            {/* FOLDER 4: ON-HOLD ORDERS */}
+            <div
+              onClick={() => setActiveTab("ON_HOLD")}
+              className={cn(
+                "group relative rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
+                "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
+                activeTab === "ON_HOLD"
+                  ? "border-amber-500/60 ring-2 ring-amber-500/20 bg-gradient-to-br from-amber-500/10 via-amber-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-amber-500/5 -translate-y-0.5"
+                  : "border-border/60 hover:border-amber-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
+              )}
+            >
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "p-3 rounded-xl transition-all duration-200 shrink-0",
+                    activeTab === "ON_HOLD"
+                      ? "bg-amber-600 text-white shadow-xs scale-105"
+                      : "bg-amber-500/10 text-amber-600 dark:text-amber-400 group-hover:bg-amber-500/20"
+                  )}>
+                    {activeTab === "ON_HOLD" ? <PauseCircle className="h-5 w-5" /> : <Folder className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-sm tracking-tight text-foreground">
+                        On-Hold Orders
+                      </h3>
+                      {activeTab === "ON_HOLD" && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30 uppercase tracking-wider">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Paused orders with documented reasons</p>
+                  </div>
+                </div>
+                <Badge
+                  variant={activeTab === "ON_HOLD" ? "default" : "secondary"}
+                  className={cn(
+                    "font-mono text-xs font-bold px-2.5 py-0.5 shrink-0",
+                    activeTab === "ON_HOLD" ? "bg-amber-600 text-white hover:bg-amber-600" : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {onHoldOrdersCount}
+                </Badge>
+              </div>
+
+              <div className="pt-2.5 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-semibold">
+                  <AlertTriangle className="h-3 w-3" /> Awaiting Action
+                </span>
+                <span className="font-medium text-foreground/80">{onHoldOrdersCount} {onHoldOrdersCount === 1 ? "order" : "orders"}</span>
+              </div>
+            </div>
+
+            {/* FOLDER 5: COMPLETED ORDERS */}
+            <div
+              onClick={() => setActiveTab("COMPLETED")}
+              className={cn(
+                "group relative rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
+                "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
+                activeTab === "COMPLETED"
+                  ? "border-emerald-500/60 ring-2 ring-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-emerald-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-emerald-500/5 -translate-y-0.5"
+                  : "border-border/60 hover:border-emerald-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
+              )}
+            >
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "p-3 rounded-xl transition-all duration-200 shrink-0",
+                    activeTab === "COMPLETED"
+                      ? "bg-emerald-600 text-white shadow-xs scale-105"
+                      : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-500/20"
+                  )}>
+                    {activeTab === "COMPLETED" ? <FolderCheck className="h-5 w-5" /> : <Folder className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-sm tracking-tight text-foreground">
+                        Completed Orders
+                      </h3>
+                      {activeTab === "COMPLETED" && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 uppercase tracking-wider">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Delivered & finalized orders archive</p>
+                  </div>
+                </div>
+                <Badge
+                  variant={activeTab === "COMPLETED" ? "default" : "secondary"}
+                  className={cn(
+                    "font-mono text-xs font-bold px-2.5 py-0.5 shrink-0",
+                    activeTab === "COMPLETED" ? "bg-emerald-600 text-white hover:bg-emerald-600" : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {completedOrdersCount}
+                </Badge>
+              </div>
+
+              <div className="pt-2.5 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-semibold">
+                  <CheckCircle2 className="h-3 w-3" /> 100% Concluded
+                </span>
+                <span className="font-medium text-foreground/80">{completedOrdersCount} archived</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Orders List Card with Folder Breadcrumbs & Search Toolbar */}
+        <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
+          <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
+
+            {/* Active Folder Directory Breadcrumb */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground w-full sm:w-auto">
+              <div className="flex items-center gap-2 font-semibold text-foreground bg-card/90 dark:bg-zinc-900/90 px-3 py-1.5 rounded-xl border border-border/60 shadow-2xs">
+                {activeTab === "ASSIGNED" && (
+                  <>
+                    <FolderOpen className="h-4 w-4 text-purple-500 shrink-0" />
+                    <span>Assigned Orders Folder</span>
+                  </>
+                )}
+                {activeTab === "IN_PROGRESS" && (
+                  <>
+                    <FolderClock className="h-4 w-4 text-sky-500 shrink-0" />
+                    <span>In-Progress Orders Folder</span>
+                  </>
+                )}
+                {activeTab === "REVIEW_ORDER" && (
+                  <>
+                    <ShieldCheck className="h-4 w-4 text-indigo-500 shrink-0" />
+                    <span>Review Orders Folder</span>
+                  </>
+                )}
+                {activeTab === "ON_HOLD" && (
+                  <>
+                    <PauseCircle className="h-4 w-4 text-amber-500 shrink-0" />
+                    <span>On-Hold Orders Folder</span>
+                  </>
+                )}
+                {activeTab === "COMPLETED" && (
+                  <>
+                    <FolderCheck className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <span>Completed Orders Folder</span>
+                  </>
+                )}
+              </div>
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
+              <span className="text-[11px] font-mono text-muted-foreground font-medium">
+                {filteredOrders.length} {filteredOrders.length === 1 ? "order" : "orders"} listed
+              </span>
+            </div>
+
+            {/* Search bar & Filter actions */}
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder={`Search inside ${activeTab === "ASSIGNED" ? "assigned orders" : activeTab === "IN_PROGRESS" ? "in-progress orders" : activeTab === "REVIEW_ORDER" ? "review orders" : activeTab === "ON_HOLD" ? "on-hold orders" : "completed orders"}...`}
+                  className="pl-8 h-9 text-xs rounded-lg bg-background/80"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              {searchTerm && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSearchTerm("")}
+                  className="h-9 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <CardContent className="p-0">
+            {filteredOrders.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <ShoppingCart className="h-12 w-12 text-muted-foreground/35 mb-3" />
+                <h3 className="font-bold text-lg">
+                  {activeTab === "ASSIGNED" ? "No Newly Assigned Orders" : activeTab === "IN_PROGRESS" ? "No In-Progress Orders" : activeTab === "REVIEW_ORDER" ? "No Review Orders" : activeTab === "ON_HOLD" ? "No On-Hold Orders" : "No Completed Orders"}
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-sm mt-1">
+                  {searchTerm
+                    ? "No results match your search query."
+                    : activeTab === "ASSIGNED"
+                      ? "There are currently no new unstarted orders waiting in the assigned queue."
+                      : activeTab === "IN_PROGRESS"
+                        ? "There are currently no orders in active progress in your queue."
+                        : activeTab === "REVIEW_ORDER"
+                          ? "There are currently no active orders allocated to you for continuous lifecycle review."
+                          : activeTab === "ON_HOLD"
+                            ? "There are currently no paused orders placed on hold."
+                            : "There are currently no completed orders in your archive."}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
+                        <th className="p-4 w-10 text-center">No.</th>
+                        <th className="p-4 w-28 whitespace-nowrap">Order ID</th>
+                        <th className="p-4 min-w-[170px]">Client & Company</th>
+                        <th className="p-4 min-w-[260px] lg:min-w-[320px]">Service Scope</th>
+                        <th className="p-4 w-44 min-w-[150px]">Consultant & Reviewer</th>
+                        <th className="p-4 w-32 whitespace-nowrap">Created Date</th>
+                        <th className="p-4 w-40 text-center whitespace-nowrap">Execution Stage</th>
+                        <th className="p-4 w-28 text-right whitespace-nowrap">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {paginatedOrders.map((ord, idx) => {
+                        const isHighlighted = highlightedOrderNum === ord.order_number;
+                        return (
+                          <tr
+                            key={ord.order_number}
+                            id={`order-row-${ord.order_number}`}
+                            onClick={() => {
+                              setHighlightedOrderNum(ord.order_number);
+                              if (typeof window !== "undefined") {
+                                sessionStorage.setItem("assigned_orders_highlighted_order", ord.order_number);
+                              }
+                            }}
+                            className={`transition-all duration-300 border-b last:border-0 ${isHighlighted
+                                ? "bg-blue-500/15 dark:bg-blue-500/20 ring-2 ring-blue-500 ring-inset shadow-md"
+                                : "hover:bg-muted/30 cursor-pointer"
+                              }`}
+                          >
+                            <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5">
+                              #{startIndex + idx + 1}
+                            </td>
+                            <td className="p-4 align-top pt-5">
+                              {ord.company_id ? (
+                                <Link
+                                  href={`/business/clients/documents/${ord.company_id}?order=${ord.order_number}&from=assigned-orders&tab=${activeTab}`}
+                                  onClick={() => {
+                                    setHighlightedOrderNum(ord.order_number);
+                                    if (typeof window !== "undefined") {
+                                      sessionStorage.setItem("assigned_orders_highlighted_order", ord.order_number);
+                                    }
+                                  }}
+                                >
+                                  <Badge
+                                    variant="outline"
+                                    className="font-mono font-bold text-xs bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary cursor-pointer transition-colors"
+                                    title="Navigate to Company Documents Folder for this Order"
+                                  >
+                                    {ord.order_number}
+                                  </Badge>
+                                </Link>
+                              ) : (
+                                <Badge variant="outline" className="font-mono font-bold text-xs bg-primary/10 border-primary/30 text-primary">
+                                  {ord.order_number}
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="p-4 text-muted-foreground space-y-1 align-top pt-5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-foreground font-semibold text-sm">{ord.company_name || "Personal Client"}</span>
+                                {(() => {
+                                  const vStatus = ord.company?.validation_status;
+                                  if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
+                                    return (
+                                      <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 flex items-center gap-0.5" title="Company pending admin validation">
+                                        <Clock className="h-2.5 w-2.5" /> Pending Company
+                                      </Badge>
+                                    );
+                                  }
+                                  if (vStatus === "NEEDS_REVISION") {
+                                    return (
+                                      <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 flex items-center gap-0.5" title="Company needs revision">
+                                        <AlertCircle className="h-2.5 w-2.5" /> Revision Required
+                                      </Badge>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                              </div>
+                              <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
+                                <Building className="h-3.5 w-3.5 shrink-0" />
+                                <span>{ord.client_name || "Representative"}</span>
+                              </div>
+                            </td>
+                            <td className="p-4 text-muted-foreground align-top">
+                              {ord.items && ord.items.length > 0 ? (
+                                <div className="space-y-2.5 max-w-md my-1">
+                                  {ord.items.map((item: any, idx: number) => {
+                                    const itemKey = `${ord.order_number}-${idx}`;
+                                    const isExpanded = !!expandedItems[itemKey];
+                                    return (
+                                      <div
+                                        key={idx}
+                                        className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-950/20 shadow-none space-y-1.5 transition-all duration-200"
+                                      >
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          <span className="font-bold text-foreground text-xs leading-normal break-words">
+                                            {item.job_title}
+                                          </span>
+                                          {item.job_id && (
+                                            <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                              {item.job_id}
+                                            </Badge>
+                                          )}
+                                          {item.pricing_tier && (
+                                            <Badge variant="secondary" className="text-[9px] py-0 px-1.5 font-medium capitalize shrink-0">
+                                              {item.pricing_tier.toLowerCase().replace('_', ' ')}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        {item.description && (
+                                          <div className="space-y-1">
+                                            {isExpanded && (
+                                              <div className="text-[10px] text-muted-foreground leading-relaxed whitespace-pre-wrap transition-all duration-200 mt-1 border-l-2 border-zinc-300 dark:border-zinc-700 pl-2 py-0.5">
+                                                {item.description}
+                                              </div>
+                                            )}
+                                            <button
+                                              type="button"
+                                              onClick={() => toggleItemExpansion(itemKey)}
+                                              className="text-[9.5px] text-primary hover:text-primary/80 font-bold hover:underline block"
+                                            >
+                                              {isExpanded ? "Hide details" : "Show details"}
+                                            </button>
+                                          </div>
+                                        )}
+
+                                        {item.service_instructions && (
+                                          <div className="mt-1.5 p-2 rounded-md bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-0.5">
+                                            <div className="flex items-center gap-1.5 font-bold text-[10px] text-amber-700 dark:text-amber-400">
+                                              <FileText className="h-3 w-3 shrink-0" />
+                                              <span>Service Instructions:</span>
+                                            </div>
+                                            <p className="text-[11px] font-medium leading-relaxed whitespace-pre-wrap text-foreground/90">
+                                              {item.service_instructions}
+                                            </p>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground italic text-xs">-</span>
+                              )}
+                            </td>
+                            <td className="p-4 align-top pt-5 w-44 min-w-[150px]">
+                              <div className="flex flex-col items-start gap-1.5 w-full">
+                                {ord.consultants && ord.consultants.length > 0 ? (
+                                  ord.consultants.map((c: any) => (
+                                    <Badge
+                                      key={c.id}
+                                      variant="outline"
+                                      className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-semibold flex items-center gap-1.5 py-0.5 px-2 max-w-full truncate shadow-none"
+                                      title={`Assigned Consultant: ${c.name}`}
+                                    >
+                                      <UserCheck className="h-3 w-3 text-emerald-600 shrink-0" />
+                                      <span className="truncate">{c.name}</span>
+                                    </Badge>
+                                  ))
+                                ) : (
+                                  <span className="text-muted-foreground italic text-[11px]">Unassigned</span>
+                                )}
+                                {ord.reviewer && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/25 font-semibold flex items-center gap-1.5 py-0.5 px-2 max-w-full truncate shadow-none"
+                                    title={`Designated Reviewer: ${ord.reviewer.name}`}
+                                  >
+                                    <ShieldCheck className="h-3 w-3 text-purple-600 dark:text-purple-400 shrink-0" />
+                                    <span className="truncate">Rev: {ord.reviewer.name}</span>
+                                  </Badge>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-4 font-mono font-medium text-muted-foreground align-top pt-5">
+                              {formatDate(ord.created_at)}
+                            </td>
+                            <td className="p-4 text-center align-top pt-5">
+                              {CONSULTANT_EDITABLE_STATUSES.includes((ord.status || "").toUpperCase()) ? (
+                                <select
+                                  value={ord.status}
+                                  disabled={savingStatus}
+                                  onChange={(e) => handleUpdateStatus(ord, e.target.value)}
+                                  className={`h-8 px-2.5 py-1 text-xs font-bold rounded-md border shadow-xs bg-background transition-colors cursor-pointer ${getOrderStatusColor(ord.status)}`}
+                                >
+                                  <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
+                                  <option value="IN_PROGRESS">IN PROGRESS</option>
+                                  <option value="REVIEW_DOCS">REVIEW DOCS</option>
+                                  <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
+                                  <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
+                                  <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
+                                  <option value="FINAL_DOC_READY">FINAL DOC READY</option>
+                                  <option value="ON_HOLD">ON HOLD</option>
+                                </select>
+                              ) : ord.status === "COMPLETED" ? (
+                                <Badge variant="outline" className="text-xs font-bold py-1 px-2.5 uppercase shadow-xs whitespace-nowrap bg-emerald-500/15 text-emerald-600 border-emerald-500/30 flex items-center justify-center gap-1 mx-auto">
+                                  <Lock className="h-3 w-3 text-emerald-600 shrink-0" />
+                                  COMPLETED
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className={`text-xs font-bold py-1 px-2.5 uppercase shadow-xs whitespace-nowrap ${getOrderStatusColor(ord.status)}`}>
+                                  {(ord.status || "").replace(/_/g, " ")}
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="p-4 text-right align-top pt-5">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1.5 font-bold border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30 shadow-sm"
+                                onClick={() => {
+                                  setSelectedGroup(ord);
+                                  setIsChatOpen(true);
+                                  fetchProgressUpdates(ord.order_number);
+                                }}
+                              >
+                                <MessageSquare className="h-3.5 w-3.5" /> Chat
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+                    <div className="text-xs text-muted-foreground">
+                      Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
+                      <span className="font-medium text-foreground">{Math.min(filteredOrders.length, endIndex)}</span> of{" "}
+                      <span className="font-medium text-foreground">{filteredOrders.length}</span> entries
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                      >
+                        Previous
+                      </Button>
+                      <span className="text-xs text-muted-foreground px-2">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        className="h-8 text-xs bg-background border-zinc-200 dark:border-zinc-800"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* VIEW SCOPE DIALOG */}
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
         <DialogContent className="sm:max-w-[88vw] max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-2xl shadow-2xl bg-background border border-border">
-          
+
           <DialogHeader className="p-6 border-b border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shrink-0">
             <div>
               <DialogTitle className="text-xl font-bold flex items-center gap-2">
@@ -1601,10 +1602,10 @@ export default function AssignedOrdersPage() {
           {selectedGroup && (
             <div className="flex-1 overflow-y-auto p-6 space-y-6 max-h-[calc(90vh-140px)]">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
+
                 {/* Left Column: Client Details & Service Items (2/3 width) */}
                 <div className="lg:col-span-2 space-y-6">
-                  
+
                   {/* Client Entity & Rep Card */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl border border-border/60 bg-muted/20 text-xs">
                     <div>
@@ -1629,7 +1630,7 @@ export default function AssignedOrdersPage() {
                     <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                       <ShoppingCart className="h-3.5 w-3.5 text-primary" /> Service Packages & Scope Details
                     </h4>
-                    
+
                     <div className="space-y-3">
                       {(selectedGroup.items || []).map((item: any) => (
                         <div key={item.id} className="p-4 rounded-xl border border-border bg-card shadow-sm space-y-2.5">
@@ -1675,7 +1676,7 @@ export default function AssignedOrdersPage() {
 
                 {/* Right Column: Status updates, Assigned Team & Logs (1/3 width) */}
                 <div className="space-y-6">
-                  
+
                   {/* Execution Status Selector */}
                   <div className="p-4 rounded-xl border border-border bg-card shadow-xs space-y-3">
                     <div className="flex items-center justify-between">
@@ -1762,25 +1763,25 @@ export default function AssignedOrdersPage() {
                         <Loader2 className="h-4 w-4 animate-spin text-primary" />
                         <span className="text-xs">Loading updates...</span>
                       </div>
-                  ) : progressUpdates.length === 0 ? (
-                    <p className="text-xs text-muted-foreground italic p-4 bg-muted/20 border border-dashed rounded-lg text-center">
-                      No progress updates posted yet. Record the first progress status update below.
-                    </p>
-                  ) : (
-                    <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
-                      {progressUpdates.map((upd) => (
-                        <div key={upd.id} className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/30 border border-border/40 text-xs space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-foreground text-[11px]">{upd.sender_name}</span>
-                            <span className="text-[8px] text-muted-foreground font-mono">{new Date(upd.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                    ) : progressUpdates.length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic p-4 bg-muted/20 border border-dashed rounded-lg text-center">
+                        No progress updates posted yet. Record the first progress status update below.
+                      </p>
+                    ) : (
+                      <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
+                        {progressUpdates.map((upd) => (
+                          <div key={upd.id} className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/30 border border-border/40 text-xs space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-foreground text-[11px]">{upd.sender_name}</span>
+                              <span className="text-[8px] text-muted-foreground font-mono">{new Date(upd.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                            </div>
+                            <div className="text-muted-foreground whitespace-pre-wrap leading-relaxed text-[10px]">
+                              {renderMessageContent(upd.message)}
+                            </div>
                           </div>
-                          <div className="text-muted-foreground whitespace-pre-wrap leading-relaxed text-[10px]">
-                            {renderMessageContent(upd.message)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
 
                     <form onSubmit={handlePostProgress} className="space-y-2 border-t border-border/40 pt-3">
                       <div className="relative">
@@ -1794,9 +1795,9 @@ export default function AssignedOrdersPage() {
                                 className="w-full text-left px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground flex items-center gap-2 transition-colors"
                               >
                                 {item.type === "team" ? (
-                                  <div 
+                                  <div
                                     className="h-6 w-6 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0 border"
-                                    style={{ 
+                                    style={{
                                       backgroundColor: `${item.color || "#10b981"}15`,
                                       color: item.color || "#10b981",
                                       borderColor: `${item.color || "#10b981"}40`
@@ -1862,8 +1863,8 @@ export default function AssignedOrdersPage() {
       </Dialog>
 
       {/* CONFIRMATION DIALOG FOR ALL STATUS CHANGES */}
-      <Dialog 
-        open={isConfirmOpen} 
+      <Dialog
+        open={isConfirmOpen}
         onOpenChange={(open) => {
           if (!open && !savingStatus) {
             setIsConfirmOpen(false);
@@ -1883,7 +1884,7 @@ export default function AssignedOrdersPage() {
               Please review the order details and confirm the stage transition.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="py-4 space-y-3.5">
             {/* Order and Company Info */}
             <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 space-y-2.5">
@@ -1893,7 +1894,7 @@ export default function AssignedOrdersPage() {
                   {pendingConfirmGroup?.order_number || "ORDER"}
                 </Badge>
               </div>
-              
+
               {pendingConfirmGroup?.company_name && (
                 <div className="flex items-center justify-between gap-2 text-xs">
                   <span className="text-[11px] font-semibold text-muted-foreground">Company:</span>
@@ -1988,11 +1989,11 @@ export default function AssignedOrdersPage() {
               </div>
             )}
           </div>
-          
+
           <DialogFooter className="flex justify-end gap-2.5 pt-3 border-t border-border/40">
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               disabled={savingStatus}
               onClick={() => {
                 setIsConfirmOpen(false);
@@ -2004,8 +2005,8 @@ export default function AssignedOrdersPage() {
             >
               Cancel
             </Button>
-            <Button 
-              type="button" 
+            <Button
+              type="button"
               disabled={savingStatus}
               onClick={async () => {
                 if (pendingConfirmGroup) {
@@ -2022,8 +2023,8 @@ export default function AssignedOrdersPage() {
       </Dialog>
 
       {/* POP-UP DIALOG FOR PLACING ORDER ON HOLD */}
-      <Dialog 
-        open={isOnHoldDialogOpen} 
+      <Dialog
+        open={isOnHoldDialogOpen}
         onOpenChange={(open) => {
           if (!open && !submittingHold) {
             setIsOnHoldDialogOpen(false);
@@ -2239,7 +2240,7 @@ export default function AssignedOrdersPage() {
               {viewingTeam?.description || "No description provided for this team."}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
             {/* Team Leader */}
             <div className="flex items-center gap-2.5 bg-muted/40 p-3 rounded-xl border border-border/30">
@@ -2278,7 +2279,7 @@ export default function AssignedOrdersPage() {
               )}
             </div>
           </div>
-          
+
           <DialogFooter className="p-4 border-t border-border/60 bg-muted/5 shrink-0">
             <Button variant="outline" size="sm" onClick={() => setViewingTeam(null)} className="w-full sm:w-auto font-semibold">
               Close

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { 
   ShoppingCart, 
   Loader2, 
@@ -52,6 +52,7 @@ import { cn } from "@/lib/utils";
 export default function EditClientOrderPage() {
   const router = useRouter();
   const { orderNumber } = useParams<{ orderNumber: string }>();
+  const searchParams = useSearchParams();
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -240,6 +241,10 @@ export default function EditClientOrderPage() {
       }
 
       setSelectedOrderGroup(targetGroup);
+
+      if (targetGroup.status === "PIPELINE" && searchParams.get("type") !== "pipeline") {
+        router.replace(`/business/clients/orders/${orderNumber}/edit?type=pipeline`, { scroll: false });
+      }
       
       // Determine filterClientId based on the target company's registered partner
       const targetCompany = (fetchedCompanies || []).find((c: any) => c.id === targetGroup.company_id);
@@ -728,48 +733,48 @@ export default function EditClientOrderPage() {
   }
 
   return (
-    <div className="w-full max-w-none space-y-3.5 pb-12 animate-in fade-in duration-300">
+    <div className="w-full max-w-none space-y-3.5 pb-8 animate-in fade-in duration-300">
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 pb-2.5">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
           <Button
             variant="outline"
             size="icon"
             onClick={() => router.back()}
-            className="h-8 w-8 rounded-lg border-border/60 hover:bg-muted/50"
+            className="h-8 w-8 rounded-lg border-border/60 hover:bg-muted/50 shrink-0"
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-extrabold tracking-tight text-foreground flex items-center gap-1.5">
-                Edit Service Order: <span className="font-mono text-primary">{orderNumber}</span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-base font-extrabold tracking-tight text-foreground flex items-center gap-1.5 truncate">
+                Edit Service Order: <span className="font-mono text-primary truncate">{orderNumber}</span>
               </h1>
-              <Badge variant="outline" className={`text-[10px] font-mono uppercase font-bold py-0.5 px-2 ${isPipelineOrder ? 'bg-amber-500/10 text-amber-600 border-amber-500/30' : 'bg-primary/10 text-primary border-primary/30'}`}>
+              <Badge variant="outline" className={`text-[10px] font-mono uppercase font-bold py-0.5 px-2 shrink-0 ${isPipelineOrder ? 'bg-amber-500/10 text-amber-600 border-amber-500/30' : 'bg-primary/10 text-primary border-primary/30'}`}>
                 {editForm.status.replace("_", " ")}
               </Badge>
             </div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
+            <p className="text-[11px] text-muted-foreground mt-0.5 truncate sm:whitespace-normal">
               Modify allocated corporate entity, billed service line items, assigned consultants, reviewer, and billing parameters.
             </p>
           </div>
         </div>
 
         {/* Global Action Buttons */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
           <Button
             variant="outline"
             size="sm"
             onClick={() => router.back()}
             disabled={saving}
-            className="h-8 text-xs font-semibold border-border/70"
+            className="h-8 text-xs font-semibold border-border/70 rounded-lg"
           >
             Cancel
           </Button>
           <Button
             onClick={handleEditSubmit}
             disabled={saving}
-            className="h-8 text-xs font-bold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs"
+            className="h-8 text-xs font-bold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs rounded-lg px-3.5"
           >
             {saving ? (
               <>
@@ -789,31 +794,31 @@ export default function EditClientOrderPage() {
       <form onSubmit={handleEditSubmit} className="space-y-3.5">
         
         {/* Main 2-Column Responsive Split */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-3.5 items-start">
           
           {/* LEFT COLUMN: Entity Info & Service Line Items */}
-          <div className="lg:col-span-7 xl:col-span-7 2xl:col-span-8 space-y-3.5">
+          <div className="xl:col-span-7 2xl:col-span-8 space-y-3.5 min-w-0">
             
             {/* STEP 1: ENTITY & GENERAL INFORMATION */}
             <Card className="border-border/60 shadow-2xs rounded-xl overflow-hidden bg-card/60 backdrop-blur-md">
-              <CardHeader className="py-2 px-3.5 border-b border-border/40 bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
+              <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="min-w-0">
                   <CardTitle className="text-xs font-bold flex items-center gap-1.5 text-foreground uppercase tracking-wider">
-                    <Building2 className="h-3.5 w-3.5 text-primary" /> Step 1: Corporate Entity & Order Details
+                    <Building2 className="h-3.5 w-3.5 text-primary shrink-0" /> Step 1: Corporate Entity & Order Details
                   </CardTitle>
                   <CardDescription className="text-[10px] text-muted-foreground mt-0.5">
                     Designate the company entity receiving services and registered order reference ID.
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Client Partner Filter:</span>
+                <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-auto">
+                  <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider whitespace-nowrap">Client Partner:</span>
                   <select
                     value={filterClientId}
                     onChange={(e) => {
                       const cid = e.target.value;
                       setFilterClientId(cid);
                     }}
-                    className="h-6.5 rounded-md border border-border/60 bg-background px-2 text-[11px] font-medium"
+                    className="h-7 rounded-md border border-border/60 bg-background px-2 text-[11px] font-medium max-w-[180px] truncate"
                   >
                     <option value="">All Client Partners</option>
                     {clients.map((cli) => (
@@ -826,16 +831,16 @@ export default function EditClientOrderPage() {
               </CardHeader>
               
               <CardContent className="p-3">
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-start">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 gap-3 items-start">
                   
-                  {/* Col 1: Order Reference ID (3 cols - Fixed) */}
-                  <div className="md:col-span-3 space-y-1 p-2 rounded-lg border border-border/60 bg-muted/20">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1">
-                        <Tag className="h-3 w-3 text-amber-600 dark:text-amber-400" />
-                        <span>Order Reference ID</span>
+                  {/* Col 1: Order Reference ID (Fixed) */}
+                  <div className="col-span-1 sm:col-span-2 xl:col-span-4 2xl:col-span-3 space-y-1.5 p-2.5 rounded-lg border border-border/60 bg-muted/20">
+                    <div className="flex items-center justify-between gap-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1 min-w-0 truncate">
+                        <Tag className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <span className="truncate">Order Ref ID</span>
                       </label>
-                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-background border-border/70 text-muted-foreground">
+                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-background border-border/70 text-muted-foreground shrink-0">
                         <Lock className="h-2.5 w-2.5 mr-0.5" /> Fixed
                       </Badge>
                     </div>
@@ -850,25 +855,25 @@ export default function EditClientOrderPage() {
                       </div>
                     </div>
                     <div className="flex items-center justify-between text-[9px] pt-0.5">
-                      <span className="text-muted-foreground line-clamp-1">Registered Order Reference</span>
+                      <span className="text-muted-foreground truncate">Registered Order Reference</span>
                     </div>
                   </div>
 
-                  {/* Col 2: Target Corporate Entity (5 cols) */}
-                  <div className="md:col-span-5 space-y-1 bg-muted/20 p-2 rounded-lg border border-border/60">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1">
-                        <Building className="h-3 w-3 text-primary" />
-                        <span>Target Corporate Entity *</span>
+                  {/* Col 2: Target Corporate Entity */}
+                  <div className="col-span-1 sm:col-span-1 xl:col-span-4 2xl:col-span-5 space-y-1.5 bg-muted/20 p-2.5 rounded-lg border border-border/60">
+                    <div className="flex items-center justify-between gap-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1 min-w-0 truncate">
+                        <Building className="h-3 w-3 text-primary shrink-0" />
+                        <span className="truncate">Target Corporate Entity *</span>
                       </label>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         onClick={() => handleOpenCreateCompany("target")}
-                        className="h-4.5 px-1 text-[9px] gap-0.5 font-bold text-primary hover:text-primary hover:bg-primary/10"
+                        className="h-5 px-1.5 text-[9px] gap-0.5 font-bold text-primary hover:text-primary hover:bg-primary/10 shrink-0"
                       >
-                        <Plus className="h-2.5 w-2.5" /> New Company
+                        <Plus className="h-2.5 w-2.5" /> New
                       </Button>
                     </div>
                     <select
@@ -882,7 +887,7 @@ export default function EditClientOrderPage() {
                           billing_company_id: prev.same_billing_company ? val : prev.billing_company_id
                         }));
                       }}
-                      className="flex h-8 w-full rounded-md border border-border/70 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      className="flex h-8 w-full rounded-md border border-border/70 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary truncate"
                     >
                       <option value="">Choose Target Company Entity...</option>
                       {(filterClientId
@@ -914,21 +919,21 @@ export default function EditClientOrderPage() {
                               billing_company_id: checked ? prev.company_id : prev.billing_company_id
                             }));
                           }}
-                          className="h-3 w-3 rounded border-gray-300 text-primary focus:ring-primary accent-primary cursor-pointer"
+                          className="h-3 w-3 rounded border-gray-300 text-primary focus:ring-primary accent-primary cursor-pointer shrink-0"
                         />
-                        <span className="text-[10px] font-medium text-muted-foreground">
-                          Billing recipient is the same as Target Company
+                        <span className="text-[10px] font-medium text-muted-foreground leading-tight">
+                          Billing recipient is same as Target
                         </span>
                       </label>
                     </div>
                   </div>
 
-                  {/* Col 3: Invoicing / Billing Recipient Entity (4 cols) */}
-                  <div className="md:col-span-4 space-y-1 bg-muted/20 p-2 rounded-lg border border-border/60">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1">
-                        <Building className="h-3 w-3 text-primary" />
-                        <span>Invoicing Recipient / Billed Entity</span>
+                  {/* Col 3: Invoicing / Billing Recipient Entity */}
+                  <div className="col-span-1 sm:col-span-1 xl:col-span-4 2xl:col-span-4 space-y-1.5 bg-muted/20 p-2.5 rounded-lg border border-border/60">
+                    <div className="flex items-center justify-between gap-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1 min-w-0 truncate">
+                        <Building className="h-3 w-3 text-primary shrink-0" />
+                        <span className="truncate">Invoicing / Billed Entity</span>
                       </label>
                       {!editForm.same_billing_company && (
                         <Button
@@ -936,16 +941,16 @@ export default function EditClientOrderPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleOpenCreateCompany("billing")}
-                          className="h-4.5 px-1 text-[9px] gap-0.5 font-bold text-primary hover:text-primary hover:bg-primary/10"
+                          className="h-5 px-1.5 text-[9px] gap-0.5 font-bold text-primary hover:text-primary hover:bg-primary/10 shrink-0"
                         >
-                          <Plus className="h-2.5 w-2.5" /> Add Entity
+                          <Plus className="h-2.5 w-2.5" /> Add
                         </Button>
                       )}
                     </div>
 
                     {editForm.same_billing_company ? (
                       <div className="h-8 flex items-center px-2.5 rounded-md border border-border/50 bg-background/60 text-xs text-muted-foreground font-medium truncate">
-                        <span>
+                        <span className="truncate">
                           {editForm.company_id 
                             ? `Same: ${(companies.find(c => String(c.id) === editForm.company_id)?.company_name) || "Selected Target Company"}`
                             : "Same as Target Corporate Entity"}
@@ -956,7 +961,7 @@ export default function EditClientOrderPage() {
                         required
                         value={editForm.billing_company_id}
                         onChange={(e) => setEditForm(prev => ({ ...prev, billing_company_id: e.target.value }))}
-                        className="flex h-8 w-full rounded-md border border-primary/50 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                        className="flex h-8 w-full rounded-md border border-primary/50 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary truncate"
                       >
                         <option value="">Choose Billing Entity...</option>
                         {(filterClientId
@@ -976,7 +981,7 @@ export default function EditClientOrderPage() {
                         })}
                       </select>
                     )}
-                    <p className="text-[9px] text-muted-foreground line-clamp-1">
+                    <p className="text-[9px] text-muted-foreground truncate">
                       Tax & Proforma invoices will be addressed to this entity
                     </p>
                   </div>
@@ -987,10 +992,10 @@ export default function EditClientOrderPage() {
 
             {/* STEP 2: SERVICE LINE ITEMS */}
             <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
-              <CardHeader className="py-2 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Briefcase className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+              <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Briefcase className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
                     2. Billed Service Line Items ({(editForm.items || []).length})
                   </CardTitle>
                 </div>
@@ -1020,14 +1025,14 @@ export default function EditClientOrderPage() {
                       ]
                     }));
                   }}
-                  className="h-7 text-xs font-bold gap-1 text-primary border-primary/40 hover:bg-primary/10"
+                  className="h-7 px-2.5 border-dashed border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 gap-1 font-bold rounded-md text-[11px] shrink-0"
                 >
-                  <Plus className="h-3.5 w-3.5" /> Add Service Item
+                  <Plus className="h-3 w-3" /> Add Service Item
                 </Button>
               </CardHeader>
               
-              <CardContent className="p-3 space-y-3">
-                <div className="space-y-3">
+              <CardContent className="p-2.5 sm:p-3 space-y-2.5">
+                <div className="space-y-2.5">
                   {(editForm.items || []).length === 0 ? (
                     <div className="text-center py-5 text-xs text-muted-foreground italic border border-dashed rounded-lg">
                       No items in this order. Add at least one item to proceed.
@@ -1036,28 +1041,28 @@ export default function EditClientOrderPage() {
                     (editForm.items || []).map((item: any, idx: number) => (
                       <div
                         key={item.id || idx}
-                        className="p-3 rounded-xl border border-border/70 bg-card/90 space-y-2.5 transition-all hover:border-border hover:shadow-2xs relative"
+                        className="p-3 rounded-xl border border-border/70 bg-card/80 dark:bg-card/40 hover:border-primary/40 shadow-2xs transition-all space-y-2.5 relative"
                       >
                         
                         {/* Line Item Header: Number Badge, Job Title / ID info, Price Pill & Delete Button */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border/40">
-                          <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border/50">
+                          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                             <span className="flex h-5 px-2 items-center justify-center rounded-md bg-primary/10 text-primary text-[11px] font-bold font-mono shrink-0">
                               #{idx + 1}
                             </span>
                             {item.job_id && (
-                              <Badge variant="outline" className="font-mono text-[10px] font-bold bg-muted/50 border-border/70 text-foreground py-0 px-1.5">
+                              <Badge variant="outline" className="font-mono text-[10px] font-bold bg-muted/50 border-border/70 text-foreground py-0 px-1.5 shrink-0">
                                 {item.job_id}
                               </Badge>
                             )}
                             {item.job_title && (
-                              <span className="text-xs font-bold text-foreground truncate max-w-[280px] sm:max-w-md">
+                              <span className="text-xs font-bold text-foreground truncate max-w-[200px] sm:max-w-xs md:max-w-md">
                                 {item.job_title}
                               </span>
                             )}
                           </div>
 
-                          <div className="flex items-center justify-between sm:justify-end gap-2">
+                          <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
                             <div className="px-2.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 font-mono text-[11px] font-black text-emerald-700 dark:text-emerald-300">
                               {formatCurrency(item.unit_price)}
                             </div>
@@ -1077,10 +1082,10 @@ export default function EditClientOrderPage() {
                         </div>
 
                         {/* Primary Configuration Grid: Service Package, Pricing Tier, Branch Reference */}
-                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start">
+                        <div className="grid grid-cols-1 md:grid-cols-12 xl:grid-cols-12 gap-2.5 items-start">
                           
-                          {/* Service Package Selector (5 cols) */}
-                          <div className="sm:col-span-5 space-y-1">
+                          {/* Service Package Selector (Full width on md, 5 cols on xl) */}
+                          <div className="col-span-1 md:col-span-12 xl:col-span-5 space-y-1">
                             <label className="text-[10.5px] font-bold text-foreground flex items-center gap-1">
                               <span>Service Package Catalog</span>
                               <span className="text-destructive font-black">*</span>
@@ -1100,8 +1105,8 @@ export default function EditClientOrderPage() {
                             </select>
                           </div>
 
-                          {/* Pricing Tier Selector (4 cols) */}
-                          <div className="sm:col-span-4 space-y-1">
+                          {/* Pricing Tier Selector (6 cols on md, 4 cols on xl) */}
+                          <div className="col-span-1 md:col-span-6 xl:col-span-4 space-y-1">
                             <label className="text-[10.5px] font-bold text-foreground flex items-center gap-1">
                               <span>Pricing Tier & Rate</span>
                               <span className="text-destructive font-black">*</span>
@@ -1110,7 +1115,7 @@ export default function EditClientOrderPage() {
                               required
                               value={item.pricing_tier}
                               onChange={(e) => handleEditTierSelect(idx, e.target.value)}
-                              className="flex h-8 w-full rounded-lg border border-border/70 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                              className="flex h-8 w-full rounded-lg border border-border/70 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary truncate"
                             >
                               <option value="BASE">
                                 Base ({item._raw_service ? formatCurrency(item._raw_service.base_price) : "Default"})
@@ -1130,8 +1135,8 @@ export default function EditClientOrderPage() {
                             </select>
                           </div>
 
-                          {/* Branch / Project Reference (3 cols) */}
-                          <div className="sm:col-span-3 space-y-1">
+                          {/* Branch / Project Reference (6 cols on md, 3 cols on xl) */}
+                          <div className="col-span-1 md:col-span-6 xl:col-span-3 space-y-1">
                             <label className="text-[10.5px] font-semibold text-muted-foreground flex items-center justify-between">
                               <span>Branch / Ref</span>
                               <span className="text-[9px] text-muted-foreground/70 font-mono">Optional</span>
@@ -1147,7 +1152,7 @@ export default function EditClientOrderPage() {
                                 });
                               }}
                               placeholder="e.g. Bali Branch / Ref #12"
-                              className="h-8 text-xs font-medium rounded-lg border-border/70 bg-background placeholder:text-muted-foreground/50"
+                              className="h-8 text-xs font-medium rounded-lg border-border/70 bg-background placeholder:text-muted-foreground/50 truncate"
                             />
                           </div>
                         </div>
@@ -1285,7 +1290,7 @@ export default function EditClientOrderPage() {
           </div>
 
           {/* RIGHT COLUMN: Frequently Changed Operational Modules (Controls, Roster, Reviewer, Notes) */}
-          <div className="lg:col-span-5 xl:col-span-5 2xl:col-span-4 space-y-3 lg:sticky lg:top-4">
+          <div className="xl:col-span-5 2xl:col-span-4 space-y-3 min-w-0 xl:sticky xl:top-2 xl:max-h-[calc(100vh-5.5rem)] xl:overflow-y-auto pr-0.5">
             
             {/* STEP 3: ORDER LIFECYCLE & FINANCIAL CONTROLS */}
             <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
@@ -1430,10 +1435,10 @@ export default function EditClientOrderPage() {
             {/* STEP 4: CONSULTANT ROSTER */}
             {!isPipelineOrder && (
               <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
-                <CardHeader className="py-2 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5 text-primary" />
-                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+                <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Users className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
                       4. Consultant Roster ({editForm.consultant_ids.length})
                     </CardTitle>
                   </div>
@@ -1443,14 +1448,14 @@ export default function EditClientOrderPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => setEditForm(prev => ({ ...prev, consultant_ids: [] }))}
-                      className="h-4.5 px-1.5 text-[9px] text-muted-foreground hover:text-destructive gap-0.5 font-medium"
+                      className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-destructive gap-0.5 font-medium shrink-0"
                     >
                       Clear All
                     </Button>
                   )}
                 </CardHeader>
                 <CardContent className="p-2.5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
                     {(() => {
                       const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
                       const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
@@ -1505,10 +1510,10 @@ export default function EditClientOrderPage() {
             {/* STEP 5: DESIGNATED REVIEWER */}
             {!isPipelineOrder && (
               <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
-                <CardHeader className="py-2 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+                <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
                       5. Designated Reviewer ({editForm.reviewer_id ? "1 Selected" : "Optional"})
                     </CardTitle>
                   </div>
@@ -1518,14 +1523,14 @@ export default function EditClientOrderPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => setEditForm(prev => ({ ...prev, reviewer_id: null }))}
-                      className="h-4.5 px-1.5 text-[9px] text-muted-foreground hover:text-destructive gap-0.5 font-medium"
+                      className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-destructive gap-0.5 font-medium shrink-0"
                     >
                       <X className="h-2.5 w-2.5" /> Clear Reviewer
                     </Button>
                   )}
                 </CardHeader>
                 <CardContent className="p-2.5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto pr-1">
                     {(() => {
                       const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
                       const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
@@ -1583,14 +1588,14 @@ export default function EditClientOrderPage() {
 
             {/* STEP 6: INTERNAL DELIVERY NOTES */}
             <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
-              <CardHeader className="py-2 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <FileText className="h-3.5 w-3.5 text-primary" />
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+              <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
                     {isPipelineOrder ? "4. Pipeline Lead Notes" : "6. Internal Delivery Notes"}
                   </CardTitle>
                 </div>
-                <span className="text-[9px] text-muted-foreground font-mono italic">For Delivery Manager</span>
+                <span className="text-[9px] text-muted-foreground font-mono italic shrink-0">For Delivery Manager</span>
               </CardHeader>
               <CardContent className="p-2.5">
                 <textarea
@@ -1609,18 +1614,18 @@ export default function EditClientOrderPage() {
         </div>
 
         {/* Bottom Sticky Action Controls Bar */}
-        <div className="flex items-center justify-between gap-3 p-2.5 sm:p-3 rounded-xl bg-card/80 border border-border/60 shadow-xs backdrop-blur-md">
-          <div className="flex items-center gap-2.5">
-            <span className="text-xs font-bold text-muted-foreground">Order Summary:</span>
-            <Badge variant="secondary" className="font-mono text-xs font-semibold px-2 py-0.5">
+        <div className="sticky bottom-0 z-30 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-xl bg-card/95 border border-border/70 shadow-[0_-4px_20px_rgba(0,0,0,0.12)] backdrop-blur-md transition-all">
+          <div className="flex items-center justify-between sm:justify-start gap-2.5 flex-wrap min-w-0">
+            <span className="text-xs font-bold text-muted-foreground whitespace-nowrap">Order Summary:</span>
+            <Badge variant="secondary" className="font-mono text-xs font-semibold px-2 py-0.5 shrink-0">
               {(editForm.items || []).length} {(editForm.items || []).length === 1 ? "Line Item" : "Line Items"}
             </Badge>
-            <span className="font-mono font-black text-sm text-foreground">
+            <span className="font-mono font-black text-sm text-foreground truncate">
               {formatCurrency(editItemsTotal)}
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-end gap-2 shrink-0">
             <Link href={isPipelineOrder ? "/business/clients/orders/pipeline" : "/business/clients/orders"}>
               <Button type="button" variant="outline" className="rounded-lg h-8 px-3.5 font-bold text-xs">
                 Cancel
@@ -1629,7 +1634,7 @@ export default function EditClientOrderPage() {
             <Button 
               type="submit" 
               disabled={saving} 
-              className="font-bold shadow-xs gap-1.5 rounded-lg h-8 px-4 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="font-bold shadow-xs gap-1.5 rounded-lg h-8 px-4 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
             >
               {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
               {saving ? "Saving Changes..." : "Save Changes"}

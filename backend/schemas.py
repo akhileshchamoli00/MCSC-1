@@ -1456,7 +1456,7 @@ class NotaryBase(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
-    city: str
+    city: Optional[str] = None
     status: str = "ACTIVE"
     notes: Optional[str] = None
     vendor_type: Optional[str] = "NOTARY"

@@ -439,7 +439,7 @@ function NotaryPaymentsContent() {
 
   const filteredSummaries = summaries.filter(s => 
     s.notary_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (s.city && s.city.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (s.vendor_type && s.vendor_type.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
@@ -669,7 +669,7 @@ function NotaryPaymentsContent() {
                           </Badge>
                         )}
                       </td>
-                      <td className="p-4 font-medium text-muted-foreground">{s.city}</td>
+                      <td className="p-4 font-medium text-muted-foreground">{s.city || "-"}</td>
                       <td className="p-4 text-center font-semibold">{s.total_jobs}</td>
                       <td className="p-4 text-center">
                         {s.total_unpaid_jobs > 0 ? (

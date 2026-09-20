@@ -6,12 +6,22 @@ import {
   type ThemeProviderProps,
 } from 'next-themes'
 
-// Suppress the hydration warning for the script tag injected by next-themes
-// This is a known false positive in React 19 / Next.js 15+
+// Suppress false-positive hydration warnings in development caused by:
+// 1. Script tags injected by next-themes (React 19 / Next.js 15+)
+// 2. Browser extensions (e.g. Bitwarden, Password Managers) injecting attributes like bis_skin_checked into DOM
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   const orig = console.error;
   console.error = (...args: any[]) => {
-    if (typeof args[0] === 'string' && args[0].includes('Encountered a script tag while rendering React component')) return;
+    const fullText = args
+      .map((a) => (typeof a === 'string' ? a : (a && typeof a === 'object' && 'message' in a ? String(a.message) : '')))
+      .join(' ');
+
+    if (
+      fullText.includes('Encountered a script tag while rendering React component') ||
+      fullText.includes('bis_skin_checked')
+    ) {
+      return;
+    }
     orig.apply(console, args);
   };
 }

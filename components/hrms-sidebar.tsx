@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -310,6 +310,7 @@ interface HRMSSidebarProps {
 export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpen }: HRMSSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
@@ -361,6 +362,68 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
     localStorage.setItem("hrms_expanded_modules", JSON.stringify(newMods));
   };
 
+  const checkIsItemActive = (itemHref: string) => {
+    const isPipelineParam = searchParams.get("type") === "pipeline" || searchParams.get("from") === "pipeline";
+    const isCompletedParam = searchParams.get("type") === "completed" || searchParams.get("from") === "completed";
+    const isCancelledParam = searchParams.get("type") === "cancelled" || searchParams.get("from") === "cancelled";
+
+    if (itemHref === "/clients" || itemHref === "/business/clients") {
+      return pathname === "/business/clients" || pathname === "/business/clients/new";
+    }
+
+    // 1. Pipeline Orders
+    if (itemHref === "/business/clients/orders/pipeline") {
+      if (pathname === "/business/clients/orders/pipeline" || pathname.startsWith("/business/clients/orders/pipeline/")) {
+        return true;
+      }
+      if (pathname === "/business/clients/orders/new" && isPipelineParam) {
+        return true;
+      }
+      if (pathname.startsWith("/business/clients/orders/") && pathname.endsWith("/edit") && isPipelineParam) {
+        return true;
+      }
+      return false;
+    }
+
+    // 2. Active Orders
+    if (itemHref === "/business/clients/orders") {
+      if (pathname === "/business/clients/orders") {
+        return true;
+      }
+      if (pathname === "/business/clients/orders/new" && !isPipelineParam) {
+        return true;
+      }
+      if (pathname.startsWith("/business/clients/orders/") && pathname.endsWith("/edit") && !isPipelineParam && !isCompletedParam && !isCancelledParam) {
+        return true;
+      }
+      return false;
+    }
+
+    // 3. Completed Orders
+    if (itemHref === "/business/clients/orders/completed") {
+      if (pathname === "/business/clients/orders/completed" || pathname.startsWith("/business/clients/orders/completed/")) {
+        return true;
+      }
+      if (pathname.startsWith("/business/clients/orders/") && pathname.endsWith("/edit") && isCompletedParam) {
+        return true;
+      }
+      return false;
+    }
+
+    // 4. Cancelled Orders
+    if (itemHref === "/business/clients/orders/cancelled") {
+      if (pathname === "/business/clients/orders/cancelled" || pathname.startsWith("/business/clients/orders/cancelled/")) {
+        return true;
+      }
+      if (pathname.startsWith("/business/clients/orders/") && pathname.endsWith("/edit") && isCancelledParam) {
+        return true;
+      }
+      return false;
+    }
+
+    return pathname === itemHref || pathname.startsWith(itemHref + '/');
+  };
+
   const isModuleActive = (module: NavModule) => {
     let href = module.href;
     if (module.title === "Dashboard" && role !== "CLIENT") {
@@ -381,12 +444,7 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
       }
       return pathname === href || pathname.startsWith(href + '/');
     }
-    return module.items?.some(item => {
-      if (item.href === "/business/clients/orders") {
-        return pathname === "/business/clients/orders" || pathname === "/business/clients/orders/new";
-      }
-      return pathname === item.href || pathname.startsWith(item.href + '/');
-    }) ?? false;
+    return module.items?.some(item => checkIsItemActive(item.href)) ?? false;
   };
 
   const handleLogout = () => {
@@ -695,11 +753,7 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
                     >
                       <div className="ml-[18px] pl-3.5 border-l border-zinc-800 dark:border-zinc-800/60 py-1 mt-1 space-y-1">
                         {visibleItems.map((item) => {
-                          const isSubActive = item.href === "/clients" || item.href === "/business/clients"
-                            ? (pathname === "/business/clients" || pathname === "/business/clients/new")
-                            : item.href === "/business/clients/orders"
-                              ? (pathname === "/business/clients/orders" || pathname === "/business/clients/orders/new")
-                              : (pathname === item.href || pathname.startsWith(item.href + '/'));
+                          const isSubActive = checkIsItemActive(item.href);
                           return (
                             <Link
                               key={item.name}

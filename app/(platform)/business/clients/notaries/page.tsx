@@ -170,7 +170,9 @@ export default function NotariesPage() {
   
   // Calculate top city
   const cityCounts = notaries.reduce((acc: any, curr) => {
-    acc[curr.city] = (acc[curr.city] || 0) + 1;
+    if (curr.city) {
+      acc[curr.city] = (acc[curr.city] || 0) + 1;
+    }
     return acc;
   }, {});
   let topCity = "N/A";
@@ -490,7 +492,7 @@ export default function NotariesPage() {
                       <td className="py-3.5 px-4 align-top font-bold text-foreground">
                         <div className="flex items-center gap-1">
                           <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
-                          <span>{notary.city}</span>
+                          <span>{notary.city || "-"}</span>
                         </div>
                         {notary.address && (
                           <div className="text-[10px] text-muted-foreground font-normal mt-1 truncate max-w-xs">

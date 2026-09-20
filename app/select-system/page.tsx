@@ -82,8 +82,8 @@ function SelectSystemContent() {
 
   if (loading || transitioning || allowedModes.length <= 1) {
     return (
-      <div className="dark">
-        <div className="flex h-screen w-full items-center justify-center bg-background text-foreground relative overflow-hidden">
+      <div className="dark" suppressHydrationWarning>
+        <div className="flex h-screen w-full items-center justify-center bg-background text-foreground relative overflow-hidden" suppressHydrationWarning>
 
           {/* Animated Lines Background */}
           <div className="absolute inset-0 bg-grid-slate-200/20 [mask-image:linear-gradient(0deg,transparent,black)] dark:bg-grid-slate-800/10 opacity-30 z-0 pointer-events-none" />
@@ -117,8 +117,8 @@ function SelectSystemContent() {
   }
 
   return (
-    <div className="dark select-none">
-      <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8 relative overflow-hidden text-foreground">
+    <div className="dark select-none" suppressHydrationWarning>
+      <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8 relative overflow-hidden text-foreground" suppressHydrationWarning>
 
         {/* Animated Lines Background */}
         <div className="absolute inset-0 bg-grid-slate-200/20 [mask-image:linear-gradient(0deg,transparent,black)] dark:bg-grid-slate-800/10 opacity-30 z-0 pointer-events-none" />

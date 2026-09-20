@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -455,12 +455,14 @@ function HRMSLayoutContent({ children }: { children: React.ReactNode }) {
       <div className="absolute top-[30%] right-[20%] w-[400px] h-[400px] rounded-full bg-indigo-500 glow-orb pointer-events-none -z-10" />
 
       {/* Sidebar Component */}
-      <HRMSSidebar
-        isAdmin={isAdmin}
-        userProfile={userProfile}
-        isMobileOpen={isSidebarOpen}
-        setIsMobileOpen={setIsSidebarOpen}
-      />
+      <Suspense fallback={<div className="w-[260px] bg-[#0c0d12] hidden md:block" />}>
+        <HRMSSidebar
+          isAdmin={isAdmin}
+          userProfile={userProfile}
+          isMobileOpen={isSidebarOpen}
+          setIsMobileOpen={setIsSidebarOpen}
+        />
+      </Suspense>
 
       {/* Main Content Area */}
       <div className="flex flex-col flex-1 h-full min-w-0 overflow-hidden">
@@ -563,7 +565,7 @@ function HRMSLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main ref={mainScrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 w-full">
+        <main ref={mainScrollRef} className="flex-1 overflow-y-auto p-3.5 sm:p-4 md:p-5 xl:p-6 2xl:p-8 w-full min-w-0">
           {children}
         </main>
       </div>

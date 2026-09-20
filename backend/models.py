@@ -1092,7 +1092,7 @@ class Notary(Base):
     email = Column(String, nullable=True)
     phone = Column(String, nullable=True)
     address = Column(String, nullable=True)
-    city = Column(String, index=True, nullable=False)
+    city = Column(String, index=True, nullable=True)
     status = Column(String, default="ACTIVE")
     notes = Column(String, nullable=True)
     vendor_type = Column(String, nullable=True, default="NOTARY")
