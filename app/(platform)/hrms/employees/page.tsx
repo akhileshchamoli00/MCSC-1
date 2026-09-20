@@ -181,12 +181,12 @@ export default function EmployeesPage() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 w-full max-w-none pb-12">
       {/* Minimalist Metrics Strip & Action Button Row */}
-      <div className="flex flex-col md:flex-row items-stretch gap-3 w-full">
+      <div className="flex flex-col xl:flex-row items-stretch gap-3 w-full">
         {/* Minimalist Metric Strip - Expanded Horizontally */}
-        <div className="grid grid-cols-2 md:grid-cols-4 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs flex-1 gap-2 sm:gap-0 divide-y md:divide-y-0 md:divide-x divide-border/50">
+        <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-xs flex-1 gap-3 sm:gap-4">
           
           {/* Total Staff */}
-          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+          <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0 justify-start sm:justify-center">
             <div className="h-9 w-9 rounded-xl bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
               <Users className="h-4 w-4" />
             </div>
@@ -197,7 +197,7 @@ export default function EmployeesPage() {
           </div>
 
           {/* Active Staff */}
-          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+          <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0 justify-start sm:justify-center">
             <div className="h-9 w-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
               <UserCheck className="h-4 w-4" />
             </div>
@@ -208,7 +208,7 @@ export default function EmployeesPage() {
           </div>
 
           {/* On Probation */}
-          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+          <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0 justify-start sm:justify-center">
             <div className="h-9 w-9 rounded-xl bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
               <Clock className="h-4 w-4" />
             </div>
@@ -219,7 +219,7 @@ export default function EmployeesPage() {
           </div>
 
           {/* Departments */}
-          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 md:py-0 justify-start sm:justify-center">
+          <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0 justify-start sm:justify-center">
             <div className="h-9 w-9 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20 shrink-0">
               <Building2 className="h-4 w-4" />
             </div>
@@ -231,13 +231,13 @@ export default function EmployeesPage() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-stretch gap-2.5 shrink-0">
-          <Button variant="outline" onClick={exportCSV} className="gap-2 font-bold shadow-xs rounded-2xl h-full min-h-[48px] px-4 text-sm bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50">
+        <div className="flex flex-wrap items-stretch gap-2.5 shrink-0">
+          <Button variant="outline" onClick={exportCSV} className="flex-1 sm:flex-initial gap-2 font-bold shadow-xs rounded-2xl h-full min-h-[48px] px-4 text-sm bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50">
             <Download className="h-4 w-4" />
             Export CSV
           </Button>
-          <Link href="/hrms/employees/new" className="shrink-0 flex items-stretch">
-            <Button className="gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm">
+          <Link href="/hrms/employees/new" className="shrink-0 flex-1 sm:flex-initial flex items-stretch">
+            <Button className="w-full gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm">
               <Plus className="h-4 w-4" />
               Add Employee
             </Button>
@@ -248,7 +248,7 @@ export default function EmployeesPage() {
       <div className="border border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
         {/* Integrated Filter & Search Bar */}
         <div className="p-4 border-b border-border/40 bg-muted/20">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input

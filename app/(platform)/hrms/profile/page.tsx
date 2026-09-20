@@ -270,10 +270,10 @@ export default function MyProfilePage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         {/* Left Column: Profile Summary Card */}
-        <div className="lg:col-span-4 xl:col-span-3 space-y-6">
-          <Card className="rounded-2xl border-border/40 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md p-5 shadow-sm sticky top-24">
+        <div className="xl:col-span-3 space-y-6">
+          <Card className="rounded-2xl border-border/40 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md p-5 shadow-sm xl:sticky xl:top-4 xl:max-h-[calc(100vh-5rem)] xl:overflow-y-auto pr-0.5">
             <div className="flex flex-col items-start text-left">
               {/* Profile Photo */}
               <div className="relative group shrink-0">

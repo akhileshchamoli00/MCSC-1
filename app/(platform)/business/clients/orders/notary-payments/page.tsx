@@ -498,83 +498,83 @@ function NotaryPaymentsContent() {
 
       {/* DYNAMIC MINIMALIST METRIC RIBBON */}
       {!selectedNotary ? (
-        <div className="flex flex-col lg:flex-row items-stretch gap-3 w-full">
-          <div className="grid grid-cols-2 md:grid-cols-4 flex-1 divide-y md:divide-y-0 md:divide-x divide-border/50 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs">
-            <div className="flex items-center gap-3 px-3 py-1.5">
-              <div className="p-2 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
+        <div className="flex flex-col xl:flex-row items-stretch gap-3 w-full">
+          <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 flex-1 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-xs gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0">
+              <div className="p-2 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 shrink-0">
                 <DollarSign className="h-4 w-4" />
               </div>
-              <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Total Vendor Cost</p>
-                <p className="text-lg font-bold tracking-tight">{formatCurrency(totalCost)}</p>
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider truncate">Total Vendor Cost</p>
+                <p className="text-base sm:text-lg font-bold tracking-tight">{formatCurrency(totalCost)}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 px-3 py-1.5">
-              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0">
+              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
                 <CheckCircle className="h-4 w-4" />
               </div>
-              <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Paid Amount</p>
-                <p className="text-lg font-bold tracking-tight">{formatCurrency(totalPaid)}</p>
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider truncate">Paid Amount</p>
+                <p className="text-base sm:text-lg font-bold tracking-tight">{formatCurrency(totalPaid)}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 px-3 py-1.5">
-              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+            <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0">
+              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
                 <Clock className="h-4 w-4" />
               </div>
-              <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Outstanding Balance</p>
-                <p className="text-lg font-bold tracking-tight">{formatCurrency(totalOutstanding)}</p>
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider truncate">Outstanding Balance</p>
+                <p className="text-base sm:text-lg font-bold tracking-tight">{formatCurrency(totalOutstanding)}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 px-3 py-1.5">
-              <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+            <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0">
+              <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 shrink-0">
                 <Scale className="h-4 w-4" />
               </div>
-              <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Registered Vendors</p>
-                <p className="text-lg font-bold tracking-tight">{activeNotariesCount}</p>
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider truncate">Registered Vendors</p>
+                <p className="text-base sm:text-lg font-bold tracking-tight">{activeNotariesCount}</p>
               </div>
             </div>
           </div>
         </div>
       ) : (
-        <div className="flex flex-col lg:flex-row items-stretch gap-3 w-full">
-          <div className="grid grid-cols-2 md:grid-cols-4 flex-1 divide-y md:divide-y-0 md:divide-x divide-border/50 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs">
-            <div className="flex items-center gap-3 px-3 py-1.5">
-              <div className="p-2 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
+        <div className="flex flex-col xl:flex-row items-stretch gap-3 w-full">
+          <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 flex-1 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-xs gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0">
+              <div className="p-2 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 shrink-0">
                 <DollarSign className="h-4 w-4" />
               </div>
-              <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Total Earned</p>
-                <p className="text-lg font-bold tracking-tight">{formatCurrency(summaries.find(s => s.notary_id === selectedNotary.id)?.total_earned)}</p>
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider truncate">Total Earned</p>
+                <p className="text-base sm:text-lg font-bold tracking-tight">{formatCurrency(summaries.find(s => s.notary_id === selectedNotary.id)?.total_earned)}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 px-3 py-1.5">
-              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0">
+              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
                 <CheckCircle className="h-4 w-4" />
               </div>
-              <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Total Paid</p>
-                <p className="text-lg font-bold tracking-tight">{formatCurrency(summaries.find(s => s.notary_id === selectedNotary.id)?.total_paid)}</p>
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider truncate">Total Paid</p>
+                <p className="text-base sm:text-lg font-bold tracking-tight">{formatCurrency(summaries.find(s => s.notary_id === selectedNotary.id)?.total_paid)}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 px-3 py-1.5">
-              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+            <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0">
+              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
                 <Clock className="h-4 w-4" />
               </div>
-              <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Outstanding</p>
-                <p className="text-lg font-bold tracking-tight">{formatCurrency(summaries.find(s => s.notary_id === selectedNotary.id)?.total_outstanding)}</p>
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider truncate">Outstanding</p>
+                <p className="text-base sm:text-lg font-bold tracking-tight">{formatCurrency(summaries.find(s => s.notary_id === selectedNotary.id)?.total_outstanding)}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 px-3 py-1.5">
-              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+            <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0">
+              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 shrink-0">
                 <Scale className="h-4 w-4" />
               </div>
-              <div>
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Total Assigned Jobs</p>
-                <p className="text-lg font-bold tracking-tight">{jobs.length}</p>
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider truncate">Total Assigned Jobs</p>
+                <p className="text-base sm:text-lg font-bold tracking-tight">{jobs.length}</p>
               </div>
             </div>
           </div>

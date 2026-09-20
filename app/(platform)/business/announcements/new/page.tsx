@@ -445,10 +445,10 @@ export default function CreateOrEditAnnouncementPage() {
       </div>
 
       {/* 3. MAIN 2-COLUMN SECTION: ANNOUNCEMENT CONTENT (LEFT) & LIVE VIEW (RIGHT) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
         
         {/* LEFT COLUMN: Expanded Announcement Content Area (7 Cols) */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="xl:col-span-7 space-y-4">
           
           <Card className="border-border/50 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md rounded-2xl shadow-xs overflow-hidden">
             <CardHeader className="p-4 sm:p-5 pb-3 border-b border-border/30">
@@ -598,7 +598,7 @@ export default function CreateOrEditAnnouncementPage() {
         </div>
 
         {/* RIGHT COLUMN: Live View Right Beside It (5 Cols) */}
-        <div className="lg:col-span-5 space-y-3.5 lg:sticky lg:top-20">
+        <div className="xl:col-span-5 space-y-3.5 xl:sticky xl:top-4 xl:max-h-[calc(100vh-5.5rem)] xl:overflow-y-auto pr-0.5">
           
           <div className="flex items-center justify-between px-1">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">

@@ -171,10 +171,10 @@ export default function EditClientServicePage() {
           </CardHeader>
           
           <CardContent className="space-y-6 pt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
               
               {/* Left Column: Scope Details */}
-              <div className="lg:col-span-6 space-y-6">
+              <div className="xl:col-span-6 space-y-6">
                 <div className="space-y-4">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                     <FileText className="h-3.5 w-3.5 text-primary" /> Service Identification & Scope

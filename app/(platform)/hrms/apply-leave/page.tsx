@@ -523,9 +523,9 @@ export default function ApplyLeavePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         {/* Application Form */}
-        <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl lg:col-span-5 xl:col-span-4 h-fit">
+        <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl xl:col-span-4 h-fit">
           <CardHeader className="py-4 border-b border-border/40 bg-muted/20">
             <CardTitle className="text-sm font-bold text-foreground">New Leave Request</CardTitle>
           </CardHeader>
@@ -693,7 +693,7 @@ export default function ApplyLeavePage() {
         </Card>
 
         {/* Right Column: Stack of Balances and History */}
-        <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-6">
+        <div className="xl:col-span-8 flex flex-col gap-6">
           {/* Balance Summary Table */}
           <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
             <CardHeader className="bg-muted/20 border-b border-border/40 py-3.5 px-5">

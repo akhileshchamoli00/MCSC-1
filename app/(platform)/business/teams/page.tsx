@@ -494,7 +494,7 @@ export default function BusinessTeamsPage() {
           )}
         </div>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {filteredTeams.map((team) => {
             const teamColor = team.color || "#10b981";
             return (
@@ -639,10 +639,10 @@ export default function BusinessTeamsPage() {
 
           {/* 2-Column Responsive Body */}
           <form id="team-form" onSubmit={handleFormSubmit} className="flex-1 overflow-y-auto p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
               
               {/* LEFT COLUMN: Team Attributes & Details (7 cols) */}
-              <div className="lg:col-span-7 space-y-5">
+              <div className="xl:col-span-7 space-y-5">
                 
                 {/* Team Name */}
                 <div className="space-y-1.5">
