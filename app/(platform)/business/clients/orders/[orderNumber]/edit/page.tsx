@@ -124,6 +124,7 @@ export default function EditClientOrderPage() {
       let fetchedClients: any[] = [];
       let fetchedOrders: any[] = [];
       let fetchedServices: any[] = [];
+      let fetchedCompanies: any[] = [];
       if (cliRes.ok) {
         fetchedClients = await cliRes.json();
         setClients(fetchedClients);
@@ -136,7 +137,22 @@ export default function EditClientOrderPage() {
       if (empRes.ok) setEmployees(await empRes.json());
       if (teamRes.ok) setTeams(await teamRes.json());
       if (notariesRes.ok) setNotaries(await notariesRes.json());
-      if (compRes.ok) setCompanies(await compRes.json());
+      if (compRes.ok) {
+        fetchedCompanies = await compRes.json();
+      }
+
+      // Ensure any company referenced in fetched orders is present in companies list
+      if (Array.isArray(fetchedOrders)) {
+        fetchedOrders.forEach((o: any) => {
+          if (o.company && !fetchedCompanies.some((c: any) => c.id === o.company.id)) {
+            fetchedCompanies.push(o.company);
+          }
+          if (o.billing_company && !fetchedCompanies.some((c: any) => c.id === o.billing_company.id)) {
+            fetchedCompanies.push(o.billing_company);
+          }
+        });
+      }
+      setCompanies(fetchedCompanies);
 
       // Group raw orders by order_number
       const groupedOrdersMap = new Map<string, any>();
@@ -171,6 +187,19 @@ export default function EditClientOrderPage() {
         const group = groupedOrdersMap.get(key);
         group.items.push(ord);
         group.total_amount += ord.unit_price || ord.total_amount || 0;
+
+        if (!group.company_id && ord.company_id) {
+          group.company_id = ord.company_id;
+          group.company_name = ord.company_name;
+        }
+        if (!group.billing_company_id && ord.billing_company_id) {
+          group.billing_company_id = ord.billing_company_id;
+          group.billing_company_name = ord.billing_company_name;
+        }
+        if (!group.client_id && ord.client_id) {
+          group.client_id = ord.client_id;
+          group.client_name = ord.client_name;
+        }
 
         if (ord.is_proforma_finalized) {
           group.is_proforma_finalized = true;
@@ -211,8 +240,13 @@ export default function EditClientOrderPage() {
       }
 
       setSelectedOrderGroup(targetGroup);
-      if (targetGroup.client_id) {
-        setFilterClientId(String(targetGroup.client_id));
+      
+      // Determine filterClientId based on the target company's registered partner
+      const targetCompany = (fetchedCompanies || []).find((c: any) => c.id === targetGroup.company_id);
+      if (targetCompany && targetCompany.client_id) {
+        setFilterClientId(String(targetCompany.client_id));
+      } else {
+        setFilterClientId("");
       }
       
       const mappedItems = (targetGroup.items || []).map((item: any) => {
@@ -307,8 +341,8 @@ export default function EditClientOrderPage() {
       } else if (tier === "PARTNER_A2") {
         price = selectedService.partner_a2_price ?? (selectedService.base_price * 0.5);
       } else if (tier === "PARTNER_A3") {
-        customText = selectedService.partner_a3_price || "Custom";
-        price = 0;
+        price = itemsCopy[index].unit_price || 0;
+        customText = "";
       }
 
       itemsCopy[index] = {
@@ -345,8 +379,8 @@ export default function EditClientOrderPage() {
         } else if (tier === "PARTNER_A2") {
           price = s.partner_a2_price ?? (s.base_price * 0.5);
         } else if (tier === "PARTNER_A3") {
-          customText = s.partner_a3_price || "Custom";
-          price = 0;
+          price = (item.pricing_tier === "PARTNER_A3" && item.unit_price) ? item.unit_price : 0;
+          customText = "";
         }
       }
 
@@ -678,7 +712,7 @@ export default function EditClientOrderPage() {
   };
 
   const formatCurrency = (val: number) => {
-    return "IDR " + new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(val);
+    return "IDR " + new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val || 0);
   };
 
   const editItemsTotal = (editForm.items || []).reduce((acc, curr) => acc + (curr.unit_price || 0), 0);
@@ -704,37 +738,38 @@ export default function EditClientOrderPage() {
             onClick={() => router.back()}
             className="h-8 w-8 rounded-lg border-border/60 hover:bg-muted/50"
           >
-            <ArrowLeft className="h-3.5 w-3.5" />
+            <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold tracking-tight text-foreground">
+              <h1 className="text-base font-extrabold tracking-tight text-foreground flex items-center gap-1.5">
                 Edit Service Order: <span className="font-mono text-primary">{orderNumber}</span>
               </h1>
-              <Badge variant="outline" className="font-mono text-[10px] uppercase px-1.5 py-0.5 bg-primary/10 border-primary/20 text-primary">
-                {isPipelineOrder ? "Pipeline Order" : "Active Workflow"}
+              <Badge variant="outline" className={`text-[10px] font-mono uppercase font-bold py-0.5 px-2 ${isPipelineOrder ? 'bg-amber-500/10 text-amber-600 border-amber-500/30' : 'bg-primary/10 text-primary border-primary/30'}`}>
+                {editForm.status.replace("_", " ")}
               </Badge>
             </div>
             <p className="text-[11px] text-muted-foreground mt-0.5">
-              Modify client corporate entity, configure service line items, and allocate team members.
+              Modify allocated corporate entity, billed service line items, assigned consultants, reviewer, and billing parameters.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Global Action Buttons */}
+        <div className="flex items-center gap-2 shrink-0">
           <Button
-            type="button"
             variant="outline"
+            size="sm"
             onClick={() => router.back()}
-            className="text-xs font-semibold h-8 rounded-lg"
+            disabled={saving}
+            className="h-8 text-xs font-semibold border-border/70"
           >
             Cancel
           </Button>
           <Button
-            type="button"
-            disabled={saving}
             onClick={handleEditSubmit}
-            className="text-xs font-bold h-8 px-3.5 gap-1.5 rounded-lg shadow-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+            disabled={saving}
+            className="h-8 text-xs font-bold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs"
           >
             {saving ? (
               <>
@@ -851,7 +886,7 @@ export default function EditClientOrderPage() {
                     >
                       <option value="">Choose Target Company Entity...</option>
                       {(filterClientId
-                        ? companies.filter(c => c.client_id === parseInt(filterClientId))
+                        ? companies.filter(c => c.client_id === parseInt(filterClientId) || String(c.id) === String(editForm.company_id))
                         : companies
                       ).map((comp) => {
                         const valSuffix = comp.validation_status === "PENDING_VALIDATION" 
@@ -925,7 +960,7 @@ export default function EditClientOrderPage() {
                       >
                         <option value="">Choose Billing Entity...</option>
                         {(filterClientId
-                          ? companies.filter(c => c.client_id === parseInt(filterClientId))
+                          ? companies.filter(c => c.client_id === parseInt(filterClientId) || String(c.id) === String(editForm.billing_company_id))
                           : companies
                         ).map((comp) => {
                           const valSuffix = comp.validation_status === "PENDING_VALIDATION" 
@@ -959,173 +994,207 @@ export default function EditClientOrderPage() {
                     2. Billed Service Line Items ({(editForm.items || []).length})
                   </CardTitle>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAddEditItem}
-                    className="h-6.5 px-2 border-dashed border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 gap-1 font-bold rounded-md text-[11px]"
-                  >
-                    <Plus className="h-3 w-3" /> Add Service Line
-                  </Button>
-                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setEditForm((prev) => ({
+                      ...prev,
+                      items: [
+                        ...prev.items,
+                        {
+                          service_id: "",
+                          job_id: "",
+                          job_title: "",
+                          branch_name: "",
+                          description: "",
+                          service_instructions: "",
+                          notes: "",
+                          pricing_tier: "BASE",
+                          unit_price: 0,
+                          custom_price_text: "",
+                          notary_id: "",
+                          _raw_service: null
+                        }
+                      ]
+                    }));
+                  }}
+                  className="h-7 text-xs font-bold gap-1 text-primary border-primary/40 hover:bg-primary/10"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Service Item
+                </Button>
               </CardHeader>
               
-              <CardContent className="p-2.5 sm:p-3 space-y-2.5">
-                {(editForm.items || []).length === 0 ? (
-                  <div className="text-center py-5 text-xs text-muted-foreground italic border border-dashed rounded-lg">
-                    No items in this order. Add at least one item to proceed.
-                  </div>
-                ) : (
-                  (editForm.items || []).map((item: any, idx: number) => (
-                    <div key={item.id || idx} className="p-3 rounded-xl border border-border/70 bg-card/80 dark:bg-card/40 hover:border-primary/40 shadow-2xs transition-all space-y-2.5 relative">
-                      
-                      {/* Line Item Header: Number Badge, Job Title / ID info, Price Pill & Delete Button */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border/50">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="flex h-5 px-2 items-center justify-center rounded-md bg-primary/10 text-primary text-[11px] font-bold font-mono shrink-0">
-                            #{idx + 1}
-                          </span>
-                          {item.job_id && (
-                            <Badge variant="outline" className="font-mono text-[10px] font-bold bg-muted/50 border-border/70 text-foreground py-0 px-1.5">
-                              {item.job_id}
-                            </Badge>
-                          )}
-                          {item.job_title && (
-                            <span className="text-xs font-bold text-foreground truncate max-w-[280px] sm:max-w-md">
-                              {item.job_title}
+              <CardContent className="p-3 space-y-3">
+                <div className="space-y-3">
+                  {(editForm.items || []).length === 0 ? (
+                    <div className="text-center py-5 text-xs text-muted-foreground italic border border-dashed rounded-lg">
+                      No items in this order. Add at least one item to proceed.
+                    </div>
+                  ) : (
+                    (editForm.items || []).map((item: any, idx: number) => (
+                      <div
+                        key={item.id || idx}
+                        className="p-3 rounded-xl border border-border/70 bg-card/90 space-y-2.5 transition-all hover:border-border hover:shadow-2xs relative"
+                      >
+                        
+                        {/* Line Item Header: Number Badge, Job Title / ID info, Price Pill & Delete Button */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border/40">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="flex h-5 px-2 items-center justify-center rounded-md bg-primary/10 text-primary text-[11px] font-bold font-mono shrink-0">
+                              #{idx + 1}
                             </span>
-                          )}
-                        </div>
+                            {item.job_id && (
+                              <Badge variant="outline" className="font-mono text-[10px] font-bold bg-muted/50 border-border/70 text-foreground py-0 px-1.5">
+                                {item.job_id}
+                              </Badge>
+                            )}
+                            {item.job_title && (
+                              <span className="text-xs font-bold text-foreground truncate max-w-[280px] sm:max-w-md">
+                                {item.job_title}
+                              </span>
+                            )}
+                          </div>
 
-                        <div className="flex items-center justify-between sm:justify-end gap-2">
-                          {item.pricing_tier === "PARTNER_A3" ? (
-                            <div className="px-2.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 font-mono text-[11px] font-bold text-amber-700 dark:text-amber-300">
-                              {item.custom_price_text ? `Custom: ${item.custom_price_text}` : "Custom Pricing"}
-                            </div>
-                          ) : (
+                          <div className="flex items-center justify-between sm:justify-end gap-2">
                             <div className="px-2.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 font-mono text-[11px] font-black text-emerald-700 dark:text-emerald-300">
                               {formatCurrency(item.unit_price)}
                             </div>
-                          )}
 
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            disabled={(editForm.items || []).length <= 1 && !item.service_id}
-                            onClick={() => handleRemoveEditItem(idx)}
-                            className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md shrink-0"
-                            title="Remove service line item"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Primary Configuration Grid: Service Package, Pricing Tier, Branch Reference */}
-                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start">
-                        
-                        {/* Service Package Selector (5 cols) */}
-                        <div className="sm:col-span-5 space-y-1">
-                          <label className="text-[10.5px] font-bold text-foreground flex items-center gap-1">
-                            <span>Service Package Catalog</span>
-                            <span className="text-destructive font-black">*</span>
-                          </label>
-                          <select
-                            required
-                            value={item.service_id}
-                            onChange={(e) => handleEditServiceSelect(idx, e.target.value)}
-                            className="flex h-8 w-full rounded-lg border border-border/70 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary truncate"
-                          >
-                            <option value="">-- Choose Service Package / Job Title * --</option>
-                            {services.map((s) => (
-                              <option key={s.id} value={String(s.id)}>
-                                {s.job_title} ({s.job_id})
-                              </option>
-                            ))}
-                          </select>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              disabled={(editForm.items || []).length <= 1 && !item.service_id}
+                              onClick={() => handleRemoveEditItem(idx)}
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md shrink-0"
+                              title="Remove service line item"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
 
-                        {/* Pricing Tier Selector (4 cols) */}
-                        <div className="sm:col-span-4 space-y-1">
-                          <label className="text-[10.5px] font-bold text-foreground flex items-center gap-1">
-                            <span>Pricing Tier & Rate</span>
-                            <span className="text-destructive font-black">*</span>
-                          </label>
-                          <select
-                            required
-                            value={item.pricing_tier}
-                            onChange={(e) => handleEditTierSelect(idx, e.target.value)}
-                            className="flex h-8 w-full rounded-lg border border-border/70 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-                          >
-                            <option value="BASE">
-                              Base ({item._raw_service ? formatCurrency(item._raw_service.base_price) : "Default"})
-                            </option>
-                            <option value="PARTNER_A">
-                              Partner A (-{item._raw_service?.partner_a_discount || 20}%)
-                            </option>
-                            <option value="PARTNER_A1">
-                              Partner A1 (-{item._raw_service?.partner_a1_discount || 40}%)
-                            </option>
-                            <option value="PARTNER_A2">
-                              Partner A2 (-{item._raw_service?.partner_a2_discount || 50}%)
-                            </option>
-                            <option value="PARTNER_A3">
-                              Partner A3 (Custom Pricing / Free Text)
-                            </option>
-                          </select>
-                        </div>
-
-                        {/* Branch / Project Reference (3 cols) */}
-                        <div className="sm:col-span-3 space-y-1">
-                          <label className="text-[10.5px] font-semibold text-muted-foreground flex items-center justify-between">
-                            <span>Branch / Ref</span>
-                            <span className="text-[9px] text-muted-foreground/70 font-mono">Optional</span>
-                          </label>
-                          <Input
-                            value={item.branch_name || ""}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setEditForm((prev) => {
-                                const copy = [...prev.items];
-                                copy[idx] = { ...copy[idx], branch_name: val };
-                                return { ...prev, items: copy };
-                              });
-                            }}
-                            placeholder="e.g. Bali Branch / Ref #12"
-                            className="h-8 text-xs font-medium rounded-lg border-border/70 bg-background placeholder:text-muted-foreground/50"
-                          />
-                        </div>
-
-                        {/* Custom Contract Price Text (if PARTNER_A3) */}
-                        {item.pricing_tier === "PARTNER_A3" && (
-                          <div className="sm:col-span-12 p-2 rounded-lg bg-amber-500/5 border border-amber-500/25 space-y-1 animate-in fade-in duration-200">
-                            <label className="text-[10.5px] font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1">
-                              <span>Custom Contract Price / Billing Value Text</span>
+                        {/* Primary Configuration Grid: Service Package, Pricing Tier, Branch Reference */}
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start">
+                          
+                          {/* Service Package Selector (5 cols) */}
+                          <div className="sm:col-span-5 space-y-1">
+                            <label className="text-[10.5px] font-bold text-foreground flex items-center gap-1">
+                              <span>Service Package Catalog</span>
                               <span className="text-destructive font-black">*</span>
                             </label>
-                            <Input
+                            <select
                               required
-                              value={item.custom_price_text || ""}
+                              value={item.service_id}
+                              onChange={(e) => handleEditServiceSelect(idx, e.target.value)}
+                              className="flex h-8 w-full rounded-lg border border-border/70 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary truncate"
+                            >
+                              <option value="">-- Choose Service Package / Job Title * --</option>
+                              {services.map((s) => (
+                                <option key={s.id} value={String(s.id)}>
+                                  {s.job_title} ({s.job_id})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Pricing Tier Selector (4 cols) */}
+                          <div className="sm:col-span-4 space-y-1">
+                            <label className="text-[10.5px] font-bold text-foreground flex items-center gap-1">
+                              <span>Pricing Tier & Rate</span>
+                              <span className="text-destructive font-black">*</span>
+                            </label>
+                            <select
+                              required
+                              value={item.pricing_tier}
+                              onChange={(e) => handleEditTierSelect(idx, e.target.value)}
+                              className="flex h-8 w-full rounded-lg border border-border/70 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                            >
+                              <option value="BASE">
+                                Base ({item._raw_service ? formatCurrency(item._raw_service.base_price) : "Default"})
+                              </option>
+                              <option value="PARTNER_A">
+                                Partner A (-{item._raw_service?.partner_a_discount || 20}%)
+                              </option>
+                              <option value="PARTNER_A1">
+                                Partner A1 (-{item._raw_service?.partner_a1_discount || 40}%)
+                              </option>
+                              <option value="PARTNER_A2">
+                                Partner A2 (-{item._raw_service?.partner_a2_discount || 50}%)
+                              </option>
+                              <option value="PARTNER_A3">
+                                Partner A3 (Custom Pricing)
+                              </option>
+                            </select>
+                          </div>
+
+                          {/* Branch / Project Reference (3 cols) */}
+                          <div className="sm:col-span-3 space-y-1">
+                            <label className="text-[10.5px] font-semibold text-muted-foreground flex items-center justify-between">
+                              <span>Branch / Ref</span>
+                              <span className="text-[9px] text-muted-foreground/70 font-mono">Optional</span>
+                            </label>
+                            <Input
+                              value={item.branch_name || ""}
                               onChange={(e) => {
                                 const val = e.target.value;
                                 setEditForm((prev) => {
                                   const copy = [...prev.items];
-                                  copy[idx] = { ...copy[idx], custom_price_text: val };
+                                  copy[idx] = { ...copy[idx], branch_name: val };
                                   return { ...prev, items: copy };
                                 });
                               }}
-                              placeholder="e.g. Free (Pro Bono) or Custom Contract Amount (e.g. IDR 15,000,000)"
-                              className="h-8 text-xs font-semibold bg-background rounded-lg border-amber-500/35 focus-visible:ring-amber-500/20"
+                              placeholder="e.g. Bali Branch / Ref #12"
+                              className="h-8 text-xs font-medium rounded-lg border-border/70 bg-background placeholder:text-muted-foreground/50"
                             />
+                          </div>
+                        </div>
+
+                        {/* Custom Numerical Pricing Amount Input (if PARTNER_A3) */}
+                        {item.pricing_tier === "PARTNER_A3" && (
+                          <div className="p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/25 space-y-1 animate-in fade-in duration-200">
+                            <label className="text-[10.5px] font-bold text-foreground flex items-center justify-between">
+                              <span className="flex items-center gap-1">
+                                <span>Custom Rate / Unit Price (IDR)</span>
+                                <span className="text-destructive font-black">*</span>
+                              </span>
+                              <span className="text-[9px] text-muted-foreground font-mono font-medium">Numerical amount (two decimal places)</span>
+                            </label>
+                            <div className="relative">
+                              <div className="absolute left-2.5 top-2 text-xs font-bold text-muted-foreground select-none">
+                                IDR
+                              </div>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                required
+                                value={item.unit_price === 0 || item.unit_price === "" || item.unit_price === null ? "" : item.unit_price}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const numVal = val === "" ? 0 : parseFloat(val);
+                                  setEditForm((prev) => {
+                                    const copy = [...prev.items];
+                                    copy[idx] = { 
+                                      ...copy[idx], 
+                                      unit_price: isNaN(numVal) ? 0 : numVal, 
+                                      custom_price_text: "" 
+                                    };
+                                    return { ...prev, items: copy };
+                                  });
+                                }}
+                                placeholder="0.00"
+                                className="h-8 pl-12 text-xs font-mono font-bold bg-background rounded-lg border-border/80 focus-visible:ring-primary/20"
+                              />
+                            </div>
                           </div>
                         )}
 
                         {/* Designated Vendor / Notary Selection (if required or configured) */}
                         {(item._raw_service?.needs_notary || item._raw_service?.needs_gov_officer || item._raw_service?.needs_other_vendors) && (
-                          <div className="sm:col-span-12 space-y-1">
+                          <div className="space-y-1">
                             <label className="text-[10.5px] font-semibold text-muted-foreground flex items-center justify-between">
                               <span>
                                 {item._raw_service?.needs_notary 
@@ -1207,10 +1276,9 @@ export default function EditClientOrderPage() {
                         </div>
 
                       </div>
-
-                    </div>
-                  ))
-                )}
+                    ))
+                  )}
+                </div>
               </CardContent>
             </Card>
 

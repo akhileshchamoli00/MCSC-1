@@ -2735,10 +2735,7 @@ export default function ClientOrdersPage() {
                                   </div>
                                 </td>
                                 <td className="p-4 text-right font-mono font-bold text-sm text-zinc-950 align-top pt-6">
-                                  {item.pricing_tier === "PARTNER_A3"
-                                    ? item.custom_price_text || "Custom"
-                                    : formatCurrency(item.unit_price)
-                                  }
+                                  {formatCurrency(item.unit_price)}
                                 </td>
                               </tr>
                             );

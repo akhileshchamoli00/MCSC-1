@@ -155,8 +155,10 @@ export default function NewPartnerPage() {
       } else if (tier === "PARTNER_A2") {
         price = selectedService.partner_a2_price ?? (selectedService.base_price * 0.5);
       } else if (tier === "PARTNER_A3") {
-        customText = selectedService.partner_a3_price || "Custom";
-        price = 0;
+        customText = "";
+        price = (copy[index].pricing_tier === "PARTNER_A3" && copy[index].unit_price) 
+          ? copy[index].unit_price 
+          : (selectedService.partner_a3_price && !isNaN(parseFloat(selectedService.partner_a3_price)) ? parseFloat(selectedService.partner_a3_price) : 0);
       }
 
       copy[index] = {
@@ -192,8 +194,8 @@ export default function NewPartnerPage() {
         } else if (tier === "PARTNER_A2") {
           price = s.partner_a2_price ?? (s.base_price * 0.5);
         } else if (tier === "PARTNER_A3") {
-          customText = s.partner_a3_price || "Custom";
-          price = 0;
+          customText = "";
+          price = (item.pricing_tier === "PARTNER_A3" && item.unit_price) ? item.unit_price : (s.partner_a3_price && !isNaN(parseFloat(s.partner_a3_price)) ? parseFloat(s.partner_a3_price) : 0);
         }
       }
 
@@ -208,7 +210,7 @@ export default function NewPartnerPage() {
   };
 
   const formatCurrency = (val: number) => {
-    return "IDR " + new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(val);
+    return "IDR " + new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
   };
 
   const orderGrandTotal = orderItems.reduce((acc, curr) => acc + (curr.unit_price || 0), 0);
@@ -689,30 +691,39 @@ export default function NewPartnerPage() {
                               Partner A2 (-{item._raw_service?.partner_a2_discount || 50}% {item._raw_service ? `= ${formatCurrency(item._raw_service.partner_a2_price ?? (item._raw_service.base_price * 0.5))}` : ""})
                             </SelectItem>
                             <SelectItem value="PARTNER_A3">
-                              Partner A3 (Free Text: {item._raw_service?.partner_a3_price || "Custom"})
+                              Partner A3 {item._raw_service?.partner_a3_price && !isNaN(parseFloat(item._raw_service.partner_a3_price)) ? `(${formatCurrency(parseFloat(item._raw_service.partner_a3_price))})` : "(Custom)"}
                             </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
-                    {/* Custom Price Text Input (only show if PARTNER_A3 tier is selected) */}
+                    {/* Custom Numerical Pricing Amount Input (if PARTNER_A3) */}
                     {item.pricing_tier === "PARTNER_A3" && (
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-foreground">Custom Price Text (e.g. Free, Special Rate, Quote Needed) *</label>
-                        <Input
-                          placeholder="e.g. Special Corporate Waiver"
-                          value={item.custom_price_text || ""}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setOrderItems(prev => {
-                              const itemsCopy = [...prev];
-                              itemsCopy[idx] = { ...itemsCopy[idx], custom_price_text: val };
-                              return itemsCopy;
-                            });
-                          }}
-                          className="h-10 text-xs"
-                          required
-                        />
+                      <div className="space-y-1.5 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                        <label className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center justify-between">
+                          <span>Partner A3 Pricing Amount *</span>
+                          <span className="text-[10px] font-normal text-muted-foreground">Key in amount (2 decimal places)</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">IDR</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            value={item.unit_price === 0 || !item.unit_price ? "" : item.unit_price}
+                            onChange={(e) => {
+                              const val = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                              setOrderItems(prev => {
+                                const itemsCopy = [...prev];
+                                itemsCopy[idx] = { ...itemsCopy[idx], unit_price: isNaN(val) ? 0 : val };
+                                return itemsCopy;
+                              });
+                            }}
+                            className="h-10 text-xs font-mono font-bold pl-12 bg-background"
+                            required
+                          />
+                        </div>
                       </div>
                     )}
 
@@ -735,10 +746,7 @@ export default function NewPartnerPage() {
                         <Tag className="h-3.5 w-3.5 text-primary" /> Active Pricing:
                       </span>
                       <span className="font-bold text-sm text-foreground">
-                        {item.pricing_tier === "PARTNER_A3"
-                          ? `Free Text: ${item.custom_price_text || "Custom"}`
-                          : formatCurrency(item.unit_price)
-                        }
+                        {formatCurrency(item.unit_price)}
                       </span>
                     </div>
 

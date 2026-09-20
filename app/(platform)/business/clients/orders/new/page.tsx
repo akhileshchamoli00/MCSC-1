@@ -285,8 +285,8 @@ function NewClientOrderContent() {
       } else if (tier === "PARTNER_A2") {
         price = selectedService.partner_a2_price ?? (selectedService.base_price * 0.5);
       } else if (tier === "PARTNER_A3") {
-        customText = selectedService.partner_a3_price || "Custom";
-        price = 0;
+        price = copy[index].unit_price || 0;
+        customText = "";
       }
 
       copy[index] = {
@@ -323,8 +323,8 @@ function NewClientOrderContent() {
         } else if (tier === "PARTNER_A2") {
           price = s.partner_a2_price ?? (s.base_price * 0.5);
         } else if (tier === "PARTNER_A3") {
-          customText = s.partner_a3_price || "Custom";
-          price = 0;
+          price = (item.pricing_tier === "PARTNER_A3" && item.unit_price) ? item.unit_price : 0;
+          customText = "";
         }
       }
 
@@ -508,7 +508,7 @@ function NewClientOrderContent() {
   };
 
   const formatCurrency = (val: number) => {
-    return "IDR " + new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(val);
+    return "IDR " + new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val || 0);
   };
 
   const orderGrandTotal = orderItems.reduce((acc, curr) => acc + (curr.unit_price || 0), 0);
@@ -737,7 +737,7 @@ function NewClientOrderContent() {
                     >
                       <option value="">Choose Target Company Entity...</option>
                       {(filterClientId
-                        ? companies.filter(c => c.client_id === parseInt(filterClientId))
+                        ? companies.filter(c => c.client_id === parseInt(filterClientId) || String(c.id) === String(selectedCompanyId))
                         : companies
                       ).map((comp) => {
                         const valSuffix = comp.validation_status === "PENDING_VALIDATION" 
@@ -810,7 +810,7 @@ function NewClientOrderContent() {
                       >
                         <option value="">Choose Billing Entity...</option>
                         {(filterClientId
-                          ? companies.filter(c => c.client_id === parseInt(filterClientId))
+                          ? companies.filter(c => c.client_id === parseInt(filterClientId) || String(c.id) === String(billingCompanyId))
                           : companies
                         ).map((comp) => {
                           const valSuffix = comp.validation_status === "PENDING_VALIDATION" 
@@ -880,15 +880,9 @@ function NewClientOrderContent() {
                       </div>
 
                       <div className="flex items-center justify-between sm:justify-end gap-2">
-                        {item.pricing_tier === "PARTNER_A3" ? (
-                          <div className="px-2.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 font-mono text-[11px] font-bold text-amber-700 dark:text-amber-300">
-                            {item.custom_price_text ? `Custom: ${item.custom_price_text}` : "Custom Pricing"}
-                          </div>
-                        ) : (
-                          <div className="px-2.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 font-mono text-[11px] font-black text-emerald-700 dark:text-emerald-300">
-                            {formatCurrency(item.unit_price)}
-                          </div>
-                        )}
+                        <div className="px-2.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 font-mono text-[11px] font-black text-emerald-700 dark:text-emerald-300">
+                          {formatCurrency(item.unit_price)}
+                        </div>
 
                         <Button
                           type="button"
@@ -953,7 +947,7 @@ function NewClientOrderContent() {
                             Partner A2 (-{item._raw_service?.partner_a2_discount || 50}%)
                           </option>
                           <option value="PARTNER_A3">
-                            Partner A3 (Custom Pricing / Free Text)
+                            Partner A3 (Custom Pricing)
                           </option>
                         </select>
                       </div>
@@ -978,30 +972,47 @@ function NewClientOrderContent() {
                           className="h-8 text-xs font-medium rounded-lg border-border/70 bg-background placeholder:text-muted-foreground/50"
                         />
                       </div>
+                    </div>
 
-                      {/* Custom Contract Price Text (if PARTNER_A3) */}
-                      {item.pricing_tier === "PARTNER_A3" && (
-                        <div className="sm:col-span-12 p-2 rounded-lg bg-amber-500/5 border border-amber-500/25 space-y-1 animate-in fade-in duration-200">
-                          <label className="text-[10.5px] font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1">
-                            <span>Custom Contract Price / Billing Value Text</span>
+                    {/* Custom Numerical Pricing Amount Input (if PARTNER_A3) */}
+                    {item.pricing_tier === "PARTNER_A3" && (
+                      <div className="p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/25 space-y-1 animate-in fade-in duration-200">
+                        <label className="text-[10.5px] font-bold text-foreground flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <span>Custom Rate / Unit Price (IDR)</span>
                             <span className="text-destructive font-black">*</span>
-                          </label>
+                          </span>
+                          <span className="text-[9px] text-muted-foreground font-mono font-medium">Numerical amount (two decimal places)</span>
+                        </label>
+                        <div className="relative">
+                          <div className="absolute left-2.5 top-2 text-xs font-bold text-muted-foreground select-none">
+                            IDR
+                          </div>
                           <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
                             required
-                            value={item.custom_price_text || ""}
+                            value={item.unit_price === 0 || item.unit_price === "" || item.unit_price === null ? "" : item.unit_price}
                             onChange={(e) => {
                               const val = e.target.value;
+                              const numVal = val === "" ? 0 : parseFloat(val);
                               setOrderItems((prev) => {
                                 const copy = [...prev];
-                                copy[idx].custom_price_text = val;
+                                copy[idx] = { 
+                                  ...copy[idx], 
+                                  unit_price: isNaN(numVal) ? 0 : numVal, 
+                                  custom_price_text: "" 
+                                };
                                 return copy;
                               });
                             }}
-                            placeholder="e.g. Free (Pro Bono) or Custom Contract Amount (e.g. IDR 15,000,000)"
-                            className="h-8 text-xs font-semibold bg-background rounded-lg border-amber-500/35 focus-visible:ring-amber-500/20"
+                            placeholder="0.00"
+                            className="h-8 pl-12 text-xs font-mono font-bold bg-background rounded-lg border-border/80 focus-visible:ring-primary/20"
                           />
                         </div>
-                      )}
+                      </div>
+                    )}
 
                       {/* Designated Vendor / Notary Selection (if required or configured) */}
                       {(item._raw_service?.needs_notary || item._raw_service?.needs_gov_officer || item._raw_service?.needs_other_vendors) && (
@@ -1087,9 +1098,7 @@ function NewClientOrderContent() {
                       </div>
 
                     </div>
-
-                  </div>
-                ))}
+                  ))}
               </CardContent>
             </Card>
 

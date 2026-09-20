@@ -747,8 +747,8 @@ export default function ClientOrdersPage() {
       } else if (tier === "PARTNER_A2") {
         price = selectedService.partner_a2_price ?? (selectedService.base_price * 0.5);
       } else if (tier === "PARTNER_A3") {
-        customText = selectedService.partner_a3_price || "Custom";
-        price = 0;
+        price = itemsCopy[index].unit_price || 0;
+        customText = "";
       }
 
       itemsCopy[index] = {
@@ -784,8 +784,8 @@ export default function ClientOrdersPage() {
         } else if (tier === "PARTNER_A2") {
           price = s.partner_a2_price ?? (s.base_price * 0.5);
         } else if (tier === "PARTNER_A3") {
-          customText = s.partner_a3_price || "Custom";
-          price = 0;
+          price = (item.pricing_tier === "PARTNER_A3" && item.unit_price) ? item.unit_price : 0;
+          customText = "";
         }
       }
 
@@ -862,7 +862,7 @@ export default function ClientOrdersPage() {
               job_title: item.job_title || null,
               description: item.description || null,
               pricing_tier: item.pricing_tier || null,
-              unit_price: item.pricing_tier === "PARTNER_A3" ? 0 : Number(item.unit_price),
+              unit_price: Number(item.unit_price) || 0,
               custom_price_text: item.custom_price_text || null,
               is_proforma_finalized: editForm.is_proforma_finalized,
               is_final_invoice_finalized: editForm.is_final_invoice_finalized
@@ -2354,31 +2354,47 @@ export default function ClientOrdersPage() {
                               Partner A2 (-{item._raw_service?.partner_a2_discount || 50}% {item._raw_service ? `= ${formatCurrency(item._raw_service.partner_a2_price ?? (item._raw_service.base_price * 0.5))}` : ""})
                             </option>
                             <option value="PARTNER_A3">
-                              Partner A3 (Free Text: {item._raw_service?.partner_a3_price || "Custom"})
+                              Partner A3 (Custom Pricing)
                             </option>
                           </select>
                         </div>
                       </div>
 
-                      {/* Custom Price Text Input (only show if PARTNER_A3 tier is selected) */}
+                      {/* Custom Numerical Pricing Amount Input (if PARTNER_A3) */}
                       {item.pricing_tier === "PARTNER_A3" && (
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-semibold text-foreground">Custom Price Text (e.g. Free, Special Rate, Quote Needed) *</label>
-                          <Input
-                            placeholder="e.g. Special Corporate Waiver"
-                            value={item.custom_price_text || ""}
-                            disabled={editForm.is_proforma_finalized}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setEditForm(prev => {
-                                const itemsCopy = [...prev.items];
-                                itemsCopy[idx] = { ...itemsCopy[idx], custom_price_text: val };
-                                return { ...prev, items: itemsCopy };
-                              });
-                            }}
-                            className="h-10 text-xs"
-                            required
-                          />
+                        <div className="p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/25 space-y-1">
+                          <label className="text-xs font-bold text-foreground flex items-center justify-between">
+                            <span>Custom Rate / Unit Price (IDR) *</span>
+                            <span className="text-[10px] text-muted-foreground font-mono">Numerical amount (two decimal places)</span>
+                          </label>
+                          <div className="relative">
+                            <div className="absolute left-2.5 top-2.5 text-xs font-bold text-muted-foreground select-none">
+                              IDR
+                            </div>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              disabled={editForm.is_proforma_finalized}
+                              value={item.unit_price === 0 || item.unit_price === "" || item.unit_price === null ? "" : item.unit_price}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const numVal = val === "" ? 0 : parseFloat(val);
+                                setEditForm((prev) => {
+                                  const itemsCopy = [...prev.items];
+                                  itemsCopy[idx] = { 
+                                    ...itemsCopy[idx], 
+                                    unit_price: isNaN(numVal) ? 0 : numVal, 
+                                    custom_price_text: "" 
+                                  };
+                                  return { ...prev, items: itemsCopy };
+                                });
+                              }}
+                              placeholder="0.00"
+                              className="h-9 pl-12 text-xs font-mono font-bold bg-background rounded-lg border-border/80"
+                              required
+                            />
+                          </div>
                         </div>
                       )}
 
@@ -2388,10 +2404,7 @@ export default function ClientOrdersPage() {
                           <Tag className="h-3.5 w-3.5 text-primary" /> Active Price:
                         </span>
                         <span className="font-bold text-sm text-foreground">
-                          {item.pricing_tier === "PARTNER_A3"
-                            ? `Free Text: ${item.custom_price_text || "Custom"}`
-                            : formatCurrency(item.unit_price)
-                          }
+                          {formatCurrency(item.unit_price)}
                         </span>
                       </div>
 
@@ -3054,10 +3067,7 @@ export default function ClientOrdersPage() {
                                   </div>
                                 </td>
                                 <td className="p-4 text-right font-mono font-bold text-sm text-zinc-950 align-top pt-6">
-                                  {item.pricing_tier === "PARTNER_A3"
-                                    ? item.custom_price_text || "Custom"
-                                    : formatCurrency(item.unit_price)
-                                  }
+                                  {formatCurrency(item.unit_price)}
                                 </td>
                               </tr>
                             );

@@ -1228,10 +1228,7 @@ export default function CancelledOrdersPage() {
                                   </div>
                                 </td>
                                 <td className="p-4 text-right font-mono font-bold text-sm text-zinc-400 line-through align-top pt-6">
-                                  {item.pricing_tier === "PARTNER_A3"
-                                    ? item.custom_price_text || "Custom"
-                                    : formatCurrency(item.unit_price)
-                                  }
+                                  {formatCurrency(item.unit_price)}
                                 </td>
                               </tr>
                             );
