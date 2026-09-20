@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Any, Dict
 from datetime import datetime, date
 
 class UserBase(BaseModel):
@@ -925,10 +925,12 @@ class ClientOrderCreateRequest(BaseModel):
     billing_company_id: Optional[int] = None
     items: List[ClientOrderItemCreate]
     consultant_ids: Optional[List[int]] = []
+    reviewer_id: Optional[int] = None
     internal_notes: Optional[str] = None
     notes: Optional[str] = None
     order_number: Optional[str] = None
     status: Optional[str] = None
+    allow_append: Optional[bool] = False
 
 class ClientOrderItemResponse(BaseModel):
     id: int
@@ -961,6 +963,7 @@ class ClientOrderResponse(BaseModel):
     service_id: Optional[int] = None
     job_id: Optional[str] = None
     job_title: Optional[str] = "Service Package"
+    service_name: Optional[str] = None
     branch_name: Optional[str] = None
     description: Optional[str] = None
     service_instructions: Optional[str] = None
@@ -977,6 +980,8 @@ class ClientOrderResponse(BaseModel):
     is_final_invoice_finalized: Optional[bool] = False
     consultant_ids: Optional[List[int]] = []
     consultants: Optional[List[dict]] = []
+    reviewer_id: Optional[int] = None
+    reviewer: Optional[Any] = None
     internal_notes: Optional[str] = None
     notes: Optional[str] = None
     payment_link: Optional[str] = None
@@ -1011,10 +1016,13 @@ class ClientOrderResponse(BaseModel):
     last_invoice_sent_at: Optional[datetime] = None
     last_invoice_sent_to: Optional[str] = None
     invoice_delivery_channel: Optional[str] = None
+    signed_docs_sent_at: Optional[datetime] = None
+    signed_docs_sent_to: Optional[str] = None
     deliverables_sent_at: Optional[datetime] = None
     deliverables_sent_to: Optional[str] = None
     notary_voucher_sent_at: Optional[datetime] = None
     notary_voucher_sent_to: Optional[str] = None
+    document_count: Optional[int] = 0
 
     class Config:
         from_attributes = True
@@ -1141,11 +1149,14 @@ class AnnouncementResponse(AnnouncementBase):
         return v
 
 class ClientOrderUpdate(BaseModel):
+    company_id: Optional[int] = None
+    client_id: Optional[int] = None
     status: Optional[str] = None
     payment_status: Optional[str] = None
     billing_company_id: Optional[int] = None
     invoice_number: Optional[str] = None
     consultant_ids: Optional[List[int]] = None
+    reviewer_id: Optional[int] = None
     service_instructions: Optional[str] = None
     internal_notes: Optional[str] = None
     notes: Optional[str] = None
@@ -1216,15 +1227,15 @@ class ClientDocumentResponse(BaseModel):
     id: int
     company_id: int
     file_name: str
-    file_url: str
+    file_url: Optional[str] = None
     document_type: Optional[str] = None
     description: Optional[str] = None
     document_path: Optional[str] = None
     order_number: Optional[str] = None
     document_date: Optional[date] = None
     expiry_date: Optional[date] = None
-    uploaded_at: datetime
-    uploaded_by: int
+    uploaded_at: Optional[datetime] = None
+    uploaded_by: Optional[int] = None
 
     class Config:
         from_attributes = True

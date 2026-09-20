@@ -50,7 +50,8 @@ import {
   AlertCircle,
   Clock,
   Zap,
-  MailCheck
+  MailCheck,
+  AlertTriangle
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -58,6 +59,7 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
+import { Checkbox } from "@/components/ui/checkbox";
 import domToImage from "dom-to-image";
 import { jsPDF } from "jspdf";
 import { motion, AnimatePresence } from "framer-motion";
@@ -328,8 +330,8 @@ export default function ClientOrdersPage() {
     setLoadingProgress(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNum}/progress`, {
-      credentials: "include",
-        });
+        credentials: "include",
+      });
       if (res.ok) {
         setProgressUpdates(await res.json());
       }
@@ -346,7 +348,7 @@ export default function ClientOrdersPage() {
     setPostingProgress(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/progress`, {
-      credentials: "include",
+        credentials: "include",
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -392,17 +394,23 @@ export default function ClientOrdersPage() {
       setLoading(true);
       const [ordRes, cliRes, compRes, serRes, empRes, teamRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
-      credentials: "include", }),
+          credentials: "include",
+        }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
-      credentials: "include", }),
+          credentials: "include",
+        }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, {
-      credentials: "include", }),
+          credentials: "include",
+        }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
-      credentials: "include", }),
+          credentials: "include",
+        }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, {
-      credentials: "include", }),
+          credentials: "include",
+        }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, {
-      credentials: "include", })
+          credentials: "include",
+        })
       ]);
 
       if (ordRes.ok) {
@@ -432,7 +440,7 @@ export default function ClientOrdersPage() {
     const toastId = toast.loading("Syncing order with Accurate Online...");
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/accurate/sync-order/${orderIdentifier}`, {
-      credentials: "include",
+        credentials: "include",
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -498,8 +506,19 @@ export default function ClientOrdersPage() {
       setHighlightedOrderNum(matched.order_number);
       setTimeout(() => {
         const el = document.getElementById(`order-row-${matched.order_number}`);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        const scrollParent = el?.closest('main') || document.querySelector('main');
+        if (el && scrollParent) {
+          const parentRect = scrollParent.getBoundingClientRect();
+          const elRect = el.getBoundingClientRect();
+          if (elRect.top < parentRect.top || elRect.bottom > parentRect.bottom) {
+            const relativeTop = elRect.top - parentRect.top + scrollParent.scrollTop;
+            scrollParent.scrollTo({ top: Math.max(0, relativeTop - 120), behavior: "smooth" });
+          }
+        }
+        if (typeof window !== "undefined") {
+          window.scrollTo(0, 0);
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
         }
       }, 300);
 
@@ -566,6 +585,8 @@ export default function ClientOrdersPage() {
         invoice_number: ord.invoice_number || null,
         consultant_ids: ord.consultant_ids || [],
         consultants: ord.consultants || [],
+        reviewer_id: ord.reviewer_id || null,
+        reviewer: ord.reviewer || null,
         notes: ord.notes || "",
         total_amount: 0,
         items: [],
@@ -588,6 +609,8 @@ export default function ClientOrdersPage() {
         last_invoice_sent_at: ord.last_invoice_sent_at || null,
         last_invoice_sent_to: ord.last_invoice_sent_to || null,
         invoice_delivery_channel: ord.invoice_delivery_channel || null,
+        signed_docs_sent_at: ord.signed_docs_sent_at || null,
+        signed_docs_sent_to: ord.signed_docs_sent_to || null,
         deliverables_sent_at: ord.deliverables_sent_at || null,
         deliverables_sent_to: ord.deliverables_sent_to || null
       });
@@ -610,6 +633,9 @@ export default function ClientOrdersPage() {
       group.is_final_invoice_finalized = true;
     }
 
+    if (ord.reviewer_id) group.reviewer_id = ord.reviewer_id;
+    if (ord.reviewer) group.reviewer = ord.reviewer;
+
     if (ord.proforma_sent_at) group.proforma_sent_at = ord.proforma_sent_at;
     if (ord.proforma_sent_to) group.proforma_sent_to = ord.proforma_sent_to;
     if (ord.final_invoice_sent_at) group.final_invoice_sent_at = ord.final_invoice_sent_at;
@@ -617,6 +643,8 @@ export default function ClientOrdersPage() {
     if (ord.last_invoice_sent_at) group.last_invoice_sent_at = ord.last_invoice_sent_at;
     if (ord.last_invoice_sent_to) group.last_invoice_sent_to = ord.last_invoice_sent_to;
     if (ord.invoice_delivery_channel) group.invoice_delivery_channel = ord.invoice_delivery_channel;
+    if (ord.signed_docs_sent_at) group.signed_docs_sent_at = ord.signed_docs_sent_at;
+    if (ord.signed_docs_sent_to) group.signed_docs_sent_to = ord.signed_docs_sent_to;
     if (ord.deliverables_sent_at) group.deliverables_sent_at = ord.deliverables_sent_at;
     if (ord.deliverables_sent_to) group.deliverables_sent_to = ord.deliverables_sent_to;
 
@@ -684,16 +712,16 @@ export default function ClientOrdersPage() {
     setSaving(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/group/${selectedOrderGroup.order_number}`, {
-      credentials: "include",
+        credentials: "include",
         method: "DELETE",
-        });
+      });
       if (!res.ok && selectedOrderGroup.items) {
         await Promise.all(
           selectedOrderGroup.items.map((itemRow: any) =>
             fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${itemRow.id}`, {
-      credentials: "include",
+              credentials: "include",
               method: "DELETE",
-              })
+            })
           )
         );
       }
@@ -758,6 +786,9 @@ export default function ClientOrdersPage() {
       case "IN_PROGRESS": return "bg-blue-500/15 text-blue-600 border-blue-500/30";
       case "ON_HOLD": return "bg-amber-500/15 text-amber-600 border-amber-500/30 font-bold";
       case "REVIEW_DOCS": return "bg-teal-500/15 text-teal-600 border-teal-500/30";
+      case "DOCUMENTS_REVIEWED": return "bg-indigo-500/15 text-indigo-600 border-indigo-500/30 font-bold";
+      case "PRE_DOC_SENT_FOR_SIGNATURE": return "bg-purple-500/15 text-purple-600 border-purple-500/30 font-bold";
+      case "PRE_DOCS_SENT": return "bg-purple-500/15 text-purple-600 border-purple-500/30 font-bold";
       case "FINAL_DOCUMENT_PREPARATION": return "bg-orange-500/15 text-orange-600 border-orange-500/30";
       case "FINAL_DOC_READY": return "bg-lime-500/15 text-lime-600 border-lime-500/30";
       case "INVOICE_GENERATED": return "bg-pink-500/15 text-pink-600 border-pink-500/30";
@@ -804,8 +835,21 @@ export default function ClientOrdersPage() {
   const [sendDocsCustomMessage, setSendDocsCustomMessage] = useState("");
   const [sendDocsDocuments, setSendDocsDocuments] = useState<any[]>([]);
   const [sendDocsZipInfo, setSendDocsZipInfo] = useState<any>(null);
+  const [sendDocsDisableZip, setSendDocsDisableZip] = useState(false);
   const [fetchingDocsLoading, setFetchingDocsLoading] = useState(false);
   const [sendingDocsLoading, setSendingDocsLoading] = useState(false);
+
+  // State for Send Signed Documents Modal
+  const [isSendSignedDocsModalOpen, setIsSendSignedDocsModalOpen] = useState(false);
+  const [sendSignedDocsOrder, setSendSignedDocsOrder] = useState<any>(null);
+  const [selectedSignedDocsEmails, setSelectedSignedDocsEmails] = useState<string[]>([]);
+  const [sendSignedDocsRecipientName, setSendSignedDocsRecipientName] = useState("");
+  const [sendSignedDocsCustomMessage, setSendSignedDocsCustomMessage] = useState("");
+  const [sendSignedDocsDocuments, setSendSignedDocsDocuments] = useState<any[]>([]);
+  const [sendSignedDocsZipInfo, setSendSignedDocsZipInfo] = useState<any>(null);
+  const [sendSignedDocsDisableZip, setSendSignedDocsDisableZip] = useState(false);
+  const [fetchingSignedDocsLoading, setFetchingSignedDocsLoading] = useState(false);
+  const [sendingSignedDocsLoading, setSendingSignedDocsLoading] = useState(false);
 
   // Helper to convert images to base64 Data URLs for foolproof html2canvas PDF generation
   const getBase64ImageFromUrl = async (imageUrl: string): Promise<string> => {
@@ -897,7 +941,7 @@ export default function ClientOrdersPage() {
       formData.append("proforma_stage_percent", String(proformaPercent));
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/finalize-invoice`, {
-      credentials: "include",
+        credentials: "include",
         method: "POST",
         body: formData
       });
@@ -905,10 +949,15 @@ export default function ClientOrdersPage() {
       if (!res.ok) {
         let errMsg = "Failed to finalize invoice";
         try {
-          const err = await res.json();
-          errMsg = err.detail
-            ? (typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail))
-            : JSON.stringify(err);
+          const text = await res.text();
+          try {
+            const err = JSON.parse(text);
+            errMsg = err.detail
+              ? (typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail))
+              : JSON.stringify(err);
+          } catch {
+            errMsg = text || `Error ${res.status}: ${res.statusText}`;
+          }
         } catch (e) {
           errMsg = `Error ${res.status}: ${res.statusText}`;
         }
@@ -970,7 +1019,18 @@ export default function ClientOrdersPage() {
     const isEmailActive = invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'email';
     const isWhatsAppActive = invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'whatsapp';
 
+    const billingCompanyId = selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id;
+    const companyObj = companies.find((c: any) => c.id === billingCompanyId);
+    const targetCompanyObj = companies.find((c: any) => c.id === selectedOrderGroup.company_id);
+    const effectiveCompany = companyObj || targetCompanyObj;
+    const isCompanyVerified = effectiveCompany ? (effectiveCompany.validation_status === 'VALIDATED' || effectiveCompany.validation_status === 'VERIFIED') : true;
+    const companyValStatus = effectiveCompany?.validation_status || 'PENDING_VALIDATION';
+
     if (isEmailActive) {
+      if (!isCompanyVerified) {
+        toast.error(`Cannot send email invoice: Company '${effectiveCompany?.company_name || selectedOrderGroup.company_name}' has not been verified (Current status: ${companyValStatus}). Please validate and verify the company profile first.`);
+        return;
+      }
       if (selectedInvoiceEmails.length === 0) {
         toast.error("Please select at least one registered recipient email address from the contacts list.");
         return;
@@ -1000,9 +1060,9 @@ export default function ClientOrdersPage() {
       }
 
       const res = await fetch(url, {
-      credentials: "include",
+        credentials: "include",
         method: "POST",
-        });
+      });
       if (res.ok) {
         const updatedOrders = await res.json();
         const channelLabel = invoiceDeliveryChannel === 'both'
@@ -1017,39 +1077,18 @@ export default function ClientOrdersPage() {
           setSelectedOrderGroup((prev: any) => prev ? { ...prev, ...firstUpdated, status: firstUpdated.status } : null);
           setOrders(prev => prev.map(ord => ord.order_number === selectedOrderGroup.order_number ? { ...ord, ...firstUpdated, status: firstUpdated.status } : ord));
         }
-        // Refresh full list
+        // Refresh full list & chat progress updates (backend records system milestone)
         fetchData();
-
-        // Post automated update to order chat
-        try {
-          const isResend = emailConfirmType === 'proforma'
-            ? (selectedOrderGroup.status && !['DRAFT', 'PROFORMA_GENERATED'].includes(selectedOrderGroup.status))
-            : (selectedOrderGroup.status && ['WAITING_FOR_FINAL_PAYMENT', 'FINAL_PAYMENT_COMPLETED', 'SOFT_COPY_DELIVERED', 'HARD_COPY_DELIVERED', 'COMPLETED'].includes(selectedOrderGroup.status));
-
-          const chatVerb = isResend ? "re-sent" : "sent";
-          const chatMsg = emailConfirmType === 'proforma'
-            ? `Proforma invoice has been ${chatVerb} to the client ${channelLabel}`
-            : `Final invoice has been ${chatVerb} to the client ${channelLabel}`;
-
-          const chatRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/progress`, {
-      credentials: "include",
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ message: chatMsg })
-          });
-          if (chatRes.ok) {
-            const newUpdate = await chatRes.json();
-            setProgressUpdates(prev => [...prev, newUpdate]);
-          }
-        } catch (chatErr) {
-          console.error("Error posting automated email notification to chat:", chatErr);
-        }
         fetchProgressUpdates(selectedOrderGroup.order_number);
       } else {
-        const err = await res.json();
-        toast.error(err.detail || `Failed to send ${emailConfirmType} invoice`);
+        let errMsg = `Failed to send ${emailConfirmType} invoice`;
+        try {
+          const err = await res.json();
+          errMsg = err.detail || err.message || errMsg;
+        } catch {
+          errMsg = `Server returned status ${res.status}: ${res.statusText || "Internal Server Error"}`;
+        }
+        toast.error(errMsg);
       }
     } catch (err) {
       console.error(err);
@@ -1067,6 +1106,7 @@ export default function ClientOrdersPage() {
     if (!orderGroup) return;
     setSendDocsOrder(orderGroup);
     setSendDocsCustomMessage("");
+    setSendDocsDisableZip(false);
     setIsSendDocsModalOpen(true);
 
     // Initial email resolution from cached companies & clients
@@ -1078,14 +1118,25 @@ export default function ClientOrdersPage() {
     const initialEmail = companyObj?.key_contact_email || targetCompanyObj?.key_contact_email || clientObj?.email || "";
     const initialName = companyObj?.key_contact_person || targetCompanyObj?.key_contact_person || clientObj?.contact_person || orderGroup.company_name || "";
 
+    const initialVerified = (companyObj?.validation_status === 'VALIDATED' || companyObj?.validation_status === 'VERIFIED') || (targetCompanyObj?.validation_status === 'VALIDATED' || targetCompanyObj?.validation_status === 'VERIFIED');
+    const initialStatus = companyObj?.validation_status || targetCompanyObj?.validation_status || "PENDING_VALIDATION";
+
+    setSendDocsZipInfo({
+      target_company_name: targetCompanyObj?.company_name || companyObj?.company_name || orderGroup.company_name,
+      target_company_code: targetCompanyObj?.company_code || companyObj?.company_code || "",
+      target_tax_number: targetCompanyObj?.tax_number || companyObj?.tax_number || "",
+      is_company_verified: initialVerified,
+      company_validation_status: initialStatus,
+    });
+
     setSelectedDocsEmails(initialEmail ? [initialEmail.trim()] : []);
     setSendDocsRecipientName(initialName);
     setSendDocsDocuments([]);
     setFetchingDocsLoading(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderGroup.order_number}/final-documents`, {
-      credentials: "include",
-        });
+        credentials: "include",
+      });
       if (res.ok) {
         const data = await res.json();
         setSendDocsDocuments(data.documents || []);
@@ -1094,6 +1145,8 @@ export default function ClientOrdersPage() {
           zip_filename: data.zip_filename,
           target_company_code: data.target_company_code,
           target_tax_number: data.target_tax_number,
+          is_company_verified: data.is_company_verified !== undefined ? data.is_company_verified : initialVerified,
+          company_validation_status: data.company_validation_status || initialStatus,
         });
         if (data.recipient_email && !initialEmail) {
           setSelectedDocsEmails([data.recipient_email.trim()]);
@@ -1115,6 +1168,19 @@ export default function ClientOrdersPage() {
       return;
     }
 
+    const finalDocsBillingComp = companies.find((c: any) => c.id === (sendDocsOrder.billing_company_id || sendDocsOrder.company_id));
+    const finalDocsTargetComp = companies.find((c: any) => c.id === sendDocsOrder.company_id);
+    const effFinalDocsComp = finalDocsBillingComp || finalDocsTargetComp;
+    const isFinalDocsVerified = sendDocsZipInfo?.is_company_verified !== undefined
+      ? sendDocsZipInfo.is_company_verified
+      : (effFinalDocsComp ? (effFinalDocsComp.validation_status === 'VALIDATED' || effFinalDocsComp.validation_status === 'VERIFIED') : true);
+    const finalDocsStatus = sendDocsZipInfo?.company_validation_status || effFinalDocsComp?.validation_status || 'PENDING_VALIDATION';
+
+    if (!isFinalDocsVerified) {
+      toast.error(`Cannot send final documents: Company '${sendDocsOrder.company_name}' has not been verified (Current status: ${finalDocsStatus}). Please validate and verify the company profile first.`);
+      return;
+    }
+
     setSendingDocsLoading(true);
     const primaryEmail = selectedDocsEmails[0];
     const additionalRecipients = selectedDocsEmails.slice(1);
@@ -1122,7 +1188,7 @@ export default function ClientOrdersPage() {
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${sendDocsOrder.order_number}/send-final-documents`, {
-      credentials: "include",
+        credentials: "include",
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -1131,7 +1197,8 @@ export default function ClientOrdersPage() {
           recipient_email: primaryEmail.trim(),
           recipient_name: sendDocsRecipientName.trim() || sendDocsOrder.company_name || "Valued Client",
           custom_message: sendDocsCustomMessage.trim(),
-          additional_recipients: additionalRecipients
+          additional_recipients: additionalRecipients,
+          disable_zip: sendDocsDisableZip
         })
       });
 
@@ -1169,6 +1236,152 @@ export default function ClientOrdersPage() {
       toast.error(err.message || "Error sending final documents.", { id: toastId });
     } finally {
       setSendingDocsLoading(false);
+    }
+  };
+
+  const handleOpenSendSignedDocs = async (orderGroup: any) => {
+    if (!orderGroup) return;
+    setSendSignedDocsOrder(orderGroup);
+    setSendSignedDocsCustomMessage("");
+    setSendSignedDocsDisableZip(false);
+    setIsSendSignedDocsModalOpen(true);
+
+    // Initial email resolution from cached companies & clients
+    const billingCompanyId = orderGroup.billing_company_id || orderGroup.company_id;
+    const companyObj = companies.find((c: any) => c.id === billingCompanyId);
+    const targetCompanyObj = companies.find((c: any) => c.id === orderGroup.company_id);
+    const clientObj = clients.find((c: any) => c.id === (companyObj?.client_id || orderGroup.client_id) || c.contact_person === orderGroup.client_name);
+
+    const initialEmail = companyObj?.key_contact_email || targetCompanyObj?.key_contact_email || clientObj?.email || "";
+    const initialName = companyObj?.key_contact_person || targetCompanyObj?.key_contact_person || clientObj?.contact_person || orderGroup.company_name || "";
+    const initialTaxNumber = targetCompanyObj?.tax_number || companyObj?.tax_number || "";
+    const initialCompCode = targetCompanyObj?.company_code || companyObj?.company_code || "";
+    const defaultPass = initialCompCode ? `${initialCompCode}${orderGroup.order_number}` : orderGroup.order_number;
+    const cleanCompName = (targetCompanyObj?.company_name || companyObj?.company_name || orderGroup.company_name || "Client").replace(/[/\\?%*:|"<> ]/g, "_");
+
+    const initialVerified = (companyObj?.validation_status === 'VALIDATED' || companyObj?.validation_status === 'VERIFIED') || (targetCompanyObj?.validation_status === 'VALIDATED' || targetCompanyObj?.validation_status === 'VERIFIED');
+    const initialStatus = companyObj?.validation_status || targetCompanyObj?.validation_status || "PENDING_VALIDATION";
+
+    setSendSignedDocsZipInfo({
+      target_company_name: targetCompanyObj?.company_name || companyObj?.company_name || orderGroup.company_name,
+      target_company_code: initialCompCode,
+      target_tax_number: initialTaxNumber,
+      zip_password: defaultPass || "Company Code + Order ID",
+      zip_filename: `${cleanCompName}_${orderGroup.order_number}_Pre_Documents.zip`,
+      is_company_verified: initialVerified,
+      company_validation_status: initialStatus,
+    });
+
+    setSelectedSignedDocsEmails(initialEmail ? [initialEmail.trim()] : []);
+    setSendSignedDocsRecipientName(initialName);
+    setSendSignedDocsDocuments([]);
+    setFetchingSignedDocsLoading(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderGroup.order_number}/signed-documents`, {
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSendSignedDocsDocuments(data.documents || []);
+        if (data.recipient_email && !initialEmail) {
+          setSelectedSignedDocsEmails([data.recipient_email.trim()]);
+        }
+        if (data.recipient_name && !initialName) {
+          setSendSignedDocsRecipientName(data.recipient_name);
+        }
+        if (data.zip_password || data.zip_filename || data.is_company_verified !== undefined) {
+          setSendSignedDocsZipInfo({
+            target_company_name: data.target_company_name,
+            target_company_code: data.target_company_code,
+            target_tax_number: data.target_tax_number,
+            zip_password: data.zip_password,
+            zip_filename: data.zip_filename,
+            is_company_verified: data.is_company_verified !== undefined ? data.is_company_verified : initialVerified,
+            company_validation_status: data.company_validation_status || initialStatus,
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch order signed documents:", err);
+    } finally {
+      setFetchingSignedDocsLoading(false);
+    }
+  };
+
+  const executeSendSignedDocs = async () => {
+    if (!sendSignedDocsOrder || selectedSignedDocsEmails.length === 0) {
+      toast.error("Please select at least one registered company contact email recipient.");
+      return;
+    }
+
+    const signedDocsBillingComp = companies.find((c: any) => c.id === (sendSignedDocsOrder.billing_company_id || sendSignedDocsOrder.company_id));
+    const signedDocsTargetComp = companies.find((c: any) => c.id === sendSignedDocsOrder.company_id);
+    const effSignedDocsComp = signedDocsBillingComp || signedDocsTargetComp;
+    const isSignedDocsVerified = sendSignedDocsZipInfo?.is_company_verified !== undefined
+      ? sendSignedDocsZipInfo.is_company_verified
+      : (effSignedDocsComp ? (effSignedDocsComp.validation_status === 'VALIDATED' || effSignedDocsComp.validation_status === 'VERIFIED') : true);
+    const signedDocsStatus = sendSignedDocsZipInfo?.company_validation_status || effSignedDocsComp?.validation_status || 'PENDING_VALIDATION';
+
+    if (!isSignedDocsVerified) {
+      toast.error(`Cannot send documents for signature: Company '${sendSignedDocsOrder.company_name}' has not been verified (Current status: ${signedDocsStatus}). Please validate and verify the company profile first.`);
+      return;
+    }
+
+    setSendingSignedDocsLoading(true);
+    const primaryEmail = selectedSignedDocsEmails[0];
+    const additionalRecipients = selectedSignedDocsEmails.slice(1);
+    const toastId = toast.loading(`Dispatching documents for signature to ${primaryEmail}...`);
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${sendSignedDocsOrder.order_number}/send-signed-documents`, {
+        credentials: "include",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          recipient_email: primaryEmail.trim(),
+          recipient_name: sendSignedDocsRecipientName.trim() || sendSignedDocsOrder.company_name || "Valued Client",
+          custom_message: sendSignedDocsCustomMessage.trim(),
+          additional_recipients: additionalRecipients,
+          disable_zip: sendSignedDocsDisableZip
+        })
+      });
+
+      if (res.ok) {
+        let updatedDocsOrders = null;
+        try {
+          updatedDocsOrders = await res.json();
+        } catch (jsonErr) {
+          console.warn("Could not parse response JSON:", jsonErr);
+        }
+        toast.success(`Documents for signature successfully delivered to ${primaryEmail}!`, { id: toastId });
+        setIsSendSignedDocsModalOpen(false);
+
+        // Update local state with the actual status returned from the backend
+        if (updatedDocsOrders && updatedDocsOrders.length > 0) {
+          const firstDocsUpdated = updatedDocsOrders[0];
+          setOrders(prev => prev.map(o => o.order_number === sendSignedDocsOrder.order_number ? { ...o, ...firstDocsUpdated, status: firstDocsUpdated.status } : o));
+          setSelectedOrderGroup((prev: any) => prev && prev.order_number === sendSignedDocsOrder.order_number ? { ...prev, ...firstDocsUpdated, status: firstDocsUpdated.status } : prev);
+        }
+
+        fetchData();
+        fetchProgressUpdates(sendSignedDocsOrder.order_number);
+      } else {
+        let errMsg = "Failed to send documents for signature.";
+        try {
+          const err = await res.json();
+          errMsg = err.detail || err.message || errMsg;
+        } catch {
+          errMsg = `Server returned status ${res.status}: ${res.statusText || "Internal Server Error"}`;
+        }
+        toast.error(errMsg, { id: toastId });
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Error sending documents for signature.", { id: toastId });
+    } finally {
+      setSendingSignedDocsLoading(false);
     }
   };
 
@@ -1435,7 +1648,7 @@ export default function ClientOrdersPage() {
       formData.append("file", pdfBlob, fileName);
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/finalize-final-invoice`, {
-      credentials: "include",
+        credentials: "include",
         method: "POST",
         body: formData
       });
@@ -1443,10 +1656,15 @@ export default function ClientOrdersPage() {
       if (!res.ok) {
         let errMsg = "Failed to finalize final invoice";
         try {
-          const err = await res.json();
-          errMsg = err.detail
-            ? (typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail))
-            : JSON.stringify(err);
+          const text = await res.text();
+          try {
+            const err = JSON.parse(text);
+            errMsg = err.detail
+              ? (typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail))
+              : JSON.stringify(err);
+          } catch {
+            errMsg = text || `Error ${res.status}: ${res.statusText}`;
+          }
         } catch (e) {
           errMsg = `Error ${res.status}: ${res.statusText}`;
         }
@@ -1595,350 +1813,397 @@ export default function ClientOrdersPage() {
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                        <th className="p-4 w-12 text-center">No.</th>
-                        <th className="p-4">Order ID</th>
-                        <th className="p-4">Company Entity</th>
-                        <th className="p-4">Service Package</th>
-                        <th className="p-4">Assigned Consultants</th>
-                        <th className="p-4 text-right">Total Amount</th>
-                        <th className="p-4 text-center">Payment</th>
-                        <th className="p-4 text-center">Lifecycle Status</th>
-                        <th className="p-4 text-right">Actions</th>
+                        <th className="py-2.5 px-2 w-8 text-center">No.</th>
+                        <th className="py-2.5 px-2 whitespace-nowrap w-24">Order ID</th>
+                        <th className="py-2.5 px-2 min-w-[130px] max-w-[170px]">Company Entity</th>
+                        <th className="py-2.5 px-2.5 min-w-[240px] max-w-[340px]">Service Package</th>
+                        <th className="py-2.5 px-3 w-36 min-w-[145px] max-w-[170px] whitespace-nowrap text-left">Assigned Consultants</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap w-28 min-w-[105px]">Total Amount</th>
+                        <th className="py-2.5 px-2 text-center whitespace-nowrap min-w-[85px]">Payment</th>
+                        <th className="py-2.5 px-2 text-left whitespace-nowrap">Lifecycle Status</th>
+                        <th className="py-2.5 px-2 text-right whitespace-nowrap">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/30">
                       {paginatedOrders.map((ord, index) => {
                         const isHighlighted = highlightedOrderNum === ord.order_number;
                         return (
-                        <tr 
-                          key={ord.order_number || index} 
-                          id={`order-row-${ord.order_number}`} 
-                          className={`transition-all duration-300 border-b border-border/30 last:border-0 ${
-                            isHighlighted 
-                              ? "bg-emerald-500/20 dark:bg-emerald-500/25 ring-2 ring-emerald-500 ring-inset shadow-md" 
-                              : "hover:bg-muted/40"
-                          }`}
-                        >
-                          <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5">
-                            #{startIndex + index + 1}
-                          </td>
-                          <td className="p-4 align-top pt-5">
-                            {ord.company_id ? (
-                              <Link href={`/business/clients/documents/${ord.company_id}?from=orders`}>
-                                <Badge
-                                  variant="outline"
-                                  className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2.5 py-0.5 rounded-md hover:border-emerald-500/40 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
-                                  title="Go to Company Documents Folder"
-                                >
+                          <tr
+                            key={ord.order_number || index}
+                            id={`order-row-${ord.order_number}`}
+                            className={`transition-all duration-300 border-b border-border/30 last:border-0 ${isHighlighted
+                                ? "bg-emerald-500/20 dark:bg-emerald-500/25 ring-2 ring-emerald-500 ring-inset shadow-md"
+                                : "hover:bg-muted/40"
+                              }`}
+                          >
+                            <td className="py-2 px-2 text-center font-mono font-medium text-muted-foreground align-top pt-2.5 text-xs">
+                              #{startIndex + index + 1}
+                            </td>
+                            <td className="py-2 px-2 align-top pt-2.5 whitespace-nowrap">
+                              {ord.company_id ? (
+                                <Link href={`/business/clients/documents/${ord.company_id}?from=orders`}>
+                                  <Badge
+                                    variant="outline"
+                                    className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2 py-0.5 rounded hover:border-emerald-500/40 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
+                                    title="Go to Company Documents Folder"
+                                  >
+                                    {ord.order_number}
+                                  </Badge>
+                                </Link>
+                              ) : (
+                                <Badge variant="outline" className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2 py-0.5 rounded">
                                   {ord.order_number}
                                 </Badge>
-                              </Link>
-                            ) : (
-                              <Badge variant="outline" className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2.5 py-0.5 rounded-md">
-                                {ord.order_number}
-                              </Badge>
-                            )}
-                          </td>
-                          <td className="p-4 font-bold text-foreground text-sm align-top pt-5">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span>{ord.company_name || "Personal Client Account"}</span>
-                              {(() => {
-                                const comp = companies.find((c: any) => c.id === (ord.company_id || ord.company?.id)) || ord.company;
-                                if (!comp) return null;
-                                const vStatus = comp.validation_status;
-                                if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
-                                  return (
-                                    <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 flex items-center gap-0.5" title="Company pending admin validation">
-                                      <Clock className="h-2.5 w-2.5" /> Pending Company
-                                    </Badge>
-                                  );
-                                }
-                                if (vStatus === "NEEDS_REVISION") {
-                                  return (
-                                    <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 flex items-center gap-0.5" title="Company needs revision">
-                                      <AlertCircle className="h-2.5 w-2.5" /> Revision Required
-                                    </Badge>
-                                  );
-                                }
-                                return null;
-                              })()}
-                            </div>
-                            <div className="text-xs font-normal text-muted-foreground flex items-center gap-1 mt-1">
-                              <Building className="h-3 w-3 text-muted-foreground" /> {ord.client_name || "Representative"}
-                            </div>
-                          </td>
-                          <td className="p-4 align-top pt-5">
-                            {ord.items && ord.items.length > 0 ? (
-                              <div className="space-y-1.5 max-w-sm">
-                                {ord.items.map((item: any, idx: number) => (
-                                  <div key={idx} className="flex flex-wrap items-center gap-1.5 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
-                                    <span className="font-semibold text-foreground text-xs leading-normal break-words">
-                                      {item.job_title}
-                                    </span>
-                                    {item.job_id && (
-                                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 bg-primary/5 text-primary border-primary/20 shrink-0">
-                                        {item.job_id}
+                              )}
+                            </td>
+                            <td className="py-2 px-2 font-bold text-foreground align-top pt-2.5 min-w-[130px] max-w-[170px]">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-sm font-bold leading-snug break-words">{ord.company_name || "Personal Client Account"}</span>
+                                {(() => {
+                                  const comp = companies.find((c: any) => c.id === (ord.company_id || ord.company?.id)) || ord.company;
+                                  if (!comp) return null;
+                                  const vStatus = comp.validation_status;
+                                  if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
+                                    return (
+                                      <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 flex items-center gap-0.5" title="Company pending admin validation">
+                                        <Clock className="h-2.5 w-2.5" /> Pending
                                       </Badge>
-                                    )}
-                                    {item.branch_name && (
-                                      <Badge variant="outline" className="text-[9px] font-medium py-0 px-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 shrink-0">
-                                        {item.branch_name}
+                                    );
+                                  }
+                                  if (vStatus === "NEEDS_REVISION") {
+                                    return (
+                                      <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 flex items-center gap-0.5" title="Company needs revision">
+                                        <AlertCircle className="h-2.5 w-2.5" /> Revision
                                       </Badge>
-                                    )}
-                                    {renderVendorBadge(item)}
-                                  </div>
-                                ))}
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
-                            ) : (
-                              <span className="text-muted-foreground italic text-xs">-</span>
-                            )}
-                          </td>
-                          <td className="p-4 align-top pt-5">
-                            {ord.consultants && ord.consultants.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {ord.consultants.map((c: any) => (
-                                  <Badge key={c.id} variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-medium flex items-center gap-1">
-                                    <UserCheck className="h-3 w-3 text-emerald-600" />
-                                    {c.name}
-                                  </Badge>
-                                ))}
+                              <div className="text-xs font-normal text-muted-foreground flex items-center gap-1 mt-1 truncate">
+                                <Building className="h-3 w-3 text-muted-foreground shrink-0" /> <span className="truncate">{ord.client_name || "Representative"}</span>
                               </div>
-                            ) : (
-                              <span className="text-muted-foreground italic text-xs">No consultant assigned</span>
-                            )}
-                          </td>
-                          <td className="p-4 text-right font-mono font-bold text-sm text-foreground align-top pt-5">
-                            {formatCurrency(ord.total_amount)}
-                          </td>
-                          <td className="p-4 text-center align-top pt-5">
-                            <div className="flex flex-col items-center gap-1.5 justify-center">
-                              <Badge className={`${getPaymentStatusColor(ord.payment_status)} font-bold font-mono border text-[11px]`}>
-                                {ord.payment_status || "UNPAID"}
-                              </Badge>
-
-                              {/* Accurate Online Live Status Badge */}
-                              {(() => {
-                                const accStatus = ord.accurate_sync_status;
-                                if (accStatus === "PAID") {
-                                  return (
-                                    <Badge variant="outline" className="text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 flex items-center gap-1 mt-0.5" title={`Accurate Receipt: ${ord.accurate_receipt_no || 'Paid'}`}>
-                                      <CheckCircle2 className="h-2.5 w-2.5 text-emerald-600" /> AOL: {ord.accurate_receipt_no || "Paid"}
-                                    </Badge>
-                                  );
-                                }
-                                if (accStatus === "INV_CREATED") {
-                                  return (
-                                    <Badge variant="outline" className="text-[9px] font-mono font-bold bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30 flex items-center gap-1 mt-0.5" title={`Accurate Invoice: ${ord.accurate_inv_no}`}>
-                                      <Receipt className="h-2.5 w-2.5 text-blue-600" /> AOL: {ord.accurate_inv_no || "Invoice"}
-                                    </Badge>
-                                  );
-                                }
-                                if (accStatus === "SO_CREATED") {
-                                  return (
-                                    <Badge variant="outline" className="text-[9px] font-mono font-bold bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 flex items-center gap-1 mt-0.5" title={`Accurate Sales Order: ${ord.accurate_so_no}`}>
-                                      <Zap className="h-2.5 w-2.5 text-purple-600" /> AOL: {ord.accurate_so_no || "SO Active"}
-                                    </Badge>
-                                  );
-                                }
-                                if (accStatus === "FAILED") {
-                                  return (
-                                    <div className="flex items-center gap-1 mt-0.5">
-                                      <Badge variant="outline" className="text-[9px] font-mono font-bold bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30 flex items-center gap-0.5" title={ord.accurate_sync_error || "Accurate sync failed"}>
-                                        <AlertCircle className="h-2.5 w-2.5 text-red-600" /> AOL: Failed
-                                      </Badge>
-                                      <button
-                                        onClick={() => handleSyncAccurate(ord.order_number || ord.id)}
-                                        className="h-4 w-4 rounded-full bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center text-red-600 transition-colors"
-                                        title="Retry Accurate Sync"
-                                      >
-                                        <RefreshCw className="h-2.5 w-2.5" />
-                                      </button>
+                            </td>
+                            <td className="py-2 px-2.5 align-top pt-2.5 min-w-[240px] max-w-[340px]">
+                              {ord.items && ord.items.length > 0 ? (
+                                <div className="space-y-1.5 w-full">
+                                  {ord.items.map((item: any, idx: number) => (
+                                    <div key={idx} className="flex flex-wrap items-center gap-1.5 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
+                                      <span className="font-semibold text-foreground text-xs leading-normal break-words">
+                                        {item.job_title}
+                                      </span>
+                                      {item.job_id && (
+                                        <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                          {item.job_id}
+                                        </Badge>
+                                      )}
+                                      {item.branch_name && (
+                                        <Badge variant="outline" className="text-[9px] font-medium py-0 px-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 shrink-0">
+                                          {item.branch_name}
+                                        </Badge>
+                                      )}
+                                      {renderVendorBadge(item)}
                                     </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground italic text-xs">-</span>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 align-top pt-2.5 w-36 min-w-[145px] max-w-[170px]">
+                              <div className="flex flex-col items-start gap-1 w-full">
+                                {ord.reviewer && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[9px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 font-semibold flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none"
+                                    title={`Reviewer: ${ord.reviewer.name}`}
+                                  >
+                                    <ShieldCheck className="h-2.5 w-2.5 text-purple-600 shrink-0" />
+                                    <span className="truncate"><span className="text-[8px] font-bold uppercase opacity-80 mr-0.5">Rev:</span>{ord.reviewer.name}</span>
+                                  </Badge>
+                                )}
+                                {ord.consultants && ord.consultants.length > 0 ? (
+                                  ord.consultants.map((c: any) => (
+                                    <Badge
+                                      key={c.id}
+                                      variant="outline"
+                                      className="text-[9.5px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-medium flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none"
+                                      title={c.name}
+                                    >
+                                      <UserCheck className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
+                                      <span className="truncate">{c.name}</span>
+                                    </Badge>
+                                  ))
+                                ) : !ord.reviewer ? (
+                                  <span className="text-muted-foreground italic text-xs">Unassigned</span>
+                                ) : null}
+                              </div>
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono font-bold text-sm text-foreground align-top pt-2.5 whitespace-nowrap">
+                              {formatCurrency(ord.total_amount)}
+                            </td>
+                            <td className="py-2 px-2 text-center align-top pt-2.5 whitespace-nowrap min-w-[85px]">
+                              <div className="flex flex-col items-center gap-1 justify-center">
+                                <Badge className={`${getPaymentStatusColor(ord.payment_status)} font-bold font-mono border text-[10px] px-2 py-0.5`}>
+                                  {ord.payment_status || "UNPAID"}
+                                </Badge>
+
+                                {/* Accurate Online Live Status Badge */}
+                                {(() => {
+                                  const accStatus = ord.accurate_sync_status;
+                                  if (accStatus === "PAID") {
+                                    return (
+                                      <Badge variant="outline" className="text-[8.5px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 flex items-center gap-0.5 py-0.5 px-1.5" title={`Accurate Receipt: ${ord.accurate_receipt_no || 'Paid'}`}>
+                                        <CheckCircle2 className="h-2.5 w-2.5 text-emerald-600" /> AOL: {ord.accurate_receipt_no || "Paid"}
+                                      </Badge>
+                                    );
+                                  }
+                                  if (accStatus === "INV_CREATED") {
+                                    return (
+                                      <Badge variant="outline" className="text-[8.5px] font-mono font-bold bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30 flex items-center gap-0.5 py-0.5 px-1.5" title={`Accurate Invoice: ${ord.accurate_inv_no}`}>
+                                        <Receipt className="h-2.5 w-2.5 text-blue-600" /> AOL: {ord.accurate_inv_no || "Invoice"}
+                                      </Badge>
+                                    );
+                                  }
+                                  if (accStatus === "SO_CREATED") {
+                                    return (
+                                      <Badge variant="outline" className="text-[8.5px] font-mono font-bold bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 flex items-center gap-0.5 py-0.5 px-1.5" title={`Accurate Sales Order: ${ord.accurate_so_no}`}>
+                                        <Zap className="h-2.5 w-2.5 text-purple-600" /> AOL: {ord.accurate_so_no || "SO Active"}
+                                      </Badge>
+                                    );
+                                  }
+                                  if (accStatus === "FAILED") {
+                                    return (
+                                      <div className="flex items-center gap-0.5">
+                                        <Badge variant="outline" className="text-[8.5px] font-mono font-bold bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30 flex items-center gap-0.5 py-0.5 px-1.5" title={ord.accurate_sync_error || "Accurate sync failed"}>
+                                          <AlertCircle className="h-2.5 w-2.5 text-red-600" /> AOL: Failed
+                                        </Badge>
+                                        <button
+                                          onClick={() => handleSyncAccurate(ord.order_number || ord.id)}
+                                          className="h-4 w-4 rounded-full bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center text-red-600 transition-colors"
+                                          title="Retry Accurate Sync"
+                                        >
+                                          <RefreshCw className="h-2.5 w-2.5" />
+                                        </button>
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <button
+                                      onClick={() => handleSyncAccurate(ord.order_number || ord.id)}
+                                      className="text-[8.5px] font-mono font-semibold text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors opacity-60 hover:opacity-100"
+                                      title="Sync with Accurate Online"
+                                    >
+                                      <Zap className="h-2.5 w-2.5 text-purple-500" /> Sync AOL
+                                    </button>
                                   );
-                                }
-                                return (
-                                  <button
-                                    onClick={() => handleSyncAccurate(ord.order_number || ord.id)}
-                                    className="text-[9px] font-mono font-semibold text-muted-foreground hover:text-foreground flex items-center gap-0.5 mt-0.5 transition-colors opacity-60 hover:opacity-100"
-                                    title="Sync with Accurate Online"
-                                  >
-                                    <Zap className="h-2.5 w-2.5 text-purple-500" /> Sync AOL
-                                  </button>
-                                );
-                              })()}
+                                })()}
 
-                              {/* Service Payment / Invoice Email Dispatch Status Marker */}
-                              {ord.last_invoice_sent_at ? (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[9px] font-mono font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30 flex items-center gap-1 mt-0.5"
-                                  title={`Invoice dispatched ${ord.invoice_delivery_channel === 'BOTH' ? 'via Email & WhatsApp' : ord.invoice_delivery_channel === 'WHATSAPP' ? 'via WhatsApp' : 'via Email'} on ${formatDate(ord.last_invoice_sent_at)} to ${ord.last_invoice_sent_to || 'client'}`}
-                                >
-                                  <MailCheck className="h-2.5 w-2.5 text-sky-600 dark:text-sky-400" />
-                                  <span>{ord.final_invoice_sent_at ? "Final Inv Sent" : "Proforma Sent"}</span>
-                                </Badge>
-                              ) : (ord.is_proforma_finalized || ord.is_final_invoice_finalized) ? (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[9px] font-mono font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 flex items-center gap-1 mt-0.5"
-                                  title="Invoice PDF finalized in storage, but email has not yet been sent to client"
-                                >
-                                  <Clock className="h-2.5 w-2.5 text-amber-600" />
-                                  <span>Inv Unsent</span>
-                                </Badge>
-                              ) : null}
-
-                              {/* Deliverables Dispatched Indicator */}
-                              {ord.deliverables_sent_at && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[9px] font-mono font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 flex items-center gap-1 mt-0.5"
-                                  title={`Final documents delivered to ${ord.deliverables_sent_to || 'client'} on ${formatDate(ord.deliverables_sent_at)}`}
-                                >
-                                  <FileCheck className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400" />
-                                  <span>Docs Sent</span>
-                                </Badge>
-                              )}
-
-                              {isPaymentActionVisible(ord) && (
-                                <>
-                                  <Button
-                                    size="sm"
+                                {/* Service Payment / Invoice Email Dispatch Status Marker */}
+                                {ord.last_invoice_sent_at ? (
+                                  <Badge
                                     variant="outline"
-                                    className="h-6 px-2 text-[10px] gap-1 font-bold shadow-xs"
-                                    onClick={async () => {
-                                      if (ord.payment_link) {
-                                        navigator.clipboard.writeText(ord.payment_link);
-                                        toast.success("Payment link copied to clipboard!");
-                                        return;
-                                      }
-                                      const toastId = toast.loading("Generating secure payment link...");
-                                      try {
-                                        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${ord.order_number}/payment-link`, {
-      credentials: "include",
-                                          method: "POST",
+                                    className="text-[8.5px] font-mono font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30 flex items-center gap-1 py-0.5 px-1.5"
+                                    title={`Invoice dispatched ${ord.invoice_delivery_channel === 'BOTH' ? 'via Email & WhatsApp' : ord.invoice_delivery_channel === 'WHATSAPP' ? 'via WhatsApp' : 'via Email'} on ${formatDate(ord.last_invoice_sent_at)} to ${ord.last_invoice_sent_to || 'client'}`}
+                                  >
+                                    <MailCheck className="h-2.5 w-2.5 text-sky-600 dark:text-sky-400" />
+                                    <span>{ord.final_invoice_sent_at ? "Final Inv" : "Proforma"}</span>
+                                  </Badge>
+                                ) : (ord.is_proforma_finalized || ord.is_final_invoice_finalized) ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[8.5px] font-mono font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 flex items-center gap-1 py-0.5 px-1.5"
+                                    title="Invoice PDF finalized in storage, but email has not yet been sent to client"
+                                  >
+                                    <Clock className="h-2.5 w-2.5 text-amber-600" />
+                                    <span>Inv Unsent</span>
+                                  </Badge>
+                                ) : null}
+
+                                {/* Signature Pre-Docs Dispatched Indicator */}
+                                {ord.signed_docs_sent_at && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[8.5px] font-mono font-medium bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/30 flex items-center gap-1 py-0.5 px-1.5"
+                                    title={`Pre-documents for signature dispatched via Email on ${formatDate(ord.signed_docs_sent_at)} to ${ord.signed_docs_sent_to || 'client'}`}
+                                  >
+                                    <MailCheck className="h-2.5 w-2.5 text-indigo-600 dark:text-indigo-400" />
+                                    <span>Sign Sent</span>
+                                  </Badge>
+                                )}
+
+                                {/* Deliverables Dispatched Indicator */}
+                                {ord.deliverables_sent_at && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[8.5px] font-mono font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 flex items-center gap-1 py-0.5 px-1.5"
+                                    title={`Final documents delivered to ${ord.deliverables_sent_to || 'client'} on ${formatDate(ord.deliverables_sent_at)}`}
+                                  >
+                                    <FileCheck className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400" />
+                                    <span>Docs Sent</span>
+                                  </Badge>
+                                )}
+
+                                {isPaymentActionVisible(ord) && (
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-5 px-1.5 text-[8.5px] gap-0.5 font-bold shadow-none"
+                                      onClick={async () => {
+                                        if (ord.payment_link) {
+                                          navigator.clipboard.writeText(ord.payment_link);
+                                          toast.success("Payment link copied to clipboard!");
+                                          return;
+                                        }
+                                        const toastId = toast.loading("Generating link...");
+                                        try {
+                                          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${ord.order_number}/payment-link`, {
+                                            credentials: "include",
+                                            method: "POST",
                                           });
-                                        if (res.ok) {
+                                          if (res.ok) {
+                                            const data = await res.json();
+                                            toast.success("Payment link copied!", { id: toastId });
+                                            setOrders(prev => prev.map(o => o.order_number === ord.order_number ? { ...o, payment_link: data.payment_link } : o));
+                                            navigator.clipboard.writeText(data.payment_link);
+                                          } else {
+                                            toast.error("Failed link generation", { id: toastId });
+                                          }
+                                        } catch (err) {
+                                          console.error(err);
+                                          toast.error("Error generating link", { id: toastId });
+                                        }
+                                      }}
+                                    >
+                                      <Link2 className="h-2.5 w-2.5" /> Link
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-5 px-1.5 text-[8.5px] gap-0.5 font-bold shadow-none"
+                                      onClick={async () => {
+                                        const toastId = toast.loading("Checking...");
+                                        try {
+                                          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${ord.order_number}/sync-payment`, {
+                                            credentials: "include",
+                                            method: "POST",
+                                          });
                                           const data = await res.json();
-                                          toast.success("Payment link generated and copied to clipboard!", { id: toastId });
-                                          setOrders(prev => prev.map(o => o.order_number === ord.order_number ? { ...o, payment_link: data.payment_link } : o));
-                                          navigator.clipboard.writeText(data.payment_link);
-                                        } else {
-                                          toast.error("Failed to generate payment link", { id: toastId });
+                                          if (res.ok && data.status === "success") {
+                                            toast.success(data.message || "Payment verified!", { id: toastId });
+                                            fetchData();
+                                          } else if (res.ok && data.status === "received") {
+                                            toast.info(`Status: ${data.xendit_status || "PENDING"}`, { id: toastId });
+                                          } else {
+                                            toast.info(data.detail || data.message || "No payment detected", { id: toastId });
+                                          }
+                                        } catch (err) {
+                                          console.error(err);
+                                          toast.error("Error verifying", { id: toastId });
                                         }
-                                      } catch (err) {
-                                        console.error(err);
-                                        toast.error("Error generating payment link", { id: toastId });
-                                      }
-                                    }}
-                                  >
-                                    <Link2 className="h-3 w-3" /> Copy Link
-                                  </Button>
+                                      }}
+                                    >
+                                      <RefreshCw className="h-2.5 w-2.5" /> Check
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-2 px-2 text-left align-top pt-2.5 whitespace-nowrap">
+                              <Badge className={`${getOrderStatusColor(ord.status)} font-bold border text-[10px] px-2 py-0.5`}>
+                                {ord.status || "CONFIRMED"}
+                              </Badge>
+                            </td>
+                            <td className="py-2 px-2 text-right align-top pt-2.5 whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1">
+                                {['DOCUMENTS_REVIEWED', 'PRE_DOC_SENT_FOR_SIGNATURE', 'PRE_DOCS_SENT'].includes(ord.status) && (
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-6 px-2 text-[10px] gap-1 font-bold shadow-xs"
-                                    onClick={async () => {
-                                      const toastId = toast.loading("Verifying payment with Xendit...");
-                                      try {
-                                        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${ord.order_number}/sync-payment`, {
-      credentials: "include",
-                                          method: "POST",
-                                          });
-                                        const data = await res.json();
-                                        if (res.ok && data.status === "success") {
-                                          toast.success(data.message || "Payment verified and updated!", { id: toastId });
-                                          fetchData();
-                                        } else if (res.ok && data.status === "received") {
-                                          toast.info(`Payment status on Xendit: ${data.xendit_status || "PENDING"}`, { id: toastId });
-                                        } else {
-                                          toast.info(data.detail || data.message || "No payment detected yet", { id: toastId });
-                                        }
-                                      } catch (err) {
-                                        console.error(err);
-                                        toast.error("Error verifying payment", { id: toastId });
-                                      }
-                                    }}
+                                    className={`h-6 px-1.5 text-[9.5px] font-bold gap-1 shadow-none inline-flex items-center rounded ${
+                                      ord.signed_docs_sent_at
+                                        ? "text-indigo-700 border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/20 dark:text-indigo-300"
+                                        : "text-indigo-600 border-indigo-500/30 hover:bg-indigo-50 dark:text-indigo-400 dark:border-indigo-500/40"
+                                    }`}
+                                    title={ord.signed_docs_sent_at ? `Signature email previously sent to ${ord.signed_docs_sent_to || 'client'} on ${formatDate(ord.signed_docs_sent_at)}. Click to re-send.` : "Send pre-documents for signature to client email"}
+                                    onClick={() => handleOpenSendSignedDocs(ord)}
                                   >
-                                    <RefreshCw className="h-3 w-3" /> Check Payment
+                                    <Send className="h-3 w-3" /> {ord.signed_docs_sent_at ? "Re-send Signature" : "Send for Signature"}
                                   </Button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                          <td className="p-4 text-center align-top pt-5">
-                            <Badge className={`${getOrderStatusColor(ord.status)} font-bold border text-[11px]`}>
-                              {ord.status || "CONFIRMED"}
-                            </Badge>
-                          </td>
-                          <td className="p-4 text-right space-x-1 align-top pt-5">
-                            {(['FINAL_PAYMENT_COMPLETED', 'SOFT_COPY_DELIVERED', 'HARD_COPY_DELIVERED', 'COMPLETED'].includes(ord.status) || ord.payment_status === "PAID") && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 px-2.5 text-xs font-bold gap-1.5 shadow-xs inline-flex items-center"
-                                title="Send final documents to client email"
-                                onClick={() => handleOpenSendDocs(ord)}
-                              >
-                                <Send className="h-3.5 w-3.5" /> Send Docs
-                              </Button>
-                            )}
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              title="Edit Order & Consultants"
-                              onClick={() => router.push(`/business/clients/orders/${ord.order_number}/edit`)}
-                            >
-                              <Edit className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              title="View Order Details"
-                              onClick={() => {
-                                setSelectedOrderGroup(ord);
-                                const pct = ord.proforma_stage_percent || 70;
-                                setProformaPercent(pct);
-                                setTempPercent(String(pct));
-                                if (ord.proforma_paid_amount != null && ord.proforma_paid_amount > 0) {
-                                  setTempAmount(String(Math.round(ord.proforma_paid_amount)));
-                                } else {
-                                  setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
-                                }
-                                setIsPph21(false);
-                                setIsViewOpen(true);
-                                fetchProgressUpdates(ord.order_number);
-                              }}
-                            >
-                              <Eye className="h-4 w-4 text-slate-500 hover:text-foreground" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              title="Order Chat"
-                              onClick={() => {
-                                setSelectedOrderGroup(ord);
-                                setIsChatOpen(true);
-                                fetchProgressUpdates(ord.order_number);
-                              }}
-                            >
-                              <MessageSquare className="h-4 w-4 text-emerald-600 hover:text-emerald-700" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              title="Delete Order"
-                              onClick={() => {
-                                setSelectedOrderGroup(ord);
-                                setIsDeleteOpen(true);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive/70 hover:text-destructive" />
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                                )}
+                                {(['FINAL_PAYMENT_COMPLETED', 'SOFT_COPY_DELIVERED', 'HARD_COPY_DELIVERED', 'COMPLETED'].includes(ord.status) || ord.payment_status === "PAID") && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-6 px-1.5 text-[9.5px] font-bold gap-1 shadow-none inline-flex items-center text-emerald-600 border-emerald-500/30 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-500/40 rounded"
+                                    title="Send final documents to client email"
+                                    onClick={() => handleOpenSendDocs(ord)}
+                                  >
+                                    <Send className="h-3 w-3" /> Send Final Docs
+                                  </Button>
+                                )}
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6 rounded p-0"
+                                  title="Edit Order & Consultants"
+                                  onClick={() => router.push(`/business/clients/orders/${ord.order_number}/edit`)}
+                                >
+                                  <Edit className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6 rounded p-0"
+                                  title="View Order Details"
+                                  onClick={() => {
+                                    setSelectedOrderGroup(ord);
+                                    const pct = ord.proforma_stage_percent || 70;
+                                    setProformaPercent(pct);
+                                    setTempPercent(String(pct));
+                                    if (ord.proforma_paid_amount != null && ord.proforma_paid_amount > 0) {
+                                      setTempAmount(String(Math.round(ord.proforma_paid_amount)));
+                                    } else {
+                                      setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
+                                    }
+                                    setIsPph21(false);
+                                    setIsViewOpen(true);
+                                    fetchProgressUpdates(ord.order_number);
+                                  }}
+                                >
+                                  <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6 rounded p-0"
+                                  title="Order Chat"
+                                  onClick={() => {
+                                    setSelectedOrderGroup(ord);
+                                    setIsChatOpen(true);
+                                    fetchProgressUpdates(ord.order_number);
+                                  }}
+                                >
+                                  <MessageSquare className="h-3.5 w-3.5 text-emerald-600 hover:text-emerald-700" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6 rounded p-0"
+                                  title="Delete Order"
+                                  onClick={() => {
+                                    setSelectedOrderGroup(ord);
+                                    setIsDeleteOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive/70 hover:text-destructive" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -2098,9 +2363,9 @@ export default function ClientOrdersPage() {
                                   const toastId = toast.loading("Generating secure payment link...");
                                   try {
                                     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/payment-link`, {
-      credentials: "include",
+                                      credentials: "include",
                                       method: "POST",
-                                      });
+                                    });
                                     if (res.ok) {
                                       const data = await res.json();
                                       toast.success("Payment link generated and copied to clipboard!", { id: toastId });
@@ -2126,9 +2391,9 @@ export default function ClientOrdersPage() {
                                   const toastId = toast.loading("Verifying payment with Xendit...");
                                   try {
                                     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/sync-payment`, {
-      credentials: "include",
+                                      credentials: "include",
                                       method: "POST",
-                                      });
+                                    });
                                     const data = await res.json();
                                     if (res.ok && data.status === "success") {
                                       toast.success(data.message || "Payment verified and updated!", { id: toastId });
@@ -2164,6 +2429,24 @@ export default function ClientOrdersPage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Designated Order Reviewer */}
+                    {selectedOrderGroup.reviewer && (
+                      <div className="p-3.5 rounded-2xl border border-purple-200 bg-purple-50/40 shadow-xs space-y-2">
+                        <span className="text-purple-800 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5 pb-1.5 border-b border-purple-100">
+                          <ShieldCheck className="h-3.5 w-3.5 text-purple-600" /> Designated Order Reviewer
+                        </span>
+                        <div className="flex items-center gap-2.5 py-1 px-1">
+                          <div className="h-8 w-8 rounded-full bg-purple-200 text-purple-900 font-bold flex items-center justify-center text-xs shrink-0 border border-purple-300">
+                            {selectedOrderGroup.reviewer.name?.substring(0, 2).toUpperCase() || "RV"}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <span className="font-semibold text-purple-950 block truncate text-xs">{selectedOrderGroup.reviewer.name}</span>
+                            <span className="text-[10px] text-purple-700 block truncate">{selectedOrderGroup.reviewer.job_title || "Order Reviewer"}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Assigned Consultants */}
                     <div className="p-4 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-2.5">
@@ -2345,13 +2628,30 @@ export default function ClientOrdersPage() {
                         </p>
                       )}
 
+                      {['DOCUMENTS_REVIEWED', 'PRE_DOC_SENT_FOR_SIGNATURE', 'PRE_DOCS_SENT'].includes(selectedOrderGroup?.status) && (
+                        <div className="space-y-1.5">
+                          <Button
+                            type="button"
+                            onClick={() => handleOpenSendSignedDocs(selectedOrderGroup)}
+                            className="w-full gap-2 font-semibold h-11 text-sm bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                          >
+                            <Send className="h-4 w-4 shrink-0" /> {selectedOrderGroup?.signed_docs_sent_at ? "Re-send Documents for Signature" : "Send Documents for Signature to Client"}
+                          </Button>
+                          {selectedOrderGroup?.signed_docs_sent_at && (
+                            <p className="text-[11px] text-indigo-700 dark:text-indigo-300 text-center font-mono flex items-center justify-center gap-1">
+                              <MailCheck className="h-3.5 w-3.5" /> Emailed to {selectedOrderGroup.signed_docs_sent_to || 'client'} on {formatDate(selectedOrderGroup.signed_docs_sent_at)}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
                       {(['FINAL_PAYMENT_COMPLETED', 'SOFT_COPY_DELIVERED', 'HARD_COPY_DELIVERED', 'COMPLETED'].includes(selectedOrderGroup?.status) || selectedOrderGroup?.payment_status === "PAID") && (
                         <Button
                           type="button"
                           onClick={() => handleOpenSendDocs(selectedOrderGroup)}
-                          className="w-full gap-2 font-semibold h-11 text-sm"
+                          className="w-full gap-2 font-semibold h-11 text-sm bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
                         >
-                          <Send className="h-4 w-4 shrink-0" /> Send Final Documents to Client
+                          <Send className="h-4 w-4 shrink-0" /> Send Final Docs
                         </Button>
                       )}
                     </div>
@@ -3096,205 +3396,330 @@ export default function ClientOrdersPage() {
 
       {/* EMAIL & WHATSAPP CONFIRMATION DIALOG */}
       <Dialog open={isEmailConfirmOpen} onOpenChange={setIsEmailConfirmOpen}>
-        <DialogContent className="sm:max-w-2xl md:max-w-3xl w-[94vw] p-0 bg-background border border-border text-foreground rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden">
+        <DialogContent className="sm:max-w-5xl md:max-w-6xl lg:max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1500px] w-[96vw] max-h-[95vh] h-auto p-0 !gap-0 bg-background border border-border text-foreground rounded-2xl shadow-2xl overflow-hidden flex flex-col">
           {/* Header */}
-          <div className={`p-6 sm:p-7 pb-5 border-b border-border/60 ${emailConfirmType === 'final'
-            ? 'bg-gradient-to-r from-emerald-500/15 via-emerald-500/5 to-transparent dark:from-emerald-950/50 dark:via-emerald-950/20'
-            : 'bg-gradient-to-r from-primary/15 via-primary/5 to-transparent dark:from-primary/30 dark:via-primary/10'
-            }`}>
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-              <DialogTitle className={`text-xl sm:text-2xl font-bold flex items-center gap-3 ${emailConfirmType === 'final' ? 'text-emerald-600 dark:text-emerald-400' : 'text-primary'
+          <div className={`p-4 sm:px-6 sm:py-3.5 border-b border-border/60 shrink-0 ${
+            emailConfirmType === 'final'
+              ? 'bg-gradient-to-r from-emerald-500/15 via-emerald-500/5 to-transparent dark:from-emerald-950/50 dark:via-emerald-950/20'
+              : 'bg-gradient-to-r from-sky-500/15 via-sky-500/5 to-transparent dark:from-sky-950/50 dark:via-sky-950/20'
+          }`}>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+              <DialogTitle className={`text-base sm:text-lg font-bold flex items-center gap-2.5 ${
+                emailConfirmType === 'final' ? 'text-emerald-600 dark:text-emerald-400' : 'text-sky-600 dark:text-sky-400'
+              }`}>
+                <div className={`h-7 w-7 sm:h-8 sm:w-8 rounded-xl border shadow-xs flex items-center justify-center shrink-0 ${
+                  emailConfirmType === 'final'
+                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-sky-500/15 border-sky-500/30 text-sky-600 dark:text-sky-400'
                 }`}>
-                <div className={`h-10 w-10 rounded-2xl flex items-center justify-center border shadow-xs shrink-0 ${emailConfirmType === 'final'
-                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                  : 'bg-primary/15 border-primary/30 text-primary'
-                  }`}>
-                  <Mail className="h-5 w-5" />
+                  <Receipt className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </div>
-                <span>Dispatch {emailConfirmType === 'final' ? 'Final Tax' : 'Proforma'} Invoice</span>
+                <span>Dispatch {emailConfirmType === 'final' ? 'Final Tax Invoice' : 'Proforma Invoice'}</span>
               </DialogTitle>
               {selectedOrderGroup && (
-                <Badge variant="outline" className={`font-mono text-xs sm:text-sm font-bold px-3 py-1 ${emailConfirmType === 'final'
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
-                  : 'bg-primary/10 border-primary/30 text-primary'
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                  <Badge variant="outline" className={`font-mono text-xs font-bold px-2.5 py-0.5 ${
+                    emailConfirmType === 'final'
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-sky-500/10 border-sky-500/30 text-sky-600 dark:text-sky-400'
                   }`}>
-                  {selectedOrderGroup.order_number}
-                </Badge>
+                    {selectedOrderGroup.order_number}
+                  </Badge>
+                  <Badge variant="secondary" className="text-xs font-semibold px-2 py-0.5">
+                    {emailConfirmType === 'final' ? '100% Full Total' : `Proforma Stage (${selectedOrderGroup.proforma_stage_percent || proformaPercent || 70}%)`}
+                  </Badge>
+                  <span className="text-xs font-bold text-foreground flex items-center gap-1 bg-background/80 px-2.5 py-0.5 rounded-lg border border-border/70 truncate max-w-[240px]">
+                    <Building2 className={`h-3 w-3 shrink-0 ${emailConfirmType === 'final' ? 'text-emerald-600' : 'text-sky-600'}`} />
+                    <span className="truncate">{selectedOrderGroup.company_name || selectedOrderGroup.client_name || "Client"}</span>
+                  </span>
+                </div>
               )}
             </div>
-            <DialogDescription className="text-xs sm:text-sm text-muted-foreground leading-relaxed max-w-xl">
-              Dispatches the official PDF invoice directly to the client's verified email and mobile phone with secure instant payment link.
+            <DialogDescription className="text-xs text-muted-foreground leading-normal">
+              Dispatches official invoice document and payment notification directly to the client's registered contacts.
             </DialogDescription>
-
-            {/* Entity & Amount Summary Card */}
-            {selectedOrderGroup && (
-              <div className="mt-4 p-4 rounded-2xl bg-background/90 dark:bg-zinc-900/90 border border-border/80 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="h-9 w-9 rounded-xl bg-muted/60 border border-border/60 flex items-center justify-center shrink-0">
-                    <Building2 className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="font-bold text-foreground text-sm block truncate">
-                      {selectedOrderGroup.company_name || selectedOrderGroup.client_name || "Client Entity"}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      Billing & Invoicing Entity
-                    </span>
-                  </div>
-                </div>
-                <div className="text-left sm:text-right shrink-0">
-                  <span className="text-xs text-muted-foreground block font-medium">
-                    {emailConfirmType === 'final' ? 'Final Invoice Total' : `Proforma Amount (${proformaPercent}%)`}
-                  </span>
-                  <div className="flex items-center gap-2 sm:justify-end">
-                    <span className="font-mono font-bold text-base sm:text-lg text-foreground">
-                      {emailConfirmType === 'final'
-                        ? `Rp ${(selectedOrderGroup.total_amount || 0).toLocaleString("id-ID")}`
-                        : `Rp ${((selectedOrderGroup.total_amount || 0) * (proformaPercent / 100)).toLocaleString("id-ID")}`
-                      }
-                    </span>
-                    <Badge variant="secondary" className="text-[10px] py-0.5 px-2 font-semibold">
-                      {emailConfirmType === 'final' ? '100% Full Total' : `Stage ${proformaPercent}%`}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
-          <div className="p-6 sm:p-8 space-y-6 max-h-[70vh] overflow-y-auto">
-            {/* Delivery Channel Selector */}
-            <div className="space-y-2.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  Delivery Channel Selection
-                </span>
-                <span className="text-xs text-muted-foreground/80 font-normal">Choose delivery method</span>
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setInvoiceDeliveryChannel('both')}
-                  className={`flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-2xl border text-center transition-all cursor-pointer select-none gap-1.5 ${invoiceDeliveryChannel === 'both'
-                    ? 'bg-primary text-primary-foreground border-primary font-bold shadow-md ring-2 ring-primary/40'
-                    : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-300 text-zinc-700 dark:bg-black dark:border-white/40 dark:text-white dark:hover:bg-zinc-900 dark:hover:border-white font-medium'
-                    }`}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <Mail className="h-4 w-4" />
-                    <span className="text-xs font-bold">+</span>
-                    <Phone className="h-4 w-4" />
+          {/* Body: 2-Column Horizontal Layout */}
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:px-6 sm:py-4">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 lg:gap-6 items-start">
+              {/* Left Column (7 cols): Channel Selection, Stakeholder Emails, WhatsApp, Alerts */}
+              <div className="md:col-span-6 lg:col-span-7 space-y-2.5 sm:space-y-3">
+                {/* Unverified Company Warning for Email Dispatch */}
+                {selectedOrderGroup && (() => {
+                  const billingComp = companies.find((c: any) => c.id === (selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id));
+                  const targetComp = companies.find((c: any) => c.id === selectedOrderGroup.company_id);
+                  const effComp = billingComp || targetComp;
+                  const isCompVerified = effComp ? (effComp.validation_status === 'VALIDATED' || effComp.validation_status === 'VERIFIED') : true;
+                  const compValStatus = effComp?.validation_status || 'PENDING_VALIDATION';
+
+                  if (!isCompVerified && (invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'email')) {
+                    return (
+                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+                        <p className="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" /> Company Profile Not Verified
+                        </p>
+                        <p className="leading-relaxed text-[11px]">
+                          Company <strong>{effComp?.company_name || selectedOrderGroup.company_name}</strong> has not been verified yet (Current status: <strong>{compValStatus}</strong>). Email sending is disabled until the company profile is reviewed and marked as <strong>VALIDATED</strong>. You may still dispatch via WhatsApp only.
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
+                {/* Delivery Channel Selector */}
+                <div className="space-y-1 bg-muted/30 p-2 sm:p-2.5 rounded-xl border border-border/60">
+                  <label className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+                    <span>Delivery Channel Selection</span>
+                    <span className="text-[11px] text-muted-foreground/80 font-normal">Choose delivery method</span>
+                  </label>
+                  <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setInvoiceDeliveryChannel('both')}
+                      className={`flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-xl border text-center transition-all cursor-pointer select-none gap-0.5 ${invoiceDeliveryChannel === 'both'
+                        ? (emailConfirmType === 'final'
+                            ? 'bg-emerald-600 text-white border-emerald-600 font-bold shadow-sm ring-1 ring-emerald-500/40'
+                            : 'bg-sky-600 text-white border-sky-600 font-bold shadow-sm ring-1 ring-sky-500/40')
+                        : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-300 text-zinc-700 dark:bg-black dark:border-white/40 dark:text-white dark:hover:bg-zinc-900 font-medium'
+                        }`}
+                    >
+                      <div className="flex items-center gap-1">
+                        <Mail className="h-3.5 w-3.5" />
+                        <span className="text-[10px] font-bold">+</span>
+                        <Phone className="h-3.5 w-3.5" />
+                      </div>
+                      <span className="text-xs leading-tight font-bold">Email & WhatsApp</span>
+                      <span className="text-[10px] opacity-80 leading-tight">Both Channels</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setInvoiceDeliveryChannel('email')}
+                      className={`flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-xl border text-center transition-all cursor-pointer select-none gap-0.5 ${invoiceDeliveryChannel === 'email'
+                        ? 'bg-sky-600 text-white border-sky-600 font-bold shadow-sm ring-1 ring-sky-500/40'
+                        : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-300 text-zinc-700 dark:bg-black dark:border-white/40 dark:text-white dark:hover:bg-zinc-900 font-medium'
+                        }`}
+                    >
+                      <Mail className="h-3.5 w-3.5" />
+                      <span className="text-xs leading-tight font-bold">Email Only</span>
+                      <span className="text-[10px] opacity-80 leading-tight">PDF Attachment</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setInvoiceDeliveryChannel('whatsapp')}
+                      className={`flex flex-col items-center justify-center p-2 sm:p-2.5 rounded-xl border text-center transition-all cursor-pointer select-none gap-0.5 ${invoiceDeliveryChannel === 'whatsapp'
+                        ? 'bg-emerald-600 text-white border-emerald-600 font-bold shadow-sm ring-1 ring-emerald-500/40'
+                        : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-300 text-zinc-700 dark:bg-black dark:border-white/40 dark:text-white dark:hover:bg-zinc-900 font-medium'
+                        }`}
+                    >
+                      <Phone className="h-3.5 w-3.5" />
+                      <span className="text-xs leading-tight font-bold">WhatsApp Only</span>
+                      <span className="text-[10px] opacity-80 leading-tight">Meta Cloud API</span>
+                    </button>
                   </div>
-                  <span className="text-xs sm:text-sm leading-tight font-bold">Email & WhatsApp</span>
-                  <span className="text-[10px] opacity-80 leading-tight">Both Channels</span>
-                </button>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => setInvoiceDeliveryChannel('email')}
-                  className={`flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-2xl border text-center transition-all cursor-pointer select-none gap-1.5 ${invoiceDeliveryChannel === 'email'
-                    ? 'bg-sky-600 text-white border-sky-600 font-bold shadow-md ring-2 ring-sky-500/40 dark:bg-sky-600 dark:text-white'
-                    : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-300 text-zinc-700 dark:bg-black dark:border-white/40 dark:text-white dark:hover:bg-zinc-900 dark:hover:border-white font-medium'
-                    }`}
-                >
-                  <Mail className="h-4 w-4 mb-0.5" />
-                  <span className="text-xs sm:text-sm leading-tight font-bold">Email Only</span>
-                  <span className="text-[10px] opacity-80 leading-tight">PDF Attachment</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setInvoiceDeliveryChannel('whatsapp')}
-                  className={`flex flex-col items-center justify-center p-3.5 sm:p-4 rounded-2xl border text-center transition-all cursor-pointer select-none gap-1.5 ${invoiceDeliveryChannel === 'whatsapp'
-                    ? 'bg-emerald-600 text-white border-emerald-600 font-bold shadow-md ring-2 ring-emerald-500/40 dark:bg-emerald-600 dark:text-white'
-                    : 'bg-zinc-100 hover:bg-zinc-200 border-zinc-300 text-zinc-700 dark:bg-black dark:border-white/40 dark:text-white dark:hover:bg-zinc-900 dark:hover:border-white font-medium'
-                    }`}
-                >
-                  <Phone className="h-4 w-4 mb-0.5" />
-                  <span className="text-xs sm:text-sm leading-tight font-bold">WhatsApp Only</span>
-                  <span className="text-[10px] opacity-80 leading-tight">Meta Cloud API</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Email Recipients Section (Only for Email or Both) */}
-            {(invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'email') && selectedOrderGroup && (
-              <StakeholderRecipientsSelector
-                companyId={selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id}
-                selectedEmails={selectedInvoiceEmails}
-                onChange={(emails) => setSelectedInvoiceEmails(emails)}
-                fallbackContact={{
-                  name: companies.find((c: any) => c.id === (selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id))?.key_contact_person || selectedOrderGroup.client_name,
-                  email: companies.find((c: any) => c.id === (selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id))?.key_contact_email,
-                  phone: companies.find((c: any) => c.id === (selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id))?.key_contact_phone,
-                  role: "Primary Contact"
-                }}
-                accentColor={emailConfirmType === 'final' ? 'emerald' : 'primary'}
-                title="Invoice Email Recipients"
-                subtitle="The invoice PDF will be emailed directly to the selected registered company contacts."
-              />
-            )}
-
-            {/* WhatsApp Mobile Number Field (Only for WhatsApp or Both) */}
-            {(invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'whatsapp') && (
-              <div className="space-y-2 bg-muted/30 p-4 rounded-2xl border border-border/60">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5 text-emerald-600" />
-                    WhatsApp Mobile Number <span className="text-destructive">*</span>
-                  </span>
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                    Meta Cloud API
-                  </span>
-                </label>
-                <PhoneInput
-                  placeholder="812 3456 789"
-                  value={emailConfirmPhone}
-                  required
-                  onChange={(val) => setEmailConfirmPhone(val)}
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  The client will receive an automated WhatsApp notification with invoice PDF attachment and payment link.
-                </p>
-              </div>
-            )}
-
-            {/* Channel Info Card */}
-            <div className={`p-4 sm:p-5 rounded-2xl border text-xs sm:text-sm transition-colors ${invoiceDeliveryChannel === 'both'
-              ? 'border-primary/30 bg-primary/5 dark:bg-primary/10 text-foreground'
-              : invoiceDeliveryChannel === 'email'
-                ? 'border-sky-500/30 bg-sky-500/10 dark:bg-sky-950/20 text-sky-950 dark:text-sky-200'
-                : 'border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-200'
-              }`}>
-              <div className="flex items-center gap-2.5 font-bold text-xs sm:text-sm mb-1">
-                {invoiceDeliveryChannel === 'both' ? (
-                  <>
-                    <Mail className="h-4 w-4 text-primary shrink-0" />
-                    <span>Dispatches via Email & WhatsApp Meta Cloud API</span>
-                  </>
-                ) : invoiceDeliveryChannel === 'email' ? (
-                  <>
-                    <Mail className="h-4 w-4 text-sky-600 shrink-0" />
-                    <span>Dispatches PDF invoice attachment to client's email</span>
-                  </>
-                ) : (
-                  <>
-                    <Phone className="h-4 w-4 text-emerald-600 shrink-0" />
-                    <span>Dispatches official WhatsApp message with PDF & payment link</span>
-                  </>
+                {/* Email Recipients Section (Only for Email or Both) */}
+                {(invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'email') && selectedOrderGroup && (
+                  <StakeholderRecipientsSelector
+                    companyId={selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id}
+                    selectedEmails={selectedInvoiceEmails}
+                    onChange={(emails) => setSelectedInvoiceEmails(emails)}
+                    fallbackContact={{
+                      name: companies.find((c: any) => c.id === (selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id))?.key_contact_person || selectedOrderGroup.client_name,
+                      email: companies.find((c: any) => c.id === (selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id))?.key_contact_email,
+                      phone: companies.find((c: any) => c.id === (selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id))?.key_contact_phone,
+                      role: "Primary Contact"
+                    }}
+                    accentColor={emailConfirmType === 'final' ? 'emerald' : 'sky'}
+                    title="Invoice Email Recipients"
+                    subtitle="The official PDF invoice will be emailed directly to the selected registered company contacts."
+                    compact={true}
+                  />
                 )}
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {invoiceDeliveryChannel === 'both'
-                  ? 'Client will receive the PDF invoice attachment by email and an interactive WhatsApp notification with secure payment link.'
+
+                {/* WhatsApp Mobile Number Field (Only for WhatsApp or Both) */}
+                {(invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'whatsapp') && (
+                  <div className="space-y-1.5 bg-muted/30 p-2 sm:p-2.5 rounded-xl border border-border/60">
+                    <label className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Phone className="h-3.5 w-3.5 text-emerald-600" />
+                        WhatsApp Mobile Number <span className="text-destructive">*</span>
+                      </span>
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                        Meta Cloud API
+                      </span>
+                    </label>
+                    <PhoneInput
+                      placeholder="812 3456 789"
+                      value={emailConfirmPhone}
+                      required
+                      onChange={(val) => setEmailConfirmPhone(val)}
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      The client will receive an automated WhatsApp notification with invoice PDF attachment and payment link.
+                    </p>
+                  </div>
+                )}
+
+                {/* Channel Info Card */}
+                <div className={`p-2.5 rounded-xl border text-xs transition-colors ${invoiceDeliveryChannel === 'both'
+                  ? (emailConfirmType === 'final'
+                      ? 'border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-200'
+                      : 'border-sky-500/30 bg-sky-500/10 dark:bg-sky-950/20 text-sky-950 dark:text-sky-200')
                   : invoiceDeliveryChannel === 'email'
-                    ? 'Official PDF invoice with itemized breakdown and bank details will be delivered straight to client inbox.'
-                    : 'Official WhatsApp direct message with attached PDF invoice and instant payment link will be sent.'}
-              </p>
+                    ? 'border-sky-500/30 bg-sky-500/10 dark:bg-sky-950/20 text-sky-950 dark:text-sky-200'
+                    : 'border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-200'
+                  }`}>
+                  <div className="flex items-center gap-2 font-bold text-xs mb-0.5">
+                    {invoiceDeliveryChannel === 'both' ? (
+                      <>
+                        <Mail className="h-3.5 w-3.5 shrink-0" />
+                        <span>Dispatches via Email & WhatsApp Meta Cloud API</span>
+                      </>
+                    ) : invoiceDeliveryChannel === 'email' ? (
+                      <>
+                        <Mail className="h-3.5 w-3.5 text-sky-600 shrink-0" />
+                        <span>Dispatches PDF invoice attachment to client's email</span>
+                      </>
+                    ) : (
+                      <>
+                        <Phone className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        <span>Dispatches official WhatsApp message with PDF & payment link</span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    {invoiceDeliveryChannel === 'both'
+                      ? 'Client will receive the PDF invoice attachment by email and an interactive WhatsApp notification with secure payment link.'
+                      : invoiceDeliveryChannel === 'email'
+                        ? 'Official PDF invoice with itemized breakdown and bank details will be delivered straight to client inbox.'
+                        : 'Official WhatsApp direct message with attached PDF invoice and instant payment link will be sent.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Right Column (5 cols): Invoice Summary & Line Items Breakdown */}
+              <div className="md:col-span-6 lg:col-span-5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Receipt className={`h-3.5 w-3.5 ${emailConfirmType === 'final' ? 'text-emerald-600' : 'text-sky-600'}`} />
+                    Invoice Summary & Breakdown
+                  </label>
+                  <span className="text-[11px] text-muted-foreground font-mono bg-muted/60 px-2 py-0.5 rounded">
+                    {emailConfirmType === 'final' ? 'Final Tax' : 'Proforma'}
+                  </span>
+                </div>
+
+                {/* Financial Calculation Card */}
+                {selectedOrderGroup && (() => {
+                  const effStagePct = selectedOrderGroup.proforma_stage_percent || proformaPercent || 70;
+                  const rawTotal = selectedOrderGroup.total_amount || 0;
+                  const proformaAmount = (rawTotal * effStagePct) / 100;
+                  const payableAmount = emailConfirmType === 'final' ? rawTotal : proformaAmount;
+
+                  return (
+                    <div className={`p-3 rounded-xl border text-xs space-y-1.5 ${
+                      emailConfirmType === 'final'
+                        ? 'bg-emerald-500/10 border-emerald-500/30 dark:bg-emerald-950/20'
+                        : 'bg-sky-500/10 border-sky-500/30 dark:bg-sky-950/20'
+                    }`}>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-muted-foreground font-medium">Billing Entity:</span>
+                        <span className="font-bold text-foreground text-right truncate max-w-[200px]">
+                          {selectedOrderGroup.company_name || selectedOrderGroup.client_name || "Client Entity"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-muted-foreground font-medium">Contract Total:</span>
+                        <span className="font-mono font-semibold text-foreground">
+                          Rp {rawTotal.toLocaleString("id-ID")}
+                        </span>
+                      </div>
+                      {emailConfirmType === 'proforma' && (
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-muted-foreground font-medium">Stage Percentage:</span>
+                          <Badge variant="outline" className="font-mono text-[10px] bg-sky-500/20 text-sky-700 border-sky-500/30 font-bold px-1.5 py-0">
+                            {effStagePct}% Down Payment
+                          </Badge>
+                        </div>
+                      )}
+                      <div className="pt-1.5 border-t border-border/60 flex justify-between items-center">
+                        <span className="font-bold text-foreground text-xs">
+                          {emailConfirmType === 'final' ? 'Final Amount Due:' : `Proforma Due (${effStagePct}%):`}
+                        </span>
+                        <span className={`font-mono font-black text-sm sm:text-base ${
+                          emailConfirmType === 'final' ? 'text-emerald-700 dark:text-emerald-300' : 'text-sky-700 dark:text-sky-300'
+                        }`}>
+                          Rp {Math.round(payableAmount).toLocaleString("id-ID")}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Line Items List Preview */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
+                    <span>Billed Service Items ({selectedOrderGroup?.items?.length || 0})</span>
+                    <span className="text-[10px] text-muted-foreground font-mono">/PDF Invoice</span>
+                  </div>
+                  {(!selectedOrderGroup?.items || selectedOrderGroup.items.length === 0) ? (
+                    <div className="p-3 rounded-xl border border-dashed border-border text-center text-muted-foreground text-xs">
+                      <span>Total lump sum service package billed</span>
+                    </div>
+                  ) : (
+                    <div className="border border-border/60 rounded-xl overflow-hidden divide-y divide-border/40 bg-card max-h-[170px] lg:max-h-[190px] overflow-y-auto">
+                      {selectedOrderGroup.items.map((item: any, idx: number) => {
+                        const linePrice = item.unit_price || item.total_price || item.price || 0;
+                        const effStagePct = selectedOrderGroup.proforma_stage_percent || proformaPercent || 70;
+                        const itemDue = emailConfirmType === 'final' ? linePrice : (linePrice * effStagePct) / 100;
+
+                        return (
+                          <div key={item.id || idx} className="p-2 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className={`h-5 w-5 rounded-md flex items-center justify-center shrink-0 ${
+                                emailConfirmType === 'final'
+                                  ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-600'
+                                  : 'bg-sky-500/10 border border-sky-500/20 text-sky-600'
+                              }`}>
+                                <FileText className="h-3 w-3" />
+                              </div>
+                              <div className="min-w-0">
+                                <span className="text-xs font-bold text-foreground block truncate max-w-[200px] sm:max-w-[240px]" title={item.job_title || item.service_name || item.name}>
+                                  {item.job_title || item.service_name || item.name || `Service Item #${idx + 1}`}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground font-mono block">
+                                  Qty: {item.quantity || 1} • Rp {Math.round(linePrice).toLocaleString("id-ID")}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0 ml-2">
+                              <span className="font-mono text-xs font-bold text-foreground block">
+                                Rp {Math.round(itemDue).toLocaleString("id-ID")}
+                              </span>
+                              <Badge variant="outline" className={`text-[9px] font-mono px-1 py-0 ${
+                                emailConfirmType === 'final'
+                                  ? 'text-emerald-700 bg-emerald-500/10 border-emerald-500/20'
+                                  : 'text-sky-700 bg-sky-500/10 border-sky-500/20'
+                              }`}>
+                                {emailConfirmType === 'final' ? '100%' : `${effStagePct}%`}
+                              </Badge>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
-          <DialogFooter className="p-5 sm:p-6 px-6 sm:px-8 border-t border-border/60 bg-muted/10 gap-3 shrink-0 flex items-center justify-end">
+          <DialogFooter className="p-3 sm:px-6 sm:py-3 border-t border-border/60 bg-muted/10 gap-2 shrink-0 flex items-center justify-end">
             <Button
               type="button"
               variant="outline"
@@ -3305,7 +3730,7 @@ export default function ClientOrdersPage() {
                 setEmailConfirmPhone("");
                 setInvoiceDeliveryChannel('both');
               }}
-              className="text-xs sm:text-sm font-semibold h-10 sm:h-11 px-5 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border-zinc-300 dark:bg-black dark:hover:bg-zinc-900 dark:text-white dark:border-white/60 dark:hover:border-white rounded-xl transition-colors"
+              className="text-xs font-semibold h-8 sm:h-9 px-3.5 rounded-lg"
             >
               Cancel
             </Button>
@@ -3314,18 +3739,26 @@ export default function ClientOrdersPage() {
               onClick={executeSendInvoiceEmail}
               disabled={
                 sendingEmail ||
+                (selectedOrderGroup && (() => {
+                  const billingComp = companies.find((c: any) => c.id === (selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id));
+                  const targetComp = companies.find((c: any) => c.id === selectedOrderGroup.company_id);
+                  const effComp = billingComp || targetComp;
+                  const isCompVerified = effComp ? (effComp.validation_status === 'VALIDATED' || effComp.validation_status === 'VERIFIED') : true;
+                  return !isCompVerified && (invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'email');
+                })()) ||
                 ((invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'email') && selectedInvoiceEmails.length === 0) ||
                 ((invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'whatsapp') && (!emailConfirmPhone.trim() || !isValidPhoneNumber(emailConfirmPhone)))
               }
-              className={`text-xs sm:text-sm font-bold h-10 sm:h-11 px-6 shadow-md gap-2 rounded-xl transition-all ${emailConfirmType === 'final'
-                ? 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white'
-                : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                }`}
+              className={`text-xs font-bold h-8 sm:h-9 px-4 sm:px-5 text-white shadow-sm gap-1.5 rounded-lg disabled:opacity-40 transition-all ${
+                emailConfirmType === 'final'
+                  ? 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500'
+                  : 'bg-sky-600 hover:bg-sky-700 active:bg-sky-800 dark:bg-sky-600 dark:hover:bg-sky-500'
+              }`}
             >
               {sendingEmail ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Send className="h-4 w-4" />
+                <Send className="h-3.5 w-3.5" />
               )}
               {invoiceDeliveryChannel === 'both'
                 ? "Send via Email & WhatsApp"
@@ -3339,185 +3772,513 @@ export default function ClientOrdersPage() {
 
       {/* SEND FINAL DOCUMENTS CONFIRMATION DIALOG */}
       <Dialog open={isSendDocsModalOpen} onOpenChange={setIsSendDocsModalOpen}>
-        <DialogContent className="sm:max-w-3xl md:max-w-4xl w-[95vw] p-0 bg-background border border-border text-foreground rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden">
+        <DialogContent className="sm:max-w-5xl md:max-w-5xl lg:max-w-6xl xl:max-w-7xl w-[96vw] max-h-[88vh] h-[88vh] md:h-auto md:max-h-[86vh] p-0 !gap-0 bg-background border border-border text-foreground rounded-2xl shadow-2xl overflow-hidden flex flex-col">
           {/* Header */}
-          <div className="p-6 sm:p-7 pb-5 border-b border-border/60 bg-gradient-to-r from-sky-500/15 via-sky-500/5 to-transparent dark:from-sky-950/50 dark:via-sky-950/20">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-              <DialogTitle className="text-xl sm:text-2xl font-bold flex items-center gap-3 text-sky-600 dark:text-sky-400">
-                <div className="h-10 w-10 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-600 dark:text-sky-400 shadow-xs shrink-0">
-                  <Send className="h-5 w-5" />
+          <div className="p-4 sm:p-5 pb-3 border-b border-border/60 bg-gradient-to-r from-sky-500/15 via-sky-500/5 to-transparent dark:from-sky-950/50 dark:via-sky-950/20 shrink-0">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+              <DialogTitle className="text-base sm:text-lg font-bold flex items-center gap-2.5 text-sky-600 dark:text-sky-400">
+                <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-600 dark:text-sky-400 shadow-xs shrink-0">
+                  <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </div>
                 <span>Send Final Deliverable Documents</span>
               </DialogTitle>
               {sendDocsOrder && (
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="font-mono text-xs sm:text-sm font-bold bg-sky-500/10 border-sky-500/30 text-sky-600 dark:text-sky-400 px-3 py-1">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                  <Badge variant="outline" className="font-mono text-xs font-bold bg-sky-500/10 border-sky-500/30 text-sky-600 dark:text-sky-400 px-2.5 py-0.5">
                     {sendDocsOrder.order_number}
                   </Badge>
-                  <Badge variant="secondary" className="text-xs sm:text-sm font-semibold px-2.5 py-1">
+                  <Badge variant="secondary" className="text-xs font-semibold px-2 py-0.5">
                     {sendDocsDocuments.length} files attached
                   </Badge>
+                  <span className="text-xs font-bold text-foreground flex items-center gap-1 bg-background/80 px-2.5 py-0.5 rounded-lg border border-border/70 truncate max-w-[220px]">
+                    <Building2 className="h-3 w-3 text-sky-600 shrink-0" />
+                    <span className="truncate">{sendDocsOrder.company_name || sendDocsOrder.client_name || "Client"}</span>
+                  </span>
                 </div>
               )}
             </div>
-            <DialogDescription className="text-xs sm:text-sm text-muted-foreground leading-relaxed max-w-2xl">
+            <DialogDescription className="text-xs text-muted-foreground leading-normal">
               Dispatch official deliverables directly from the Dropbox order folder to the client as an AES-256 password-protected ZIP archive.
             </DialogDescription>
-
-            {/* Entity Summary */}
-            {sendDocsOrder && (
-              <div className="mt-4 p-4 rounded-2xl bg-background/90 dark:bg-zinc-900/90 border border-border/80 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="h-9 w-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-600 shrink-0">
-                    <Building2 className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="font-bold text-foreground text-sm block truncate">
-                      {sendDocsOrder.company_name || sendDocsOrder.client_name || "Individual Client"}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      Client Entity & Organization
-                    </span>
-                  </div>
-                </div>
-                <Badge variant="outline" className="text-xs font-mono bg-muted/50 px-3 py-1">
-                  Dropbox Cloud Synced
-                </Badge>
-              </div>
-            )}
           </div>
 
-          <div className="p-6 sm:p-8 space-y-6 max-h-[70vh] overflow-y-auto">
-            {/* Stakeholder Recipients Selection */}
-            {sendDocsOrder && (
-              <StakeholderRecipientsSelector
-                companyId={sendDocsOrder.billing_company_id || sendDocsOrder.company_id}
-                selectedEmails={selectedDocsEmails}
-                onChange={(emails, primaryStk) => {
-                  setSelectedDocsEmails(emails);
-                  if (primaryStk?.name) {
-                    setSendDocsRecipientName(primaryStk.name);
-                  }
-                }}
-                fallbackContact={{
-                  name: companies.find((c: any) => c.id === (sendDocsOrder.billing_company_id || sendDocsOrder.company_id))?.key_contact_person || sendDocsOrder.client_name,
-                  email: companies.find((c: any) => c.id === (sendDocsOrder.billing_company_id || sendDocsOrder.company_id))?.key_contact_email,
-                  phone: companies.find((c: any) => c.id === (sendDocsOrder.billing_company_id || sendDocsOrder.company_id))?.key_contact_phone,
-                  role: "Primary Contact"
-                }}
-                accentColor="sky"
-                title="Deliverables Email Recipients"
-                subtitle="Password-protected final documents will be dispatched exclusively to the selected registered company contacts."
-              />
-            )}
+          {/* Body: 2-Column Horizontal Layout */}
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 lg:gap-6 items-start">
+              {/* Left Column (7 cols): Stakeholders, Custom Message & Encryption Details */}
+              <div className="md:col-span-6 lg:col-span-7 space-y-3">
+                {/* Unverified Company Warning for Final Deliverables */}
+                {sendDocsOrder && (() => {
+                  const finalDocsBillingComp = companies.find((c: any) => c.id === (sendDocsOrder.billing_company_id || sendDocsOrder.company_id));
+                  const finalDocsTargetComp = companies.find((c: any) => c.id === sendDocsOrder.company_id);
+                  const effFinalDocsComp = finalDocsBillingComp || finalDocsTargetComp;
+                  const isFinalDocsVerified = sendDocsZipInfo?.is_company_verified !== undefined
+                    ? sendDocsZipInfo.is_company_verified
+                    : (effFinalDocsComp ? (effFinalDocsComp.validation_status === 'VALIDATED' || effFinalDocsComp.validation_status === 'VERIFIED') : true);
+                  const finalDocsStatus = sendDocsZipInfo?.company_validation_status || effFinalDocsComp?.validation_status || 'PENDING_VALIDATION';
 
-            {/* Optional Custom Message Note */}
-            <div className="space-y-2 bg-muted/30 p-4 rounded-2xl border border-border/60">
-              <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-                Optional Delivery Note / Custom Message
-              </label>
-              <Input
-                type="text"
-                placeholder="e.g. Please find the legalized articles of association and official deed documents attached..."
-                value={sendDocsCustomMessage}
-                onChange={(e) => setSendDocsCustomMessage(e.target.value)}
-                className="h-10 text-xs sm:text-sm bg-background border-zinc-300 dark:border-zinc-700 rounded-xl"
-              />
-            </div>
-
-            {/* Security & Password-Protected ZIP Details Card */}
-            <div className="p-4 sm:p-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-950/20 text-xs sm:text-sm space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2 font-bold text-emerald-800 dark:text-emerald-300">
-                <span className="flex items-center gap-2 text-sm">
-                  <Lock className="h-4 w-4 text-emerald-600 shrink-0" />
-                  Password-Protected AES-256 ZIP Archive
-                </span>
-                <Badge variant="outline" className="font-mono text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-500/20 border-emerald-500/30 px-2.5 py-0.5">
-                  Auto-Encrypted
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                All deliverable files will be compressed into a secure encrypted ZIP archive (<span className="font-mono font-semibold text-foreground">{sendDocsZipInfo?.zip_filename || "Documents.zip"}</span>).
-              </p>
-              <div className="flex flex-wrap items-center gap-2 pt-1 font-mono text-xs">
-                <span className="text-muted-foreground font-sans font-medium">ZIP Extraction Password:</span>
-                <span className="font-bold text-emerald-700 dark:text-emerald-300 bg-background/80 px-2.5 py-1 rounded-lg border border-emerald-500/30">
-                  {sendDocsZipInfo?.zip_password || "NPWP + Company Code"}
-                </span>
-                <span className="text-[11px] text-muted-foreground italic font-sans">
-                  (NPWP: {sendDocsZipInfo?.target_tax_number || "N/A"} • Company Code: {sendDocsZipInfo?.target_company_code || "N/A"})
-                </span>
-              </div>
-            </div>
-
-            {/* Final Documents Breakdown */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <FileCheck className="h-4 w-4 text-sky-600" /> Deliverables from Dropbox ({sendDocsDocuments.length})
-                </label>
-                <span className="text-xs text-muted-foreground font-mono bg-muted/50 px-2.5 py-0.5 rounded">
-                  /Final Documents
-                </span>
-              </div>
-
-              {fetchingDocsLoading ? (
-                <div className="p-8 rounded-2xl border border-dashed border-border flex flex-col items-center justify-center gap-3 text-muted-foreground">
-                  <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
-                  <span className="text-sm font-medium">Scanning Dropbox order folder for final documents...</span>
-                </div>
-              ) : sendDocsDocuments.length === 0 ? (
-                <div className="p-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300 text-xs sm:text-sm space-y-1.5">
-                  <div className="font-bold flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
-                    No Deliverables Found in Final Documents Folder
-                  </div>
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    Please upload the completed final documents in the Company Documents section or Dropbox folder before sending.
-                  </p>
-                </div>
-              ) : (
-                <div className="border border-border/60 rounded-2xl overflow-hidden divide-y divide-border/40 bg-card">
-                  {sendDocsDocuments.map((doc, idx) => (
-                    <div key={idx} className="p-3.5 sm:p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-8 w-8 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-600 shrink-0">
-                          <Paperclip className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <span className="text-xs sm:text-sm font-bold text-foreground block truncate">{doc.file_name}</span>
-                          <span className="text-xs text-muted-foreground font-mono block mt-0.5">
-                            {doc.size ? `${(doc.size / 1024).toFixed(1)} KB • ` : ""}{doc.document_type || "Final Document"}
-                          </span>
-                        </div>
+                  if (!isFinalDocsVerified) {
+                    return (
+                      <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+                        <p className="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" /> Company Profile Not Verified
+                        </p>
+                        <p className="leading-relaxed text-[11px]">
+                          Official final deliverable documents cannot be emailed because company <strong>{sendDocsOrder.company_name}</strong> has not been verified (Current status: <strong>{finalDocsStatus}</strong>). Please validate and verify the company profile first.
+                        </p>
                       </div>
-                      <Badge variant="outline" className="text-xs font-mono font-semibold text-emerald-600 bg-emerald-500/10 border-emerald-500/20 px-2.5 py-0.5 shrink-0">
-                        Ready
+                    );
+                  }
+                  return null;
+                })()}
+
+                {sendDocsOrder && (
+                  <StakeholderRecipientsSelector
+                    companyId={sendDocsOrder.billing_company_id || sendDocsOrder.company_id}
+                    selectedEmails={selectedDocsEmails}
+                    onChange={(emails, primaryStk) => {
+                      setSelectedDocsEmails(emails);
+                      if (primaryStk?.name) {
+                        setSendDocsRecipientName(primaryStk.name);
+                      }
+                    }}
+                    fallbackContact={{
+                      name: companies.find((c: any) => c.id === (sendDocsOrder.billing_company_id || sendDocsOrder.company_id))?.key_contact_person || sendDocsOrder.client_name,
+                      email: companies.find((c: any) => c.id === (sendDocsOrder.billing_company_id || sendDocsOrder.company_id))?.key_contact_email,
+                      phone: companies.find((c: any) => c.id === (sendDocsOrder.billing_company_id || sendDocsOrder.company_id))?.key_contact_phone,
+                      role: "Primary Contact"
+                    }}
+                    accentColor="sky"
+                    title="Deliverables Email Recipients"
+                    subtitle="Password-protected final documents will be dispatched exclusively to the selected registered company contacts."
+                    compact={true}
+                  />
+                )}
+
+                {/* Optional Custom Message Note */}
+                <div className="space-y-1 bg-muted/30 p-2.5 sm:p-3 rounded-xl border border-border/60">
+                  <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                    Optional Delivery Note / Custom Message
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="e.g. Please find the legalized articles of association and official deed documents attached..."
+                    value={sendDocsCustomMessage}
+                    onChange={(e) => setSendDocsCustomMessage(e.target.value)}
+                    className="h-8 sm:h-9 text-xs bg-background border-zinc-300 dark:border-zinc-700 rounded-lg"
+                  />
+                </div>
+
+                {/* Delivery Mode: Direct Attachments vs Encrypted ZIP Checkbox */}
+                <div className="flex items-start space-x-2.5 bg-muted/30 p-2.5 sm:p-3 rounded-xl border border-border/60">
+                  <Checkbox
+                    id="send-final-docs-disable-zip"
+                    checked={sendDocsDisableZip}
+                    onCheckedChange={(checked) => setSendDocsDisableZip(!!checked)}
+                    className="mt-0.5 data-[state=checked]:bg-sky-600 data-[state=checked]:border-sky-600"
+                  />
+                  <div className="grid gap-0.5 leading-none cursor-pointer" onClick={() => setSendDocsDisableZip(!sendDocsDisableZip)}>
+                    <label
+                      htmlFor="send-final-docs-disable-zip"
+                      className="text-xs font-bold text-foreground cursor-pointer select-none"
+                    >
+                      Send as direct attachments (No ZIP & No password protection)
+                    </label>
+                    <p className="text-[11px] text-muted-foreground select-none">
+                      When checked, deliverable files will be sent as standard individual email attachments without ZIP encryption.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Security & Password-Protected ZIP Details Card or Direct Attachment Notice */}
+                {!sendDocsDisableZip ? (
+                  <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-950/20 text-xs space-y-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2 font-bold text-emerald-800 dark:text-emerald-300">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold">
+                        <Lock className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        AES-256 ZIP ({sendDocsZipInfo?.zip_filename || "Documents.zip"})
+                      </span>
+                      <Badge variant="outline" className="font-mono text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-500/20 border-emerald-500/30 px-2 py-0.5">
+                        Auto-Encrypted
                       </Badge>
                     </div>
-                  ))}
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5 font-mono text-xs">
+                      <span className="text-muted-foreground font-sans font-medium text-[11px]">ZIP Password:</span>
+                      <span className="font-bold text-emerald-700 dark:text-emerald-300 bg-background/80 px-2 py-0.5 rounded border border-emerald-500/30 text-xs">
+                        {sendDocsZipInfo?.zip_password || "Company Code + Order ID"}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl border border-sky-500/30 bg-sky-500/10 dark:bg-sky-950/20 text-xs space-y-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2 font-bold text-sky-800 dark:text-sky-300">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold">
+                        <Paperclip className="h-3.5 w-3.5 text-sky-600 shrink-0" />
+                        Direct Deliverable Attachments ({sendDocsDocuments.length} files)
+                      </span>
+                      <Badge variant="outline" className="font-mono text-[10px] text-sky-700 dark:text-sky-400 bg-sky-500/20 border-sky-500/30 px-2 py-0.5">
+                        Unencrypted
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground pt-0.5">
+                      All final deliverable documents will be attached directly to the email without password protection.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column (5 cols): Final Documents Breakdown */}
+              <div className="md:col-span-6 lg:col-span-5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <FileCheck className="h-3.5 w-3.5 text-sky-600" /> Deliverables ({sendDocsDocuments.length})
+                  </label>
+                  <span className="text-[11px] text-muted-foreground font-mono bg-muted/60 px-2 py-0.5 rounded">
+                    /Final Documents
+                  </span>
                 </div>
-              )}
+
+                {fetchingDocsLoading ? (
+                  <div className="p-8 rounded-xl border border-dashed border-border flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin text-sky-600" />
+                    <span className="text-xs font-medium">Scanning Dropbox final documents...</span>
+                  </div>
+                ) : sendDocsDocuments.length === 0 ? (
+                  <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300 text-xs space-y-1">
+                    <div className="font-bold flex items-center gap-1.5">
+                      <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                      No Deliverables Found
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                      Please upload the completed final documents in the Company Documents section or Dropbox folder before sending.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="border border-border/60 rounded-xl overflow-hidden divide-y divide-border/40 bg-card max-h-[360px] overflow-y-auto">
+                    {sendDocsDocuments.map((doc, idx) => (
+                      <div key={idx} className="p-2 sm:p-2.5 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-600 shrink-0">
+                            <Paperclip className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-xs font-bold text-foreground block truncate" title={doc.file_name}>{doc.file_name}</span>
+                            <span className="text-[10px] text-muted-foreground font-mono block">
+                              {doc.size ? `${(doc.size / 1024).toFixed(1)} KB • ` : ""}{doc.document_type || "Final Document"}
+                            </span>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="text-[10px] font-mono font-semibold text-emerald-600 bg-emerald-500/10 border-emerald-500/20 px-2 py-0.5 shrink-0 ml-2">
+                          Ready
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          <DialogFooter className="p-5 sm:p-6 px-6 sm:px-8 border-t border-border/60 bg-muted/10 gap-3 shrink-0 flex items-center justify-end">
+          <DialogFooter className="p-3 sm:p-3.5 px-4 sm:px-6 border-t border-border/60 bg-muted/10 gap-2 shrink-0 flex items-center justify-end">
             <Button
               type="button"
               variant="outline"
               onClick={() => setIsSendDocsModalOpen(false)}
-              className="text-xs sm:text-sm font-semibold h-10 sm:h-11 px-5 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border-zinc-300 dark:bg-black dark:hover:bg-zinc-900 dark:text-white dark:border-white/60 dark:hover:border-white rounded-xl transition-colors"
+              className="text-xs font-semibold h-8 sm:h-9 px-3.5 rounded-lg"
             >
               Cancel
             </Button>
             <Button
               type="button"
               onClick={executeSendFinalDocs}
-              disabled={sendingDocsLoading || fetchingDocsLoading || selectedDocsEmails.length === 0 || sendDocsDocuments.length === 0}
-              className="text-xs sm:text-sm font-bold h-10 sm:h-11 px-6 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 dark:bg-sky-600 dark:hover:bg-sky-500 text-white shadow-md gap-2 rounded-xl disabled:opacity-40 transition-all"
+              disabled={
+                sendingDocsLoading ||
+                fetchingDocsLoading ||
+                sendDocsZipInfo?.is_company_verified === false ||
+                selectedDocsEmails.length === 0 ||
+                sendDocsDocuments.length === 0
+              }
+              className="text-xs font-bold h-8 sm:h-9 px-4 sm:px-5 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 dark:bg-sky-600 dark:hover:bg-sky-500 text-white shadow-sm gap-1.5 rounded-lg disabled:opacity-40 transition-all"
             >
-              {sendingDocsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {sendingDocsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
               Confirm & Send Documents
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* SEND SIGNED / PRE-DOCS FOR SIGNATURE CONFIRMATION DIALOG */}
+      <Dialog open={isSendSignedDocsModalOpen} onOpenChange={setIsSendSignedDocsModalOpen}>
+        <DialogContent className="sm:max-w-5xl md:max-w-5xl lg:max-w-6xl xl:max-w-7xl w-[96vw] max-h-[88vh] h-[88vh] md:h-auto md:max-h-[86vh] p-0 !gap-0 bg-background border border-border text-foreground rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+          {/* Header */}
+          <div className="p-4 sm:p-5 pb-3 border-b border-border/60 bg-gradient-to-r from-sky-500/15 via-sky-500/5 to-transparent dark:from-sky-950/50 dark:via-sky-950/20 shrink-0">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+              <DialogTitle className="text-base sm:text-lg font-bold flex items-center gap-2.5 text-sky-600 dark:text-sky-400">
+                <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-600 dark:text-sky-400 shadow-xs shrink-0">
+                  <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                </div>
+                <span>Send Documents for Client Signature</span>
+              </DialogTitle>
+              {sendSignedDocsOrder && (
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                  <Badge variant="outline" className="font-mono text-xs font-bold bg-sky-500/10 border-sky-500/30 text-sky-600 dark:text-sky-400 px-2.5 py-0.5">
+                    {sendSignedDocsOrder.order_number}
+                  </Badge>
+                  <Badge variant="secondary" className="text-xs font-semibold px-2 py-0.5">
+                    {sendSignedDocsDocuments.length} files
+                  </Badge>
+                  <span className="text-xs font-bold text-foreground flex items-center gap-1 bg-background/80 px-2.5 py-0.5 rounded-lg border border-border/70 truncate max-w-[220px]">
+                    <Building2 className="h-3 w-3 text-sky-600 shrink-0" />
+                    <span className="truncate">{sendSignedDocsOrder.company_name || sendSignedDocsOrder.client_name || "Client"}</span>
+                  </span>
+                </div>
+              )}
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground leading-normal">
+              Dispatch official documents for signature directly from the Dropbox Pre Docs folder to the client as an AES-256 password-protected ZIP archive. Status will be updated to <span className="font-semibold text-foreground">Pre Doc sent for Signature</span>.
+            </DialogDescription>
+            {sendSignedDocsOrder?.signed_docs_sent_at && (
+              <div className="mt-2 p-2.5 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-800 dark:text-sky-300 text-xs flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <MailCheck className="h-4 w-4 text-sky-600 shrink-0" />
+                  Previously emailed on {formatDate(sendSignedDocsOrder.signed_docs_sent_at)} to <strong>{sendSignedDocsOrder.signed_docs_sent_to}</strong>
+                </span>
+                <Badge variant="outline" className="text-[10px] font-mono bg-sky-500/20 text-sky-700 border-sky-500/30">
+                  Re-dispatch
+                </Badge>
+              </div>
+            )}
+          </div>
+
+          {/* Body: 2-Column Horizontal Layout */}
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 lg:gap-6 items-start">
+              {/* Left Column (7 cols): Stakeholders, Custom Message & Encryption Details */}
+              <div className="md:col-span-6 lg:col-span-7 space-y-3">
+                {/* Unverified Company Warning for Signature Pre-Docs */}
+                {sendSignedDocsOrder && (() => {
+                  const signedDocsBillingComp = companies.find((c: any) => c.id === (sendSignedDocsOrder.billing_company_id || sendSignedDocsOrder.company_id));
+                  const signedDocsTargetComp = companies.find((c: any) => c.id === sendSignedDocsOrder.company_id);
+                  const effSignedDocsComp = signedDocsBillingComp || signedDocsTargetComp;
+                  const isSignedDocsVerified = sendSignedDocsZipInfo?.is_company_verified !== undefined
+                    ? sendSignedDocsZipInfo.is_company_verified
+                    : (effSignedDocsComp ? (effSignedDocsComp.validation_status === 'VALIDATED' || effSignedDocsComp.validation_status === 'VERIFIED') : true);
+                  const signedDocsStatus = sendSignedDocsZipInfo?.company_validation_status || effSignedDocsComp?.validation_status || 'PENDING_VALIDATION';
+
+                  if (!isSignedDocsVerified) {
+                    return (
+                      <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+                        <p className="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" /> Company Profile Not Verified
+                        </p>
+                        <p className="leading-relaxed text-[11px]">
+                          Documents for signature cannot be emailed because company <strong>{sendSignedDocsOrder.company_name}</strong> has not been verified (Current status: <strong>{signedDocsStatus}</strong>). Please validate and verify the company profile first.
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
+                {sendSignedDocsOrder && (
+                  <StakeholderRecipientsSelector
+                    companyId={sendSignedDocsOrder.billing_company_id || sendSignedDocsOrder.company_id}
+                    selectedEmails={selectedSignedDocsEmails}
+                    onChange={(emails, primaryStk) => {
+                      setSelectedSignedDocsEmails(emails);
+                      if (primaryStk?.name) {
+                        setSendSignedDocsRecipientName(primaryStk.name);
+                      }
+                    }}
+                    fallbackContact={{
+                      name: companies.find((c: any) => c.id === (sendSignedDocsOrder.billing_company_id || sendSignedDocsOrder.company_id))?.key_contact_person || sendSignedDocsOrder.client_name,
+                      email: companies.find((c: any) => c.id === (sendSignedDocsOrder.billing_company_id || sendSignedDocsOrder.company_id))?.key_contact_email,
+                      phone: companies.find((c: any) => c.id === (sendSignedDocsOrder.billing_company_id || sendSignedDocsOrder.company_id))?.key_contact_phone,
+                      role: "Primary Contact"
+                    }}
+                    accentColor="sky"
+                    title="Signature Recipients"
+                    subtitle="Documents requiring signature will be dispatched to selected registered contacts."
+                    compact={true}
+                  />
+                )}
+
+                {/* Optional Custom Message Note */}
+                <div className="space-y-1 bg-muted/30 p-2.5 sm:p-3 rounded-xl border border-border/60">
+                  <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                    Optional Delivery Note / Custom Message
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="e.g. Please sign and stamp the attached documents and return a scanned copy..."
+                    value={sendSignedDocsCustomMessage}
+                    onChange={(e) => setSendSignedDocsCustomMessage(e.target.value)}
+                    className="h-8 sm:h-9 text-xs bg-background border-zinc-300 dark:border-zinc-700 rounded-lg"
+                  />
+                </div>
+
+                {/* Delivery Mode: Direct Attachments vs Encrypted ZIP Checkbox */}
+                <div className="flex items-start space-x-2.5 bg-muted/30 p-2.5 sm:p-3 rounded-xl border border-border/60">
+                  <Checkbox
+                    id="send-signed-docs-disable-zip"
+                    checked={sendSignedDocsDisableZip}
+                    onCheckedChange={(checked) => setSendSignedDocsDisableZip(!!checked)}
+                    className="mt-0.5 data-[state=checked]:bg-sky-600 data-[state=checked]:border-sky-600"
+                  />
+                  <div className="grid gap-0.5 leading-none cursor-pointer" onClick={() => setSendSignedDocsDisableZip(!sendSignedDocsDisableZip)}>
+                    <label
+                      htmlFor="send-signed-docs-disable-zip"
+                      className="text-xs font-bold text-foreground cursor-pointer select-none"
+                    >
+                      Send as direct attachments (No ZIP & No password protection)
+                    </label>
+                    <p className="text-[11px] text-muted-foreground select-none">
+                      When checked, documents for signature will be sent as standard individual email attachments without ZIP encryption.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Security & Password-Protected ZIP Details Card or Direct Attachment Notice */}
+                {!sendSignedDocsDisableZip ? (
+                  <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-950/20 text-xs space-y-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2 font-bold text-emerald-800 dark:text-emerald-300">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold">
+                        <Lock className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        AES-256 ZIP ({sendSignedDocsZipInfo?.zip_filename || "Pre_Documents.zip"})
+                      </span>
+                      <Badge variant="outline" className="font-mono text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-500/20 border-emerald-500/30 px-2 py-0.5">
+                        Auto-Encrypted
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5 font-mono text-xs">
+                      <span className="text-muted-foreground font-sans font-medium text-[11px]">ZIP Password:</span>
+                      <span className="font-bold text-emerald-700 dark:text-emerald-300 bg-background/80 px-2 py-0.5 rounded border border-emerald-500/30 text-xs">
+                        {sendSignedDocsZipInfo?.zip_password || "Company Code + Order ID"}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl border border-sky-500/30 bg-sky-500/10 dark:bg-sky-950/20 text-xs space-y-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2 font-bold text-sky-800 dark:text-sky-300">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold">
+                        <Paperclip className="h-3.5 w-3.5 text-sky-600 shrink-0" />
+                        Direct Document Attachments ({sendSignedDocsDocuments.length} files)
+                      </span>
+                      <Badge variant="outline" className="font-mono text-[10px] text-sky-700 dark:text-sky-400 bg-sky-500/20 border-sky-500/30 px-2 py-0.5">
+                        Unencrypted
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground pt-0.5">
+                      All pre-documents for signature will be attached directly to the email without password protection.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column (5 cols): Documents Breakdown */}
+              <div className="md:col-span-6 lg:col-span-5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <FileCheck className="h-3.5 w-3.5 text-sky-600" /> Documents from Pre Docs ({sendSignedDocsDocuments.length})
+                  </label>
+                  <span className="text-[11px] text-muted-foreground font-mono bg-muted/60 px-2 py-0.5 rounded">
+                    /Pre Docs
+                  </span>
+                </div>
+
+                {fetchingSignedDocsLoading ? (
+                  <div className="p-8 rounded-xl border border-dashed border-border flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin text-sky-600" />
+                    <span className="text-xs font-medium">Scanning Dropbox Pre Docs folder...</span>
+                  </div>
+                ) : sendSignedDocsDocuments.length === 0 ? (
+                  <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300 text-xs space-y-1">
+                    <div className="font-bold flex items-center gap-1.5">
+                      <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                      No Documents Found in Pre Docs Folder
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                      Please upload the documents to be signed into the &quot;Pre Docs&quot; category or Dropbox folder before sending.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="border border-border/60 rounded-xl overflow-hidden bg-card max-h-[360px] overflow-y-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-muted/50 border-b border-border/50 text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                          <th className="py-2 px-3 w-1/2">Document Name</th>
+                          <th className="py-2 px-3 w-1/2">Instructions / Description</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/30">
+                        {sendSignedDocsDocuments.map((doc, idx) => (
+                          <tr key={idx} className="hover:bg-muted/30 transition-colors">
+                            <td className="py-2.5 px-3 align-top">
+                              <div className="flex items-start gap-2 min-w-0">
+                                <div className="h-6 w-6 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-600 shrink-0 mt-0.5">
+                                  <Paperclip className="h-3 w-3" />
+                                </div>
+                                <div className="min-w-0">
+                                  <span className="font-bold text-foreground text-xs block break-words" title={doc.file_name}>
+                                    {doc.file_name}
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground font-mono block">
+                                    {doc.size ? `${(doc.size / 1024).toFixed(1)} KB • ` : ""}{doc.document_type || "Pre Document"}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-3 align-top">
+                              {doc.description ? (
+                                <div className="space-y-1 bg-sky-500/5 dark:bg-sky-950/20 p-2 rounded-lg border border-sky-500/20">
+                                  {doc.description
+                                    .replace(/(?<=\S)\s+(?=(?:\d+[\.\)]|[-•*])\s+)/g, '\n')
+                                    .split('\n')
+                                    .map((l: string) => l.trim())
+                                    .filter(Boolean)
+                                    .map((line: string, lineIdx: number) => (
+                                      <div key={lineIdx} className="text-xs text-foreground font-medium leading-snug">
+                                        {line}
+                                      </div>
+                                    ))}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">-</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="p-3 sm:p-3.5 px-4 sm:px-6 border-t border-border/60 bg-muted/10 gap-2 shrink-0 flex items-center justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsSendSignedDocsModalOpen(false)}
+              className="text-xs font-semibold h-8 sm:h-9 px-3.5 rounded-lg"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={executeSendSignedDocs}
+              disabled={
+                sendingSignedDocsLoading ||
+                fetchingSignedDocsLoading ||
+                sendSignedDocsZipInfo?.is_company_verified === false ||
+                selectedSignedDocsEmails.length === 0 ||
+                sendSignedDocsDocuments.length === 0
+              }
+              className="text-xs font-bold h-8 sm:h-9 px-4 sm:px-5 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 dark:bg-sky-600 dark:hover:bg-sky-500 text-white shadow-sm gap-1.5 rounded-lg disabled:opacity-40 transition-all"
+            >
+              {sendingSignedDocsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              Confirm & Send for Signature
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1059,12 +1059,13 @@ def send_final_documents_email(
     tax_number: str = None,
     zip_password: str = None,
     zip_filename: str = None,
-    cc_emails: Optional[List[str]] = None
+    cc_emails: Optional[List[str]] = None,
+    disable_zip: bool = False
 ):
     """
-    Send official delivery email with all final deliverable documents packaged into a simple,
-    natively compatible password-protected ZIP file directly to the client.
-    Password format: [Target Company Tax ID / NPWP] + [Company Code] (e.g., 123123A260008).
+    Send official delivery email with all final deliverable documents.
+    If disable_zip is False (default), packages into an encrypted password-protected ZIP archive.
+    If disable_zip is True, attaches the files directly without encryption.
     """
     import io
     import re
@@ -1085,22 +1086,52 @@ def send_final_documents_email(
     doc_names = [fn for fn, _ in normalized_attachments]
     doc_count = len(normalized_attachments)
 
-    # Resolve ZIP password
-    effective_tax = (tax_number or "").strip()
-    effective_code = (company_code or "").strip()
-    effective_password = zip_password or (f"{effective_tax}{effective_code}" if effective_tax else effective_code) or "MCSC2026"
-    
-    # Resolve ZIP file name
-    clean_company = re.sub(r'[/\\?%*:|"<> ]', '_', company_name or "Client")
-    final_zip_name = zip_filename or f"{clean_company}_{order_number}_Final_Documents.zip"
+    zip_bytes = None
+    zip_size_kb = 0
+    final_zip_name = ""
 
-    # Build simple, universal Password-Protected ZIP Archive
-    zip_bytes = create_password_protected_zip(normalized_attachments, effective_password)
-    zip_size_kb = round(len(zip_bytes) / 1024, 1) if zip_bytes else 0
+    if not disable_zip:
+        # Resolve ZIP password
+        effective_code = (company_code or "").strip()
+        order_num = (order_number or "").strip()
+        effective_password = zip_password or f"{effective_code}{order_num}" or "MCSC2026"
+        
+        # Resolve ZIP file name
+        clean_company = re.sub(r'[/\\?%*:|"<> ]', '_', company_name or "Client")
+        final_zip_name = zip_filename or f"{clean_company}_{order_number}_Final_Documents.zip"
+
+        # Build simple, universal Password-Protected ZIP Archive
+        zip_bytes = create_password_protected_zip(normalized_attachments, effective_password)
+        zip_size_kb = round(len(zip_bytes) / 1024, 1) if zip_bytes else 0
 
     # 1. Plain Text Fallback Body
     doc_list_text = "\n".join([f"- {fn}" for fn in doc_names])
-    text_body = f"""Dear {recipient_name or 'Valued Client'},
+    
+    if disable_zip:
+        text_body = f"""Dear {recipient_name or 'Valued Client'},
+
+We are pleased to deliver the completed final documents for your service order reference {order_number}.
+
+DELIVERY DETAILS:
+- Company Entity: {company_name or 'N/A'}
+- Order Reference: {order_number}
+- Delivery Date: {delivery_date}
+- Number of Delivered Documents: {doc_count} document(s) (Direct File Attachments)
+
+DELIVERED DOCUMENTS:
+{doc_list_text if doc_list_text else '- (Documents attached)'}
+
+{f"Note: {custom_message}" if custom_message else ""}
+
+Please find the deliverable document files attached directly to this email for your corporate filing and records.
+
+Regards,
+PT Mandiri Cipta Solusi (MCS Consulting)
+Springhill Office Tower, Lantai 9 Unit 9C, Jakarta, Indonesia
+www.mcsc.co.id
+"""
+    else:
+        text_body = f"""Dear {recipient_name or 'Valued Client'},
 
 We are pleased to deliver the completed final documents for your service order reference {order_number}.
 
@@ -1116,8 +1147,8 @@ For your privacy and corporate confidentiality, all documents are packaged in a 
 
 To unlock and extract the documents:
 - ZIP Archive Password:
-  Formula: [Target Company Tax ID / NPWP] + [Company Code]
-  Example: If Company Tax ID = 12345 and Company Code = A678910, the password is 12345A678910
+  Formula: [Company Code] + [Order ID]
+  Example: If Company Code = A261226 and Order ID = MCSX-260015, the password is A261226MCSX-260015
 
 DOCUMENTS INCLUDED IN ARCHIVE:
 {doc_list_text if doc_list_text else '- (Final documents included in ZIP archive)'}
@@ -1132,7 +1163,8 @@ Springhill Office Tower, Lantai 9 Unit 9C, Jakarta, Indonesia
 www.mcsc.co.id
 """
 
-    # 2. HTML Table for included files inside the ZIP
+    # 2. HTML Table for included files
+    status_label = "Attached" if disable_zip else "Protected in ZIP"
     docs_rows_html = ""
     for idx, fn in enumerate(doc_names, 1):
         docs_rows_html += f"""
@@ -1141,7 +1173,7 @@ www.mcsc.co.id
             &#128196; <strong>{fn}</strong>
           </td>
           <td style="padding: 9px 12px; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #0284c7; text-align: right; font-weight: 600; text-transform: uppercase;">
-            Protected in ZIP
+            {status_label}
           </td>
         </tr>
         """
@@ -1168,7 +1200,7 @@ www.mcsc.co.id
       padding: 30px 10px;
     }}
     .container {{
-      max-width: 620px;
+      max-width: 740px;
       margin: 0 auto;
       background-color: #ffffff;
       border-radius: 14px;
@@ -1215,14 +1247,14 @@ www.mcsc.co.id
       font-size: 13px;
     }}
     .security-box {{
-      background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
-      border: 1.5px solid #86efac;
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      border: 1.5px solid #7dd3fc;
       border-radius: 12px;
       padding: 20px;
       margin-bottom: 25px;
     }}
     .security-title {{
-      color: #166534;
+      color: #0369a1;
       font-size: 14px;
       font-weight: 700;
       margin-bottom: 12px;
@@ -1233,13 +1265,13 @@ www.mcsc.co.id
     .password-badge {{
       display: inline-block;
       background-color: #ffffff;
-      border: 1.5px dashed #16a34a;
+      border: 1.5px dashed #0284c7;
       padding: 8px 16px;
       border-radius: 8px;
       font-family: 'Courier New', Courier, monospace;
       font-size: 16px;
       font-weight: 700;
-      color: #15803d;
+      color: #0369a1;
       letter-spacing: 1px;
       margin-top: 8px;
     }}
@@ -1280,7 +1312,7 @@ www.mcsc.co.id
           We are pleased to deliver the completed final documents for your service order reference <strong>{order_number}</strong> ({company_name or 'Client Entity'}).
         </div>
 
-        <!-- SECURITY & PASSWORD CARD -->
+        {f'''<!-- SECURITY & PASSWORD CARD -->
         <div class="security-box">
           <div class="security-title">
             &#128274; Password-Protected Deliverables Archive Attached
@@ -1289,16 +1321,16 @@ www.mcsc.co.id
             To ensure the highest standard of data privacy and corporate confidentiality, all deliverable documents are encrypted inside the attached file <strong>{final_zip_name}</strong>.
           </div>
           
-          <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #bbf7d0; font-size: 12.5px; color: #334155;">
-            <div style="font-weight: 700; color: #166534; margin-bottom: 4px;">ZIP Archive Password:</div>
+          <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #bae6fd; font-size: 12.5px; color: #334155;">
+            <div style="font-weight: 700; color: #0369a1; margin-bottom: 4px;">ZIP Archive Password:</div>
             <div style="color: #475569; font-size: 12.5px; margin-bottom: 4px;">
-              Formula: <strong>[Target Company Tax ID / NPWP]</strong> + <strong>[Company Code]</strong>
+              Formula: <strong>[Company Code]</strong> + <strong>[Order ID]</strong>
             </div>
             <div style="color: #64748b; font-size: 11.5px; font-style: italic;">
-              Example: If Company Tax ID = 12345 and Company Code = A678910, the password is <span style="font-family: monospace; font-weight: 600; color: #166534;">12345A678910</span>
+              Example: If Company Code = A261226 and Order ID = MCSX-260015, the password is <span style="font-family: monospace; font-weight: 600; color: #0369a1;">A261226MCSX-260015</span>
             </div>
           </div>
-        </div>
+        </div>''' if not disable_zip else ''}
 
         <!-- DETAILS CARD -->
         <div class="details-card">
@@ -1316,12 +1348,8 @@ www.mcsc.co.id
               <td class="details-value" style="padding-bottom: 8px; text-align: right;">{delivery_date}</td>
             </tr>
             <tr>
-              <td class="details-label" style="padding-bottom: 8px;">Attached Archive:</td>
-              <td class="details-value" style="padding-bottom: 8px; text-align: right; color: #0284c7; font-family: monospace;">{final_zip_name} ({zip_size_kb} KB)</td>
-            </tr>
-            <tr>
-              <td class="details-label" style="padding-bottom: 4px;">Archived Files:</td>
-              <td class="details-value" style="padding-bottom: 4px; text-align: right;">{doc_count} document(s)</td>
+              <td class="details-label" style="padding-bottom: 8px;">Attached Documents:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right; color: #0284c7; font-family: monospace;">{f"{final_zip_name} ({zip_size_kb} KB)" if not disable_zip else f"{doc_count} document(s) (Direct Attachments)"}</td>
             </tr>
           </table>
 
@@ -1347,7 +1375,7 @@ www.mcsc.co.id
         ''' if custom_message else ''}
 
         <div class="message" style="margin-bottom: 0;">
-          Please download and unlock the attached ZIP archive for your corporate filing and records.
+          {f"Please download and unlock the attached ZIP archive for your corporate filing and records." if not disable_zip else "Please find the attached final deliverable documents for your corporate filing and records."}
         </div>
       </div>
       <div class="footer">
@@ -1387,14 +1415,417 @@ www.mcsc.co.id
         except Exception as img_err:
             print("Failed to attach logo inline:", img_err)
 
-    # Attach the password-protected ZIP archive
-    if zip_bytes:
-        from email.mime.application import MIMEApplication
+    # Attach files: either direct attachments or single encrypted ZIP
+    from email.mime.application import MIMEApplication
+    if disable_zip:
+        for fn, ct in normalized_attachments:
+            if ct:
+                file_part = MIMEApplication(ct, Name=fn)
+                file_part.add_header('Content-Disposition', 'attachment', filename=fn)
+                msg.attach(file_part)
+    elif zip_bytes:
         zip_part = MIMEApplication(zip_bytes, Name=final_zip_name)
         zip_part.add_header('Content-Disposition', 'attachment', filename=final_zip_name)
         msg.attach(zip_part)
 
-    return send_smtp_email(msg, recipient_email, f"encrypted final documents ZIP ({doc_count} files) for order {order_number}", cc_emails=cc_emails)
+    dispatch_desc = f"final documents ({doc_count} files, {'direct attachments' if disable_zip else 'encrypted ZIP'}) for order {order_number}"
+    return send_smtp_email(msg, recipient_email, dispatch_desc, cc_emails=cc_emails)
+
+
+def send_signed_documents_for_signature_email(
+    recipient_email: str,
+    recipient_name: str,
+    order_number: str,
+    company_name: str,
+    attachments: list,
+    custom_message: str = None,
+    company_code: str = None,
+    tax_number: str = None,
+    zip_password: str = None,
+    zip_filename: str = None,
+    cc_emails: Optional[List[str]] = None,
+    disable_zip: bool = False
+):
+    """
+    Send official pre-documents for signature email to the client.
+    If disable_zip is False (default), packages into a password-protected ZIP archive.
+    If disable_zip is True, sends direct unencrypted attachments without ZIP.
+    """
+    import io
+    import re
+    from datetime import datetime
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.mime.application import MIMEApplication
+
+    subject = f"PT Mandiri Cipta Solusi - Documents for Signature (Order {order_number})"
+    transmission_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
+    delivery_date = datetime.now().strftime("%d %B %Y")
+
+    # Normalize attachments list and extract descriptions
+    normalized_attachments = []
+    for item in attachments:
+        if isinstance(item, tuple) or isinstance(item, list):
+            fn = item[0]
+            ct = item[1]
+            desc = item[2] if len(item) > 2 else ""
+            normalized_attachments.append((fn, ct, desc))
+        elif isinstance(item, dict):
+            fn = item.get("filename") or item.get("file_name", "document.pdf")
+            ct = item.get("content", b"")
+            desc = item.get("description", "")
+            normalized_attachments.append((fn, ct, desc))
+
+    doc_count = len(normalized_attachments)
+
+    zip_bytes = None
+    zip_size_kb = 0
+    final_zip_name = ""
+
+    if not disable_zip:
+        # Resolve ZIP password
+        effective_code = (company_code or "").strip()
+        order_num = (order_number or "").strip()
+        effective_password = zip_password or f"{effective_code}{order_num}" or "MCSC2026"
+        
+        # Resolve ZIP file name
+        clean_company = re.sub(r'[/\\?%*:|"<> ]', '_', company_name or "Client")
+        final_zip_name = zip_filename or f"{clean_company}_{order_number}_Pre_Documents.zip"
+
+        # Build Password-Protected ZIP Archive
+        zip_bytes = create_password_protected_zip([(fn, ct) for fn, ct, _ in normalized_attachments], effective_password)
+        zip_size_kb = round(len(zip_bytes) / 1024, 1) if zip_bytes else 0
+
+    def format_signature_instruction_html(desc: str) -> str:
+        if not desc or not desc.strip():
+            return ''
+        text = desc.strip()
+        # Break on sequence numbers (e.g., " 1. ", " 2. ", " 1) ", " 2) ", " • ", " - ")
+        formatted = re.sub(r'(?<=\S)\s+(?=(?:\d+[\.\)]|[-•*])\s+)', '\n', text)
+        lines = [line.strip() for line in formatted.split('\n') if line.strip()]
+        if len(lines) <= 1:
+            return f'<div style="background-color: #ffffff; border: 1px solid #bae6fd; border-radius: 6px; padding: 7px 10px; line-height: 1.5; color: #0f172a; font-size: 12px; font-weight: 500;">{text}</div>'
+        html_items = [f'<div style="margin-bottom: 4px; line-height: 1.45; color: #0f172a;">{l}</div>' for l in lines]
+        return f'<div style="background-color: #ffffff; border: 1px solid #bae6fd; border-radius: 6px; padding: 7px 10px; font-size: 12px; font-weight: 500;">{"".join(html_items)}</div>'
+
+    def format_signature_instruction_text(desc: str, indent: str = "    ") -> str:
+        if not desc or not desc.strip():
+            return ""
+        formatted = re.sub(r'(?<=\S)\s+(?=(?:\d+[\.\)]|[-•*])\s+)', '\n', desc.strip())
+        lines = [line.strip() for line in formatted.split('\n') if line.strip()]
+        return "\n".join([f"{indent}{l}" for l in lines])
+
+    docs_rows_html = "".join([
+        f"""<tr style="background-color: #f8fbfe;">
+            <td style="padding: 11px 14px; font-size: 12.5px; color: #0284c7; border-bottom: 1px solid #e0f2fe; font-family: monospace; font-weight: 700; vertical-align: top; width: 42%;">
+              📄 {fn}
+            </td>
+            <td style="padding: 9px 12px; font-size: 12.5px; color: #334155; border-bottom: 1px solid #e0f2fe; line-height: 1.5; vertical-align: top; width: 58%;">
+              {format_signature_instruction_html(desc)}
+            </td>
+          </tr>"""
+        for fn, _, desc in normalized_attachments
+    ])
+
+    doc_table_text = "\n".join([
+        f"• Document: {fn}" + (f"\n  Instructions:\n{format_signature_instruction_text(desc, '    ')}" if desc and desc.strip() else "")
+        for fn, _, desc in normalized_attachments
+    ])
+
+    if disable_zip:
+        text_body = f"""Dear {recipient_name or 'Valued Client'},
+
+Please find attached the documents prepared for your signature and review regarding service order reference {order_number}.
+
+ORDER & TRANSMISSION DETAILS:
+- Company Entity: {company_name or 'N/A'}
+- Order Reference: {order_number}
+- Date: {delivery_date}
+- Number of Documents for Signature: {doc_count} document(s) (Direct File Attachments)
+
+DOCUMENTS AND INSTRUCTIONS:
+{doc_table_text if doc_table_text else '- (Documents attached)'}
+
+INSTRUCTIONS:
+Please review and sign the attached documents at your earliest convenience. Once signed, you may send them back via reply email or upload them directly to your order workspace on the MCSC portal.
+
+{f'Special Instructions: {custom_message}' if custom_message else ''}
+
+Please find the document files attached directly to this email.
+
+Best regards,
+PT Mandiri Cipta Solusi (MCS Consulting)
+Springhill Office Tower, Lantai 9 Unit 9C, Jakarta, Indonesia
+www.mcsc.co.id
+"""
+    else:
+        text_body = f"""Dear {recipient_name or 'Valued Client'},
+
+Please find attached the documents prepared for your signature and review regarding service order reference {order_number}.
+
+ORDER & TRANSMISSION DETAILS:
+- Company Entity: {company_name or 'N/A'}
+- Order Reference: {order_number}
+- Date: {delivery_date}
+- Encrypted Delivery Archive: {final_zip_name} ({zip_size_kb} KB)
+- Number of Documents for Signature: {doc_count}
+
+PASSWORD PROTECTION INSTRUCTIONS:
+For your privacy and corporate confidentiality, all documents are packaged in a password-protected ZIP archive attached to this email.
+
+To unlock and extract the documents:
+- ZIP Archive Password:
+  Formula: [Company Code] + [Order ID]
+  Example: If Company Code = A261226 and Order ID = MCSX-260015, the password is A261226MCSX-260015
+
+DOCUMENTS AND INSTRUCTIONS:
+{doc_table_text if doc_table_text else '- (Documents included in ZIP archive)'}
+
+INSTRUCTIONS:
+Please review and sign the attached documents at your earliest convenience. Once signed, you may send them back via reply email or upload them directly to your order workspace on the MCSC portal.
+
+{f'Special Instructions: {custom_message}' if custom_message else ''}
+
+Please find the password-protected ZIP file attached to this email. You can open and extract it using standard archive utilities (Windows Explorer, macOS Archive Utility, 7-Zip, or WinRAR).
+
+Best regards,
+PT Mandiri Cipta Solusi (MCS Consulting)
+Springhill Office Tower, Lantai 9 Unit 9C, Jakarta, Indonesia
+www.mcsc.co.id
+"""
+
+    html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documents for Signature - Order {order_number}</title>
+  <style>
+    body {{
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f8fafc;
+      color: #334155;
+      -webkit-font-smoothing: antialiased;
+    }}
+    .wrapper {{
+      width: 100%;
+      background-color: #f8fafc;
+      padding: 30px 15px;
+    }}
+    .container {{
+      max-width: 740px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 14px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }}
+    .header {{
+      background-color: #ffffff;
+      padding: 30px;
+      text-align: center;
+      border-bottom: 1px solid #e2e8f0;
+    }}
+    .content {{
+      padding: 35px 30px;
+    }}
+    .greeting {{
+      font-size: 16px;
+      font-weight: bold;
+      color: #0f172a;
+      margin-bottom: 18px;
+    }}
+    .message {{
+      font-size: 14.5px;
+      line-height: 1.6;
+      color: #475569;
+      margin-bottom: 22px;
+    }}
+    .details-card {{
+      background-color: #f8fafc;
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 22px;
+      border: 1px solid #e2e8f0;
+    }}
+    .details-label {{
+      color: #64748b;
+      font-weight: 550;
+      font-size: 13px;
+    }}
+    .details-value {{
+      color: #0f172a;
+      font-weight: 600;
+      font-size: 13px;
+    }}
+    .security-box {{
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      border: 1.5px solid #7dd3fc;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 25px;
+    }}
+    .security-title {{
+      color: #0369a1;
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }}
+    .docs-table {{
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+      background-color: #f0f9ff;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1.5px solid #bae6fd;
+    }}
+    .footer {{
+      background-color: #f8fafc;
+      padding: 25px 30px;
+      text-align: center;
+      border-top: 1px solid #f1f5f9;
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }}
+    .footer a {{
+      color: #64748b;
+      text-decoration: underline;
+    }}
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="header">
+        <img src="cid:msc_logo" alt="PT Mandiri Cipta Solusi" style="max-height: 48px; width: auto; margin-bottom: 12px;">
+        <h2 style="margin: 0; color: #0f172a; font-size: 19px; font-weight: 700; letter-spacing: -0.3px;">Documents Prepared for Signature</h2>
+        <div style="font-size: 13px; color: #64748b; margin-top: 4px; font-weight: 500;">Order #{order_number}</div>
+      </div>
+      <div class="content">
+        <div class="greeting">Dear {recipient_name or 'Valued Client'},</div>
+        <div class="message">
+          Our team has completed the preparation and review of the documents for your service order <strong>{order_number}</strong> ({company_name or 'Client Entity'}). Please find the documents attached below for your review and signature.
+        </div>
+
+        {f'''<!-- SECURITY & PASSWORD CARD -->
+        <div class="security-box">
+          <div class="security-title">
+            &#128274; Password-Protected Signature Documents Archive Attached
+          </div>
+          <div style="font-size: 13px; color: #1e293b; line-height: 1.55;">
+            To ensure the highest standard of data privacy and confidentiality, all documents requiring signature are encrypted inside the attached archive <strong>{final_zip_name}</strong>.
+          </div>
+          
+          <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #bae6fd; font-size: 12.5px; color: #334155;">
+            <div style="font-weight: 700; color: #0369a1; margin-bottom: 4px;">ZIP Archive Password:</div>
+            <div style="color: #475569; font-size: 12.5px; margin-bottom: 4px;">
+              Formula: <strong>[Company Code]</strong> + <strong>[Order ID]</strong>
+            </div>
+            <div style="color: #64748b; font-size: 11.5px; font-style: italic;">
+              Example: If Company Code = A261226 and Order ID = MCSX-260015, the password is <span style="font-family: monospace; font-weight: 600; color: #0369a1;">A261226MCSX-260015</span>
+            </div>
+          </div>
+        </div>''' if not disable_zip else ''}
+
+        <div class="details-card">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Company Entity:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right;">{company_name or 'N/A'}</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Order Reference:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right; color: #0284c7; font-family: monospace;">#{order_number}</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Dispatch Date:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right;">{delivery_date}</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Attached Documents:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right; color: #0284c7; font-family: monospace;">{f"{final_zip_name} ({zip_size_kb} KB)" if not disable_zip else f"{doc_count} document(s) (Direct Attachments)"}</td>
+            </tr>
+          </table>
+
+          {f'''
+          <table class="docs-table">
+            <thead>
+              <tr style="background-color: #e0f2fe; border-bottom: 1.5px solid #bae6fd;">
+                <th style="padding: 10px 14px; font-size: 11px; text-transform: uppercase; color: #0369a1; text-align: left; font-weight: 700; width: 42%; letter-spacing: 0.5px;">Document Name</th>
+                <th style="padding: 10px 14px; font-size: 11px; text-transform: uppercase; color: #0369a1; text-align: left; font-weight: 700; width: 58%; letter-spacing: 0.5px;">Instructions / Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              {docs_rows_html}
+            </tbody>
+          </table>
+          ''' if normalized_attachments else ''}
+        </div>
+        
+        {f'''
+        <div class="details-card" style="margin-top: 15px; margin-bottom: 10px; font-size: 13px; color: #475569; font-style: italic;">
+          <strong style="font-style: normal; color: #0f172a;">Special Note:</strong> {custom_message}
+        </div>
+        ''' if custom_message else ''}
+      </div>
+      <div class="footer">
+        This is an official document transmission from PT Mandiri Cipta Solusi.<br>
+        Office: Springhill Office Tower, Lantai 9 Unit 9C, Jakarta, Indonesia | <a href="https://www.mcsc.co.id">www.mcsc.co.id</a>
+      </div>
+      <div style="display:none !important; font-size:1px; color:#ffffff; line-height:1px; max-height:0px; max-width:0px; opacity:0; overflow:hidden;">
+        Transmission ID: {transmission_id}
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+    msg = MIMEMultipart("mixed")
+    msg['Subject'] = subject
+
+    alt_part = MIMEMultipart("alternative")
+    alt_part.attach(MIMEText(text_body, 'plain'))
+    alt_part.attach(MIMEText(html_body, 'html'))
+    msg.attach(alt_part)
+
+    # Attach MCSC Logo inline
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    logo_path = os.path.join(base_dir, "public", "logo.png")
+    if os.path.exists(logo_path):
+        from email.mime.image import MIMEImage
+        try:
+            with open(logo_path, "rb") as f:
+                logo_data = f.read()
+                msg_image = MIMEImage(logo_data)
+                msg_image.add_header('Content-ID', '<msc_logo>')
+                msg_image.add_header('Content-Disposition', 'inline')
+                msg.attach(msg_image)
+        except Exception as img_err:
+            print("Failed to attach logo inline:", img_err)
+
+    # Attach files: either direct attachments or single encrypted ZIP
+    if disable_zip:
+        for fn, ct, _ in normalized_attachments:
+            if ct:
+                file_part = MIMEApplication(ct, Name=fn)
+                file_part.add_header('Content-Disposition', 'attachment', filename=fn)
+                msg.attach(file_part)
+    elif zip_bytes:
+        zip_part = MIMEApplication(zip_bytes, Name=final_zip_name)
+        zip_part.add_header('Content-Disposition', 'attachment', filename=final_zip_name)
+        msg.attach(zip_part)
+
+    dispatch_desc = f"pre-documents for signature ({doc_count} files, {'direct attachments' if disable_zip else 'encrypted ZIP'}) for order {order_number}"
+    return send_smtp_email(msg, recipient_email, dispatch_desc, cc_emails=cc_emails)
 
 
 def send_company_welcome_verified_email(

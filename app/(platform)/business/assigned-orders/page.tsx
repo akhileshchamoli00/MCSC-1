@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { 
   Building, 
   Search, 
@@ -24,7 +24,8 @@ import {
   FolderKanban, 
   ChevronRight,
   PauseCircle,
-  AlertTriangle
+  AlertTriangle,
+  ShieldCheck
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -42,22 +43,46 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DualOrderChatDialog } from "@/components/dual-order-chat-dialog";
 import { useUser } from "@/contexts/user-context";
 import { cn } from "@/lib/utils";
 
 export default function AssignedOrdersPage() {
   const router = useRouter();
-  const { isAdmin, hasPermission, loading: userLoading } = useUser();
+  const { profile, isAdmin, hasPermission, loading: userLoading } = useUser();
   const canView = isAdmin || hasPermission("clients_my", "view");
 
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingStatus, setSavingStatus] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState<"ASSIGNED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED">("ASSIGNED");
+  const [activeTab, setActiveTab] = useState<"ASSIGNED" | "IN_PROGRESS" | "REVIEW_ORDER" | "ON_HOLD" | "COMPLETED">("IN_PROGRESS");
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Restore active tab from URL query parameter or sessionStorage on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get("tab");
+    const savedTab = sessionStorage.getItem("assigned_orders_active_tab");
+    const targetTab = tabParam || savedTab;
+    if (targetTab && ["ASSIGNED", "IN_PROGRESS", "REVIEW_ORDER", "ON_HOLD", "COMPLETED"].includes(targetTab.toUpperCase())) {
+      setActiveTab(targetTab.toUpperCase() as any);
+    }
+  }, []);
+
+  // Save active tab in sessionStorage whenever it changes and keep URL param in sync
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("assigned_orders_active_tab", activeTab);
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("tab") !== activeTab) {
+        url.searchParams.set("tab", activeTab);
+        window.history.replaceState({}, "", url.pathname + url.search);
+      }
+    }
+  }, [activeTab]);
 
   // Authorization Check & Redirect
   useEffect(() => {
@@ -231,6 +256,8 @@ export default function AssignedOrdersPage() {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [pendingConfirmGroup, setPendingConfirmGroup] = useState<any>(null);
   const [pendingConfirmStatus, setPendingConfirmStatus] = useState<string>("");
+  const [pendingDocCount, setPendingDocCount] = useState<number | null>(null);
+  const [loadingDocCount, setLoadingDocCount] = useState<boolean>(false);
 
   // ON HOLD Modal States
   const [isOnHoldDialogOpen, setIsOnHoldDialogOpen] = useState(false);
@@ -326,53 +353,128 @@ export default function AssignedOrdersPage() {
     }
   }, [userLoading, canView]);
 
-  // Group raw rows by order_number
-  const groupedOrdersMap = new Map<string, any>();
-  (Array.isArray(orders) ? orders : []).forEach((ord) => {
-    const key = ord.order_number || `SINGLE-${ord.id}`;
-    if (!groupedOrdersMap.has(key)) {
-      groupedOrdersMap.set(key, {
-        order_number: ord.order_number,
-        client_name: ord.client_name,
-        company_name: ord.company_name,
-        company_id: ord.company_id,
-        company: ord.company,
-        created_at: ord.created_at,
-        status: ord.status || "CONFIRMED",
-        payment_status: ord.payment_status || "UNPAID",
-        consultants: ord.consultants || [],
-        notes: ord.notes || "",
-        items: []
-      });
-    }
-    const group = groupedOrdersMap.get(key);
-    group.items.push(ord);
-    
-    if (ord.consultants && ord.consultants.length > 0) {
-      const existingIds = new Set(group.consultants.map((c: any) => c.id));
-      ord.consultants.forEach((c: any) => {
-        if (!existingIds.has(c.id)) group.consultants.push(c);
-      });
-    }
-  });
+  // Group raw rows by order_number (Memoized to prevent unnecessary re-renders)
+  const groupedOrders = useMemo(() => {
+    const groupedOrdersMap = new Map<string, any>();
+    (Array.isArray(orders) ? orders : []).forEach((ord) => {
+      const key = ord.order_number || `SINGLE-${ord.id}`;
+      if (!groupedOrdersMap.has(key)) {
+        groupedOrdersMap.set(key, {
+          order_number: ord.order_number,
+          client_name: ord.client_name,
+          company_name: ord.company_name,
+          company_id: ord.company_id,
+          company: ord.company,
+          created_at: ord.created_at,
+          status: ord.status || "CONFIRMED",
+          payment_status: ord.payment_status || "UNPAID",
+          consultants: ord.consultants ? [...ord.consultants] : [],
+          consultant_ids: ord.consultant_ids ? [...ord.consultant_ids] : [],
+          reviewer_id: ord.reviewer_id || null,
+          reviewer: ord.reviewer || null,
+          notes: ord.notes || "",
+          document_count: ord.document_count || 0,
+          items: []
+        });
+      }
+      const group = groupedOrdersMap.get(key);
+      group.items.push(ord);
+      if (typeof ord.document_count === "number" && ord.document_count > (group.document_count || 0)) {
+        group.document_count = ord.document_count;
+      }
+      
+      if (ord.reviewer_id && !group.reviewer_id) {
+        group.reviewer_id = ord.reviewer_id;
+      }
+      if (ord.reviewer && !group.reviewer) {
+        group.reviewer = ord.reviewer;
+      }
+      if (ord.consultants && ord.consultants.length > 0) {
+        const existingIds = new Set(group.consultants.map((c: any) => c.id));
+        ord.consultants.forEach((c: any) => {
+          if (!existingIds.has(c.id)) group.consultants.push(c);
+        });
+      }
+      if (ord.consultant_ids && Array.isArray(ord.consultant_ids)) {
+        const existingCids = new Set(group.consultant_ids);
+        ord.consultant_ids.forEach((cid: number) => existingCids.add(cid));
+        group.consultant_ids = Array.from(existingCids);
+      }
+    });
 
-  const groupedOrders = Array.from(groupedOrdersMap.values());
+    return Array.from(groupedOrdersMap.values()).map((group) => {
+      // Enrich reviewer from employees list if missing
+      if (group.reviewer_id && !group.reviewer && employees.length > 0) {
+        const emp = employees.find((e: any) => e.id === group.reviewer_id);
+        if (emp) {
+          group.reviewer = {
+            id: emp.id,
+            name: `${emp.first_name || ""} ${emp.last_name || ""}`.trim(),
+            job_title: emp.job_title || "Designated Reviewer"
+          };
+        }
+      }
+      // Enrich consultants from employees list if missing
+      if (group.consultant_ids && group.consultant_ids.length > 0 && (!group.consultants || group.consultants.length === 0) && employees.length > 0) {
+        group.consultants = group.consultant_ids.map((cid: number) => {
+          const emp = employees.find((e: any) => e.id === cid);
+          return emp ? {
+            id: emp.id,
+            name: `${emp.first_name || ""} ${emp.last_name || ""}`.trim(),
+            job_title: emp.job_title || "Consultant"
+          } : null;
+        }).filter(Boolean);
+      }
+      return group;
+    });
+  }, [orders, employees]);
 
   const handleUpdateStatus = async (group: any, newStatus: string) => {
-    if (newStatus === "COMPLETED") {
-      setPendingConfirmGroup(group);
-      setPendingConfirmStatus(newStatus);
-      setIsConfirmOpen(true);
-      return;
-    }
+    if (!group || !newStatus || newStatus === group.status) return;
+
+    const orderNum = group.order_number;
+    setPendingDocCount(group.document_count ?? 0);
+    setLoadingDocCount(true);
+
     if (newStatus === "ON_HOLD") {
       setPendingHoldGroup(group);
       setHoldReason("");
       setHoldChannel("CLIENT");
       setIsOnHoldDialogOpen(true);
+
+      if (orderNum) {
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(orderNum)}/document-count`, { credentials: "include" })
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data && typeof data.count === "number") {
+              setPendingDocCount(data.count);
+            }
+          })
+          .catch(err => console.error("Error fetching doc count:", err))
+          .finally(() => setLoadingDocCount(false));
+      } else {
+        setLoadingDocCount(false);
+      }
       return;
     }
-    await executeUpdateStatus(group, newStatus);
+
+    setPendingConfirmGroup(group);
+    setPendingConfirmStatus(newStatus);
+    setIsConfirmOpen(true);
+
+    if (orderNum) {
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(orderNum)}/document-count`, { credentials: "include" })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data && typeof data.count === "number") {
+            setPendingDocCount(data.count);
+          }
+        })
+        .catch(err => console.error("Error fetching doc count:", err))
+        .finally(() => setLoadingDocCount(false));
+    } else {
+      setLoadingDocCount(false);
+    }
   };
 
   const handleConfirmOnHold = async () => {
@@ -423,7 +525,7 @@ export default function AssignedOrdersPage() {
       await Promise.all(
         group.items.map((itemRow: any) =>
           fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${itemRow.id}`, {
-      credentials: "include",
+            credentials: "include",
             method: "PUT",
             headers: {
               "Content-Type": "application/json"
@@ -432,7 +534,12 @@ export default function AssignedOrdersPage() {
           })
         )
       );
-      toast.success(`Order ${group.order_number} status updated to ${newStatus}`);
+      if (newStatus === "FINAL_DOC_READY") {
+        toast.success(`Order ${group.order_number} marked as Final Docs Ready and moved to Completed Orders`);
+      } else {
+        toast.success(`Order ${group.order_number} status updated to ${newStatus.replace(/_/g, " ")}`);
+      }
+      setIsConfirmOpen(false);
       fetchAssignedOrders();
       if (selectedGroup && selectedGroup.order_number === group.order_number) {
         setSelectedGroup({ ...selectedGroup, status: newStatus });
@@ -444,6 +551,7 @@ export default function AssignedOrdersPage() {
       setSavingStatus(false);
       setPendingConfirmGroup(null);
       setPendingConfirmStatus("");
+      setPendingDocCount(null);
     }
   };
 
@@ -453,6 +561,9 @@ export default function AssignedOrdersPage() {
     "IN_PROGRESS",
     "ON_HOLD",
     "REVIEW_DOCS",
+    "DOCUMENTS_REVIEWED",
+    "PRE_DOC_SENT_FOR_SIGNATURE",
+    "PRE_DOCS_SENT",
     "FINAL_DOCUMENT_PREPARATION",
     "FINAL_DOC_READY",
     "WAITING_FOR_FINAL_PAYMENT",
@@ -472,8 +583,10 @@ export default function AssignedOrdersPage() {
   const IN_PROGRESS_STATUSES = [
     "IN_PROGRESS",
     "REVIEW_DOCS",
+    "DOCUMENTS_REVIEWED",
+    "PRE_DOC_SENT_FOR_SIGNATURE",
+    "PRE_DOCS_SENT",
     "FINAL_DOCUMENT_PREPARATION",
-    "FINAL_DOC_READY",
     "WAITING_FOR_FINAL_PAYMENT",
     "FINAL_PAYMENT_COMPLETED"
   ];
@@ -483,8 +596,9 @@ export default function AssignedOrdersPage() {
     "ON_HOLD"
   ];
 
-  // 4. Completed Category (Concluded, delivered soft/hard copies)
+  // 4. Completed Category (Concluded, Final Docs Ready, delivered soft/hard copies)
   const COMPLETED_STATUSES = [
+    "FINAL_DOC_READY",
     "COMPLETED",
     "SOFT_COPY_DELIVERED",
     "HARD_COPY_DELIVERED"
@@ -495,19 +609,74 @@ export default function AssignedOrdersPage() {
     "IN_PROGRESS",
     "ON_HOLD",
     "REVIEW_DOCS",
+    "DOCUMENTS_REVIEWED",
+    "PRE_DOC_SENT_FOR_SIGNATURE",
+    "PRE_DOCS_SENT",
     "FINAL_DOCUMENT_PREPARATION",
     "FINAL_DOC_READY"
   ];
+
+  const myEmpId = profile?.id || null;
+
+  // Checks if user is designated reviewer on the order
+  const checkIsReviewer = (ord: any) => {
+    if (!myEmpId && isAdmin) {
+      return Boolean(ord.reviewer_id || ord.reviewer);
+    }
+    return Boolean(
+      myEmpId && (ord.reviewer_id === myEmpId || ord.reviewer?.id === myEmpId)
+    );
+  };
+
+  // Checks if user is an allocated executing consultant on the order
+  const checkIsExecuting = (ord: any) => {
+    if (!myEmpId && isAdmin) {
+      return true;
+    }
+    return Boolean(
+      myEmpId && (
+        (ord.consultant_ids || []).includes(myEmpId) ||
+        (ord.consultants || []).some((c: any) => c.id === myEmpId)
+      )
+    );
+  };
+
+  // True if user is ONLY a reviewer on this order (not the executing consultant)
+  const checkIsReviewOnly = (ord: any) => {
+    if (!myEmpId && isAdmin) {
+      return false;
+    }
+    return checkIsReviewer(ord) && !checkIsExecuting(ord);
+  };
 
   const filteredOrders = groupedOrders.filter(ord => {
     const status = (ord.status || "").toUpperCase();
     if (!ALLOWED_EXECUTION_STATUSES.includes(status)) return false;
 
-    // Mutually exclusive folder category check (zero duplicates across 4 folders)
-    if (activeTab === "ASSIGNED" && !ASSIGNED_STATUSES.includes(status)) return false;
-    if (activeTab === "IN_PROGRESS" && !IN_PROGRESS_STATUSES.includes(status)) return false;
-    if (activeTab === "ON_HOLD" && !ON_HOLD_STATUSES.includes(status)) return false;
-    if (activeTab === "COMPLETED" && !COMPLETED_STATUSES.includes(status)) return false;
+    const isReviewOnly = checkIsReviewOnly(ord);
+    const isExecuting = checkIsExecuting(ord);
+    const isReviewer = checkIsReviewer(ord);
+
+    // 1. Newly Assigned Orders: Followed by allocated consultant / admin
+    if (activeTab === "ASSIGNED") {
+      if (isReviewOnly || !isExecuting || !ASSIGNED_STATUSES.includes(status)) return false;
+    }
+    // 2. In-Progress Orders: Followed by allocated consultant / admin through execution lifecycle
+    if (activeTab === "IN_PROGRESS") {
+      if (isReviewOnly || !isExecuting || !IN_PROGRESS_STATUSES.includes(status)) return false;
+    }
+    // 3. Review Order: Stays in Review Order card throughout entire active lifecycle until completed or cancelled
+    if (activeTab === "REVIEW_ORDER") {
+      if (!isReviewer || COMPLETED_STATUSES.includes(status) || status === "CANCELLED") return false;
+    }
+    // 4. On-Hold Orders: Followed by allocated consultant / admin
+    if (activeTab === "ON_HOLD") {
+      if (isReviewOnly || !isExecuting || !ON_HOLD_STATUSES.includes(status)) return false;
+    }
+    // 5. Completed Orders: Concluded archive for executing consultants / admins
+    if (activeTab === "COMPLETED") {
+      if (isReviewOnly || !isExecuting || !COMPLETED_STATUSES.includes(status)) return false;
+    }
 
     const term = searchTerm.toLowerCase();
     const orderNum = (ord.order_number || "").toLowerCase();
@@ -532,15 +701,26 @@ export default function AssignedOrdersPage() {
     if (!matched) return;
 
     const st = (matched.status || "").toUpperCase();
-    let targetTab: "ASSIGNED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" = "ASSIGNED";
-    if (ON_HOLD_STATUSES.includes(st)) {
-      targetTab = "ON_HOLD";
-    } else if (COMPLETED_STATUSES.includes(st)) {
-      targetTab = "COMPLETED";
-    } else if (IN_PROGRESS_STATUSES.includes(st)) {
-      targetTab = "IN_PROGRESS";
+    const isRevOnly = checkIsReviewOnly(matched);
+    const isRev = checkIsReviewer(matched);
+
+    let targetTab: "ASSIGNED" | "IN_PROGRESS" | "REVIEW_ORDER" | "ON_HOLD" | "COMPLETED" = "ASSIGNED";
+    if (isRevOnly) {
+      if (!COMPLETED_STATUSES.includes(st) && st !== "CANCELLED") {
+        targetTab = "REVIEW_ORDER";
+      } else {
+        targetTab = "COMPLETED";
+      }
     } else {
-      targetTab = "ASSIGNED";
+      if (ON_HOLD_STATUSES.includes(st)) {
+        targetTab = "ON_HOLD";
+      } else if (COMPLETED_STATUSES.includes(st)) {
+        targetTab = "COMPLETED";
+      } else if (IN_PROGRESS_STATUSES.includes(st)) {
+        targetTab = "IN_PROGRESS";
+      } else {
+        targetTab = "ASSIGNED";
+      }
     }
 
     setActiveTab(targetTab);
@@ -550,10 +730,15 @@ export default function AssignedOrdersPage() {
     const tabOrders = groupedOrders.filter(ord => {
       const ost = (ord.status || "").toUpperCase();
       if (!ALLOWED_EXECUTION_STATUSES.includes(ost)) return false;
-      if (targetTab === "ASSIGNED" && !ASSIGNED_STATUSES.includes(ost)) return false;
-      if (targetTab === "IN_PROGRESS" && !IN_PROGRESS_STATUSES.includes(ost)) return false;
-      if (targetTab === "ON_HOLD" && !ON_HOLD_STATUSES.includes(ost)) return false;
-      if (targetTab === "COMPLETED" && !COMPLETED_STATUSES.includes(ost)) return false;
+      const oRevOnly = checkIsReviewOnly(ord);
+      const oExecuting = checkIsExecuting(ord);
+      const oReviewer = checkIsReviewer(ord);
+
+      if (targetTab === "ASSIGNED" && (oRevOnly || !oExecuting || !ASSIGNED_STATUSES.includes(ost))) return false;
+      if (targetTab === "IN_PROGRESS" && (oRevOnly || !oExecuting || !IN_PROGRESS_STATUSES.includes(ost))) return false;
+      if (targetTab === "REVIEW_ORDER" && (!oReviewer || COMPLETED_STATUSES.includes(ost) || ost === "CANCELLED")) return false;
+      if (targetTab === "ON_HOLD" && (oRevOnly || !oExecuting || !ON_HOLD_STATUSES.includes(ost))) return false;
+      if (targetTab === "COMPLETED" && (oRevOnly || !oExecuting || !COMPLETED_STATUSES.includes(ost))) return false;
       return true;
     });
 
@@ -570,38 +755,53 @@ export default function AssignedOrdersPage() {
     }
 
     setHighlightedOrderNum(matched.order_number);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("assigned_orders_highlighted_order", matched.order_number);
+    }
     setTimeout(() => {
       const el = document.getElementById(`order-row-${matched.order_number}`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      const scrollParent = el?.closest('main') || document.querySelector('main');
+      if (el && scrollParent) {
+        const parentRect = scrollParent.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        if (elRect.top < parentRect.top || elRect.bottom > parentRect.bottom) {
+          const relativeTop = elRect.top - parentRect.top + scrollParent.scrollTop;
+          scrollParent.scrollTo({ top: Math.max(0, relativeTop - 120), behavior: "smooth" });
+        }
+      }
+      if (typeof window !== "undefined") {
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
       }
     }, 300);
-
-    setTimeout(() => {
-      setHighlightedOrderNum(null);
-    }, 4000);
   };
 
-  // URL Query Params & Notification Event Listener
-  useEffect(() => {
-    if (orders.length === 0) return;
+  const hasProcessedUrlOrder = useRef(false);
 
-    const checkParams = () => {
-      if (typeof window === "undefined") return;
-      const params = new URLSearchParams(window.location.search);
-      const orderNum = params.get("order");
-      const openChat = params.get("chat");
-      if (orderNum) {
-        openOrderDirectly(orderNum, openChat === "true" || openChat === null);
-        const url = new URL(window.location.href);
+  // URL Query Params initial handler
+  useEffect(() => {
+    if (orders.length === 0 || hasProcessedUrlOrder.current) return;
+
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const orderNum = params.get("order") || sessionStorage.getItem("assigned_orders_highlighted_order");
+    const openChat = params.get("chat");
+
+    if (orderNum) {
+      hasProcessedUrlOrder.current = true;
+      openOrderDirectly(orderNum, openChat === "true");
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("order") || url.searchParams.has("chat")) {
         url.searchParams.delete("order");
         url.searchParams.delete("chat");
         window.history.replaceState({}, "", url.pathname + url.search);
       }
-    };
+    }
+  }, [orders, groupedOrders]);
 
-    checkParams();
-
+  // Notification Event Listener
+  useEffect(() => {
     const handleCustomOpen = (e: any) => {
       if (e.detail?.orderNumber) {
         openOrderDirectly(e.detail.orderNumber, e.detail.chat ?? true);
@@ -631,8 +831,11 @@ export default function AssignedOrdersPage() {
       case "IN_PROGRESS": return "bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/20 font-bold";
       case "ON_HOLD": return "bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 font-bold";
       case "REVIEW_DOCS": return "bg-teal-500/10 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400 border-teal-500/20 font-bold";
+      case "DOCUMENTS_REVIEWED": return "bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 font-bold";
+      case "PRE_DOC_SENT_FOR_SIGNATURE": return "bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20 font-bold";
+      case "PRE_DOCS_SENT": return "bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20 font-bold";
       case "FINAL_DOCUMENT_PREPARATION": return "bg-orange-500/10 dark:bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/20 font-bold";
-      case "FINAL_DOC_READY": return "bg-lime-500/10 dark:bg-lime-500/15 text-lime-600 dark:text-lime-400 border-lime-500/20 font-bold";
+      case "FINAL_DOC_READY": return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold";
       case "INVOICE_GENERATED": return "bg-pink-500/10 dark:bg-pink-500/15 text-pink-600 dark:text-pink-400 border-pink-500/20 font-bold";
       case "WAITING_FOR_FINAL_PAYMENT": return "bg-pink-500/10 dark:bg-pink-500/15 text-pink-600 dark:text-pink-400 border-pink-500/20 font-bold";
       case "FINAL_PAYMENT_COMPLETED": return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold";
@@ -642,13 +845,43 @@ export default function AssignedOrdersPage() {
     }
   };
 
-  // Mutually Exclusive Counts
-  const assignedOrdersCount = groupedOrders.filter(o => ASSIGNED_STATUSES.includes((o.status || "").toUpperCase())).length;
-  const inProgressOrdersCount = groupedOrders.filter(o => IN_PROGRESS_STATUSES.includes((o.status || "").toUpperCase())).length;
-  const onHoldOrdersCount = groupedOrders.filter(o => ON_HOLD_STATUSES.includes((o.status || "").toUpperCase())).length;
-  const reviewPrepOrdersCount = groupedOrders.filter(o => ["REVIEW_DOCS", "FINAL_DOCUMENT_PREPARATION", "FINAL_DOC_READY"].includes((o.status || "").toUpperCase())).length;
-  const completedOrdersCount = groupedOrders.filter(o => COMPLETED_STATUSES.includes((o.status || "").toUpperCase())).length;
-  const totalAllocatedCount = groupedOrders.filter(o => ALLOWED_EXECUTION_STATUSES.includes((o.status || "").toUpperCase())).length;
+  // Mutually Exclusive Counts Across All Folders
+  const assignedOrdersCount = groupedOrders.filter(o => {
+    const st = (o.status || "").toUpperCase();
+    return ASSIGNED_STATUSES.includes(st) && !checkIsReviewOnly(o) && checkIsExecuting(o);
+  }).length;
+
+  const inProgressOrdersCount = groupedOrders.filter(o => {
+    const st = (o.status || "").toUpperCase();
+    return IN_PROGRESS_STATUSES.includes(st) && !checkIsReviewOnly(o) && checkIsExecuting(o);
+  }).length;
+
+  const reviewOrdersCount = groupedOrders.filter(o => {
+    const st = (o.status || "").toUpperCase();
+    return checkIsReviewer(o) && !COMPLETED_STATUSES.includes(st) && st !== "CANCELLED";
+  }).length;
+
+  const onHoldOrdersCount = groupedOrders.filter(o => {
+    const st = (o.status || "").toUpperCase();
+    return ON_HOLD_STATUSES.includes(st) && !checkIsReviewOnly(o) && checkIsExecuting(o);
+  }).length;
+
+  const completedOrdersCount = groupedOrders.filter(o => {
+    const st = (o.status || "").toUpperCase();
+    return COMPLETED_STATUSES.includes(st) && !checkIsReviewOnly(o) && checkIsExecuting(o);
+  }).length;
+
+  const reviewPrepOrdersCount = groupedOrders.filter(o => {
+    const st = (o.status || "").toUpperCase();
+    return !checkIsReviewOnly(o) && checkIsExecuting(o) && ["REVIEW_DOCS", "DOCUMENTS_REVIEWED", "PRE_DOC_SENT_FOR_SIGNATURE", "PRE_DOCS_SENT", "FINAL_DOCUMENT_PREPARATION"].includes(st);
+  }).length;
+
+  const totalAllocatedCount = groupedOrders.filter(o => {
+    const st = (o.status || "").toUpperCase();
+    if (!ALLOWED_EXECUTION_STATUSES.includes(st) || COMPLETED_STATUSES.includes(st) || st === "CANCELLED") return false;
+    if (!myEmpId && isAdmin) return true;
+    return !checkIsReviewOnly(o) && checkIsExecuting(o);
+  }).length;
 
   if (userLoading || (!canView && !isAdmin)) {
     return (
@@ -693,8 +926,8 @@ export default function AssignedOrdersPage() {
           </div>
         </div>
 
-        {/* 4 Interactive Workflow Folders */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 5 Interactive Workflow Folders */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
           
           {/* FOLDER 1: NEWLY ASSIGNED */}
           <div
@@ -725,7 +958,7 @@ export default function AssignedOrdersPage() {
                     </h3>
                     {activeTab === "ASSIGNED" && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/30 uppercase tracking-wider">
-                        Active Folder
+                        Active
                       </span>
                     )}
                   </div>
@@ -776,15 +1009,15 @@ export default function AssignedOrdersPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-sm tracking-tight text-foreground">
-                      In-Progress Orders
+                      In-Progress
                     </h3>
                     {activeTab === "IN_PROGRESS" && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/30 uppercase tracking-wider">
-                        Active Folder
+                        Active
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Execution, review & prep stages</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Execution, prep & payment stages</p>
                 </div>
               </div>
               <Badge 
@@ -800,13 +1033,67 @@ export default function AssignedOrdersPage() {
 
             <div className="pt-2.5 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-sky-600 dark:text-sky-400 font-semibold">
-                <Clock className="h-3 w-3" /> {reviewPrepOrdersCount} In Review / Prep
+                <Clock className="h-3 w-3" /> {reviewPrepOrdersCount} In Review/Prep
               </span>
-              <span className="font-medium text-foreground/80">{inProgressOrdersCount} active {inProgressOrdersCount === 1 ? "order" : "orders"}</span>
+              <span className="font-medium text-foreground/80">{inProgressOrdersCount} active</span>
             </div>
           </div>
 
-          {/* FOLDER 3: ON-HOLD ORDERS */}
+          {/* FOLDER 3: REVIEW ORDER */}
+          <div
+            onClick={() => setActiveTab("REVIEW_ORDER")}
+            className={cn(
+              "group relative rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
+              "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
+              activeTab === "REVIEW_ORDER"
+                ? "border-indigo-500/60 ring-2 ring-indigo-500/20 bg-gradient-to-br from-indigo-500/10 via-indigo-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-indigo-500/5 -translate-y-0.5"
+                : "border-border/60 hover:border-indigo-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
+            )}
+          >
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "p-3 rounded-xl transition-all duration-200 shrink-0",
+                  activeTab === "REVIEW_ORDER"
+                    ? "bg-indigo-600 text-white shadow-xs scale-105"
+                    : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-500/20"
+                )}>
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-sm tracking-tight text-foreground">
+                      Review Order
+                    </h3>
+                    {activeTab === "REVIEW_ORDER" && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border border-indigo-500/30 uppercase tracking-wider">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Continuous review throughout order lifecycle</p>
+                </div>
+              </div>
+              <Badge 
+                variant={activeTab === "REVIEW_ORDER" ? "default" : "secondary"} 
+                className={cn(
+                  "font-mono text-xs font-bold px-2.5 py-0.5 shrink-0",
+                  activeTab === "REVIEW_ORDER" ? "bg-indigo-600 text-white hover:bg-indigo-600" : "bg-muted text-muted-foreground"
+                )}
+              >
+                {reviewOrdersCount}
+              </Badge>
+            </div>
+
+            <div className="pt-2.5 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold">
+                <ShieldCheck className="h-3 w-3" /> Continuous Review
+              </span>
+              <span className="font-medium text-foreground/80">{reviewOrdersCount} active {reviewOrdersCount === 1 ? "review" : "reviews"}</span>
+            </div>
+          </div>
+
+          {/* FOLDER 4: ON-HOLD ORDERS */}
           <div
             onClick={() => setActiveTab("ON_HOLD")}
             className={cn(
@@ -834,7 +1121,7 @@ export default function AssignedOrdersPage() {
                     </h3>
                     {activeTab === "ON_HOLD" && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30 uppercase tracking-wider">
-                        Active Folder
+                        Active
                       </span>
                     )}
                   </div>
@@ -860,7 +1147,7 @@ export default function AssignedOrdersPage() {
             </div>
           </div>
 
-          {/* FOLDER 4: COMPLETED ORDERS */}
+          {/* FOLDER 5: COMPLETED ORDERS */}
           <div
             onClick={() => setActiveTab("COMPLETED")}
             className={cn(
@@ -888,7 +1175,7 @@ export default function AssignedOrdersPage() {
                     </h3>
                     {activeTab === "COMPLETED" && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 uppercase tracking-wider">
-                        Active Folder
+                        Active
                       </span>
                     )}
                   </div>
@@ -935,6 +1222,12 @@ export default function AssignedOrdersPage() {
                   <span>In-Progress Orders Folder</span>
                 </>
               )}
+              {activeTab === "REVIEW_ORDER" && (
+                <>
+                  <ShieldCheck className="h-4 w-4 text-indigo-500 shrink-0" />
+                  <span>Review Orders Folder</span>
+                </>
+              )}
               {activeTab === "ON_HOLD" && (
                 <>
                   <PauseCircle className="h-4 w-4 text-amber-500 shrink-0" />
@@ -959,7 +1252,7 @@ export default function AssignedOrdersPage() {
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={`Search inside ${activeTab === "ASSIGNED" ? "assigned orders" : activeTab === "IN_PROGRESS" ? "in-progress orders" : activeTab === "ON_HOLD" ? "on-hold orders" : "completed orders"}...`}
+                placeholder={`Search inside ${activeTab === "ASSIGNED" ? "assigned orders" : activeTab === "IN_PROGRESS" ? "in-progress orders" : activeTab === "REVIEW_ORDER" ? "review orders" : activeTab === "ON_HOLD" ? "on-hold orders" : "completed orders"}...`}
                 className="pl-8 h-9 text-xs rounded-lg bg-background/80"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -983,7 +1276,7 @@ export default function AssignedOrdersPage() {
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <ShoppingCart className="h-12 w-12 text-muted-foreground/35 mb-3" />
               <h3 className="font-bold text-lg">
-                {activeTab === "ASSIGNED" ? "No Newly Assigned Orders" : activeTab === "IN_PROGRESS" ? "No In-Progress Orders" : activeTab === "ON_HOLD" ? "No On-Hold Orders" : "No Completed Orders"}
+                {activeTab === "ASSIGNED" ? "No Newly Assigned Orders" : activeTab === "IN_PROGRESS" ? "No In-Progress Orders" : activeTab === "REVIEW_ORDER" ? "No Review Orders" : activeTab === "ON_HOLD" ? "No On-Hold Orders" : "No Completed Orders"}
               </h3>
               <p className="text-sm text-muted-foreground max-w-sm mt-1">
                 {searchTerm
@@ -991,10 +1284,12 @@ export default function AssignedOrdersPage() {
                   : activeTab === "ASSIGNED"
                     ? "There are currently no new unstarted orders waiting in the assigned queue."
                     : activeTab === "IN_PROGRESS"
-                      ? "There are currently no orders in active progress or under review in your queue."
-                      : activeTab === "ON_HOLD"
-                        ? "There are currently no paused orders placed on hold."
-                        : "There are currently no completed orders in your archive."}
+                      ? "There are currently no orders in active progress in your queue."
+                      : activeTab === "REVIEW_ORDER"
+                        ? "There are currently no active orders allocated to you for continuous lifecycle review."
+                        : activeTab === "ON_HOLD"
+                          ? "There are currently no paused orders placed on hold."
+                          : "There are currently no completed orders in your archive."}
               </p>
             </div>
           ) : (
@@ -1003,14 +1298,14 @@ export default function AssignedOrdersPage() {
               <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                  <th className="p-4 w-12 text-center">No.</th>
-                  <th className="p-4 w-32">Order ID</th>
-                  <th className="p-4">Client & Company</th>
-                  <th className="p-4">Service Scope</th>
-                  <th className="p-4">Assigned Team</th>
-                  <th className="p-4 w-32">Created Date</th>
-                  <th className="p-4 w-40 text-center">Execution Stage</th>
-                  <th className="p-4 w-28 text-right">Actions</th>
+                  <th className="p-4 w-10 text-center">No.</th>
+                  <th className="p-4 w-28 whitespace-nowrap">Order ID</th>
+                  <th className="p-4 min-w-[170px]">Client & Company</th>
+                  <th className="p-4 min-w-[260px] lg:min-w-[320px]">Service Scope</th>
+                  <th className="p-4 w-44 min-w-[150px]">Consultant & Reviewer</th>
+                  <th className="p-4 w-32 whitespace-nowrap">Created Date</th>
+                  <th className="p-4 w-40 text-center whitespace-nowrap">Execution Stage</th>
+                  <th className="p-4 w-28 text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -1020,10 +1315,16 @@ export default function AssignedOrdersPage() {
                   <tr 
                     key={ord.order_number} 
                     id={`order-row-${ord.order_number}`} 
+                    onClick={() => {
+                      setHighlightedOrderNum(ord.order_number);
+                      if (typeof window !== "undefined") {
+                        sessionStorage.setItem("assigned_orders_highlighted_order", ord.order_number);
+                      }
+                    }}
                     className={`transition-all duration-300 border-b last:border-0 ${
                       isHighlighted 
-                        ? "bg-emerald-500/20 dark:bg-emerald-500/25 ring-2 ring-emerald-500 ring-inset shadow-md" 
-                        : "hover:bg-muted/30"
+                        ? "bg-blue-500/15 dark:bg-blue-500/20 ring-2 ring-blue-500 ring-inset shadow-md" 
+                        : "hover:bg-muted/30 cursor-pointer"
                     }`}
                   >
                     <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5">
@@ -1031,11 +1332,19 @@ export default function AssignedOrdersPage() {
                     </td>
                     <td className="p-4 align-top pt-5">
                       {ord.company_id ? (
-                        <Link href={`/business/clients/documents/${ord.company_id}?from=assigned-orders`}>
+                        <Link 
+                          href={`/business/clients/documents/${ord.company_id}?order=${ord.order_number}&from=assigned-orders&tab=${activeTab}`}
+                          onClick={() => {
+                            setHighlightedOrderNum(ord.order_number);
+                            if (typeof window !== "undefined") {
+                              sessionStorage.setItem("assigned_orders_highlighted_order", ord.order_number);
+                            }
+                          }}
+                        >
                           <Badge 
                             variant="outline" 
                             className="font-mono font-bold text-xs bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary cursor-pointer transition-colors"
-                            title="Navigate to Company Documents Folder"
+                            title="Navigate to Company Documents Folder for this Order"
                           >
                             {ord.order_number}
                           </Badge>
@@ -1135,19 +1444,34 @@ export default function AssignedOrdersPage() {
                         <span className="text-muted-foreground italic text-xs">-</span>
                       )}
                     </td>
-                    <td className="p-4 align-top pt-5">
-                      {ord.consultants && ord.consultants.length > 0 ? (
-                        <div className="flex flex-wrap gap-1 max-w-[200px]">
-                          {ord.consultants.map((c: any) => (
-                            <Badge key={c.id} variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-medium flex items-center gap-0.5 py-0.5 px-1.5">
+                    <td className="p-4 align-top pt-5 w-44 min-w-[150px]">
+                      <div className="flex flex-col items-start gap-1.5 w-full">
+                        {ord.consultants && ord.consultants.length > 0 ? (
+                          ord.consultants.map((c: any) => (
+                            <Badge 
+                              key={c.id} 
+                              variant="outline" 
+                              className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-semibold flex items-center gap-1.5 py-0.5 px-2 max-w-full truncate shadow-none"
+                              title={`Assigned Consultant: ${c.name}`}
+                            >
                               <UserCheck className="h-3 w-3 text-emerald-600 shrink-0" />
-                              <span className="truncate max-w-[80px]">{c.name}</span>
+                              <span className="truncate">{c.name}</span>
                             </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground italic text-xs">No team assigned</span>
-                      )}
+                          ))
+                        ) : (
+                          <span className="text-muted-foreground italic text-[11px]">Unassigned</span>
+                        )}
+                        {ord.reviewer && (
+                          <Badge 
+                            variant="outline" 
+                            className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/25 font-semibold flex items-center gap-1.5 py-0.5 px-2 max-w-full truncate shadow-none"
+                            title={`Designated Reviewer: ${ord.reviewer.name}`}
+                          >
+                            <ShieldCheck className="h-3 w-3 text-purple-600 dark:text-purple-400 shrink-0" />
+                            <span className="truncate">Rev: {ord.reviewer.name}</span>
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4 font-mono font-medium text-muted-foreground align-top pt-5">
                       {formatDate(ord.created_at)}
@@ -1163,10 +1487,11 @@ export default function AssignedOrdersPage() {
                           <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
                           <option value="IN_PROGRESS">IN PROGRESS</option>
                           <option value="REVIEW_DOCS">REVIEW DOCS</option>
+                          <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
+                          <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
                           <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
                           <option value="FINAL_DOC_READY">FINAL DOC READY</option>
                           <option value="ON_HOLD">ON HOLD</option>
-                          <option value="COMPLETED">COMPLETED</option>
                         </select>
                       ) : ord.status === "COMPLETED" ? (
                         <Badge variant="outline" className="text-xs font-bold py-1 px-2.5 uppercase shadow-xs whitespace-nowrap bg-emerald-500/15 text-emerald-600 border-emerald-500/30 flex items-center justify-center gap-1 mx-auto">
@@ -1369,10 +1694,11 @@ export default function AssignedOrdersPage() {
                         <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
                         <option value="IN_PROGRESS">IN PROGRESS</option>
                         <option value="REVIEW_DOCS">REVIEW DOCS</option>
+                        <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
+                        <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
                         <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
                         <option value="FINAL_DOC_READY">FINAL DOC READY</option>
                         <option value="ON_HOLD">ON HOLD</option>
-                        <option value="COMPLETED">COMPLETED</option>
                       </select>
                     ) : selectedGroup.status === "COMPLETED" ? (
                       <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5 uppercase tracking-wide">
@@ -1405,6 +1731,23 @@ export default function AssignedOrdersPage() {
                       </div>
                     ) : (
                       <span className="text-muted-foreground italic block">No team assigned</span>
+                    )}
+
+                    {selectedGroup.reviewer && (
+                      <div className="pt-2.5 mt-2 border-t border-border/40 space-y-2">
+                        <span className="text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
+                          <ShieldCheck className="h-3 w-3" /> Designated Order Reviewer
+                        </span>
+                        <div className="flex items-center gap-2.5 p-2 rounded-lg bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-800/40">
+                          <div className="h-7 w-7 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center text-xs shrink-0">
+                            {selectedGroup.reviewer.name.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <span className="font-bold text-foreground block truncate text-[11px]">{selectedGroup.reviewer.name}</span>
+                            <span className="text-[9px] text-muted-foreground block truncate">{selectedGroup.reviewer.job_title || "Designated Reviewer"}</span>
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
 
@@ -1518,34 +1861,144 @@ export default function AssignedOrdersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* CONFIRMATION DIALOG FOR COMPLETION */}
-      <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-        <DialogContent className="max-w-md p-6 rounded-2xl border border-slate-200 dark:border-zinc-700 shadow-2xl bg-background dark:bg-zinc-950">
+      {/* CONFIRMATION DIALOG FOR ALL STATUS CHANGES */}
+      <Dialog 
+        open={isConfirmOpen} 
+        onOpenChange={(open) => {
+          if (!open && !savingStatus) {
+            setIsConfirmOpen(false);
+            setPendingConfirmGroup(null);
+            setPendingConfirmStatus("");
+            setPendingDocCount(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md p-6 rounded-2xl border border-border shadow-2xl bg-background">
           <DialogHeader className="pb-3 border-b border-border/40">
             <DialogTitle className="text-lg font-bold flex items-center gap-2 text-foreground">
-              <CheckCircle2 className="h-5 w-5 text-emerald-500 animate-pulse" />
-              Complete Assigned Order?
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+              Confirm Status Change
             </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground mt-1">
-              Please read the notice below carefully before proceeding.
+            <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+              Please review the order details and confirm the stage transition.
             </DialogDescription>
           </DialogHeader>
           
-          <div className="py-4 space-y-3">
-            <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 text-xs text-amber-700 dark:text-amber-400 leading-relaxed font-medium">
-              <span className="font-bold block text-sm mb-1 text-amber-800 dark:text-amber-300">Notice:</span>
-              Please ensure the final documents are uploaded before completing the assigned order. Once completed the job will be assigned to the Finance team for further processing.
+          <div className="py-4 space-y-3.5">
+            {/* Order and Company Info */}
+            <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Order ID:</span>
+                <Badge className="bg-primary/10 text-primary hover:bg-primary/15 font-mono font-bold text-xs px-2.5 py-0.5 border border-primary/25">
+                  {pendingConfirmGroup?.order_number || "ORDER"}
+                </Badge>
+              </div>
+              
+              {pendingConfirmGroup?.company_name && (
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-[11px] font-semibold text-muted-foreground">Company:</span>
+                  <span className="font-semibold text-foreground truncate max-w-[230px] text-right">{pendingConfirmGroup.company_name}</span>
+                </div>
+              )}
+
+              {/* Status Transition Badges */}
+              <div className="pt-2 border-t border-border/40 flex items-center justify-between gap-2 text-xs">
+                <span className="text-[11px] font-semibold text-muted-foreground">Stage Update:</span>
+                <div className="flex items-center gap-1.5 font-bold">
+                  <Badge variant="outline" className={`text-[10px] py-0.5 px-2 ${getOrderStatusColor(pendingConfirmGroup?.status)}`}>
+                    {(pendingConfirmGroup?.status || "").replace(/_/g, " ")}
+                  </Badge>
+                  <span className="text-muted-foreground">➔</span>
+                  <Badge variant="outline" className={`text-[10px] py-0.5 px-2 ${getOrderStatusColor(pendingConfirmStatus)}`}>
+                    {(pendingConfirmStatus || "").replace(/_/g, " ")}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Service Scope in Confirmation Box */}
+              {pendingConfirmGroup?.items && pendingConfirmGroup.items.length > 0 && (
+                <div className="pt-2 border-t border-border/40 space-y-1">
+                  <span className="text-[11px] font-semibold text-muted-foreground block">Service Scope:</span>
+                  <div className="flex flex-wrap gap-1">
+                    {pendingConfirmGroup.items.map((item: any, i: number) => {
+                      const svc = item.job_title || item.service_name || item.name || "Service Package";
+                      return (
+                        <Badge key={i} variant="secondary" className="text-[10px] py-0.5 px-2 font-medium">
+                          {svc}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Uploaded Documents Count Box */}
+            <div className="p-3 rounded-xl bg-sky-500/5 dark:bg-sky-500/10 border border-sky-500/20 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                  <FileText className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-foreground">Uploaded Documents</p>
+                  <p className="text-[11px] text-muted-foreground">Documents uploaded for this order</p>
+                </div>
+              </div>
+              <div>
+                {loadingDocCount ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                ) : (
+                  <Badge variant="outline" className={cn(
+                    "text-xs font-bold font-mono px-2.5 py-0.5 border",
+                    (pendingDocCount || 0) > 0
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                      : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                  )}>
+                    {pendingDocCount ?? 0} {(pendingDocCount ?? 0) === 1 ? "document" : "documents"}
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            {/* Confirmation Messages & Contextual Notices */}
+            {pendingConfirmStatus === "COMPLETED" ? (
+              <div className="p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/10 text-xs text-amber-800 dark:text-amber-300 leading-relaxed font-medium">
+                <span className="font-bold block text-xs mb-1 text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5" /> Order Completion Notice:
+                </span>
+                Please ensure all final documents are uploaded before completing the assigned order. Once completed, the order will be locked and assigned to the Finance team for final billing and reconciliation.
+              </div>
+            ) : pendingConfirmStatus === "FINAL_DOC_READY" ? (
+              <div className="p-3.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed font-medium">
+                <span className="font-bold block text-xs mb-1 text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Final Document Readiness:
+                </span>
+                Marking this order as Final Docs Ready indicates that legal final documents are available in the repository and the order will move to Completed.
+              </div>
+            ) : (pendingDocCount === 0 && ["DOCUMENTS_REVIEWED", "FINAL_DOCUMENT_PREPARATION"].includes(pendingConfirmStatus)) ? (
+              <div className="p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/10 text-xs text-amber-800 dark:text-amber-300 leading-relaxed font-medium">
+                <span className="font-bold block text-xs mb-1 flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600" /> Document Notice:
+                </span>
+                There are currently 0 documents uploaded for this order. You can still proceed if documents are being verified externally.
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl border border-border/60 bg-muted/30 text-xs text-muted-foreground leading-relaxed">
+                Are you sure you want to change the status of order <span className="font-bold text-foreground">{pendingConfirmGroup?.order_number}</span> to <span className="font-bold text-foreground">{(pendingConfirmStatus || "").replace(/_/g, " ")}</span>?
+              </div>
+            )}
           </div>
           
           <DialogFooter className="flex justify-end gap-2.5 pt-3 border-t border-border/40">
             <Button 
               type="button" 
               variant="outline" 
+              disabled={savingStatus}
               onClick={() => {
                 setIsConfirmOpen(false);
                 setPendingConfirmGroup(null);
                 setPendingConfirmStatus("");
+                setPendingDocCount(null);
               }}
               className="text-xs font-semibold"
             >
@@ -1553,15 +2006,16 @@ export default function AssignedOrdersPage() {
             </Button>
             <Button 
               type="button" 
+              disabled={savingStatus}
               onClick={async () => {
-                setIsConfirmOpen(false);
                 if (pendingConfirmGroup) {
                   await executeUpdateStatus(pendingConfirmGroup, pendingConfirmStatus);
                 }
               }}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs gap-1.5"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs gap-1.5"
             >
-              Confirm
+              {savingStatus ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+              Confirm Change
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1575,30 +2029,47 @@ export default function AssignedOrdersPage() {
             setIsOnHoldDialogOpen(false);
             setPendingHoldGroup(null);
             setHoldReason("");
+            setPendingDocCount(null);
           }
         }}
       >
         <DialogContent className="max-w-lg p-0 overflow-hidden rounded-2xl border border-amber-500/30 shadow-2xl bg-background dark:bg-zinc-950">
           <div className="p-6 pb-4 border-b border-border/60 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                <PauseCircle className="h-5 w-5" />
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                  <PauseCircle className="h-5 w-5" />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+                    Place Order On Hold
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                    {pendingHoldGroup?.company_name || pendingHoldGroup?.client_name || "Assigned Order"}
+                  </DialogDescription>
+                </div>
               </div>
-              <div>
-                <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-                  Place Order On Hold
-                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px] font-bold px-2 py-0.5">
-                    {pendingHoldGroup?.order_number || "ORDER"}
-                  </Badge>
-                </DialogTitle>
-                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                  {pendingHoldGroup?.company_name || pendingHoldGroup?.client_name || "Assigned Order"}
-                </DialogDescription>
-              </div>
+              <Badge className="bg-amber-500/10 text-amber-600 border border-amber-500/30 font-mono text-xs font-bold px-2.5 py-0.5">
+                {pendingHoldGroup?.order_number || "ORDER"}
+              </Badge>
             </div>
           </div>
 
-          <div className="p-6 space-y-5">
+          <div className="p-6 space-y-4">
+            {/* Uploaded Documents Counter Box */}
+            <div className="p-2.5 rounded-xl bg-muted/40 border border-border/60 flex items-center justify-between text-xs">
+              <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
+                <FileText className="h-3.5 w-3.5 text-primary" /> Uploaded Documents:
+              </span>
+              <Badge variant="outline" className="text-xs font-mono font-bold bg-background">
+                {loadingDocCount ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  `${pendingDocCount ?? (pendingHoldGroup?.document_count || 0)} ${(pendingDocCount ?? (pendingHoldGroup?.document_count || 0)) === 1 ? "document" : "documents"} uploaded`
+                )}
+              </Badge>
+            </div>
+
             {/* Warning Banner */}
             <div className="p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/10 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2.5">
               <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />

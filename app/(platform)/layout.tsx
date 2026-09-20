@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -379,6 +379,15 @@ function HRMSLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const headerInfo = getHeaderInfo(pathname, currentMode);
+  const mainScrollRef = useRef<HTMLElement>(null);
+
+  // Auto-scroll to top on route change to prevent pages getting stuck scrolled down
+  useEffect(() => {
+    if (mainScrollRef.current) {
+      mainScrollRef.current.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
+    window.scrollTo(0, 0);
+  }, [pathname]);
 
   // Route protection and authentication guards
   useEffect(() => {
@@ -454,7 +463,7 @@ function HRMSLayoutContent({ children }: { children: React.ReactNode }) {
       />
 
       {/* Main Content Area */}
-      <div className="flex flex-col flex-1 overflow-y-auto w-full transition-all">
+      <div className="flex flex-col flex-1 h-full min-w-0 overflow-hidden">
         {/* Top Header */}
         <header className="relative w-full bg-[#0b0c10] dark:bg-[#07090e]/95 dark:backdrop-blur-xl border-b border-zinc-800/80 dark:border-zinc-800/60 shadow-[0_4px_24px_rgba(0,0,0,0.25)] flex items-center justify-between px-4 md:px-6 min-h-[64px] py-2 shrink-0 z-30 transition-colors">
           <div className="flex items-center gap-3 min-w-0">
@@ -554,7 +563,7 @@ function HRMSLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 p-6 md:p-8">
+        <main ref={mainScrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 w-full">
           {children}
         </main>
       </div>

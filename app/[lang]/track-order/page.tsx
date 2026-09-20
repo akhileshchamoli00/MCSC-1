@@ -96,6 +96,8 @@ const isSystemMessage = (msg: MessageItem) => {
     txt.startsWith("order execution status") ||
     txt.startsWith("pipeline order") ||
     txt.startsWith("order moved") ||
+    txt.startsWith("order placed on hold") ||
+    txt.includes("⏸️") ||
     txt.startsWith("payment") ||
     txt.startsWith("proforma payment") ||
     txt.startsWith("final invoice payment") ||
@@ -107,7 +109,11 @@ const isSystemMessage = (msg: MessageItem) => {
     txt.includes("uploaded to dropbox") ||
     txt.includes("emailed to client") ||
     txt.includes("assigned to review") ||
-    txt.includes("consultant is actively")
+    txt.includes("consultant is actively") ||
+    txt.includes("has been reopened") ||
+    txt.includes("reopened and moved back") ||
+    txt.includes("marked as cancelled") ||
+    txt.includes("has been cancelled")
   );
 };
 

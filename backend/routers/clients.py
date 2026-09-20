@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request, Query, Response
 from sqlalchemy.orm import Session, joinedload, selectinload
 from typing import List, Optional, Any
 from pydantic import BaseModel
 import os
+import re
 import json
 import shutil
 import uuid
@@ -52,20 +53,49 @@ def generate_client_code(db: Session) -> str:
     """
     Auto-generates client/partner code in format: X[Year2Digits][4DigitSequence]
     Example for 2026: 'X260001'
+    Guarantees monotonic incrementing so deleted client codes are never reused.
     """
-    import datetime
-    year_str = datetime.datetime.now().strftime("%y")
-    total_clients = db.query(func.count(models.Partner.id)).scalar() or 0
-    seq_num = total_clients + 1
-    
-    code = f"X{year_str}{seq_num:04d}"
-    
-    existing = db.query(models.Client).filter(models.Partner.client_code == code).first()
-    while existing:
-        seq_num += 1
-        code = f"X{year_str}{seq_num:04d}"
-        existing = db.query(models.Client).filter(models.Partner.client_code == code).first()
-        
+    import re
+    year_str = datetime.now().strftime("%y")
+    prefix = f"X{year_str}"
+    pattern = re.compile(rf"X{year_str}(\d+)", re.IGNORECASE)
+
+    max_seq = 0
+
+    # 1. Check Partner table
+    partner_codes = db.query(models.Partner.client_code).filter(
+        models.Partner.client_code.ilike(f"{prefix}%")
+    ).all()
+    for (c,) in partner_codes:
+        if c:
+            m = pattern.search(c)
+            if m:
+                try:
+                    max_seq = max(max_seq, int(m.group(1)))
+                except ValueError:
+                    pass
+
+    # 2. Check Client table
+    client_codes = db.query(models.Client.customer_code).filter(
+        models.Client.customer_code.ilike(f"{prefix}%")
+    ).all()
+    for (c,) in client_codes:
+        if c:
+            m = pattern.search(c)
+            if m:
+                try:
+                    max_seq = max(max_seq, int(m.group(1)))
+                except ValueError:
+                    pass
+
+    next_seq = max_seq + 1
+    code = f"{prefix}{next_seq:04d}"
+
+    while db.query(models.Partner).filter(func.upper(models.Partner.client_code) == code.upper()).first() or \
+          db.query(models.Client).filter(func.upper(models.Client.customer_code) == code.upper()).first():
+        next_seq += 1
+        code = f"{prefix}{next_seq:04d}"
+
     return code
 
 def validate_and_clean_email(email_str: Optional[str], field_name: str = "Email", required: bool = True) -> Optional[str]:
@@ -134,24 +164,34 @@ def update_order_group_status(
             
             target_channel = hold_channel if (new_status == "ON_HOLD" and hold_channel in ["CLIENT", "INTERNAL"]) else "CLIENT"
             
-            # Prevent duplicate status change entries in concurrent requests
+            # Prevent duplicate status change entries in concurrent requests (within last 5 seconds)
+            five_sec_ago = datetime.utcnow() - timedelta(seconds=5)
             existing = db.query(models.ClientOrderProgress).filter(
                 models.ClientOrderProgress.order_number == first_order.order_number,
-                models.ClientOrderProgress.message == msg
+                models.ClientOrderProgress.message == msg,
+                models.ClientOrderProgress.created_at >= five_sec_ago
             ).first()
             
             if not existing:
                 progress = models.ClientOrderProgress(
                     order_number=first_order.order_number,
                     message=msg,
-                    user_id=user_id,
+                    user_id=None,
                     channel=target_channel
                 )
                 db.add(progress)
-                try:
-                    db.commit()  # Commit immediately to serialize writes and make it visible to other threads
-                except Exception:
-                    db.rollback()
+
+        try:
+            db.commit()  # Always commit status updates and any progress entry
+        except Exception:
+            db.rollback()
+
+        # Automatically update Dropbox archive on completion / final delivery
+        if new_status in ["COMPLETED", "SOFT_COPY_DELIVERED", "HARD_COPY_DELIVERED"]:
+            try:
+                save_order_chat_to_dropbox(first_order.order_number, db)
+            except Exception as e:
+                print(f"Warning: Auto-archiving completed order chat to Dropbox failed: {e}")
 
 def replicate_key_contact_to_stakeholder(db: Session, db_company: models.ClientCompany):
     if not db_company or not db_company.id:
@@ -436,6 +476,8 @@ def build_consultants_cache(db: Session, orders: List[models.ClientOrder]) -> di
     for o in orders:
         for cid in parse_consultant_ids(o.consultant_ids):
             all_emp_ids.add(cid)
+        if getattr(o, "reviewer_id", None):
+            all_emp_ids.add(o.reviewer_id)
             
     if not all_emp_ids:
         return {}
@@ -459,7 +501,24 @@ def build_consultants_cache(db: Session, orders: List[models.ClientOrder]) -> di
         }
     return cache
 
-def format_order_response(ord_obj: models.ClientOrder, consultants_cache: dict) -> schemas.ClientOrderResponse:
+def build_doc_counts_cache(db: Session, orders: list) -> dict:
+    order_nums = list({ord_obj.order_number.strip() for ord_obj in orders if getattr(ord_obj, "order_number", None) and ord_obj.order_number.strip()})
+    if not order_nums:
+        return {}
+    try:
+        counts = db.query(models.ClientDocument.order_number, func.count(models.ClientDocument.id)).filter(
+            models.ClientDocument.order_number.in_(order_nums)
+        ).group_by(models.ClientDocument.order_number).all()
+        doc_counts = {}
+        for ord_num, cnt in counts:
+            if ord_num:
+                doc_counts[ord_num.strip().upper()] = cnt
+        return doc_counts
+    except Exception as e:
+        print("build_doc_counts_cache error:", e)
+        return {}
+
+def format_order_response(ord_obj: models.ClientOrder, consultants_cache: dict, doc_counts_cache: Optional[dict] = None) -> schemas.ClientOrderResponse:
     res = schemas.ClientOrderResponse.model_validate(ord_obj) if hasattr(schemas.ClientOrderResponse, "model_validate") else schemas.ClientOrderResponse.from_orm(ord_obj)
     if ord_obj.client:
         res.client_name = ord_obj.client.contact_person
@@ -478,6 +537,23 @@ def format_order_response(ord_obj: models.ClientOrder, consultants_cache: dict) 
     parsed_cids = parse_consultant_ids(ord_obj.consultant_ids)
     res.consultants = [consultants_cache[cid] for cid in parsed_cids if cid in consultants_cache]
     res.consultant_ids = parsed_cids
+    if ord_obj.reviewer_id:
+        res.reviewer_id = ord_obj.reviewer_id
+        res.reviewer = consultants_cache.get(ord_obj.reviewer_id)
+
+    svc_title = ""
+    if ord_obj.service and getattr(ord_obj.service, "job_title", None):
+        svc_title = ord_obj.service.job_title
+    elif ord_obj.job_title:
+        svc_title = ord_obj.job_title
+    res.service_name = svc_title or "Service Package"
+    if not res.job_title:
+        res.job_title = res.service_name
+
+    if doc_counts_cache and ord_obj.order_number:
+        res.document_count = doc_counts_cache.get(ord_obj.order_number.strip().upper(), 0)
+    else:
+        res.document_count = getattr(res, "document_count", 0) or 0
     return res
 
 def get_consultants_data(db: Session, c_ids: Any) -> List[dict]:
@@ -527,6 +603,9 @@ def get_my_assigned_orders(db: Session = Depends(database.get_db), current_user:
         "IN_PROGRESS",
         "ON_HOLD",
         "REVIEW_DOCS",
+        "DOCUMENTS_REVIEWED",
+        "PRE_DOC_SENT_FOR_SIGNATURE",
+        "PRE_DOCS_SENT",
         "FINAL_DOCUMENT_PREPARATION",
         "FINAL_DOC_READY",
         "WAITING_FOR_FINAL_PAYMENT",
@@ -536,16 +615,18 @@ def get_my_assigned_orders(db: Session = Depends(database.get_db), current_user:
         "COMPLETED"
     ]
 
+    is_admin = is_admin_or_hr(current_user) or auth.is_super_admin(current_user)
     filtered_orders = []
     for ord_obj in all_orders:
         c_ids = parse_consultant_ids(ord_obj.consultant_ids)
-        is_assigned = bool(target_emp_id and target_emp_id in c_ids)
+        is_assigned = is_admin or bool(target_emp_id and (target_emp_id in c_ids or ord_obj.reviewer_id == target_emp_id))
             
         if is_assigned and (ord_obj.status or "").upper() in ALLOWED_ASSIGNED_STATUSES:
             filtered_orders.append(ord_obj)
             
     consultants_cache = build_consultants_cache(db, filtered_orders)
-    return [format_order_response(ord_obj, consultants_cache) for ord_obj in filtered_orders]
+    doc_counts_cache = build_doc_counts_cache(db, filtered_orders)
+    return [format_order_response(ord_obj, consultants_cache, doc_counts_cache) for ord_obj in filtered_orders]
 
 @router.get("/orders", response_model=List[schemas.ClientOrderResponse])
 def get_client_orders(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
@@ -617,7 +698,7 @@ def get_client_orders(db: Session = Depends(database.get_db), current_user: mode
         filtered = []
         for ord_obj in all_orders:
             c_ids = parse_consultant_ids(ord_obj.consultant_ids)
-            is_assigned = emp_id is not None and emp_id in c_ids
+            is_assigned = emp_id is not None and (emp_id in c_ids or ord_obj.reviewer_id == emp_id)
             
             # If user has access to active orders and order is active
             if can_view_active and ord_obj.status not in ["COMPLETED", "CANCELLED", "PROSPECT", "PIPELINE"]:
@@ -643,7 +724,56 @@ def get_client_orders(db: Session = Depends(database.get_db), current_user: mode
         raise HTTPException(status_code=403, detail="Access denied. You do not have permission to view orders.")
 
     consultants_cache = build_consultants_cache(db, orders)
-    return [format_order_response(ord_obj, consultants_cache) for ord_obj in orders]
+    doc_counts_cache = build_doc_counts_cache(db, orders)
+    return [format_order_response(ord_obj, consultants_cache, doc_counts_cache) for ord_obj in orders]
+
+@router.get("/orders/next-number")
+def get_next_order_number(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    """
+    Returns the next guaranteed unique, sequential Order ID (e.g. MCSX-260017).
+    """
+    return {"order_number": generate_order_number(db)}
+
+@router.get("/orders/check-number")
+def check_order_number_availability(order_number: str = Query(...), db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    """
+    Validates whether an order number is unique and available.
+    """
+    cleaned = (order_number or "").strip().upper()
+    if not cleaned:
+        return {"available": False, "reason": "Order Reference ID cannot be blank."}
+    
+    # Auto-correct typo prefix
+    normalized = cleaned
+    if normalized.startswith("MSCX-"):
+        normalized = "MCSX-" + normalized[5:]
+    elif normalized.startswith("MCS-"):
+        normalized = "MCSX-" + normalized[4:]
+        
+    alt_prefix = normalized.replace("MCSX-", "MSCX-") if normalized.startswith("MCSX-") else normalized.replace("MSCX-", "MCSX-")
+
+    existing = db.query(models.ClientOrder).filter(
+        or_(
+            func.upper(models.ClientOrder.order_number) == cleaned,
+            func.upper(models.ClientOrder.order_number) == normalized,
+            func.upper(models.ClientOrder.order_number) == alt_prefix
+        )
+    ).first()
+
+    if existing:
+        return {
+            "available": False,
+            "order_number": cleaned,
+            "normalized": normalized,
+            "reason": f"Order ID '{existing.order_number}' is already registered in the system."
+        }
+
+    return {
+        "available": True,
+        "order_number": cleaned,
+        "normalized": normalized,
+        "message": f"Order ID '{normalized}' is available."
+    }
 
 @router.post("/orders", response_model=List[schemas.ClientOrderResponse], status_code=status.HTTP_201_CREATED)
 def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
@@ -664,19 +794,41 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
             raise HTTPException(status_code=400, detail="No valid client found to attach this order to")
         target_client_id = first_c.id
         
-    order_num = order_req.order_number or generate_order_number(db)
-    
-    order_status = order_req.status or "DRAFT"
-    payment_status = "UNPAID"
-    if order_req.order_number:
-        existing_item = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_req.order_number).first()
-        if existing_item:
-            order_status = order_req.status or existing_item.status
-            payment_status = existing_item.payment_status
+    if not order_req.order_number or not order_req.order_number.strip():
+        order_num = generate_order_number(db)
     else:
-        # Brand new order number generated: purge any lingering progress records
+        order_num = order_req.order_number.strip().upper()
+        # Normalize common typo prefixes
+        if order_num.startswith("MSCX-"):
+            order_num = "MCSX-" + order_num[5:]
+        elif order_num.startswith("MCS-"):
+            order_num = "MCSX-" + order_num[4:]
+        
+    # Check if order number already exists in active/completed/cancelled/pipeline orders (including typo permutations)
+    alt_num = order_num.replace("MCSX-", "MSCX-") if order_num.startswith("MCSX-") else order_num.replace("MSCX-", "MCSX-")
+    existing_item = db.query(models.ClientOrder).filter(
+        or_(
+            func.upper(models.ClientOrder.order_number) == order_num.upper(),
+            func.upper(models.ClientOrder.order_number) == alt_num.upper()
+        )
+    ).first()
+    if existing_item and not order_req.allow_append:
+        raise HTTPException(status_code=400, detail=f"Order ID '{order_num}' already exists in the system (Order: {existing_item.order_number}). Please enter a unique Order ID.")
+
+    # Mutual exclusion check: same person cannot be consultant and reviewer
+    if order_req.reviewer_id and order_req.consultant_ids and order_req.reviewer_id in order_req.consultant_ids:
+        raise HTTPException(
+            status_code=400,
+            detail="The same person cannot be allocated as both an executing consultant and the order reviewer."
+        )
+
+    # Purge any lingering progress records for this order number to ensure clean state ONLY for brand new orders
+    if not existing_item:
         db.query(models.ClientOrderProgress).filter(models.ClientOrderProgress.order_number == order_num).delete(synchronize_session=False)
         db.commit()
+
+    order_status = order_req.status or (existing_item.status if existing_item else "DRAFT")
+    payment_status = (existing_item.payment_status if existing_item else "UNPAID")
 
     created_rows = []
     
@@ -714,6 +866,7 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
             status=order_status,
             payment_status=payment_status,
             consultant_ids=order_req.consultant_ids or [],
+            reviewer_id=order_req.reviewer_id,
             service_instructions=service_inst.strip() if (service_inst and service_inst.strip()) else None,
             notes=order_internal_notes.strip() if (order_internal_notes and order_internal_notes.strip()) else None,
             notary_id=item.notary_id,
@@ -740,6 +893,10 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
             
         res.consultants = get_consultants_data(db, db_order.consultant_ids)
         res.consultant_ids = db_order.consultant_ids or []
+        if db_order.reviewer_id:
+            res.reviewer_id = db_order.reviewer_id
+            rev_data = get_consultants_data(db, [db_order.reviewer_id])
+            res.reviewer = rev_data[0] if rev_data else None
         created_rows.append(res)
         
     return created_rows
@@ -761,13 +918,20 @@ def move_pipeline_order_to_active(order_number: str, db: Session = Depends(datab
     
     # Log progress message
     msg = "Pipeline order has been moved to Active Orders (DRAFT)."
-    progress = models.ClientOrderProgress(
-        order_number=order_number,
-        message=msg,
-        user_id=current_user.id,
-        channel="CLIENT"
-    )
-    db.add(progress)
+    five_sec_ago = datetime.utcnow() - timedelta(seconds=5)
+    recent_prog = db.query(models.ClientOrderProgress).filter(
+        models.ClientOrderProgress.order_number == order_number,
+        models.ClientOrderProgress.message == msg,
+        models.ClientOrderProgress.created_at >= five_sec_ago
+    ).first()
+    if not recent_prog:
+        progress = models.ClientOrderProgress(
+            order_number=order_number,
+            message=msg,
+            user_id=None,
+            channel="CLIENT"
+        )
+        db.add(progress)
     db.commit()
     
     log_activity(db, "ORDER_MOVED_TO_ACTIVE", f"Pipeline order {order_number} moved to Active Orders (DRAFT)", user_id=current_user.id)
@@ -796,14 +960,27 @@ def cancel_order_group(
     
     # Log progress message
     msg = f"Order #{order_number} has been marked as CANCELLED. Reason/Notes: {reason}"
-    progress = models.ClientOrderProgress(
-        order_number=order_number,
-        message=msg,
-        user_id=current_user.id,
-        channel="INTERNAL"
-    )
-    db.add(progress)
+    five_sec_ago = datetime.utcnow() - timedelta(seconds=5)
+    recent_cancel = db.query(models.ClientOrderProgress).filter(
+        models.ClientOrderProgress.order_number == order_number,
+        models.ClientOrderProgress.message == msg,
+        models.ClientOrderProgress.created_at >= five_sec_ago
+    ).first()
+    if not recent_cancel:
+        progress = models.ClientOrderProgress(
+            order_number=order_number,
+            message=msg,
+            user_id=None,
+            channel="CLIENT"
+        )
+        db.add(progress)
     db.commit()
+
+    # Auto-archive conversation to Dropbox on cancellation
+    try:
+        save_order_chat_to_dropbox(order_number, db)
+    except Exception as e:
+        print(f"Warning: Failed to save cancelled order chat to Dropbox for order {order_number}: {e}")
     
     log_activity(db, "ORDER_CANCELLED", f"Order {order_number} marked as CANCELLED ({reason})", user_id=current_user.id)
     return {"message": "Order cancelled successfully", "order_number": order_number}
@@ -829,14 +1006,27 @@ def reopen_order_group(
     
     # Log progress message
     msg = f"Cancelled order #{order_number} has been reopened and moved back to Active Orders (DRAFT)."
-    progress = models.ClientOrderProgress(
-        order_number=order_number,
-        message=msg,
-        user_id=current_user.id,
-        channel="INTERNAL"
-    )
-    db.add(progress)
+    five_sec_ago = datetime.utcnow() - timedelta(seconds=5)
+    recent_reopen = db.query(models.ClientOrderProgress).filter(
+        models.ClientOrderProgress.order_number == order_number,
+        models.ClientOrderProgress.message == msg,
+        models.ClientOrderProgress.created_at >= five_sec_ago
+    ).first()
+    if not recent_reopen:
+        progress = models.ClientOrderProgress(
+            order_number=order_number,
+            message=msg,
+            user_id=None,
+            channel="CLIENT"
+        )
+        db.add(progress)
     db.commit()
+
+    # Update Dropbox transcript with the reopened status
+    try:
+        save_order_chat_to_dropbox(order_number, db)
+    except Exception as e:
+        print(f"Warning: Failed to update Dropbox chat archive for reopened order {order_number}: {e}")
     
     log_activity(db, "ORDER_REOPENED", f"Cancelled order {order_number} reopened to Active Orders (DRAFT)", user_id=current_user.id)
     return {"message": "Order reopened successfully", "order_number": order_number}
@@ -845,22 +1035,38 @@ def reopen_order_group(
 def delete_order_group(order_number: str, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders", "delete", db) or auth.has_permission(current_user, "clients_orders_pipeline", "delete", db) or auth.has_permission(current_user, "clients_orders_active", "delete", db) or auth.has_permission(current_user, "clients_orders_completed", "delete", db) or auth.has_permission(current_user, "clients_orders_cancelled", "delete", db) or is_admin_or_hr(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized to delete orders")
+
+    clean_no = (order_number or "").strip().upper()
+
+    # 1. Auto-archive complete conversation to Dropbox before deletion
+    try:
+        save_order_chat_to_dropbox(clean_no, db)
+    except Exception as e:
+        print(f"Warning: Failed to auto-archive chat history to Dropbox for order {clean_no}: {e}")
         
-    orders = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
+    orders = db.query(models.ClientOrder).filter(func.upper(models.ClientOrder.order_number) == clean_no).all()
     if not orders:
-        # Also ensure any dangling chat history for this order_number is deleted
-        db.query(models.ClientOrderProgress).filter(models.ClientOrderProgress.order_number == order_number).delete(synchronize_session=False)
+        # Also ensure any dangling chat history, reactions and read receipts for this order_number are deleted
+        progress_ids = [p.id for p in db.query(models.ClientOrderProgress.id).filter(func.upper(models.ClientOrderProgress.order_number) == clean_no).all()]
+        if progress_ids:
+            db.query(models.ClientOrderProgressReaction).filter(models.ClientOrderProgressReaction.progress_id.in_(progress_ids)).delete(synchronize_session=False)
+        db.query(models.ClientOrderProgress).filter(func.upper(models.ClientOrderProgress.order_number) == clean_no).delete(synchronize_session=False)
+        db.query(models.ClientOrderUserRead).filter(func.upper(models.ClientOrderUserRead.order_number) == clean_no).delete(synchronize_session=False)
         db.commit()
         return {"message": "Order group and chat history deleted"}
         
     for ord_obj in orders:
         db.delete(ord_obj)
         
-    # Delete associated chat history
-    db.query(models.ClientOrderProgress).filter(models.ClientOrderProgress.order_number == order_number).delete(synchronize_session=False)
+    # Delete associated chat history, reactions and read receipts
+    progress_ids = [p.id for p in db.query(models.ClientOrderProgress.id).filter(func.upper(models.ClientOrderProgress.order_number) == clean_no).all()]
+    if progress_ids:
+        db.query(models.ClientOrderProgressReaction).filter(models.ClientOrderProgressReaction.progress_id.in_(progress_ids)).delete(synchronize_session=False)
+    db.query(models.ClientOrderProgress).filter(func.upper(models.ClientOrderProgress.order_number) == clean_no).delete(synchronize_session=False)
+    db.query(models.ClientOrderUserRead).filter(func.upper(models.ClientOrderUserRead.order_number) == clean_no).delete(synchronize_session=False)
     db.commit()
     
-    log_activity(db, "ORDER_DELETED", f"Order {order_number} and associated chat history deleted", user_id=current_user.id)
+    log_activity(db, "ORDER_DELETED", f"Order {order_number} and associated chat history archived and deleted", user_id=current_user.id)
     return {"message": "Order group and chat history deleted successfully"}
 
 @router.delete("/orders/{id:int}")
@@ -873,14 +1079,25 @@ def delete_client_order(id: int, db: Session = Depends(database.get_db), current
         raise HTTPException(status_code=404, detail="Order not found")
         
     order_number = db_order.order_number
+    clean_no = (order_number or "").strip().upper()
     db.delete(db_order)
     db.commit()
     
     # Check if there are any remaining items in this order group
-    remaining = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).count()
+    remaining = db.query(models.ClientOrder).filter(func.upper(models.ClientOrder.order_number) == clean_no).count()
     if remaining == 0:
-        # Delete progress logs (this includes both system and user messages in the order chat)
-        db.query(models.ClientOrderProgress).filter(models.ClientOrderProgress.order_number == order_number).delete(synchronize_session=False)
+        # Auto-archive conversation to Dropbox before purging progress records
+        try:
+            save_order_chat_to_dropbox(clean_no, db)
+        except Exception as e:
+            print(f"Warning: Failed to auto-archive chat history to Dropbox for order {clean_no}: {e}")
+
+        # Delete progress logs, reactions and read receipts
+        progress_ids = [p.id for p in db.query(models.ClientOrderProgress.id).filter(func.upper(models.ClientOrderProgress.order_number) == clean_no).all()]
+        if progress_ids:
+            db.query(models.ClientOrderProgressReaction).filter(models.ClientOrderProgressReaction.progress_id.in_(progress_ids)).delete(synchronize_session=False)
+        db.query(models.ClientOrderProgress).filter(func.upper(models.ClientOrderProgress.order_number) == clean_no).delete(synchronize_session=False)
+        db.query(models.ClientOrderUserRead).filter(func.upper(models.ClientOrderUserRead.order_number) == clean_no).delete(synchronize_session=False)
         db.commit()
         
     return {"message": "Order deleted successfully"}
@@ -1015,17 +1232,63 @@ def create_client(client_data: schemas.ClientCreate, db: Session = Depends(datab
     return db_client
 
 def generate_order_number(db: Session) -> str:
-    curr_year_2digit = str(datetime.now().year)[-2:] # e.g. '26'
-    total_orders = db.query(func.count(models.ClientOrder.id)).scalar() or 0
-    seq = total_orders + 1
-    order_num = f"MCSX-{curr_year_2digit}{seq:04d}" # e.g. MCSX-260001
-    
-    existing = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_num).first()
-    while existing:
-        seq += 1
-        order_num = f"MCSX-{curr_year_2digit}{seq:04d}"
-        existing = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_num).first()
-        
+    """
+    Generates a monotonically increasing, non-recyclable order number:
+    Format: MCSX-[Year2Digits][4DigitSequence] (e.g. MCSX-260001, MCSX-260002)
+    Guarantees order numbers are strictly unique and never reused, even after order deletions.
+    """
+    import re
+    curr_year_2digit = str(datetime.now().year)[-2:]
+    prefix = f"MCSX-{curr_year_2digit}"
+    pattern = re.compile(rf"(?:MCSX|MSCX|MCS)-{curr_year_2digit}(\d+)", re.IGNORECASE)
+
+    max_seq = 0
+
+    # 1. Check existing ClientOrders
+    order_nums = db.query(models.ClientOrder.order_number).all()
+    for (num,) in order_nums:
+        if num:
+            match = pattern.search(num)
+            if match:
+                try:
+                    max_seq = max(max_seq, int(match.group(1)))
+                except ValueError:
+                    pass
+
+    # 2. Check ClientDocuments
+    doc_nums = db.query(models.ClientDocument.order_number).all()
+    for (num,) in doc_nums:
+        if num:
+            match = pattern.search(num)
+            if match:
+                try:
+                    max_seq = max(max_seq, int(match.group(1)))
+                except ValueError:
+                    pass
+
+    # 3. Check ClientActivityLog for any past orders that were deleted
+    activity_logs = db.query(models.ClientActivityLog.description).all()
+    for (desc,) in activity_logs:
+        if desc:
+            for match in pattern.finditer(desc):
+                try:
+                    max_seq = max(max_seq, int(match.group(1)))
+                except ValueError:
+                    pass
+
+    next_seq = max_seq + 1
+    order_num = f"{prefix}{next_seq:04d}"
+
+    # Fallback collision check
+    while db.query(models.ClientOrder).filter(
+        or_(
+            func.upper(models.ClientOrder.order_number) == order_num.upper(),
+            func.upper(models.ClientOrder.order_number) == f"MSCX-{curr_year_2digit}{next_seq:04d}"
+        )
+    ).first():
+        next_seq += 1
+        order_num = f"{prefix}{next_seq:04d}"
+
     return order_num
 
 def log_activity(db: Session, action_type: str, description: str, client_id: Optional[int] = None, company_id: Optional[int] = None, user_id: Optional[int] = None):
@@ -1071,6 +1334,16 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
     if db_order.status == "COMPLETED" and not is_admin_hr:
         raise HTTPException(status_code=400, detail="This order is completed and its status is locked.")
 
+    # Mutual exclusion check: same person cannot be consultant and reviewer
+    fields_set = getattr(order_update, '__fields_set__', None) or getattr(order_update, 'model_fields_set', set())
+    effective_reviewer_id = order_update.reviewer_id if ("reviewer_id" in fields_set or order_update.reviewer_id is not None) else db_order.reviewer_id
+    effective_consultant_ids = order_update.consultant_ids if order_update.consultant_ids is not None else parse_consultant_ids(db_order.consultant_ids)
+    if effective_reviewer_id and effective_consultant_ids and effective_reviewer_id in effective_consultant_ids:
+        raise HTTPException(
+            status_code=400,
+            detail="The same person cannot be allocated as both an executing consultant and the order reviewer."
+        )
+
     if order_update.status:
         update_order_group_status(
             db, 
@@ -1111,6 +1384,12 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
             db_order.invoice_number = order_update.invoice_number
         if order_update.consultant_ids is not None:
             db_order.consultant_ids = order_update.consultant_ids
+            for o_item in orders_in_group:
+                o_item.consultant_ids = order_update.consultant_ids
+        if "reviewer_id" in fields_set or order_update.reviewer_id is not None:
+            db_order.reviewer_id = order_update.reviewer_id
+            for o_item in orders_in_group:
+                o_item.reviewer_id = order_update.reviewer_id
         if order_update.service_id is not None:
             db_order.service_id = order_update.service_id
         if order_update.job_id is not None:
@@ -1143,10 +1422,14 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
                 db_order.notary_fee = 0.0
         if order_update.is_proforma_finalized is not None:
             db_order.is_proforma_finalized = order_update.is_proforma_finalized
-            if not order_update.is_proforma_finalized:
-                db_order.is_final_invoice_finalized = False
+            for o_item in orders_in_group:
+                o_item.is_proforma_finalized = order_update.is_proforma_finalized
+                if not order_update.is_proforma_finalized:
+                    o_item.is_final_invoice_finalized = False
         if order_update.proforma_stage_percent is not None:
             db_order.proforma_stage_percent = order_update.proforma_stage_percent
+            for o_item in orders_in_group:
+                o_item.proforma_stage_percent = order_update.proforma_stage_percent
         if order_update.proforma_paid_amount is not None:
             with status_lock:
                 old_val = db_order.proforma_paid_amount
@@ -1192,6 +1475,19 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
                 for o_item in orders_in_group:
                     o_item.payment_link = None
                     o_item.xendit_invoice_id = None
+        if order_update.company_id is not None:
+            db_order.company_id = order_update.company_id
+            comp = db.query(models.ClientCompany).filter(models.ClientCompany.id == order_update.company_id).first()
+            if comp and comp.client_id:
+                db_order.client_id = comp.client_id
+            for o_item in orders_in_group:
+                o_item.company_id = order_update.company_id
+                if comp and comp.client_id:
+                    o_item.client_id = comp.client_id
+        elif order_update.client_id is not None:
+            db_order.client_id = order_update.client_id
+            for o_item in orders_in_group:
+                o_item.client_id = order_update.client_id
         if order_update.billing_company_id is not None:
             db_order.billing_company_id = order_update.billing_company_id
             for o_item in orders_in_group:
@@ -1235,6 +1531,10 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
         res.company_name = db_order.client.companies[0].company_name
     res.consultants = get_consultants_data(db, db_order.consultant_ids)
     res.consultant_ids = db_order.consultant_ids or []
+    if db_order.reviewer_id:
+        res.reviewer_id = db_order.reviewer_id
+        rev_data = get_consultants_data(db, [db_order.reviewer_id])
+        res.reviewer = rev_data[0] if rev_data else None
     return res
 
 @router.get("/companies/{company_id}/stakeholders", response_model=List[schemas.CompanyStakeholderResponse])
@@ -1369,7 +1669,8 @@ def get_company_activities(company_id: int, db: Session = Depends(database.get_d
     from sqlalchemy.orm import joinedload
     return db.query(models.ClientActivityLog).options(
         joinedload(models.ClientActivityLog.user).joinedload(models.User.employee),
-        joinedload(models.ClientActivityLog.user).joinedload(models.User.partner)
+        joinedload(models.ClientActivityLog.user).joinedload(models.User.partner),
+        joinedload(models.ClientActivityLog.user).joinedload(models.User.client)
     ).filter(models.ClientActivityLog.company_id == company_id).order_by(models.ClientActivityLog.id.desc()).all()
 
 @router.get("/{client_id:int}/activities", response_model=List[schemas.ClientActivityLogResponse])
@@ -1377,7 +1678,8 @@ def get_client_activities(client_id: int, db: Session = Depends(database.get_db)
     from sqlalchemy.orm import joinedload
     return db.query(models.ClientActivityLog).options(
         joinedload(models.ClientActivityLog.user).joinedload(models.User.employee),
-        joinedload(models.ClientActivityLog.user).joinedload(models.User.partner)
+        joinedload(models.ClientActivityLog.user).joinedload(models.User.partner),
+        joinedload(models.ClientActivityLog.user).joinedload(models.User.client)
     ).filter(models.ClientActivityLog.client_id == client_id).order_by(models.ClientActivityLog.id.desc()).all()
 
 @router.put("/{id:int}", response_model=schemas.ClientResponse)
@@ -2209,6 +2511,16 @@ async def preview_client_document(
         if not mime_type:
             mime_type = "application/octet-stream"
             
+        order_suffix = f" for order {db_doc.order_number}" if db_doc.order_number else ""
+        log_activity(
+            db, 
+            "DOCUMENT_VIEWED", 
+            f"Viewed document '{db_doc.file_name}' ({db_doc.document_type or 'General'}){order_suffix}", 
+            client_id=company.client_id, 
+            company_id=company_id, 
+            user_id=current_user.id
+        )
+
         return StreamingResponse(stream_file(), media_type=mime_type)
         
     raise HTTPException(status_code=400, detail="Document URL format is invalid")
@@ -2297,6 +2609,16 @@ def update_client_document(
     db.commit()
     db.refresh(db_doc)
     
+    order_suffix = f" for order {db_doc.order_number}" if db_doc.order_number else ""
+    log_activity(
+        db, 
+        "DOCUMENT_UPDATED", 
+        f"Updated document '{db_doc.file_name}' ({db_doc.document_type or 'General'}){order_suffix}", 
+        client_id=company.client_id, 
+        company_id=company_id, 
+        user_id=current_user.id
+    )
+
     return db_doc
 
 @router.delete("/companies/{company_id}/documents/{document_id}")
@@ -2338,9 +2660,22 @@ def delete_client_document(
             except Exception as e:
                 print("Failed to delete Supabase file:", e)
         
+    file_name = db_doc.file_name or "Document"
+    doc_type = db_doc.document_type or "General"
+    order_suffix = f" from order {db_doc.order_number}" if db_doc.order_number else ""
+
     db.delete(db_doc)
     db.commit()
     
+    log_activity(
+        db, 
+        "DOCUMENT_DELETED", 
+        f"Deleted document '{file_name}' ({doc_type}){order_suffix}", 
+        client_id=company.client_id, 
+        company_id=company_id, 
+        user_id=current_user.id
+    )
+
     return {"message": "Document deleted successfully"}
 
 # CLIENT SERVICES & PRICE LIST ENDPOINTS
@@ -2504,9 +2839,9 @@ def get_client_documents(company_id: int, db: Session = Depends(database.get_db)
     )
     if not can_view_invoices:
         query = query.filter(
-            ~models.ClientDocument.document_type.ilike("%invoice%"),
-            ~models.ClientDocument.document_path.ilike("%/invoice/%"),
-            ~models.ClientDocument.file_name.ilike("%invoice%")
+            or_(models.ClientDocument.document_type == None, ~models.ClientDocument.document_type.ilike("%invoice%")),
+            or_(models.ClientDocument.document_path == None, ~models.ClientDocument.document_path.ilike("%/invoice/%")),
+            or_(models.ClientDocument.file_name == None, ~models.ClientDocument.file_name.ilike("%invoice%"))
         )
         
     return query.all()
@@ -2567,7 +2902,7 @@ def check_order_authorization_for_chat(user: models.User, order_number: str, db:
         if auth.has_permission(user, "clients_my", "view", db):
             for o in orders_in_group:
                 c_ids = parse_consultant_ids(o.consultant_ids)
-                if emp_id in c_ids:
+                if emp_id in c_ids or o.reviewer_id == emp_id:
                     return True
 
         return False
@@ -2591,12 +2926,25 @@ def is_automated_milestone_message(message: Optional[str]) -> bool:
         or msg.startswith("additional payment")
         or msg.startswith("amount received")
         or "invoice has been generated" in msg
-        or "proforma invoice (" in msg
+        or "invoice has been sent" in msg
+        or "invoice has been re-sent" in msg
+        or "proforma invoice" in msg
+        or "final invoice" in msg
         or "final documents" in msg
         or "uploaded to dropbox" in msg
         or "emailed to client" in msg
+        or "dispatched to client" in msg
         or "assigned to review" in msg
         or "consultant is actively" in msg
+        or "has been reopened" in msg
+        or "reopened and moved back" in msg
+        or "marked as cancelled" in msg
+        or "order was marked as cancelled" in msg
+        or "has been cancelled" in msg
+        or "documents for signature" in msg
+        or "pre-documents" in msg
+        or "pre docs" in msg
+        or "documents reviewed" in msg
     )
 
 
@@ -2746,6 +3094,12 @@ def get_order_summary(
     unique_cids = list(dict.fromkeys(all_cids))
     consultants = get_consultants_data(db, unique_cids)
 
+    reviewer_data = None
+    if first_order.reviewer_id:
+        rev_list = get_consultants_data(db, [first_order.reviewer_id])
+        if rev_list:
+            reviewer_data = rev_list[0]
+
     items = []
     total_amount = 0.0
     for o in orders:
@@ -2814,6 +3168,8 @@ def get_order_summary(
         "company": company_data,
         "client": client_data,
         "consultants": consultants,
+        "reviewer_id": first_order.reviewer_id,
+        "reviewer": reviewer_data,
         "items": items
     }
 
@@ -2845,11 +3201,15 @@ def get_order_progress(
         (models.ClientOrderProgress.message.ilike("Pipeline order has been moved to Active Orders%")) |
         (models.ClientOrderProgress.message.ilike("%payment completed successfully via Xendit%")) |
         (models.ClientOrderProgress.message.ilike("Additional payment received via Xendit%")) |
-        (models.ClientOrderProgress.message.ilike("Proforma invoice (%has been generated and saved%")) |
-        (models.ClientOrderProgress.message.ilike("Final invoice has been generated and saved%")) |
-        (models.ClientOrderProgress.message.ilike("Final documents uploaded to Dropbox%")) |
-        (models.ClientOrderProgress.message.ilike("Final documents (%have been emailed to client%")) |
-        (models.ClientOrderProgress.message.ilike("Amount Received / Proforma Paid manually updated%"))
+        (models.ClientOrderProgress.message.ilike("%invoice%has been generated%")) |
+        (models.ClientOrderProgress.message.ilike("%invoice%has been sent%")) |
+        (models.ClientOrderProgress.message.ilike("%invoice%has been re-sent%")) |
+        (models.ClientOrderProgress.message.ilike("%final documents%")) |
+        (models.ClientOrderProgress.message.ilike("%Pre-documents for signature%")) |
+        (models.ClientOrderProgress.message.ilike("Amount Received / Proforma Paid manually updated%")) |
+        (models.ClientOrderProgress.message.ilike("%has been reopened%")) |
+        (models.ClientOrderProgress.message.ilike("%marked as CANCELLED%")) |
+        (models.ClientOrderProgress.message.ilike("%has been cancelled%"))
     )
     
     is_client_user = bool(current_user.role and current_user.role.name.upper() in ["CLIENT", "CUSTOMER", "MEMBER"])
@@ -2986,7 +3346,8 @@ def get_order_progress(
             reactions_by_msg[r.progress_id][r.emoji].append(user_item)
 
     res = []
-    seen_system_messages = set()
+    last_system_msg_key = None
+    last_system_msg_time = None
     for u in updates:
         is_milestone = not u.user_id or is_automated_milestone_message(u.message)
 
@@ -2999,9 +3360,15 @@ def get_order_progress(
 
         if is_milestone:
             msg_key = (u.message or "").strip()
-            if msg_key in seen_system_messages:
+            is_immediate_dup = (
+                msg_key == last_system_msg_key and
+                u.created_at and last_system_msg_time and
+                abs((u.created_at - last_system_msg_time).total_seconds()) <= 5
+            )
+            if is_immediate_dup:
                 continue
-            seen_system_messages.add(msg_key)
+            last_system_msg_key = msg_key
+            last_system_msg_time = u.created_at
             res.append(format_order_progress_response(u, db, seen_by=[], reactions=[]))
             continue
             
@@ -3235,6 +3602,386 @@ def record_sender_read_watermark(order_number: str, channel: str, user_id: int, 
         print(f"Warning: Failed to auto-update sender read watermark: {e}")
 
 
+def generate_order_chat_transcript(order_number: str, db: Session, user_scope: Optional[str] = "ALL") -> str:
+    """
+    Generates a structured, offline-secure plain-text transcript of all chat interactions
+    (External Client messages, Internal Consultant notes, System milestones, and Reactions)
+    for the specified order.
+    """
+    clean_no = (order_number or "").strip().upper()
+    orders = db.query(models.ClientOrder).options(
+        joinedload(models.ClientOrder.partner),
+        joinedload(models.ClientOrder.company),
+        joinedload(models.ClientOrder.billing_company),
+        joinedload(models.ClientOrder.service),
+        joinedload(models.ClientOrder.notary)
+    ).filter(func.upper(models.ClientOrder.order_number) == clean_no).order_by(models.ClientOrder.id.asc()).all()
+
+    first_order = orders[0] if orders else None
+
+    # Company details
+    company_name = "N/A"
+    company_code = "N/A"
+    tax_number = "N/A"
+    company_addr = "N/A"
+    director = "N/A"
+    key_contact = "N/A"
+    if first_order and first_order.company:
+        company_name = first_order.company.company_name or "N/A"
+        company_code = first_order.company.company_code or "N/A"
+        tax_number = first_order.company.tax_number or "N/A"
+        company_addr = first_order.company.address or "N/A"
+        director = first_order.company.director_name or "N/A"
+        kc_parts = [p for p in [first_order.company.key_contact_person, first_order.company.key_contact_email, first_order.company.key_contact_phone] if p]
+        if kc_parts:
+            key_contact = " | ".join(kc_parts)
+
+    # Client/Partner details
+    client_name = "N/A"
+    client_code = "N/A"
+    client_contact_info = "N/A"
+    if first_order and first_order.partner:
+        client_name = first_order.partner.contact_person or "N/A"
+        client_code = first_order.partner.client_code or "N/A"
+        c_parts = [p for p in [first_order.partner.email, first_order.partner.phone] if p]
+        if c_parts:
+            client_contact_info = " | ".join(c_parts)
+    elif first_order and first_order.customer_id:
+        cust = db.query(models.Client).filter(models.Client.id == first_order.customer_id).first()
+        if cust:
+            client_name = cust.full_name or "N/A"
+            client_code = cust.customer_code or "N/A"
+            c_parts = [p for p in [cust.email, cust.phone] if p]
+            if c_parts:
+                client_contact_info = " | ".join(c_parts)
+
+    # Order meta
+    order_status = first_order.status if first_order else "N/A"
+    payment_status = first_order.payment_status if first_order else "N/A"
+    invoice_no = first_order.invoice_number if first_order and first_order.invoice_number else "N/A"
+    so_no = first_order.accurate_so_no if first_order and first_order.accurate_so_no else "N/A"
+    created_date = first_order.created_at.strftime("%Y-%m-%d %H:%M:%S UTC") if first_order and first_order.created_at else "N/A"
+
+    # Services / Line items
+    services_lines = []
+    total_amount = 0.0
+    all_cids = []
+    for o in orders:
+        total_amount += float(o.unit_price or 0.0)
+        all_cids.extend(parse_consultant_ids(o.consultant_ids))
+        job_title = o.job_title or (o.service.job_title if o.service else "Corporate Service")
+        job_id = o.job_id or (f"JOB-{o.service_id}" if o.service_id else "N/A")
+        price_str = f"IDR {float(o.unit_price or 0.0):,.2f}"
+        services_lines.append(f"  • {job_title} ({job_id}) - {price_str}")
+        if o.service_instructions:
+            services_lines.append(f"    Instructions: {o.service_instructions.strip()}")
+        if o.notes:
+            services_lines.append(f"    Notes: {o.notes.strip()}")
+
+    # Assigned Consultants
+    unique_cids = list(dict.fromkeys(all_cids))
+    consultants = get_consultants_data(db, unique_cids)
+    consultant_names = [f"{c['name']} ({c['job_title'] or 'Consultant'})" for c in consultants] or ["Unassigned"]
+
+    # Query all progress records
+    progress_records = db.query(models.ClientOrderProgress).options(
+        joinedload(models.ClientOrderProgress.user).joinedload(models.User.employee),
+        joinedload(models.ClientOrderProgress.user).joinedload(models.User.role),
+        joinedload(models.ClientOrderProgress.user).joinedload(models.User.client),
+        joinedload(models.ClientOrderProgress.user).joinedload(models.User.partner)
+    ).filter(func.upper(models.ClientOrderProgress.order_number) == clean_no).order_by(
+        models.ClientOrderProgress.created_at.asc(),
+        models.ClientOrderProgress.id.asc()
+    ).all()
+
+    # Query all reactions
+    update_ids = [u.id for u in progress_records]
+    reactions_by_msg = {}
+    if update_ids:
+        all_reactions = db.query(models.ClientOrderProgressReaction).options(
+            joinedload(models.ClientOrderProgressReaction.user).joinedload(models.User.employee),
+            joinedload(models.ClientOrderProgressReaction.user).joinedload(models.User.client),
+            joinedload(models.ClientOrderProgressReaction.user).joinedload(models.User.partner),
+            joinedload(models.ClientOrderProgressReaction.user).joinedload(models.User.role)
+        ).filter(
+            models.ClientOrderProgressReaction.progress_id.in_(update_ids)
+        ).order_by(models.ClientOrderProgressReaction.id.asc()).all()
+
+        for r in all_reactions:
+            if not r.user:
+                continue
+            r_user = r.user
+            r_is_client = bool(r_user.role and r_user.role.name.upper() in ["CLIENT", "CUSTOMER", "MEMBER"])
+            if r_is_client:
+                r_name = "Client"
+                if r_user.partner and r_user.partner.contact_person:
+                    r_name = r_user.partner.contact_person
+                elif r_user.client and r_user.client.full_name:
+                    r_name = r_user.client.full_name
+                elif r_user.name:
+                    r_name = r_user.name
+            elif r_user.employee:
+                fn = r_user.employee.first_name or ""
+                ln = r_user.employee.last_name or ""
+                r_name = f"{fn} {ln}".strip() or (r_user.role.name.title() if r_user.role else "Consultant")
+            elif r_user.role:
+                r_name = r_user.role.name.title()
+            else:
+                r_name = "Staff"
+
+            if r.progress_id not in reactions_by_msg:
+                reactions_by_msg[r.progress_id] = {}
+            if r.emoji not in reactions_by_msg[r.progress_id]:
+                reactions_by_msg[r.progress_id][r.emoji] = []
+            reactions_by_msg[r.progress_id][r.emoji].append(r_name)
+
+    # Filter messages if client scope
+    is_client_scope = user_scope == "CLIENT_ONLY"
+    client_msg_count = 0
+    internal_msg_count = 0
+    system_msg_count = 0
+
+    formatted_messages = []
+    last_system_transcript_key = None
+    last_system_transcript_time = None
+
+    for u in progress_records:
+        is_milestone = not u.user_id or is_automated_milestone_message(u.message)
+
+        if is_milestone:
+            msg_key = (u.message or "").strip()
+            is_immediate_dup = (
+                msg_key == last_system_transcript_key and
+                u.created_at and last_system_transcript_time and
+                abs((u.created_at - last_system_transcript_time).total_seconds()) <= 5
+            )
+            if is_immediate_dup:
+                continue
+            last_system_transcript_key = msg_key
+            last_system_transcript_time = u.created_at
+
+            system_msg_count += 1
+            channel_tag = "[SYSTEM MILESTONE]"
+            sender_str = "System (Automated Event)"
+        elif u.user and u.user.role and u.user.role.name.upper() in ["CLIENT", "CUSTOMER", "MEMBER"]:
+            client_msg_count += 1
+            channel_tag = "[CLIENT CHAT]"
+            c_name = "Client"
+            if u.user.partner and u.user.partner.contact_person:
+                c_name = u.user.partner.contact_person
+            elif u.user.client and u.user.client.full_name:
+                c_name = u.user.client.full_name
+            elif u.user.name:
+                c_name = u.user.name
+            sender_str = f"{c_name} (Client)"
+        else:
+            # Staff user
+            is_internal = (u.channel or "").upper() == "INTERNAL"
+            if is_internal:
+                if is_client_scope:
+                    continue  # Hide internal consultant notes from client-scope export
+                internal_msg_count += 1
+                channel_tag = "[INTERNAL NOTE]"
+            else:
+                client_msg_count += 1
+                channel_tag = "[CLIENT CHAT]"
+
+            if u.user and u.user.employee:
+                fn = u.user.employee.first_name or ""
+                ln = u.user.employee.last_name or ""
+                st_name = f"{fn} {ln}".strip() or (u.user.role.name.title() if u.user.role else "Consultant")
+                st_role = u.user.employee.job_title or (u.user.role.name.title() if u.user.role else "Consultant")
+            elif u.user and u.user.role:
+                st_name = u.user.role.name.title()
+                st_role = u.user.role.name.upper()
+            else:
+                st_name = "Staff"
+                st_role = "Consultant"
+            sender_str = f"{st_name} ({st_role})"
+
+        ts = u.created_at.strftime("%Y-%m-%d %H:%M:%S UTC") if u.created_at else "N/A"
+
+        # Build message text block
+        lines = []
+        lines.append(f"[{ts}] {channel_tag} {sender_str}:")
+        
+        # Quoted reply
+        if getattr(u, "quoted_message_text", None):
+            q_sender = getattr(u, "quoted_sender_name", None) or "Quoted Message"
+            q_text = getattr(u, "quoted_message_text", "").replace("\n", " ")
+            lines.append(f"  > In reply to {q_sender}: \"{q_text}\"")
+
+        # Main content
+        if getattr(u, "is_deleted", False):
+            lines.append("  [Message was deleted by sender]")
+        else:
+            msg_content = (u.message or "").strip()
+            if msg_content:
+                for msg_line in msg_content.splitlines():
+                    lines.append(f"  {msg_line}")
+
+        # Attachment
+        if u.attachment_url or u.attachment_name:
+            lines.append(f"  [Attachment: {u.attachment_name or 'Document'} | URL: {u.attachment_url}]")
+
+        # Reactions
+        if u.id in reactions_by_msg and reactions_by_msg[u.id]:
+            rx_parts = []
+            for em, names in reactions_by_msg[u.id].items():
+                rx_parts.append(f"{em} ({', '.join(names)})")
+            lines.append(f"  [Reactions: {' | '.join(rx_parts)}]")
+
+        formatted_messages.append("\n".join(lines))
+
+    # Build Header
+    total_messages_recorded = len(formatted_messages)
+    now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    services_block = "\n".join(services_lines) if services_lines else "  • No service items listed"
+    consultants_str = ", ".join(consultant_names)
+
+    header = f"""================================================================================
+MCSC ORDER CONVERSATION ARCHIVE & AUDIT TRAIL
+================================================================================
+Order Number      : {clean_no}
+Export Date (UTC) : {now_utc}
+Company Name      : {company_name} (Code: {company_code})
+Tax Number (NPWP) : {tax_number}
+Company Address   : {company_addr}
+Director / Rep    : {director}
+Key Contact       : {key_contact}
+--------------------------------------------------------------------------------
+Client / Partner  : {client_name} (Code: {client_code})
+Client Contact    : {client_contact_info}
+--------------------------------------------------------------------------------
+Order Status      : {order_status} | Payment Status: {payment_status}
+Invoice / SO No   : Inv: {invoice_no} | SO: {so_no}
+Order Created At  : {created_date}
+Total Amount      : IDR {total_amount:,.2f}
+Assigned Team     : {consultants_str}
+--------------------------------------------------------------------------------
+Services / Line Items:
+{services_block}
+================================================================================
+CONVERSATION LOG ({total_messages_recorded} Messages | Client: {client_msg_count} | Internal Notes: {internal_msg_count} | System: {system_msg_count})
+================================================================================
+"""
+
+    body = "\n\n".join(formatted_messages) if formatted_messages else "No chat messages or communication records recorded for this order."
+
+    footer = f"""
+================================================================================
+END OF ARCHIVE - MCSC SECURE OFFLINE CHAT & ACTIVITY LOG
+File Reference: Chat_History_{clean_no}.txt
+Generated by PT Multi Corporate Services Consultant (MCSC)
+================================================================================
+"""
+
+    return header + "\n" + body + "\n" + footer
+
+
+def save_order_chat_to_dropbox(order_number: str, db: Session) -> dict:
+    """
+    Saves the complete order chat transcript to Dropbox under:
+    /Clients/{company_code}/{order_number}/Chat_History_{order_number}.txt
+    """
+    clean_no = (order_number or "").strip().upper()
+    orders = db.query(models.ClientOrder).options(
+        joinedload(models.ClientOrder.company)
+    ).filter(func.upper(models.ClientOrder.order_number) == clean_no).all()
+
+    company_code = "General"
+    for o in orders:
+        if o.company and o.company.company_code:
+            company_code = o.company.company_code
+            break
+
+    # Order folder
+    order_folder = clean_no.replace("/", "_").replace("\\", "_")
+    filename = f"Chat_History_{clean_no}.txt"
+    dropbox_path = f"/Clients/{company_code}/{order_folder}/{filename}"
+    if dropbox_path.startswith("//"):
+        dropbox_path = dropbox_path[1:]
+
+    transcript_text = generate_order_chat_transcript(clean_no, db, user_scope="ALL")
+    file_bytes = transcript_text.encode("utf-8")
+
+    try:
+        from utils.dropbox_client import upload_file
+        res = upload_file(file_bytes, dropbox_path)
+        if res.get("success"):
+            return {
+                "success": True,
+                "path": res.get("path") or dropbox_path,
+                "filename": filename,
+                "size_bytes": len(file_bytes)
+            }
+        else:
+            return {
+                "success": False,
+                "error": res.get("error") or "Unknown Dropbox upload error",
+                "path": dropbox_path,
+                "filename": filename
+            }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "path": dropbox_path,
+            "filename": filename
+        }
+
+
+@router.post("/orders/{order_number}/export-chat-dropbox")
+def export_order_chat_to_dropbox(
+    order_number: str,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if not check_order_authorization_for_chat(current_user, order_number, db):
+        raise HTTPException(status_code=403, detail="Not authorized to export chat for this order")
+
+    clean_no = (order_number or "").strip().upper()
+    res = save_order_chat_to_dropbox(clean_no, db)
+    if not res.get("success"):
+        raise HTTPException(status_code=500, detail=f"Failed to save chat to Dropbox: {res.get('error')}")
+
+    log_activity(db, "CHAT_EXPORTED_DROPBOX", f"Chat history for order {clean_no} saved to Dropbox at {res.get('path')}", user_id=current_user.id)
+    return {
+        "status": "success",
+        "message": f"Chat history successfully archived to Dropbox at {res.get('path')}",
+        "path": res.get("path"),
+        "filename": res.get("filename"),
+        "size_bytes": res.get("size_bytes")
+    }
+
+
+@router.get("/orders/{order_number}/download-chat-transcript")
+def download_order_chat_transcript(
+    order_number: str,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    if not check_order_authorization_for_chat(current_user, order_number, db):
+        raise HTTPException(status_code=403, detail="Not authorized to download chat transcript for this order")
+
+    clean_no = (order_number or "").strip().upper()
+    is_client_user = bool(current_user.role and current_user.role.name.upper() in ["CLIENT", "CUSTOMER", "MEMBER"])
+    scope = "CLIENT_ONLY" if is_client_user else "ALL"
+
+    transcript_text = generate_order_chat_transcript(clean_no, db, user_scope=scope)
+    filename = f"Chat_History_{clean_no}.txt"
+
+    return Response(
+        content=transcript_text,
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-cache"
+        }
+    )
+
+
 def get_taggable_users_for_order(order_number: str, db: Session) -> List[models.User]:
     orders_in_group = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
     if not orders_in_group:
@@ -3243,11 +3990,13 @@ def get_taggable_users_for_order(order_number: str, db: Session) -> List[models.
     is_completed = any(o.status == "COMPLETED" for o in orders_in_group)
     is_pipeline = any(o.status in ["PROSPECT", "PIPELINE"] for o in orders_in_group)
     
-    # Consultant employee IDs
+    # Consultant and reviewer employee IDs
     consultant_employee_ids = set()
     for o in orders_in_group:
         c_ids = parse_consultant_ids(o.consultant_ids)
         consultant_employee_ids.update(c_ids)
+        if getattr(o, "reviewer_id", None):
+            consultant_employee_ids.add(o.reviewer_id)
         
     active_users = db.query(models.User).options(
         joinedload(models.User.employee),
@@ -3638,7 +4387,7 @@ async def upload_order_attachment(
             file_name=sanitized_filename,
             file_url=destination_path,
             document_type="Client Shared Docs",
-            description=(message.strip() if message and message.strip() else f"Uploaded via Order Chat #{order_number}"),
+            description=(message.strip() if message and message.strip() else None),
             document_path=destination_path,
             order_number=order_number,
             document_date=datetime.now().date(),
@@ -3828,6 +4577,8 @@ def finalize_order_invoice(
         res = upload_file(file_bytes, destination_path)
         if not res.get("success"):
             raise HTTPException(status_code=500, detail=f"Failed to upload to Dropbox: {res.get('error')}")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save file to Dropbox: {str(e)}")
         
@@ -3855,7 +4606,7 @@ def finalize_order_invoice(
     # Post progress update in the chat
     db_progress = models.ClientOrderProgress(
         order_number=order_number,
-        user_id=current_user.id,
+        user_id=None,
         message=f"Proforma invoice ({proforma_stage_percent}%) has been generated and saved.",
         channel="CLIENT"
     )
@@ -3879,16 +4630,8 @@ def finalize_order_invoice(
     for order in orders_in_group:
         db.refresh(order)
         
-    res_list = []
-    for ord_obj in orders_in_group:
-        res = schemas.ClientOrderResponse.model_validate(ord_obj) if hasattr(schemas.ClientOrderResponse, "model_validate") else schemas.ClientOrderResponse.from_orm(ord_obj)
-        if ord_obj.client:
-            res.client_name = ord_obj.client.contact_person
-        if ord_obj.company:
-            res.company_name = ord_obj.company.company_name
-        res_list.append(res)
-        
-    return res_list
+    consultants_cache = build_consultants_cache(db, orders_in_group)
+    return [format_order_response(order, consultants_cache) for order in orders_in_group]
 
 @router.post("/orders/{order_number}/finalize-final-invoice", response_model=List[schemas.ClientOrderResponse])
 def finalize_order_final_invoice(
@@ -3930,6 +4673,8 @@ def finalize_order_final_invoice(
         res = upload_file(file_bytes, destination_path)
         if not res.get("success"):
             raise HTTPException(status_code=500, detail=f"Failed to upload to Dropbox: {res.get('error')}")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save file to Dropbox: {str(e)}")
         
@@ -3956,7 +4701,7 @@ def finalize_order_final_invoice(
     # Post progress update in the chat
     db_progress = models.ClientOrderProgress(
         order_number=order_number,
-        user_id=current_user.id,
+        user_id=None,
         message="Final invoice has been generated and saved.",
         channel="CLIENT"
     )
@@ -3978,18 +4723,10 @@ def finalize_order_final_invoice(
     
     # Refresh and return
     for order in orders_in_group:
-      db.refresh(order)
+        db.refresh(order)
         
-    res_list = []
-    for ord_obj in orders_in_group:
-        res = schemas.ClientOrderResponse.model_validate(ord_obj) if hasattr(schemas.ClientOrderResponse, "model_validate") else schemas.ClientOrderResponse.from_orm(ord_obj)
-        if ord_obj.client:
-            res.client_name = ord_obj.client.contact_person
-        if ord_obj.company:
-            res.company_name = ord_obj.company.company_name
-        res_list.append(res)
-        
-    return res_list
+    consultants_cache = build_consultants_cache(db, orders_in_group)
+    return [format_order_response(order, consultants_cache) for order in orders_in_group]
 
 
 @router.get("/documents/expiring")
@@ -4113,6 +4850,8 @@ def send_order_invoice_email(
                     pdf_content = response.content
                 else:
                     raise HTTPException(status_code=500, detail="Failed to download invoice PDF from Dropbox link")
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error downloading invoice PDF: {str(e)}")
     elif doc.file_url.startswith("/uploads/"):
@@ -4133,6 +4872,12 @@ def send_order_invoice_email(
     recipient_name = company.key_contact_person or (company.client.contact_person if company.client else None) or (first_order.client.contact_person if first_order.client else "")
 
     if eff_send_email:
+        val_status = str(company.validation_status or "").strip().upper()
+        if val_status not in ["VALIDATED", "VERIFIED"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot send email invoice. Company '{company.company_name}' has not been verified (Current status: {company.validation_status or 'PENDING_VALIDATION'}). Please validate and verify the company profile first."
+            )
         if not final_recipient_email or not str(final_recipient_email).strip():
             raise HTTPException(status_code=400, detail="Recipient email address is required when sending email invoice.")
         final_recipient_email = validate_and_clean_email(final_recipient_email, "Recipient Email", required=True)
@@ -4169,16 +4914,18 @@ def send_order_invoice_email(
     proforma_pct = first_order.proforma_stage_percent or 50
     proforma_deduction = first_order.proforma_paid_amount if (first_order.proforma_paid_amount is not None and first_order.proforma_paid_amount > 0) else round((total_amount * proforma_pct) / 100)
 
+    is_group_partially_paid = any(item.payment_status == "PARTIALLY_PAID" for item in orders_in_group) or (first_order.proforma_paid_amount is not None and first_order.proforma_paid_amount > 0)
+
     if invoice_type == "proforma":
         charge_amount = round((total_amount * proforma_pct) / 100)
     else:
-        if first_order.payment_status == "PARTIALLY_PAID":
+        if is_group_partially_paid:
             charge_amount = max(0, total_amount - proforma_deduction)
         else:
             charge_amount = total_amount
 
     # Need a new link if final invoice stage or if payment link is not yet created
-    needs_new_link = (invoice_type == "final" and first_order.payment_status == "PARTIALLY_PAID") or (not first_order.payment_link)
+    needs_new_link = (invoice_type == "final" and is_group_partially_paid) or (not first_order.payment_link)
     payment_url = first_order.payment_link
     if needs_new_link:
         from utils.xendit_client import XenditClient
@@ -4204,15 +4951,20 @@ def send_order_invoice_email(
     # 1. Send Email with PDF Attachment and CC Recipients
     if eff_send_email and final_recipient_email:
         from utils.email_service import send_invoice_attachment_email
-        send_invoice_attachment_email(
-            recipient_email=final_recipient_email,
-            recipient_name=recipient_name,
-            invoice_type=invoice_type,
-            pdf_content=pdf_content,
-            pdf_filename=doc.file_name,
-            payment_url=payment_url,
-            cc_emails=cleaned_additional
-        )
+        try:
+            email_sent = send_invoice_attachment_email(
+                recipient_email=final_recipient_email,
+                recipient_name=recipient_name,
+                invoice_type=invoice_type,
+                pdf_content=pdf_content,
+                pdf_filename=doc.file_name,
+                payment_url=payment_url,
+                cc_emails=cleaned_additional
+            )
+            if not email_sent:
+                print(f"Warning: send_invoice_attachment_email returned False for {final_recipient_email}")
+        except Exception as email_err:
+            print("Warning: Failed to send invoice attachment email:", email_err)
 
     # 2. Send WhatsApp Notification & PDF Document via Meta Cloud API
     if eff_send_whatsapp and final_recipient_phone:
@@ -4279,17 +5031,27 @@ def send_order_invoice_email(
         user_id=current_user.id
     )
 
-    res_list = []
+    # Post automated notification in chat as system milestone
+    try:
+        inv_label = "Proforma" if invoice_type == "proforma" else "Final"
+        delivery_via = f"via {channel_desc}" if channel_desc else ""
+        progress_msg = f"{inv_label} invoice has been {'re-sent' if is_resend else 'sent'} to the client {delivery_via}".strip()
+        progress_entry = models.ClientOrderProgress(
+            order_number=order_number,
+            user_id=None,
+            message=progress_msg,
+            channel="CLIENT"
+        )
+        db.add(progress_entry)
+        db.commit()
+    except Exception as chat_err:
+        print("Warning: failed to record automated invoice progress entry:", chat_err)
+
     for ord_obj in orders_in_group:
         db.refresh(ord_obj)
-        res = schemas.ClientOrderResponse.model_validate(ord_obj) if hasattr(schemas.ClientOrderResponse, "model_validate") else schemas.ClientOrderResponse.from_orm(ord_obj)
-        if ord_obj.client:
-            res.client_name = ord_obj.client.contact_person
-        if ord_obj.company:
-            res.company_name = ord_obj.company.company_name
-        res_list.append(res)
         
-    return res_list
+    consultants_cache = build_consultants_cache(db, orders_in_group)
+    return [format_order_response(ord_obj, consultants_cache) for ord_obj in orders_in_group]
 
 
 @router.post("/orders/{order_number}/payment-link")
@@ -4520,6 +5282,405 @@ def sync_order_payment(orderNumber: str, db: Session = Depends(database.get_db),
     return res
 
 
+def find_order_signed_documents(db: Session, order_number: str, company: models.ClientCompany):
+    """
+    Locates pre-docs/signed docs for signature for an order:
+    1. Scans DB ClientDocument records for this order tagged with document_type containing 'Pre Docs', 'Pre Doc', 'Signed Docs', 'Signed'
+    2. Scans Dropbox folders:
+       - /Clients/{company_code}/{order_folder}/Pre Docs
+       - /Clients/{company_code}/{order_folder}/Pre-Docs
+       - /Clients/{company_code}/{order_folder}/Pre_Docs
+       - /Clients/{company_code}/{order_folder}/Pre Documents
+       - /Clients/{company_code}/{order_folder}/Signed Docs
+       - /Clients/{company_code}/{order_folder}/Signed Documents
+       - /Clients/{company_code}/Pre Docs
+       - /Clients/{company_code}/No_Order/Pre Docs
+    """
+    order_folder = order_number.strip()
+    
+    # Collect all relevant company IDs and codes for this order
+    orders_in_group = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_folder).all()
+    company_ids = set()
+    company_codes = set()
+    
+    if company:
+        if company.id:
+            company_ids.add(company.id)
+        if company.company_code:
+            company_codes.add(company.company_code.strip())
+            
+    for o in orders_in_group:
+        if o.company_id:
+            company_ids.add(o.company_id)
+        if o.billing_company_id:
+            company_ids.add(o.billing_company_id)
+        if o.company and o.company.company_code:
+            company_codes.add(o.company.company_code.strip())
+
+    # Ensure fallback company_code if empty
+    if not company_codes:
+        company_codes.add(company.company_code or f"comp_{company.id}")
+    
+    docs_map = {}
+    
+    # 1. Check DB documents tagged with order_number or associated with company_ids
+    db_query = db.query(models.ClientDocument).filter(
+        or_(
+            func.upper(models.ClientDocument.order_number) == order_folder.upper(),
+            models.ClientDocument.company_id.in_(list(company_ids))
+        )
+    )
+    db_docs = db_query.all()
+    
+    for d in db_docs:
+        fname = d.file_name or (os.path.basename(d.file_url) if d.file_url else "Document")
+        dtype = (d.document_type or "").lower()
+        furl = (d.file_url or "").lower()
+        desc = (d.description or "").lower()
+        d_order = (d.order_number or "").strip().upper()
+        
+        is_signed_or_pre = (
+            "pre doc" in dtype or "predoc" in dtype or "pre-doc" in dtype or "pre doc" in dtype or "signed" in dtype or
+            "pre doc" in furl or "predoc" in furl or "pre-doc" in furl or "signed" in furl or
+            "pre doc" in desc or "predoc" in desc or "pre-doc" in desc or "signed" in desc or "signature" in desc or
+            (d_order == order_folder.upper() and ("pre" in dtype or "sign" in dtype or "pre" in furl or "sign" in furl))
+        )
+        
+        # If explicitly tagged with this order and not invoice
+        if d_order == order_folder.upper() and ("invoice" not in dtype and "proforma" not in furl):
+            if is_signed_or_pre or "final" not in dtype:
+                is_signed_or_pre = True
+        
+        if is_signed_or_pre and fname:
+            key = fname.lower()
+            if key not in docs_map:
+                clean_desc = d.description or ""
+                if clean_desc.strip().lower().startswith("uploaded via"):
+                    clean_desc = ""
+                docs_map[key] = {
+                    "id": d.id,
+                    "file_name": fname,
+                    "file_url": d.file_url,
+                    "document_type": d.document_type or "Pre Document",
+                    "description": clean_desc,
+                    "source": "database"
+                }
+                
+    # 2. Check Dropbox Pre Docs / Signed Docs folders for all candidate company codes
+    try:
+        from utils.dropbox_client import list_folder
+        candidate_folders = []
+        for ccode in company_codes:
+            candidate_folders.extend([
+                f"/Clients/{ccode}/{order_folder}/Pre Docs",
+                f"/Clients/{ccode}/{order_folder}/Pre-Docs",
+                f"/Clients/{ccode}/{order_folder}/Pre_Docs",
+                f"/Clients/{ccode}/{order_folder}/PreDocs",
+                f"/Clients/{ccode}/{order_folder}/Pre Documents",
+                f"/Clients/{ccode}/{order_folder}/Signed Docs",
+                f"/Clients/{ccode}/{order_folder}/Signed-Docs",
+                f"/Clients/{ccode}/{order_folder}/Signed Documents",
+                f"/Clients/{ccode}/Pre Docs",
+                f"/Clients/{ccode}/Signed Docs",
+                f"/Clients/{ccode}/No_Order/Pre Docs",
+                f"/Clients/{ccode}/No_Order/Signed Docs"
+            ])
+        
+        # Deduplicate folder list
+        unique_folders = list(dict.fromkeys(candidate_folders))
+        for folder_path in unique_folders:
+            res = list_folder(folder_path)
+            if res.get("success") and res.get("items"):
+                for item in res["items"]:
+                    if item.get("type") == "file":
+                        fname = item.get("name")
+                        key = fname.lower()
+                        matching_db = next((d for d in db_docs if (d.file_name or "").strip().lower() == fname.strip().lower() or (d.file_url or "").strip().lower().endswith(fname.strip().lower())), None)
+                        if key not in docs_map:
+                            docs_map[key] = {
+                                "id": matching_db.id if matching_db else None,
+                                "file_name": fname,
+                                "file_url": item.get("path_display") or item.get("path_lower"),
+                                "size": item.get("size", 0),
+                                "document_type": (matching_db.document_type if matching_db else None) or "Pre Document",
+                                "description": (matching_db.description if matching_db else None),
+                                "source": "dropbox"
+                            }
+                        else:
+                            if not docs_map[key].get("size") and item.get("size"):
+                                docs_map[key]["size"] = item.get("size")
+                            if not docs_map[key].get("description") and matching_db and matching_db.description:
+                                docs_map[key]["description"] = matching_db.description
+    except Exception as e:
+        print(f"Warning: Dropbox folder scan for pre/signed docs encountered: {e}")
+        
+    return list(docs_map.values())
+
+
+@router.get("/orders/{order_number}/signed-documents")
+def get_order_signed_documents(
+    order_number: str,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    first_order = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).first()
+    if not first_order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    company_id = first_order.billing_company_id or first_order.company_id
+    company = db.query(models.ClientCompany).filter(models.ClientCompany.id == company_id).first()
+    target_company = db.query(models.ClientCompany).filter(models.ClientCompany.id == first_order.company_id).first()
+    
+    effective_company = company or target_company
+    if not effective_company:
+        raise HTTPException(status_code=404, detail="Company not found for this order")
+        
+    recipient_email = (
+        (company.key_contact_email if company and company.key_contact_email else None) or
+        (target_company.key_contact_email if target_company and target_company.key_contact_email else None) or
+        (company.client.email if company and company.client and company.client.email else None) or
+        (first_order.client.email if first_order.client else "")
+    )
+    recipient_name = (
+        (company.key_contact_person if company and company.key_contact_person else None) or
+        (target_company.key_contact_person if target_company and target_company.key_contact_person else None) or
+        (company.client.contact_person if company and company.client else None) or
+        (first_order.client.contact_person if first_order.client else "")
+    )
+    company_name = effective_company.company_name
+
+    docs = find_order_signed_documents(db, order_number, effective_company)
+
+    target_comp = target_company or company
+    tax_id = (target_comp.tax_number or "").strip()
+    comp_code = (target_comp.company_code or f"comp_{target_comp.id}").strip()
+    order_num = order_number.strip()
+    zip_password = f"{comp_code}{order_num}"
+    
+    clean_comp_name = re.sub(r'[/\\?%*:|"<> ]', '_', target_comp.company_name or "Client")
+    zip_filename = f"{clean_comp_name}_{order_number}_Pre_Documents.zip"
+
+    comp_val_status = str(effective_company.validation_status or "PENDING_VALIDATION").strip().upper()
+    is_comp_verified = comp_val_status in ["VALIDATED", "VERIFIED"]
+
+    return {
+        "order_number": order_number,
+        "company_name": company_name,
+        "company_validation_status": effective_company.validation_status or "PENDING_VALIDATION",
+        "is_company_verified": is_comp_verified,
+        "target_company_name": target_comp.company_name,
+        "target_company_code": comp_code,
+        "target_tax_number": tax_id,
+        "zip_password": zip_password,
+        "zip_filename": zip_filename,
+        "recipient_email": recipient_email,
+        "recipient_name": recipient_name,
+        "documents": docs,
+        "total_documents": len(docs)
+    }
+
+
+class SendSignedDocumentsPayload(BaseModel):
+    recipient_email: Optional[str] = None
+    recipient_name: Optional[str] = None
+    custom_message: Optional[str] = None
+    additional_recipients: Optional[List[str]] = None
+    disable_zip: Optional[bool] = False
+
+
+@router.post("/orders/{order_number}/send-signed-documents", response_model=List[schemas.ClientOrderResponse])
+def send_order_signed_documents(
+    order_number: str,
+    payload: Optional[SendSignedDocumentsPayload] = None,
+    recipient_email: Optional[str] = Query(None),
+    recipient_name: Optional[str] = Query(None),
+    custom_message: Optional[str] = Query(None),
+    additional_recipients: Optional[str] = Query(None),
+    disable_zip: Optional[bool] = Query(False),
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    final_recipient_email = (payload.recipient_email if payload and payload.recipient_email else recipient_email)
+    final_recipient_name = (payload.recipient_name if payload and payload.recipient_name else recipient_name)
+    final_custom_message = (payload.custom_message if payload and payload.custom_message else custom_message)
+    final_disable_zip = (payload.disable_zip if payload and payload.disable_zip is not None else disable_zip) or False
+
+    raw_addl = (payload.additional_recipients if (payload and payload.additional_recipients) else None) or additional_recipients
+    cleaned_additional = parse_additional_recipients(raw_addl)
+
+    orders_in_group = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
+    if not orders_in_group:
+        raise HTTPException(status_code=404, detail="Order group not found")
+        
+    first_order = orders_in_group[0]
+    company_id = first_order.billing_company_id or first_order.company_id
+    company = db.query(models.ClientCompany).filter(models.ClientCompany.id == company_id).first()
+    target_company = db.query(models.ClientCompany).filter(models.ClientCompany.id == first_order.company_id).first()
+    effective_company = company or target_company
+    
+    if not effective_company:
+        raise HTTPException(status_code=404, detail="Company not found for this order")
+
+    # Strict Check: Ensure company is VERIFIED / VALIDATED before sending documents for signature
+    val_status = str(effective_company.validation_status or "").strip().upper()
+    if val_status not in ["VALIDATED", "VERIFIED"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot send documents for signature. Company '{effective_company.company_name}' has not been verified (Current status: {effective_company.validation_status or 'PENDING_VALIDATION'}). Please validate and verify the company profile first."
+        )
+
+    if not final_recipient_email or not final_recipient_email.strip():
+        final_recipient_email = (
+            (company.key_contact_email if company and company.key_contact_email else None) or
+            (target_company.key_contact_email if target_company and target_company.key_contact_email else None) or
+            (company.client.email if company and company.client and company.client.email else None) or
+            (first_order.client.email if first_order.client else "")
+        )
+        
+    if not final_recipient_email or not final_recipient_email.strip():
+        raise HTTPException(status_code=400, detail="Recipient email address is required.")
+
+    final_recipient_email = validate_and_clean_email(final_recipient_email, "Recipient Email", required=True)
+
+    if not final_recipient_name:
+        final_recipient_name = (
+            (company.key_contact_person if company and company.key_contact_person else None) or
+            (target_company.key_contact_person if target_company and target_company.key_contact_person else None) or
+            (company.client.contact_person if company and company.client else None) or
+            effective_company.company_name
+        )
+
+    # Locate signed/pre-doc documents from Dropbox / DB
+    docs = find_order_signed_documents(db, order_number, effective_company)
+    if not docs:
+        company_folder_code = effective_company.company_code or f"comp_{effective_company.id}"
+        raise HTTPException(
+            status_code=400, 
+            detail=f"No documents found for order {order_number} in Dropbox folder (/Clients/{company_folder_code}/{order_number}/Pre Docs) or in database. Please upload the documents first."
+        )
+
+    # Download document contents
+    import httpx
+    attachments = []
+    
+    for doc in docs:
+        file_name = doc["file_name"]
+        file_url = doc["file_url"]
+        content = b""
+        
+        if file_url.startswith("/Clients/"):
+            from utils.dropbox_client import get_temporary_link
+            link_res = get_temporary_link(file_url)
+            if link_res.get("success") and link_res.get("link"):
+                try:
+                    with httpx.Client(timeout=45.0) as client:
+                        resp = client.get(link_res["link"])
+                        if resp.status_code == 200:
+                            content = resp.content
+                        else:
+                            print(f"Warning: Failed to fetch {file_url} (status {resp.status_code})")
+                except Exception as dl_err:
+                    print(f"Warning: Exception downloading {file_url}: {dl_err}")
+            else:
+                print(f"Warning: Failed to get temporary link for {file_url}: {link_res.get('error')}")
+        elif file_url.startswith("/uploads/"):
+            local_path = os.path.join("uploads", file_url.replace("/uploads/", "", 1))
+            if os.path.exists(local_path):
+                with open(local_path, "rb") as f:
+                    content = f.read()
+        elif file_url.startswith("http://") or file_url.startswith("https://"):
+            try:
+                with httpx.Client(timeout=45.0) as client:
+                    resp = client.get(file_url)
+                    if resp.status_code == 200:
+                        content = resp.content
+            except Exception as dl_err:
+                print(f"Warning: Exception downloading HTTP file {file_url}: {dl_err}")
+
+        if content:
+            attachments.append((file_name, content, doc.get("description") or ""))
+
+    if not attachments:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to retrieve file contents from storage for signed documents. Please verify the files in Dropbox."
+        )
+
+    # Calculate password based on Target Company Entity: [Company Code] + [Order ID] (e.g. A261226MCSX-260015)
+    target_comp = target_company or company
+    tax_id = (target_comp.tax_number or "").strip()
+    comp_code = (target_comp.company_code or f"comp_{target_comp.id}").strip()
+    order_num = order_number.strip()
+    zip_password = f"{comp_code}{order_num}"
+    
+    import re
+    clean_comp_name = re.sub(r'[/\\?%*:|"<> ]', '_', target_comp.company_name or "Client")
+    zip_filename = f"{clean_comp_name}_{order_number}_Pre_Documents.zip"
+
+    # Dispatch email with attachments (direct or password-protected ZIP archive) and CC recipients
+    from utils.email_service import send_signed_documents_for_signature_email
+    email_sent = send_signed_documents_for_signature_email(
+        recipient_email=final_recipient_email.strip(),
+        recipient_name=final_recipient_name,
+        order_number=order_number,
+        company_name=effective_company.company_name,
+        attachments=attachments,
+        custom_message=final_custom_message,
+        company_code=comp_code,
+        tax_number=tax_id,
+        zip_password=zip_password,
+        zip_filename=zip_filename,
+        cc_emails=cleaned_additional,
+        disable_zip=final_disable_zip
+    )
+
+    if not email_sent:
+        raise HTTPException(status_code=500, detail="Failed to dispatch email. Please check server email/SMTP configuration.")
+
+    # Update lifecycle status to PRE_DOC_SENT_FOR_SIGNATURE
+    update_order_group_status(db, orders_in_group, "PRE_DOC_SENT_FOR_SIGNATURE", current_user.id)
+
+    now = datetime.now()
+    for item in orders_in_group:
+        item.signed_docs_sent_at = now
+        item.signed_docs_sent_to = final_recipient_email.strip()
+
+    db.commit()
+
+    # Log activity
+    cc_log = f" (CC: {', '.join(cleaned_additional)})" if cleaned_additional else ""
+    format_label = "direct unencrypted attachments" if final_disable_zip else "encrypted ZIP archive"
+    log_activity(
+        db,
+        "PRE_DOCS_SENT_FOR_SIGNATURE",
+        f"Delivered {len(attachments)} pre-documents for signature ({format_label}) to {final_recipient_email}{cc_log} for order {order_number}",
+        client_id=effective_company.client_id,
+        company_id=effective_company.id,
+        user_id=current_user.id
+    )
+
+    # Post automated notification in chat
+    try:
+        container_desc = "as direct attachments" if final_disable_zip else "in password-protected ZIP archive"
+        progress_msg = f"Pre-documents for signature ({len(attachments)} file(s)) {container_desc} have been emailed to client ({final_recipient_email.strip()})"
+        progress_entry = models.ClientOrderProgress(
+            order_number=order_number,
+            user_id=None,
+            message=progress_msg,
+            channel="CLIENT"
+        )
+        db.add(progress_entry)
+        db.commit()
+    except Exception as chat_err:
+        print("Warning: failed to record automated progress entry:", chat_err)
+
+    for ord_obj in orders_in_group:
+        db.refresh(ord_obj)
+        
+    consultants_cache = build_consultants_cache(db, orders_in_group)
+    return [format_order_response(ord_obj, consultants_cache) for ord_obj in orders_in_group]
+
+
 def find_order_final_documents(db: Session, order_number: str, company: models.ClientCompany):
     """
     Locates deliverable / final documents for an order by checking:
@@ -4556,12 +5717,15 @@ def find_order_final_documents(db: Session, order_number: str, company: models.C
         if is_final and not is_invoice and fname:
             key = fname.lower()
             if key not in docs_map:
+                clean_desc = d.description or ""
+                if clean_desc.strip().lower().startswith("uploaded via"):
+                    clean_desc = ""
                 docs_map[key] = {
                     "id": d.id,
                     "file_name": fname,
                     "file_url": d.file_url,
                     "document_type": d.document_type or "Final Document",
-                    "description": d.description,
+                    "description": clean_desc,
                     "source": "database"
                 }
 
@@ -4594,6 +5758,23 @@ def find_order_final_documents(db: Session, order_number: str, company: models.C
             print(f"Warning: Dropbox folder scan for final docs encountered: {e}")
 
     return list(docs_map.values())
+
+
+@router.get("/orders/{order_number}/document-count")
+def get_order_document_count(
+    order_number: str,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    clean_ord = (order_number or "").strip()
+    if not clean_ord:
+        return {"order_number": order_number, "count": 0}
+        
+    count = db.query(models.ClientDocument).filter(
+        func.upper(models.ClientDocument.order_number) == clean_ord.upper()
+    ).count()
+    
+    return {"order_number": clean_ord, "count": count}
 
 
 @router.get("/orders/{order_number}/final-documents")
@@ -4633,15 +5814,21 @@ def get_order_final_documents(
     target_comp = target_company or company
     tax_id = (target_comp.tax_number or "").strip()
     comp_code = (target_comp.company_code or f"comp_{target_comp.id}").strip()
-    zip_password = f"{tax_id}{comp_code}" if tax_id else f"{comp_code}"
+    order_num = order_number.strip()
+    zip_password = f"{comp_code}{order_num}"
     
     import re
     clean_comp_name = re.sub(r'[/\\?%*:|"<> ]', '_', target_comp.company_name or "Client")
     zip_filename = f"{clean_comp_name}_{order_number}_Final_Documents.zip"
 
+    comp_val_status = str(effective_company.validation_status or "PENDING_VALIDATION").strip().upper()
+    is_comp_verified = comp_val_status in ["VALIDATED", "VERIFIED"]
+
     return {
         "order_number": order_number,
         "company_name": company_name,
+        "company_validation_status": effective_company.validation_status or "PENDING_VALIDATION",
+        "is_company_verified": is_comp_verified,
         "target_company_name": target_comp.company_name,
         "target_company_code": comp_code,
         "target_tax_number": tax_id,
@@ -4659,6 +5846,7 @@ class SendFinalDocumentsPayload(BaseModel):
     recipient_name: Optional[str] = None
     custom_message: Optional[str] = None
     additional_recipients: Optional[List[str]] = None
+    disable_zip: Optional[bool] = False
 
 
 @router.post("/orders/{order_number}/send-final-documents", response_model=List[schemas.ClientOrderResponse])
@@ -4669,12 +5857,14 @@ def send_order_final_documents(
     recipient_name: Optional[str] = Query(None),
     custom_message: Optional[str] = Query(None),
     additional_recipients: Optional[str] = Query(None),
+    disable_zip: Optional[bool] = Query(False),
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
     final_recipient_email = (payload.recipient_email if payload and payload.recipient_email else recipient_email)
     final_recipient_name = (payload.recipient_name if payload and payload.recipient_name else recipient_name)
     final_custom_message = (payload.custom_message if payload and payload.custom_message else custom_message)
+    final_disable_zip = (payload.disable_zip if payload and payload.disable_zip is not None else disable_zip) or False
 
     raw_addl = (payload.additional_recipients if (payload and payload.additional_recipients) else None) or additional_recipients
     cleaned_additional = parse_additional_recipients(raw_addl)
@@ -4691,6 +5881,14 @@ def send_order_final_documents(
     
     if not effective_company:
         raise HTTPException(status_code=404, detail="Company not found for this order")
+
+    # Strict Check: Ensure company is VERIFIED / VALIDATED before sending final deliverable documents
+    val_status = str(effective_company.validation_status or "").strip().upper()
+    if val_status not in ["VALIDATED", "VERIFIED"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot send final deliverable documents. Company '{effective_company.company_name}' has not been verified (Current status: {effective_company.validation_status or 'PENDING_VALIDATION'}). Please validate and verify the company profile first."
+        )
 
     if not final_recipient_email or not final_recipient_email.strip():
         final_recipient_email = (
@@ -4769,17 +5967,18 @@ def send_order_final_documents(
             detail="Failed to retrieve file contents from storage for final documents. Please verify the files in Dropbox."
         )
 
-    # Calculate password based on Target Company Entity: [Tax ID / NPWP] + [Company Code] (e.g. 123123A260008)
+    # Calculate password based on Target Company Entity: [Company Code] + [Order ID] (e.g. A261226MCSX-260015)
     target_comp = target_company or company
     tax_id = (target_comp.tax_number or "").strip()
     comp_code = (target_comp.company_code or f"comp_{target_comp.id}").strip()
-    zip_password = f"{tax_id}{comp_code}" if tax_id else f"{comp_code}"
+    order_num = order_number.strip()
+    zip_password = f"{comp_code}{order_num}"
     
     import re
     clean_comp_name = re.sub(r'[/\\?%*:|"<> ]', '_', target_comp.company_name or "Client")
     zip_filename = f"{clean_comp_name}_{order_number}_Final_Documents.zip"
 
-    # Dispatch email with password-protected encrypted ZIP archive and CC recipients
+    # Dispatch email with attachments (direct or password-protected ZIP archive) and CC recipients
     from utils.email_service import send_final_documents_email
     email_sent = send_final_documents_email(
         recipient_email=final_recipient_email.strip(),
@@ -4792,7 +5991,8 @@ def send_order_final_documents(
         tax_number=tax_id,
         zip_password=zip_password,
         zip_filename=zip_filename,
-        cc_emails=cleaned_additional
+        cc_emails=cleaned_additional,
+        disable_zip=final_disable_zip
     )
 
     if not email_sent:
@@ -4814,10 +6014,11 @@ def send_order_final_documents(
 
     # Log activity
     cc_log = f" (CC: {', '.join(cleaned_additional)})" if cleaned_additional else ""
+    format_label = "direct unencrypted attachments" if final_disable_zip else "encrypted ZIP archive"
     log_activity(
         db,
         "FINAL_DOCUMENTS_DISPATCHED",
-        f"Delivered {len(attachments)} final documents in encrypted ZIP archive to {final_recipient_email}{cc_log} for order {order_number}",
+        f"Delivered {len(attachments)} final documents ({format_label}) to {final_recipient_email}{cc_log} for order {order_number}",
         client_id=effective_company.client_id,
         company_id=effective_company.id,
         user_id=current_user.id
@@ -4833,11 +6034,12 @@ def send_order_final_documents(
 
     # Post automated notification in chat
     try:
-        progress_msg = f"Final documents ({len(attachments)} file(s)) have been {'re-sent' if is_resend_docs else 'emailed'} to client ({final_recipient_email.strip()})"
+        container_desc = "as direct attachments" if final_disable_zip else "in password-protected ZIP archive"
+        progress_msg = f"Final documents ({len(attachments)} file(s)) {container_desc} have been {'re-sent' if is_resend_docs else 'emailed'} to client ({final_recipient_email.strip()})"
         progress_entry = models.ClientOrderProgress(
             order_number=order_number,
-            user_id=current_user.id,
-            message="Final documents uploaded to Dropbox.",
+            user_id=None,
+            message=progress_msg,
             channel="CLIENT"
         )
         db.add(progress_entry)
@@ -4845,17 +6047,11 @@ def send_order_final_documents(
     except Exception as chat_err:
         print("Warning: failed to record automated progress entry:", chat_err)
 
-    res_list = []
     for ord_obj in orders_in_group:
         db.refresh(ord_obj)
-        res = schemas.ClientOrderResponse.model_validate(ord_obj) if hasattr(schemas.ClientOrderResponse, "model_validate") else schemas.ClientOrderResponse.from_orm(ord_obj)
-        if ord_obj.client:
-            res.client_name = ord_obj.client.contact_person
-        if ord_obj.company:
-            res.company_name = ord_obj.company.company_name
-        res_list.append(res)
         
-    return res_list
+    consultants_cache = build_consultants_cache(db, orders_in_group)
+    return [format_order_response(ord_obj, consultants_cache) for ord_obj in orders_in_group]
 
 
 public_router = APIRouter(
@@ -5185,7 +6381,7 @@ async def upload_public_order_attachment(
             file_name=sanitized_filename,
             file_url=attachment_url,
             document_type="CHAT_UPLOAD",
-            description=f"Uploaded via Member/Client Order Chat ({first_order.order_number})",
+            description=(message.strip() if (message and message.strip()) else None),
             order_number=first_order.order_number,
             uploaded_by=current_user.id
         )

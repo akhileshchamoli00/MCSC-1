@@ -284,8 +284,19 @@ export default function CancelledOrdersPage() {
       setHighlightedOrderNum(matched.order_number);
       setTimeout(() => {
         const el = document.getElementById(`order-row-${matched.order_number}`);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        const scrollParent = el?.closest('main') || document.querySelector('main');
+        if (el && scrollParent) {
+          const parentRect = scrollParent.getBoundingClientRect();
+          const elRect = el.getBoundingClientRect();
+          if (elRect.top < parentRect.top || elRect.bottom > parentRect.bottom) {
+            const relativeTop = elRect.top - parentRect.top + scrollParent.scrollTop;
+            scrollParent.scrollTo({ top: Math.max(0, relativeTop - 120), behavior: "smooth" });
+          }
+        }
+        if (typeof window !== "undefined") {
+          window.scrollTo(0, 0);
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
         }
       }, 300);
 
@@ -731,56 +742,56 @@ export default function CancelledOrdersPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                      <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                        <th className="p-4 w-12 text-center">No.</th>
-                        <th className="p-4">Order ID</th>
-                        <th className="p-4">Company Entity</th>
-                        <th className="p-4">Service Package</th>
-                        <th className="p-4">Assigned Consultants</th>
-                        <th className="p-4 text-right">Total Amount</th>
-                        <th className="p-4 text-right">Vendor Fee</th>
-                        <th className="p-4 text-right">Net Voided</th>
-                        <th className="p-4 text-center">Payment</th>
-                        <th className="p-4 text-center">Lifecycle Status</th>
-                        <th className="p-4 text-right">Actions</th>
+                      <tr className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
+                        <th className="py-2.5 px-2 w-8 text-center">No.</th>
+                        <th className="py-2.5 px-2 whitespace-nowrap w-24">Order ID</th>
+                        <th className="py-2.5 px-2 min-w-[120px] max-w-[160px]">Company Entity</th>
+                        <th className="py-2.5 px-2.5 min-w-[220px] max-w-[320px]">Service Package</th>
+                        <th className="py-2.5 px-3 w-36 min-w-[145px] max-w-[170px] whitespace-nowrap text-left">Assigned Consultants</th>
+                        <th className="py-2.5 px-2.5 text-right whitespace-nowrap">Total Amount</th>
+                        <th className="py-2.5 px-2.5 text-right whitespace-nowrap">Vendor Fee</th>
+                        <th className="py-2.5 px-2.5 text-right whitespace-nowrap">Net Voided</th>
+                        <th className="py-2.5 px-2 text-center whitespace-nowrap min-w-[85px]">Payment</th>
+                        <th className="py-2.5 px-2 text-left whitespace-nowrap">Lifecycle Status</th>
+                        <th className="py-2.5 px-2 text-right whitespace-nowrap">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y">
+                    <tbody className="divide-y divide-border/30">
                       {paginatedOrders.map((ord, index) => {
                         const isHighlighted = highlightedOrderNum === ord.order_number;
                         return (
                         <tr 
                           key={ord.order_number || index} 
-                          id={`order-row-${ord.order_number}`}
-                          className={`transition-all duration-300 border-b last:border-0 ${
+                          id={`order-row-${ord.order_number}`} 
+                          className={`transition-all duration-300 border-b border-border/30 last:border-0 ${
                             isHighlighted 
                               ? "bg-emerald-500/20 dark:bg-emerald-500/25 ring-2 ring-emerald-500 ring-inset shadow-md" 
-                              : "hover:bg-muted/30"
+                              : "hover:bg-muted/40"
                           }`}
                         >
-                          <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5">
+                          <td className="py-2 px-2 text-center font-mono font-medium text-muted-foreground align-top pt-2.5 text-xs">
                             #{startIndex + index + 1}
                           </td>
-                          <td className="p-4 align-top pt-5">
+                          <td className="py-2 px-2 align-top pt-2.5 whitespace-nowrap">
                             {ord.company_id ? (
                               <Link href={`/business/clients/documents/${ord.company_id}?from=orders`}>
                                 <Badge
                                   variant="outline"
-                                  className="font-mono font-bold text-xs bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-600 dark:text-rose-400 cursor-pointer transition-colors"
+                                  className="font-mono font-bold text-xs bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-600 dark:text-rose-400 cursor-pointer transition-colors px-2 py-0.5 rounded"
                                   title="Go to Company Documents Folder"
                                 >
                                   {ord.order_number}
                                 </Badge>
                               </Link>
                             ) : (
-                              <Badge variant="outline" className="font-mono font-bold text-xs bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400">
+                              <Badge variant="outline" className="font-mono font-bold text-xs bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded">
                                 {ord.order_number}
                               </Badge>
                             )}
                           </td>
-                          <td className="p-4 font-bold text-foreground text-sm align-top pt-5">
+                          <td className="py-2 px-2 font-bold text-foreground align-top pt-2.5 min-w-[120px] max-w-[160px]">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span>{ord.company_name || "Personal Client Account"}</span>
+                              <span className="text-sm font-bold leading-snug break-words">{ord.company_name || "Personal Client Account"}</span>
                               {(() => {
                                 const comp = companies.find((c: any) => c.id === (ord.company_id || ord.company?.id)) || ord.company;
                                 if (!comp) return null;
@@ -788,34 +799,34 @@ export default function CancelledOrdersPage() {
                                 if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
                                   return (
                                     <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 flex items-center gap-0.5" title="Company pending admin validation">
-                                      <Clock className="h-2.5 w-2.5" /> Pending Company
+                                      <Clock className="h-2.5 w-2.5" /> Pending
                                     </Badge>
                                   );
                                 }
                                 if (vStatus === "NEEDS_REVISION") {
                                   return (
                                     <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 flex items-center gap-0.5" title="Company needs revision">
-                                      <AlertCircle className="h-2.5 w-2.5" /> Revision Required
+                                      <AlertCircle className="h-2.5 w-2.5" /> Revision
                                     </Badge>
                                   );
                                 }
                                 return null;
                               })()}
                             </div>
-                            <div className="text-xs font-normal text-muted-foreground flex items-center gap-1 mt-1">
-                              <Building className="h-3 w-3 text-muted-foreground" /> {ord.client_name || "Representative"}
+                            <div className="text-xs font-normal text-muted-foreground flex items-center gap-1 mt-1 truncate">
+                              <Building className="h-3 w-3 text-muted-foreground shrink-0" /> <span className="truncate">{ord.client_name || "Representative"}</span>
                             </div>
                           </td>
-                          <td className="p-4 align-top pt-5">
+                          <td className="py-2 px-2.5 align-top pt-2.5 min-w-[220px] max-w-[320px]">
                             {ord.items && ord.items.length > 0 ? (
-                              <div className="space-y-1.5 max-w-sm">
+                              <div className="space-y-1.5 w-full">
                                 {ord.items.map((item: any, idx: number) => (
                                   <div key={idx} className="flex flex-wrap items-center gap-1.5 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
                                     <span className="font-semibold text-foreground text-xs leading-normal break-words line-through opacity-70">
                                       {item.job_title}
                                     </span>
                                     {item.job_id && (
-                                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-primary/5 text-primary border-primary/20 shrink-0">
                                         {item.job_id}
                                       </Badge>
                                     )}
@@ -827,104 +838,108 @@ export default function CancelledOrdersPage() {
                               <span className="text-muted-foreground italic text-xs">-</span>
                             )}
                           </td>
-                          <td className="p-4 align-top pt-5">
+                          <td className="py-2 px-3 align-top pt-2.5 w-36 min-w-[145px] max-w-[170px]">
                             {ord.consultants && ord.consultants.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
+                              <div className="flex flex-col items-start gap-1 w-full">
                                 {ord.consultants.map((c: any) => (
-                                  <Badge key={c.id} variant="outline" className="text-[10px] bg-zinc-500/10 text-zinc-700 dark:text-zinc-400 border-zinc-500/20 font-medium flex items-center gap-1">
-                                    <UserCheck className="h-3 w-3 text-zinc-500" />
-                                    {c.name}
+                                  <Badge key={c.id} variant="outline" className="text-[9.5px] bg-zinc-500/10 text-zinc-700 dark:text-zinc-400 border-zinc-500/20 font-medium flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none">
+                                    <UserCheck className="h-2.5 w-2.5 text-zinc-500 shrink-0" />
+                                    <span className="truncate">{c.name}</span>
                                   </Badge>
                                 ))}
                               </div>
                             ) : (
-                              <span className="text-muted-foreground italic text-xs">No consultant assigned</span>
+                              <span className="text-muted-foreground italic text-xs">Unassigned</span>
                             )}
                           </td>
-                          <td className="p-4 text-right font-mono font-bold text-sm text-muted-foreground line-through align-top pt-5">
+                          <td className="py-2 px-2.5 text-right font-mono font-bold text-sm text-muted-foreground line-through align-top pt-2.5 whitespace-nowrap">
                             {formatCurrency(ord.total_amount)}
                           </td>
-                          <td className="p-4 text-right font-mono font-bold text-sm text-amber-600/70 dark:text-amber-400/70 line-through align-top pt-5">
+                          <td className="py-2 px-2.5 text-right font-mono font-bold text-sm text-amber-600/70 dark:text-amber-400/70 line-through align-top pt-2.5 whitespace-nowrap">
                             {formatCurrency(ord.total_notary_fee || 0)}
                           </td>
-                          <td className="p-4 text-right font-mono font-bold text-sm text-rose-600 dark:text-rose-400 line-through align-top pt-5">
+                          <td className="py-2 px-2.5 text-right font-mono font-bold text-sm text-rose-600 dark:text-rose-400 line-through align-top pt-2.5 whitespace-nowrap">
                             {formatCurrency((ord.total_amount || 0) - (ord.total_notary_fee || 0))}
                           </td>
-                          <td className="p-4 text-center align-top pt-5">
-                            <Badge className={`${getPaymentStatusColor(ord.payment_status)} font-bold font-mono border text-[11px]`}>
+                          <td className="py-2 px-2 text-center align-top pt-2.5 whitespace-nowrap min-w-[85px]">
+                            <Badge className={`${getPaymentStatusColor(ord.payment_status)} font-bold font-mono border text-[10px] px-2 py-0.5`}>
                               {ord.payment_status || "UNPAID"}
                             </Badge>
                           </td>
-                          <td className="p-4 text-center align-top pt-5">
-                            <Badge className={`${getOrderStatusColor(ord.status)} font-bold border text-[11px] flex items-center gap-1 justify-center mx-auto`}>
-                              <Ban className="h-3 w-3" />
+                          <td className="py-2 px-2 text-left align-top pt-2.5 whitespace-nowrap">
+                            <Badge className={`${getOrderStatusColor(ord.status)} font-bold border text-[10px] px-2 py-0.5 inline-flex items-center gap-1`}>
+                              <Ban className="h-2.5 w-2.5" />
                               {ord.status || "CANCELLED"}
                             </Badge>
                           </td>
-                          <td className="p-4 text-right space-x-1 align-top pt-5 whitespace-nowrap">
-                            {/* Restore Order */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 px-2.5 text-xs font-bold gap-1.5 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/40 shadow-xs inline-flex items-center"
-                              title="Reopen Order back to Active stream"
-                              onClick={() => {
-                                setSelectedOrderGroup(ord);
-                                setIsReopenOpen(true);
-                              }}
-                            >
-                              <RotateCcw className="h-3.5 w-3.5" /> Restore
-                            </Button>
-                            {/* View Details */}
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              title="View Order Details"
-                              onClick={() => {
-                                setSelectedOrderGroup(ord);
-                                const pct = ord.proforma_stage_percent || 70;
-                                setProformaPercent(pct);
-                                setTempPercent(String(pct));
-                                if (ord.proforma_paid_amount != null && ord.proforma_paid_amount > 0) {
-                                  setTempAmount(String(Math.round(ord.proforma_paid_amount)));
-                                } else {
-                                  setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
-                                }
-                                setIsPph21(false);
-                                setIsViewOpen(true);
-                                fetchProgressUpdates(ord.order_number);
-                              }}
-                            >
-                              <Eye className="h-4 w-4 text-slate-500 hover:text-foreground" />
-                            </Button>
-                            {/* Order Chat */}
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              title="Order Chat"
-                              onClick={() => {
-                                setSelectedOrderGroup(ord);
-                                setIsChatOpen(true);
-                                fetchProgressUpdates(ord.order_number);
-                              }}
-                            >
-                              <MessageSquare className="h-4 w-4 text-emerald-600 hover:text-emerald-700" />
-                            </Button>
-                            {/* Delete (Admin only) */}
-                            {isAdmin && (
+                          <td className="py-2 px-2 text-right align-top pt-2.5 whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1">
+                              {/* Restore Order */}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-1.5 text-[9.5px] font-bold gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/40 shadow-none inline-flex items-center rounded"
+                                title="Reopen Order back to Active stream"
+                                onClick={() => {
+                                  setSelectedOrderGroup(ord);
+                                  setIsReopenOpen(true);
+                                }}
+                              >
+                                <RotateCcw className="h-2.5 w-2.5" /> Restore
+                              </Button>
+                              {/* View Details */}
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                title="Delete Cancelled Order"
-                                className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                                className="h-6 w-6 rounded p-0"
+                                title="View Order Details"
                                 onClick={() => {
                                   setSelectedOrderGroup(ord);
-                                  setIsDeleteOpen(true);
+                                  const pct = ord.proforma_stage_percent || 70;
+                                  setProformaPercent(pct);
+                                  setTempPercent(String(pct));
+                                  if (ord.proforma_paid_amount != null && ord.proforma_paid_amount > 0) {
+                                    setTempAmount(String(Math.round(ord.proforma_paid_amount)));
+                                  } else {
+                                    setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
+                                  }
+                                  setIsPph21(false);
+                                  setIsViewOpen(true);
+                                  fetchProgressUpdates(ord.order_number);
                                 }}
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                               </Button>
-                            )}
+                              {/* Order Chat */}
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6 rounded p-0"
+                                title="Order Chat"
+                                onClick={() => {
+                                  setSelectedOrderGroup(ord);
+                                  setIsChatOpen(true);
+                                  fetchProgressUpdates(ord.order_number);
+                                }}
+                              >
+                                <MessageSquare className="h-3.5 w-3.5 text-emerald-600 hover:text-emerald-700" />
+                              </Button>
+                              {/* Delete (Admin only) */}
+                              {isAdmin && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6 rounded p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                                  title="Delete Cancelled Order"
+                                  onClick={() => {
+                                    setSelectedOrderGroup(ord);
+                                    setIsDeleteOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );

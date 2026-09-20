@@ -716,6 +716,8 @@ class ClientActivityLog(Base):
             return "System"
         if self.user.employee:
             return f"{self.user.employee.first_name} {self.user.employee.last_name}"
+        if self.user.partner:
+            return self.user.partner.contact_person
         if self.user.client:
             return self.user.client.contact_person
         return self.user.email
@@ -833,6 +835,7 @@ class ClientOrder(Base):
     proforma_paid_amount = Column(Float, nullable=True, default=None)
     is_final_invoice_finalized = Column(Boolean, default=False)
     consultant_ids = Column(JSON, nullable=True, default=list) # List of assigned employee/consultant IDs
+    reviewer_id = Column(Integer, ForeignKey("employees.id", ondelete="SET NULL"), nullable=True) # Designated Order Reviewer
     service_instructions = Column(String, nullable=True) # Service item specific instructions for processing team
     notes = Column(String, nullable=True) # Internal Instructions / Notes from order creator to delivery manager
     payment_link = Column(String, nullable=True)
@@ -863,6 +866,8 @@ class ClientOrder(Base):
     last_invoice_sent_at = Column(DateTime(timezone=True), nullable=True)
     last_invoice_sent_to = Column(String, nullable=True)
     invoice_delivery_channel = Column(String, nullable=True)
+    signed_docs_sent_at = Column(DateTime(timezone=True), nullable=True)
+    signed_docs_sent_to = Column(String, nullable=True)
     deliverables_sent_at = Column(DateTime(timezone=True), nullable=True)
     deliverables_sent_to = Column(String, nullable=True)
     notary_voucher_sent_at = Column(DateTime(timezone=True), nullable=True)
@@ -881,6 +886,7 @@ class ClientOrder(Base):
     billing_company = relationship("ClientCompany", foreign_keys=[billing_company_id])
     service = relationship("ClientService")
     notary = relationship("Notary")
+    reviewer = relationship("Employee", foreign_keys=[reviewer_id])
 
 
 class ClientOrderProgress(Base):

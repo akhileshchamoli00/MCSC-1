@@ -4,22 +4,30 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { 
+  ShoppingCart, 
   Loader2, 
   ArrowLeft, 
   Check, 
-  Users,
-  Tag,
-  Plus,
-  Trash2,
+  Building2, 
+  Building, 
+  UserCheck, 
+  Users, 
+  Tag, 
+  Plus, 
+  Trash2, 
+  Briefcase, 
+  MapPin, 
+  Mail, 
+  Phone, 
+  FileText, 
+  ShieldCheck, 
+  X, 
+  RefreshCw, 
+  CheckCircle2, 
+  AlertCircle,
   Lock,
   Edit,
-  Building,
-  Building2,
   DollarSign,
-  Briefcase,
-  MapPin,
-  UserCheck,
-  FileText,
   PauseCircle,
   AlertTriangle,
   MessageSquare
@@ -27,7 +35,6 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { 
   Dialog, 
@@ -51,40 +58,41 @@ export default function EditClientOrderPage() {
   const [selectedOrderGroup, setSelectedOrderGroup] = useState<any>(null);
 
   // DB Data Options
+  const [clients, setClients] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [notaries, setNotaries] = useState<any[]>([]);
 
+  // Filter Client Partner
+  const [filterClientId, setFilterClientId] = useState<string>("");
+
   // Edit Form States
   const [deletedItemIds, setDeletedItemIds] = useState<number[]>([]);
   const [editForm, setEditForm] = useState({
+    company_id: "" as string,
+    billing_company_id: "" as string,
+    same_billing_company: true,
     status: "CONFIRMED",
     payment_status: "UNPAID",
     proforma_paid_amount: null as number | null,
-    billing_company_id: null as number | null,
-    same_billing_company: true,
     invoice_number: "",
     consultant_ids: [] as number[],
+    reviewer_id: null as number | null,
     notes: "",
     items: [] as any[],
     is_proforma_finalized: false,
     is_final_invoice_finalized: false
   });
 
-  // Quick  // Create Company in Edit Form State
+  // Quick Create Company Modal State
   const [isCreateCompanyOpen, setIsCreateCompanyOpen] = useState(false);
+  const [createCompanyTarget, setCreateCompanyTarget] = useState<"billing" | "target">("billing");
   const [creatingCompany, setCreatingCompany] = useState(false);
-
-  // On Hold Modal State
-  const [isOnHoldDialogOpen, setIsOnHoldDialogOpen] = useState(false);
-  const [holdReason, setHoldReason] = useState("");
-  const [holdChannel, setHoldChannel] = useState<"CLIENT" | "INTERNAL">("CLIENT");
-  const [prevStatusBeforeHold, setPrevStatusBeforeHold] = useState<string>("CONFIRMED");
-
   const [newCompanyForm, setNewCompanyForm] = useState({
     company_name: "",
+    client_id: "",
     address: "",
     tax_number: "",
     industry: "",
@@ -94,35 +102,41 @@ export default function EditClientOrderPage() {
     notes: ""
   });
 
-  const fetchData = async () => {
+  // On Hold Modal State
+  const [isOnHoldDialogOpen, setIsOnHoldDialogOpen] = useState(false);
+  const [holdReason, setHoldReason] = useState("");
+  const [holdChannel, setHoldChannel] = useState<"CLIENT" | "INTERNAL">("CLIENT");
+  const [prevStatusBeforeHold, setPrevStatusBeforeHold] = useState<string>("CONFIRMED");
 
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const [ordRes, serRes, empRes, teamRes, notariesRes, compRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
-      credentials: "include", }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
-      credentials: "include", }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, {
-      credentials: "include", }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, {
-      credentials: "include", }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries`, {
-      credentials: "include", }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, {
-      credentials: "include", })
+      const [cliRes, ordRes, serRes, empRes, teamRes, notariesRes, compRes] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, { credentials: "include" }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, { credentials: "include" }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, { credentials: "include" }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, { credentials: "include" }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, { credentials: "include" }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries`, { credentials: "include" }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, { credentials: "include" })
       ]);
 
+      let fetchedClients: any[] = [];
       let fetchedOrders: any[] = [];
       let fetchedServices: any[] = [];
+      if (cliRes.ok) {
+        fetchedClients = await cliRes.json();
+        setClients(fetchedClients);
+      }
       if (ordRes.ok) fetchedOrders = await ordRes.json();
-      if (serRes.ok) fetchedServices = await serRes.json();
+      if (serRes.ok) {
+        fetchedServices = await serRes.json();
+        setServices(fetchedServices);
+      }
       if (empRes.ok) setEmployees(await empRes.json());
       if (teamRes.ok) setTeams(await teamRes.json());
       if (notariesRes.ok) setNotaries(await notariesRes.json());
       if (compRes.ok) setCompanies(await compRes.json());
-      
-      setServices(fetchedServices);
 
       // Group raw orders by order_number
       const groupedOrdersMap = new Map<string, any>();
@@ -143,6 +157,8 @@ export default function EditClientOrderPage() {
             invoice_number: ord.invoice_number || null,
             consultant_ids: ord.consultant_ids || [],
             consultants: ord.consultants || [],
+            reviewer_id: ord.reviewer_id || null,
+            reviewer: ord.reviewer || null,
             notes: ord.notes || "",
             total_amount: 0,
             items: [],
@@ -169,6 +185,13 @@ export default function EditClientOrderPage() {
           group.is_final_invoice_finalized = true;
         }
 
+        if (ord.reviewer_id) {
+          group.reviewer_id = ord.reviewer_id;
+        }
+        if (ord.reviewer) {
+          group.reviewer = ord.reviewer;
+        }
+
         if (ord.consultants && ord.consultants.length > 0) {
           const existingIds = new Set(group.consultants.map((c: any) => c.id));
           ord.consultants.forEach((c: any) => {
@@ -188,6 +211,9 @@ export default function EditClientOrderPage() {
       }
 
       setSelectedOrderGroup(targetGroup);
+      if (targetGroup.client_id) {
+        setFilterClientId(String(targetGroup.client_id));
+      }
       
       const mappedItems = (targetGroup.items || []).map((item: any) => {
         const matchedService = fetchedServices.find((s) => s.id === item.service_id);
@@ -210,13 +236,15 @@ export default function EditClientOrderPage() {
 
       const isSameBilling = !targetGroup.billing_company_id || targetGroup.billing_company_id === targetGroup.company_id;
       setEditForm({
+        company_id: targetGroup.company_id ? String(targetGroup.company_id) : "",
+        billing_company_id: targetGroup.billing_company_id ? String(targetGroup.billing_company_id) : (targetGroup.company_id ? String(targetGroup.company_id) : ""),
+        same_billing_company: isSameBilling,
         status: targetGroup.status || "CONFIRMED",
         payment_status: targetGroup.payment_status || "UNPAID",
         proforma_paid_amount: targetGroup.proforma_paid_amount != null ? targetGroup.proforma_paid_amount : null,
-        billing_company_id: targetGroup.billing_company_id || targetGroup.company_id,
-        same_billing_company: isSameBilling,
         invoice_number: targetGroup.invoice_number || "",
         consultant_ids: targetGroup.consultant_ids || [],
+        reviewer_id: targetGroup.reviewer_id || null,
         notes: targetGroup.notes || "",
         items: mappedItems,
         is_proforma_finalized: targetGroup.is_proforma_finalized || false,
@@ -238,11 +266,27 @@ export default function EditClientOrderPage() {
   }, [orderNumber]);
 
   const toggleEditConsultantSelect = (empId: number) => {
+    if (editForm.reviewer_id === empId && !(editForm.consultant_ids || []).includes(empId)) {
+      toast.error("This person is currently selected as the Designated Reviewer. An employee cannot be both an executing consultant and the order reviewer.");
+      return;
+    }
     setEditForm(prev => {
       const current = prev.consultant_ids || [];
       const updated = current.includes(empId) ? current.filter(id => id !== empId) : [...current, empId];
       return { ...prev, consultant_ids: updated };
     });
+  };
+
+  const handleSelectEditReviewer = (empId: number) => {
+    if (editForm.reviewer_id === empId) {
+      setEditForm(prev => ({ ...prev, reviewer_id: null }));
+      return;
+    }
+    if ((editForm.consultant_ids || []).includes(empId)) {
+      toast.error("This person is currently allocated as an executing consultant. An employee cannot be both an executing consultant and the order reviewer.");
+      return;
+    }
+    setEditForm(prev => ({ ...prev, reviewer_id: empId }));
   };
 
   const handleEditServiceSelect = (index: number, serviceIdStr: string) => {
@@ -324,6 +368,7 @@ export default function EditClientOrderPage() {
           service_id: "",
           job_id: "",
           job_title: "",
+          branch_name: "",
           description: "",
           service_instructions: "",
           notes: "",
@@ -338,9 +383,11 @@ export default function EditClientOrderPage() {
     }));
   };
 
-  const handleOpenCreateCompany = () => {
+  const handleOpenCreateCompany = (target: "billing" | "target") => {
+    setCreateCompanyTarget(target);
     setNewCompanyForm({
       company_name: "",
+      client_id: filterClientId || "",
       address: "",
       tax_number: "",
       industry: "",
@@ -375,7 +422,7 @@ export default function EditClientOrderPage() {
     try {
       const payload = {
         company_name: newCompanyForm.company_name.trim(),
-        client_id: selectedOrderGroup?.client_id || null,
+        client_id: newCompanyForm.client_id ? parseInt(newCompanyForm.client_id) : (selectedOrderGroup?.client_id || null),
         address: newCompanyForm.address || null,
         tax_number: newCompanyForm.tax_number || null,
         industry: newCompanyForm.industry || null,
@@ -386,7 +433,7 @@ export default function EditClientOrderPage() {
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/standalone`, {
-      credentials: "include",
+        credentials: "include",
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -398,11 +445,20 @@ export default function EditClientOrderPage() {
         const createdComp = await res.json();
         toast.success(`Company "${createdComp.company_name}" created successfully!`);
         setCompanies(prev => [...prev, createdComp]);
-        setEditForm(prev => ({
-          ...prev,
-          billing_company_id: createdComp.id,
-          same_billing_company: false
-        }));
+        
+        if (createCompanyTarget === "billing") {
+          setEditForm(prev => ({
+            ...prev,
+            billing_company_id: String(createdComp.id),
+            same_billing_company: false
+          }));
+        } else {
+          setEditForm(prev => ({
+            ...prev,
+            company_id: String(createdComp.id),
+            billing_company_id: prev.same_billing_company ? String(createdComp.id) : prev.billing_company_id
+          }));
+        }
         setIsCreateCompanyOpen(false);
       } else {
         const err = await res.json();
@@ -420,6 +476,28 @@ export default function EditClientOrderPage() {
     const itemToRemove = editForm.items[index];
     if (itemToRemove.id) {
       setDeletedItemIds(prev => [...prev, itemToRemove.id]);
+    }
+    if (editForm.items.length <= 1) {
+      setEditForm(prev => ({
+        ...prev,
+        items: [
+          {
+            service_id: "",
+            job_id: "",
+            job_title: "",
+            branch_name: "",
+            description: "",
+            service_instructions: "",
+            notes: "",
+            pricing_tier: "BASE",
+            unit_price: 0,
+            custom_price_text: "",
+            notary_id: "",
+            _raw_service: null
+          }
+        ]
+      }));
+      return;
     }
     setEditForm(prev => ({
       ...prev,
@@ -465,6 +543,11 @@ export default function EditClientOrderPage() {
       return;
     }
 
+    if (editForm.reviewer_id && (editForm.consultant_ids || []).includes(editForm.reviewer_id)) {
+      toast.error("The same person cannot be selected as both an executing consultant and the order reviewer.");
+      return;
+    }
+
     if (editForm.status === "ON_HOLD" && !holdReason.trim()) {
       toast.error("Please provide a reason for placing this order on hold.");
       setIsOnHoldDialogOpen(true);
@@ -478,9 +561,9 @@ export default function EditClientOrderPage() {
         await Promise.all(
           deletedItemIds.map((id) =>
             fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${id}`, {
-      credentials: "include",
-              method: "DELETE",
-              })
+              credentials: "include",
+              method: "DELETE"
+            })
           )
         );
       }
@@ -489,21 +572,24 @@ export default function EditClientOrderPage() {
       const existingItems = editForm.items.filter((item: any) => item.id);
       const newItems = editForm.items.filter((item: any) => !item.id);
 
-      // 3. Update existing items in db
+      // 3. Target company and billing company IDs
+      const targetCompId = editForm.company_id ? Number(editForm.company_id) : selectedOrderGroup.company_id;
       const finalBillingId = editForm.same_billing_company
-        ? selectedOrderGroup.company_id
-        : (editForm.billing_company_id ? Number(editForm.billing_company_id) : selectedOrderGroup.company_id);
+        ? targetCompId
+        : (editForm.billing_company_id ? Number(editForm.billing_company_id) : targetCompId);
 
+      // 4. Update existing items in db
       if (existingItems.length > 0) {
         await Promise.all(
           existingItems.map((item: any, idx: number) =>
             fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${item.id}`, {
-      credentials: "include",
+              credentials: "include",
               method: "PUT",
               headers: {
                 "Content-Type": "application/json"
               },
               body: JSON.stringify({
+                company_id: targetCompId,
                 status: editForm.status,
                 payment_status: editForm.payment_status,
                 ...(editForm.status === "ON_HOLD" && holdReason.trim() ? {
@@ -516,6 +602,7 @@ export default function EditClientOrderPage() {
                 billing_company_id: finalBillingId,
                 invoice_number: editForm.invoice_number || null,
                 consultant_ids: editForm.consultant_ids,
+                reviewer_id: editForm.reviewer_id || null,
                 service_instructions: item.service_instructions ? item.service_instructions.trim() : null,
                 notes: editForm.notes ? editForm.notes.trim() : null,
                 service_id: item.service_id ? Number(item.service_id) : null,
@@ -535,11 +622,14 @@ export default function EditClientOrderPage() {
         );
       }
 
-      // 4. Create new items in db
+      // 5. Create new items in db
       if (newItems.length > 0) {
         const payload = {
-          company_id: selectedOrderGroup.company_id,
+          company_id: targetCompId,
           order_number: selectedOrderGroup.order_number,
+          billing_company_id: finalBillingId,
+          status: editForm.status,
+          allow_append: true,
           items: newItems.map((item: any) => ({
             service_id: item.service_id ? Number(item.service_id) : null,
             job_id: item.job_id,
@@ -553,12 +643,13 @@ export default function EditClientOrderPage() {
             notary_id: item.notary_id ? Number(item.notary_id) : null
           })),
           consultant_ids: editForm.consultant_ids,
+          reviewer_id: editForm.reviewer_id || null,
           notes: editForm.notes || null,
           internal_notes: editForm.notes || null
         };
 
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
-      credentials: "include",
+          credentials: "include",
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -591,7 +682,7 @@ export default function EditClientOrderPage() {
   };
 
   const editItemsTotal = (editForm.items || []).reduce((acc, curr) => acc + (curr.unit_price || 0), 0);
-  const canEditItems = editForm.payment_status === "UNPAID" && (editForm.status === "DRAFT" || editForm.status === "PIPELINE");
+  const isPipelineOrder = selectedOrderGroup?.status === "PIPELINE" || editForm.status === "PIPELINE";
 
   if (loading) {
     return (
@@ -602,200 +693,353 @@ export default function EditClientOrderPage() {
     );
   }
 
-  const isPipelineOrder = selectedOrderGroup?.status === "PIPELINE" || editForm.status === "PIPELINE";
-
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-6xl mx-auto pb-10">
-      
-      {/* Title Header */}
-      <div className="flex items-start gap-4">
-        <Link href={isPipelineOrder ? "/business/clients/orders/pipeline" : "/business/clients/orders"} className="mt-1">
-          <Button variant="ghost" size="icon" className="rounded-xl">
-            <ArrowLeft className="h-4 w-4" />
+    <div className="w-full max-w-none space-y-3.5 pb-12 animate-in fade-in duration-300">
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 pb-2.5">
+        <div className="flex items-center gap-2.5">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => router.back()}
+            className="h-8 w-8 rounded-lg border-border/60 hover:bg-muted/50"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
           </Button>
-        </Link>
-        <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 shadow-sm shrink-0 flex items-center justify-center">
-          <Edit className="h-6 w-6" />
-        </div>
-        <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Edit Service Order</h1>
-            <p className="text-muted-foreground mt-1 text-sm">Configure client partner scope entities, allocate consultant rosters, and build billing line items.</p>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 self-start sm:self-auto">
-            <Badge variant="outline" className="font-mono text-xs font-bold px-3 py-1.5 border-border/50 bg-zinc-100 dark:bg-white/5 text-zinc-800 dark:text-zinc-200 rounded-xl shrink-0">
-              {orderNumber}
-            </Badge>
-            {editItemsTotal > 0 && (
-              <Badge variant="outline" className="font-mono text-xs font-bold px-3 py-1.5 border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl shrink-0">
-                Total Order Value: {formatCurrency(editItemsTotal)}
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-bold tracking-tight text-foreground">
+                Edit Service Order: <span className="font-mono text-primary">{orderNumber}</span>
+              </h1>
+              <Badge variant="outline" className="font-mono text-[10px] uppercase px-1.5 py-0.5 bg-primary/10 border-primary/20 text-primary">
+                {isPipelineOrder ? "Pipeline Order" : "Active Workflow"}
               </Badge>
-            )}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Modify client corporate entity, configure service line items, and allocate team members.
+            </p>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.back()}
+            className="text-xs font-semibold h-8 rounded-lg"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={saving}
+            onClick={handleEditSubmit}
+            className="text-xs font-bold h-8 px-3.5 gap-1.5 rounded-lg shadow-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span>Saving Changes...</span>
+              </>
+            ) : (
+              <>
+                <Check className="h-3 w-3" />
+                <span>Save Changes</span>
+              </>
+            )}
+          </Button>
         </div>
       </div>
 
-      <form onSubmit={handleEditSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* Left Column: Entity Details & Service Items (2/3 width) */}
-        <div className="lg:col-span-2 space-y-6">
-
-          {/* Compact Entity Summary Banner with Billing Entity Controls */}
-          {selectedOrderGroup && (
-            <Card className="border-border/50 shadow-sm bg-card/60 backdrop-blur-md">
-              <CardContent className="p-4 space-y-3 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <span className="text-muted-foreground block font-medium text-[10px] uppercase tracking-wider">Target Company</span>
-                    <span className="font-bold text-foreground text-sm truncate block">{selectedOrderGroup.company_name || "Individual"}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground block font-medium text-[10px] uppercase tracking-wider">Representative</span>
-                    <span className="font-semibold text-foreground truncate block">{selectedOrderGroup.client_name || "-"}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground block font-medium text-[10px] uppercase tracking-wider">Created On</span>
-                    <span className="font-semibold text-foreground block">
-                      {new Date(selectedOrderGroup.created_at).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric"
-                      })}
-                    </span>
-                  </div>
+      <form onSubmit={handleEditSubmit} className="space-y-3.5">
+        
+        {/* Main 2-Column Responsive Split */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
+          
+          {/* LEFT COLUMN: Entity Info & Service Line Items */}
+          <div className="lg:col-span-7 xl:col-span-7 2xl:col-span-8 space-y-3.5">
+            
+            {/* STEP 1: ENTITY & GENERAL INFORMATION */}
+            <Card className="border-border/60 shadow-2xs rounded-xl overflow-hidden bg-card/60 backdrop-blur-md">
+              <CardHeader className="py-2 px-3.5 border-b border-border/40 bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="text-xs font-bold flex items-center gap-1.5 text-foreground uppercase tracking-wider">
+                    <Building2 className="h-3.5 w-3.5 text-primary" /> Step 1: Corporate Entity & Order Details
+                  </CardTitle>
+                  <CardDescription className="text-[10px] text-muted-foreground mt-0.5">
+                    Designate the company entity receiving services and registered order reference ID.
+                  </CardDescription>
                 </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Client Partner Filter:</span>
+                  <select
+                    value={filterClientId}
+                    onChange={(e) => {
+                      const cid = e.target.value;
+                      setFilterClientId(cid);
+                    }}
+                    className="h-6.5 rounded-md border border-border/60 bg-background px-2 text-[11px] font-medium"
+                  >
+                    <option value="">All Client Partners</option>
+                    {clients.map((cli) => (
+                      <option key={cli.id} value={String(cli.id)}>
+                        {cli.contact_person}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="p-3">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-start">
+                  
+                  {/* Col 1: Order Reference ID (3 cols - Fixed) */}
+                  <div className="md:col-span-3 space-y-1 p-2 rounded-lg border border-border/60 bg-muted/20">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1">
+                        <Tag className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                        <span>Order Reference ID</span>
+                      </label>
+                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-background border-border/70 text-muted-foreground">
+                        <Lock className="h-2.5 w-2.5 mr-0.5" /> Fixed
+                      </Badge>
+                    </div>
+                    <div className="relative">
+                      <Input
+                        disabled
+                        value={orderNumber}
+                        className="h-8 font-mono font-black text-xs tracking-wider bg-background/80 uppercase border-border/70 text-foreground cursor-not-allowed"
+                      />
+                      <div className="absolute right-2 top-2">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-[9px] pt-0.5">
+                      <span className="text-muted-foreground line-clamp-1">Registered Order Reference</span>
+                    </div>
+                  </div>
 
-                {/* Billing Company Checkbox & Dropdown */}
-                <div className="pt-2 border-t border-border/40 space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={editForm.same_billing_company}
+                  {/* Col 2: Target Corporate Entity (5 cols) */}
+                  <div className="md:col-span-5 space-y-1 bg-muted/20 p-2 rounded-lg border border-border/60">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1">
+                        <Building className="h-3 w-3 text-primary" />
+                        <span>Target Corporate Entity *</span>
+                      </label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenCreateCompany("target")}
+                        className="h-4.5 px-1 text-[9px] gap-0.5 font-bold text-primary hover:text-primary hover:bg-primary/10"
+                      >
+                        <Plus className="h-2.5 w-2.5" /> New Company
+                      </Button>
+                    </div>
+                    <select
+                      required
+                      value={editForm.company_id}
                       onChange={(e) => {
-                        const checked = e.target.checked;
+                        const val = e.target.value;
                         setEditForm(prev => ({
                           ...prev,
-                          same_billing_company: checked,
-                          billing_company_id: checked ? selectedOrderGroup.company_id : prev.billing_company_id
+                          company_id: val,
+                          billing_company_id: prev.same_billing_company ? val : prev.billing_company_id
                         }));
                       }}
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-primary cursor-pointer"
-                    />
-                    <span className="text-xs font-semibold text-foreground">
-                      Billing company is the same as Target Company Entity
-                    </span>
-                  </label>
+                      className="flex h-8 w-full rounded-md border border-border/70 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                    >
+                      <option value="">Choose Target Company Entity...</option>
+                      {(filterClientId
+                        ? companies.filter(c => c.client_id === parseInt(filterClientId))
+                        : companies
+                      ).map((comp) => {
+                        const valSuffix = comp.validation_status === "PENDING_VALIDATION" 
+                          ? " • [Pending Validation]" 
+                          : comp.validation_status === "NEEDS_REVISION" 
+                          ? " • [Revision Needed]" 
+                          : "";
+                        return (
+                          <option key={comp.id} value={String(comp.id)}>
+                            {comp.company_name} ({comp.company_code}){valSuffix}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <div className="pt-0.5">
+                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={editForm.same_billing_company}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setEditForm(prev => ({
+                              ...prev,
+                              same_billing_company: checked,
+                              billing_company_id: checked ? prev.company_id : prev.billing_company_id
+                            }));
+                          }}
+                          className="h-3 w-3 rounded border-gray-300 text-primary focus:ring-primary accent-primary cursor-pointer"
+                        />
+                        <span className="text-[10px] font-medium text-muted-foreground">
+                          Billing recipient is the same as Target Company
+                        </span>
+                      </label>
+                    </div>
+                  </div>
 
-                  {!editForm.same_billing_company && (
-                    <div className="space-y-1.5 pl-6 pt-1 animate-in fade-in duration-200">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-primary flex items-center gap-1">
-                          <Building className="h-3.5 w-3.5 text-primary" />
-                          <span>Select Billing Company Entity * (Invoicing Recipient)</span>
-                        </label>
+                  {/* Col 3: Invoicing / Billing Recipient Entity (4 cols) */}
+                  <div className="md:col-span-4 space-y-1 bg-muted/20 p-2 rounded-lg border border-border/60">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1">
+                        <Building className="h-3 w-3 text-primary" />
+                        <span>Invoicing Recipient / Billed Entity</span>
+                      </label>
+                      {!editForm.same_billing_company && (
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          onClick={handleOpenCreateCompany}
-                          className="h-6 px-2 text-[10px] gap-1 font-bold border-primary/40 text-primary hover:bg-primary/10"
+                          onClick={() => handleOpenCreateCompany("billing")}
+                          className="h-4.5 px-1 text-[9px] gap-0.5 font-bold text-primary hover:text-primary hover:bg-primary/10"
                         >
-                          <Plus className="h-3 w-3" /> Create Company
+                          <Plus className="h-2.5 w-2.5" /> Add Entity
                         </Button>
-                      </div>
-                      <select
-                        value={String(editForm.billing_company_id || "")}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, billing_company_id: e.target.value ? Number(e.target.value) : null }))}
-                        className="flex h-8.5 w-full rounded-lg border border-primary/50 bg-background px-3 py-1 text-xs font-semibold shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-                      >
-                        <option value="">Choose Billing Company...</option>
-                        {companies.map((comp) => (
-                          <option key={comp.id} value={String(comp.id)}>
-                            {comp.company_name} ({comp.company_code})
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-[10px] text-muted-foreground italic">
-                        Proforma and Final invoices will be addressed to and billed under this entity.
-                      </p>
+                      )}
                     </div>
-                  )}
+
+                    {editForm.same_billing_company ? (
+                      <div className="h-8 flex items-center px-2.5 rounded-md border border-border/50 bg-background/60 text-xs text-muted-foreground font-medium truncate">
+                        <span>
+                          {editForm.company_id 
+                            ? `Same: ${(companies.find(c => String(c.id) === editForm.company_id)?.company_name) || "Selected Target Company"}`
+                            : "Same as Target Corporate Entity"}
+                        </span>
+                      </div>
+                    ) : (
+                      <select
+                        required
+                        value={editForm.billing_company_id}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, billing_company_id: e.target.value }))}
+                        className="flex h-8 w-full rounded-md border border-primary/50 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      >
+                        <option value="">Choose Billing Entity...</option>
+                        {(filterClientId
+                          ? companies.filter(c => c.client_id === parseInt(filterClientId))
+                          : companies
+                        ).map((comp) => {
+                          const valSuffix = comp.validation_status === "PENDING_VALIDATION" 
+                            ? " • [Pending Validation]" 
+                            : comp.validation_status === "NEEDS_REVISION" 
+                            ? " • [Revision Needed]" 
+                            : "";
+                          return (
+                            <option key={comp.id} value={String(comp.id)}>
+                              {comp.company_name} ({comp.company_code}){valSuffix}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    )}
+                    <p className="text-[9px] text-muted-foreground line-clamp-1">
+                      Tax & Proforma invoices will be addressed to this entity
+                    </p>
+                  </div>
+
                 </div>
               </CardContent>
             </Card>
-          )}
 
-          {/* Job Items Editor */}
-          <Card className="border-border/50 shadow-sm bg-card/60 backdrop-blur-md">
-            <CardHeader className="pb-3 border-b border-border/30 p-4 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-base font-bold flex items-center gap-2">
-                  <Tag className="h-4 w-4 text-primary" /> Service Line Items ({(editForm.items || []).length})
-                </CardTitle>
-                <CardDescription className="text-xs">Configure service deliverables and pricing tiers.</CardDescription>
-              </div>
-              {canEditItems && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddEditItem}
-                  className="border-dashed border-primary/40 text-primary hover:bg-primary/5 gap-1.5 font-bold rounded-lg h-8 text-xs shrink-0"
-                >
-                  <Plus className="h-3 w-3" /> Add Item
-                </Button>
-              )}
-            </CardHeader>
-
-            <CardContent className="space-y-4 pt-4 p-4">
-              {(editForm.items || []).length === 0 ? (
-                <div className="text-center py-6 text-xs text-muted-foreground italic border border-dashed rounded-lg">
-                  No items in this order. Add at least one item to proceed.
+            {/* STEP 2: SERVICE LINE ITEMS */}
+            <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
+              <CardHeader className="py-2 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Briefcase className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+                    2. Billed Service Line Items ({(editForm.items || []).length})
+                  </CardTitle>
                 </div>
-              ) : (
-                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
-                  {(editForm.items || []).map((item: any, idx: number) => (
-                    <div key={item.id || idx} className="p-4 rounded-xl border border-border/40 bg-background/40 shadow-xs space-y-3 relative">
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddEditItem}
+                    className="h-6.5 px-2 border-dashed border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 gap-1 font-bold rounded-md text-[11px]"
+                  >
+                    <Plus className="h-3 w-3" /> Add Service Line
+                  </Button>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="p-2.5 sm:p-3 space-y-2.5">
+                {(editForm.items || []).length === 0 ? (
+                  <div className="text-center py-5 text-xs text-muted-foreground italic border border-dashed rounded-lg">
+                    No items in this order. Add at least one item to proceed.
+                  </div>
+                ) : (
+                  (editForm.items || []).map((item: any, idx: number) => (
+                    <div key={item.id || idx} className="p-3 rounded-xl border border-border/70 bg-card/80 dark:bg-card/40 hover:border-primary/40 shadow-2xs transition-all space-y-2.5 relative">
                       
-                      <div className="flex items-center justify-between pb-2 border-b border-border/30">
-                        <div className="flex items-center gap-2">
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold font-mono">
+                      {/* Line Item Header: Number Badge, Job Title / ID info, Price Pill & Delete Button */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border/50">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="flex h-5 px-2 items-center justify-center rounded-md bg-primary/10 text-primary text-[11px] font-bold font-mono shrink-0">
                             #{idx + 1}
                           </span>
-                          <h4 className="font-bold text-xs text-foreground truncate max-w-[240px]">
-                            {item.job_title ? item.job_title : `Service Item #${idx + 1}`}
-                          </h4>
                           {item.job_id && (
-                            <Badge variant="outline" className="font-mono text-[9px] text-primary bg-primary/5 border-primary/20 h-5">
+                            <Badge variant="outline" className="font-mono text-[10px] font-bold bg-muted/50 border-border/70 text-foreground py-0 px-1.5">
                               {item.job_id}
                             </Badge>
                           )}
+                          {item.job_title && (
+                            <span className="text-xs font-bold text-foreground truncate max-w-[280px] sm:max-w-md">
+                              {item.job_title}
+                            </span>
+                          )}
                         </div>
 
-                        {canEditItems && (
+                        <div className="flex items-center justify-between sm:justify-end gap-2">
+                          {item.pricing_tier === "PARTNER_A3" ? (
+                            <div className="px-2.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 font-mono text-[11px] font-bold text-amber-700 dark:text-amber-300">
+                              {item.custom_price_text ? `Custom: ${item.custom_price_text}` : "Custom Pricing"}
+                            </div>
+                          ) : (
+                            <div className="px-2.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 font-mono text-[11px] font-black text-emerald-700 dark:text-emerald-300">
+                              {formatCurrency(item.unit_price)}
+                            </div>
+                          )}
+
                           <Button
                             type="button"
                             variant="ghost"
-                            size="sm"
+                            size="icon"
+                            disabled={(editForm.items || []).length <= 1 && !item.service_id}
                             onClick={() => handleRemoveEditItem(idx)}
-                            className="text-destructive hover:bg-destructive/10 text-[10px] gap-1 h-6 rounded-lg px-2"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md shrink-0"
+                            title="Remove service line item"
                           >
-                            <Trash2 className="h-3 w-3" /> Remove
+                            <Trash2 className="h-3 w-3" />
                           </Button>
-                        )}
+                        </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {/* Service Selection */}
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Service Catalog Item *</label>
+                      {/* Primary Configuration Grid: Service Package, Pricing Tier, Branch Reference */}
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start">
+                        
+                        {/* Service Package Selector (5 cols) */}
+                        <div className="sm:col-span-5 space-y-1">
+                          <label className="text-[10.5px] font-bold text-foreground flex items-center gap-1">
+                            <span>Service Package Catalog</span>
+                            <span className="text-destructive font-black">*</span>
+                          </label>
                           <select
+                            required
                             value={item.service_id}
                             onChange={(e) => handleEditServiceSelect(idx, e.target.value)}
-                            disabled={!canEditItems}
-                            className="flex h-8.5 w-full rounded-lg border border-border/60 bg-background px-2.5 py-1 text-xs font-medium shadow-xs disabled:opacity-80 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+                            className="flex h-8 w-full rounded-lg border border-border/70 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary truncate"
                           >
-                            <option value="">Choose Service...</option>
+                            <option value="">-- Choose Service Package / Job Title * --</option>
                             {services.map((s) => (
                               <option key={s.id} value={String(s.id)}>
                                 {s.job_title} ({s.job_id})
@@ -804,377 +1048,381 @@ export default function EditClientOrderPage() {
                           </select>
                         </div>
 
-                        {/* Pricing Tier */}
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pricing Tier *</label>
+                        {/* Pricing Tier Selector (4 cols) */}
+                        <div className="sm:col-span-4 space-y-1">
+                          <label className="text-[10.5px] font-bold text-foreground flex items-center gap-1">
+                            <span>Pricing Tier & Rate</span>
+                            <span className="text-destructive font-black">*</span>
+                          </label>
                           <select
+                            required
                             value={item.pricing_tier}
                             onChange={(e) => handleEditTierSelect(idx, e.target.value)}
-                            disabled={!canEditItems}
-                            className="flex h-8.5 w-full rounded-lg border border-border/60 bg-background px-2.5 py-1 text-xs font-medium shadow-xs disabled:opacity-80 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+                            className="flex h-8 w-full rounded-lg border border-border/70 bg-background px-2.5 py-1 text-xs font-semibold shadow-2xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
                           >
                             <option value="BASE">
-                              Base Price {item._raw_service ? `(${formatCurrency(item._raw_service.base_price)})` : ""}
+                              Base ({item._raw_service ? formatCurrency(item._raw_service.base_price) : "Default"})
                             </option>
                             <option value="PARTNER_A">
-                              Partner A (-{item._raw_service?.partner_a_discount || 20}% {item._raw_service ? `= ${formatCurrency(item._raw_service.partner_a_price ?? (item._raw_service.base_price * 0.8))}` : ""})
+                              Partner A (-{item._raw_service?.partner_a_discount || 20}%)
                             </option>
                             <option value="PARTNER_A1">
-                              Partner A1 (-{item._raw_service?.partner_a1_discount || 40}% {item._raw_service ? `= ${formatCurrency(item._raw_service.partner_a1_price ?? (item._raw_service.base_price * 0.6))}` : ""})
+                              Partner A1 (-{item._raw_service?.partner_a1_discount || 40}%)
                             </option>
                             <option value="PARTNER_A2">
-                              Partner A2 (-{item._raw_service?.partner_a2_discount || 50}% {item._raw_service ? `= ${formatCurrency(item._raw_service.partner_a2_price ?? (item._raw_service.base_price * 0.5))}` : ""})
+                              Partner A2 (-{item._raw_service?.partner_a2_discount || 50}%)
                             </option>
                             <option value="PARTNER_A3">
-                              Partner A3 (Free Text: {item._raw_service?.partner_a3_price || "Custom"})
+                              Partner A3 (Custom Pricing / Free Text)
                             </option>
                           </select>
                         </div>
-                      </div>
 
-                      {/* Branch / Entity Reference (Free Text) */}
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                          <span>Branch / Entity Reference</span>
-                          <span className="text-[10px] font-mono text-muted-foreground/70 italic">Optional • Printed on Invoices</span>
-                        </label>
-                        <Input
-                          value={item.branch_name || ""}
-                          disabled={!canEditItems}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setEditForm((prev) => {
-                              const itemsCopy = [...prev.items];
-                              itemsCopy[idx] = { ...itemsCopy[idx], branch_name: val };
-                              return { ...prev, items: itemsCopy };
-                            });
-                          }}
-                          placeholder="e.g. Bali Branch, HQ Office, Project Alpha..."
-                          className="h-8.5 text-xs font-medium rounded-lg border-border/60 bg-background disabled:opacity-80"
-                        />
-                      </div>
-
-                      {/* Custom Price Text Input (A3) */}
-                      {item.pricing_tier === "PARTNER_A3" && (
-                        <div className="space-y-1 pt-0.5 animate-in slide-in-from-top-2 duration-200">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Custom Price Label Value *</label>
-                          <Input
-                            required
-                            value={item.custom_price_text || ""}
-                            disabled={!canEditItems}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setEditForm(prev => {
-                                const itemsCopy = [...prev.items];
-                                itemsCopy[idx] = { ...itemsCopy[idx], custom_price_text: val };
-                                return { ...prev, items: itemsCopy };
-                              });
-                            }}
-                            placeholder="e.g. Free or Custom Contract Price"
-                            className="h-8.5 text-xs font-semibold rounded-lg border-border/60 bg-background"
-                          />
-                        </div>
-                      )}
-
-                      {/* Vendor / Notary Selection (Conditional) */}
-                      {(item._raw_service?.needs_notary || item._raw_service?.needs_gov_officer || item._raw_service?.needs_other_vendors) && (
-                        <div className="space-y-1 pt-1 animate-in slide-in-from-top-2 duration-200">
-                          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                            <span>
-                              {item._raw_service?.needs_notary 
-                                ? "Select Notary (Optional)" 
-                                : item._raw_service?.needs_gov_officer 
-                                ? "Select Government Body (Optional)" 
-                                : "Select Vendor (Optional)"}
-                            </span>
+                        {/* Branch / Project Reference (3 cols) */}
+                        <div className="sm:col-span-3 space-y-1">
+                          <label className="text-[10.5px] font-semibold text-muted-foreground flex items-center justify-between">
+                            <span>Branch / Ref</span>
+                            <span className="text-[9px] text-muted-foreground/70 font-mono">Optional</span>
                           </label>
-                          <select
-                            disabled={!canEditItems}
-                            value={item.notary_id || ""}
+                          <Input
+                            value={item.branch_name || ""}
                             onChange={(e) => {
                               const val = e.target.value;
                               setEditForm((prev) => {
-                                const itemsCopy = [...prev.items];
-                                itemsCopy[idx] = { ...itemsCopy[idx], notary_id: val ? Number(val) : "" };
-                                return { ...prev, items: itemsCopy };
+                                const copy = [...prev.items];
+                                copy[idx] = { ...copy[idx], branch_name: val };
+                                return { ...prev, items: copy };
                               });
                             }}
-                            className="flex h-8.5 w-full rounded-lg border border-border/60 bg-background px-2.5 py-1 text-xs font-medium shadow-xs disabled:opacity-80 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
-                          >
-                            <option value="">
-                              {item._raw_service?.needs_notary 
-                                ? "Choose Notary..." 
-                                : item._raw_service?.needs_gov_officer 
-                                ? "Choose Government Body..." 
-                                : "Choose Vendor..."}
-                            </option>
-                            {(() => {
-                              const serviceId = Number(item.service_id);
-                              const isNotaryReq = Boolean(item._raw_service?.needs_notary);
-                              const isGovReq = Boolean(item._raw_service?.needs_gov_officer);
-                              const isOtherReq = Boolean(item._raw_service?.needs_other_vendors);
+                            placeholder="e.g. Bali Branch / Ref #12"
+                            className="h-8 text-xs font-medium rounded-lg border-border/70 bg-background placeholder:text-muted-foreground/50"
+                          />
+                        </div>
 
-                              const filtered = notaries.filter((n) => {
-                                const hasConfiguredFee = n.service_fees && n.service_fees.some((sf: any) => sf.service_id === serviceId);
-                                if (hasConfiguredFee) return true;
+                        {/* Custom Contract Price Text (if PARTNER_A3) */}
+                        {item.pricing_tier === "PARTNER_A3" && (
+                          <div className="sm:col-span-12 p-2 rounded-lg bg-amber-500/5 border border-amber-500/25 space-y-1 animate-in fade-in duration-200">
+                            <label className="text-[10.5px] font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1">
+                              <span>Custom Contract Price / Billing Value Text</span>
+                              <span className="text-destructive font-black">*</span>
+                            </label>
+                            <Input
+                              required
+                              value={item.custom_price_text || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setEditForm((prev) => {
+                                  const copy = [...prev.items];
+                                  copy[idx] = { ...copy[idx], custom_price_text: val };
+                                  return { ...prev, items: copy };
+                                });
+                              }}
+                              placeholder="e.g. Free (Pro Bono) or Custom Contract Amount (e.g. IDR 15,000,000)"
+                              className="h-8 text-xs font-semibold bg-background rounded-lg border-amber-500/35 focus-visible:ring-amber-500/20"
+                            />
+                          </div>
+                        )}
 
-                                if (isGovReq) return n.vendor_type === "GOVERNMENT_OFFICER" || n.is_gov_officer;
-                                if (isOtherReq) return n.vendor_type === "OTHER_VENDORS" || n.is_other_vendor;
-                                if (isNotaryReq) return n.vendor_type === "NOTARY" || n.is_notary || (!n.vendor_type && !n.is_gov_officer && !n.is_other_vendor);
-                                return true;
-                              });
+                        {/* Designated Vendor / Notary Selection (if required or configured) */}
+                        {(item._raw_service?.needs_notary || item._raw_service?.needs_gov_officer || item._raw_service?.needs_other_vendors) && (
+                          <div className="sm:col-span-12 space-y-1">
+                            <label className="text-[10.5px] font-semibold text-muted-foreground flex items-center justify-between">
+                              <span>
+                                {item._raw_service?.needs_notary 
+                                  ? "Assigned Notary Officer" 
+                                  : item._raw_service?.needs_gov_officer 
+                                  ? "Assigned Government Official Body" 
+                                  : "Assigned External Vendor"}
+                              </span>
+                              <span className="text-[9px] text-muted-foreground/70 font-mono">Optional</span>
+                            </label>
+                            <select
+                              value={item.notary_id || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setEditForm((prev) => {
+                                  const copy = [...prev.items];
+                                  copy[idx] = { ...copy[idx], notary_id: val ? parseInt(val) : "" };
+                                  return { ...prev, items: copy };
+                                });
+                              }}
+                              className="flex h-8 w-full rounded-lg border border-border/70 bg-background px-2.5 py-1 text-xs font-medium shadow-2xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                            >
+                              <option value="">
+                                {item._raw_service?.needs_notary 
+                                  ? "-- Select Notary Officer (Optional) --" 
+                                  : item._raw_service?.needs_gov_officer 
+                                  ? "-- Select Government Body (Optional) --" 
+                                  : "-- Select External Vendor (Optional) --"}
+                              </option>
+                              {(() => {
+                                const serviceId = Number(item.service_id);
+                                const isNotaryReq = Boolean(item._raw_service?.needs_notary);
+                                const isGovReq = Boolean(item._raw_service?.needs_gov_officer);
+                                const isOtherReq = Boolean(item._raw_service?.needs_other_vendors);
 
-                              return filtered.map((n) => {
-                                const valSuffix = n.validation_status === "PENDING_VALIDATION" 
-                                  ? " • [Pending Validation]" 
-                                  : n.validation_status === "NEEDS_REVISION" 
-                                  ? " • [Revision Needed]" 
-                                  : "";
-                                return (
+                                const filtered = notaries.filter((n) => {
+                                  const hasConfiguredFee = n.service_fees && n.service_fees.some((sf: any) => sf.service_id === serviceId);
+                                  if (hasConfiguredFee) return true;
+
+                                  if (isGovReq) return n.vendor_type === "GOVERNMENT_OFFICER" || n.is_gov_officer;
+                                  if (isOtherReq) return n.vendor_type === "OTHER_VENDORS" || n.is_other_vendor;
+                                  if (isNotaryReq) return n.vendor_type === "NOTARY" || n.is_notary || (!n.vendor_type && !n.is_gov_officer && !n.is_other_vendor);
+                                  return true;
+                                });
+
+                                return filtered.map((n) => (
                                   <option key={n.id} value={n.id}>
-                                    {n.name} ({n.city || "General"}){valSuffix}
+                                    {n.name} ({n.city || "General"})
                                   </option>
-                                );
+                                ));
+                              })()}
+                            </select>
+                          </div>
+                        )}
+
+                        {/* Service Execution Instructions (Textarea) */}
+                        <div className="sm:col-span-12 space-y-1 pt-0.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10.5px] font-bold text-foreground flex items-center gap-1">
+                              <FileText className="h-3 w-3 text-primary" />
+                              <span>Service Execution Instructions</span>
+                            </label>
+                            <span className="text-[9px] text-muted-foreground font-mono">Visible to assigned consultants & review team</span>
+                          </div>
+                          <textarea
+                            value={item.service_instructions || ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEditForm((prev) => {
+                                const copy = [...prev.items];
+                                copy[idx] = { ...copy[idx], service_instructions: val };
+                                return { ...prev, items: copy };
                               });
-                            })()}
-                          </select>
+                            }}
+                            rows={2}
+                            placeholder="Enter detailed service execution instructions, specific document checklists, government portal credentials/details, or processing requirements for this line item..."
+                            className="flex w-full rounded-lg border border-border/70 bg-background p-2 text-xs placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary leading-relaxed font-normal resize-y min-h-[48px]"
+                          />
                         </div>
-                      )}
 
-                      {/* Specific Service Instructions for this Service Item */}
-                      <div className="space-y-1 pt-1">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                          <span className="flex items-center gap-1.5">
-                            <FileText className="h-3 w-3 text-primary" />
-                            <span>Service Instructions</span>
-                          </span>
-                          <span className="text-[10px] font-mono text-muted-foreground/70 italic">
-                            Visible to assigned processing team & order chat
-                          </span>
-                        </label>
-                        <textarea
-                          rows={2}
-                          value={item.service_instructions || ""}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setEditForm((prev) => {
-                              const copy = [...prev.items];
-                              copy[idx] = { ...copy[idx], service_instructions: val };
-                              return { ...prev, items: copy };
-                            });
-                          }}
-                          placeholder={`e.g. Deliverable instructions, specific requirements, or guidelines for ${item.job_title || "this service item"}...`}
-                          className="flex min-h-[58px] w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-xs font-normal shadow-xs placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary resize-y leading-relaxed"
-                        />
-                      </div>
-
-                      {/* Reflected Price Bar */}
-                      <div className="flex flex-wrap items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border/30 gap-2 text-[10px] font-mono">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-muted-foreground">Price Calculation:</span>
-                          <span className="font-extrabold text-xs text-foreground">
-                            {item.pricing_tier === "PARTNER_A3"
-                              ? `Free Text: ${item.custom_price_text || "Custom"}`
-                              : formatCurrency(item.unit_price)}
-                          </span>
-                        </div>
                       </div>
 
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-        </div>
-
-        {/* Right Column: Settings, Consultants & Save Actions (1/3 width) */}
-        <div className="lg:col-span-1 space-y-3">
-
-          {/* Locked Proforma Alert banner */}
-          {selectedOrderGroup?.is_proforma_finalized && (
-            <Card className="border-amber-500/20 bg-amber-500/5 dark:bg-amber-500/10 shadow-sm">
-              <CardContent className="p-3.5 flex items-center justify-between gap-3 text-xs">
-                <div className="space-y-0.5">
-                  <h4 className="font-bold text-foreground flex items-center gap-1.5">
-                    <Lock className="h-3.5 w-3.5 text-amber-500" /> Proforma Locked
-                  </h4>
-                  <p className="text-[11px] text-muted-foreground leading-tight">
-                    Order is finalized. Uncheck to unlock and allow edits.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0 bg-background/50 p-2 rounded-lg border">
-                  <input
-                    type="checkbox"
-                    id="unlock-proforma-checkbox"
-                    checked={editForm.is_proforma_finalized}
-                    onChange={(e) => {
-                      const isChecked = e.target.checked;
-                      setEditForm(prev => {
-                        const nextForm = { ...prev, is_proforma_finalized: isChecked };
-                        if (!isChecked) {
-                          nextForm.is_final_invoice_finalized = false;
-                          nextForm.status = "DRAFT";
-                        }
-                        return nextForm;
-                      });
-                    }}
-                    className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 accent-amber-600 cursor-pointer"
-                  />
-                  <label htmlFor="unlock-proforma-checkbox" className="text-[10px] font-bold text-foreground cursor-pointer select-none">
-                    {editForm.is_proforma_finalized ? "Locked" : "Editable"}
-                  </label>
-                </div>
+                  ))
+                )}
               </CardContent>
             </Card>
-          )}
 
-          {/* Unified Order Settings, Roster, & Notes Box */}
-          <Card className="border-border/50 shadow-sm bg-card/60 backdrop-blur-md">
-            <CardContent className="space-y-4 p-4 pt-4">
-              {/* Lifecycle Stage */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Order Lifecycle Stage</label>
-                <select
-                  required
-                  value={editForm.status}
-                  onChange={(e) => handleStatusChange(e.target.value)}
-                  className="flex h-9 w-full rounded-lg border border-border/60 bg-background px-3 py-1 text-xs font-semibold shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="PIPELINE">PIPELINE</option>
-                  <option value="DRAFT">DRAFT</option>
-                  <option value="PROFORMA_GENERATED">PROFORMA GENERATED</option>
-                  <option value="WAITING_ON_CLIENT">WAITING ON CLIENT</option>
-                  <option value="CONFIRMED">CONFIRMED</option>
-                  <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
-                  <option value="IN_PROGRESS">IN PROGRESS</option>
-                  <option value="REVIEW_DOCS">REVIEW DOCS</option>
-                  <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
-                  <option value="FINAL_DOC_READY">FINAL DOC READY</option>
-                  <option value="INVOICE_GENERATED">INVOICE GENERATED</option>
-                  <option value="WAITING_FOR_FINAL_PAYMENT">WAITING FOR FINAL PAYMENT</option>
-                  <option value="FINAL_PAYMENT_COMPLETED">FINAL PAYMENT COMPLETED</option>
-                  <option value="SOFT_COPY_DELIVERED">SOFT COPY DELIVERED</option>
-                  <option value="HARD_COPY_DELIVERED">HARD COPY DELIVERED</option>
-                  <option value="ON_HOLD">ON HOLD</option>
-                  <option value="COMPLETED">COMPLETED</option>
-                  <option value="CANCELLED">CANCELLED</option>
-                </select>
+          </div>
 
-                {editForm.status === "ON_HOLD" && (
-                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-1.5 mt-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1.5 text-[11px]">
-                        <PauseCircle className="h-3.5 w-3.5" /> Hold Reason:
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setIsOnHoldDialogOpen(true)}
-                        className="text-[10px] font-bold text-amber-600 dark:text-amber-400 underline hover:text-amber-700"
-                      >
-                        Change Reason
-                      </button>
-                    </div>
-                    <p className="text-[11px] text-foreground/90 font-medium whitespace-pre-wrap leading-relaxed">
-                      {holdReason || "No hold reason specified yet"}
-                    </p>
-                    <div className="text-[10px] text-muted-foreground flex items-center gap-1 pt-0.5 border-t border-amber-500/20">
-                      <MessageSquare className="h-3 w-3 text-amber-600" />
-                      <span>Broadcast to: {holdChannel === "CLIENT" ? "Client & Team Chat" : "Internal Staff Only"}</span>
-                    </div>
+          {/* RIGHT COLUMN: Frequently Changed Operational Modules (Controls, Roster, Reviewer, Notes) */}
+          <div className="lg:col-span-5 xl:col-span-5 2xl:col-span-4 space-y-3 lg:sticky lg:top-4">
+            
+            {/* STEP 3: ORDER LIFECYCLE & FINANCIAL CONTROLS */}
+            <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
+              <CardHeader className="py-2 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <DollarSign className="h-3.5 w-3.5 text-primary" />
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+                    3. Order Lifecycle & Financial Controls
+                  </CardTitle>
+                </div>
+                {selectedOrderGroup?.is_proforma_finalized && (
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant="outline" className="text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                      <Lock className="h-2.5 w-2.5 mr-1" /> Proforma Finalized
+                    </Badge>
                   </div>
                 )}
-              </div>
+              </CardHeader>
+              
+              <CardContent className="p-3 space-y-2.5">
+                {/* Lifecycle Stage */}
+                <div className="space-y-1 bg-muted/20 p-2 rounded-lg border border-border/60">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1">
+                    <Tag className="h-3 w-3 text-primary" />
+                    <span>Lifecycle Stage</span>
+                  </label>
+                  <select
+                    required
+                    value={editForm.status}
+                    onChange={(e) => handleStatusChange(e.target.value)}
+                    className="flex h-8 w-full rounded-md border border-border/70 bg-background px-2.5 py-1 text-xs font-bold shadow-2xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                  >
+                    <option value="PIPELINE">PIPELINE</option>
+                    <option value="DRAFT">DRAFT</option>
+                    <option value="PROFORMA_GENERATED">PROFORMA GENERATED</option>
+                    <option value="WAITING_ON_CLIENT">WAITING ON CLIENT</option>
+                    <option value="CONFIRMED">CONFIRMED</option>
+                    <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
+                    <option value="IN_PROGRESS">IN PROGRESS</option>
+                    <option value="REVIEW_DOCS">REVIEW DOCS</option>
+                    <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
+                    <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
+                    <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
+                    <option value="FINAL_DOC_READY">FINAL DOC READY</option>
+                    <option value="INVOICE_GENERATED">INVOICE GENERATED</option>
+                    <option value="WAITING_FOR_FINAL_PAYMENT">WAITING FOR FINAL PAYMENT</option>
+                    <option value="FINAL_PAYMENT_COMPLETED">FINAL PAYMENT COMPLETED</option>
+                    <option value="SOFT_COPY_DELIVERED">SOFT COPY DELIVERED</option>
+                    <option value="HARD_COPY_DELIVERED">HARD COPY DELIVERED</option>
+                    <option value="ON_HOLD">ON HOLD</option>
+                    <option value="COMPLETED">COMPLETED</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                  </select>
 
-              {/* Payment Status */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Payment Status</label>
-                <select
-                  required
-                  value={editForm.payment_status}
-                  onChange={(e) => {
-                    const newStatus = e.target.value;
-                    let defaultPaidAmt = editForm.proforma_paid_amount;
-                    if (newStatus === "PARTIALLY_PAID" && (defaultPaidAmt === undefined || defaultPaidAmt === null || defaultPaidAmt === 0)) {
-                      defaultPaidAmt = Math.round((selectedOrderGroup?.total_amount || 0) * (selectedOrderGroup?.proforma_stage_percent || 50) / 100);
-                    } else if (newStatus === "PAID") {
-                      defaultPaidAmt = selectedOrderGroup?.total_amount || 0;
-                    }
-                    setEditForm({ ...editForm, payment_status: newStatus, proforma_paid_amount: defaultPaidAmt });
-                  }}
-                  className="flex h-9 w-full rounded-lg border border-border/60 bg-background px-3 py-1 text-xs font-semibold shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="UNPAID">UNPAID</option>
-                  <option value="PARTIALLY_PAID">PARTIALLY PAID</option>
-                  <option value="PAID">PAID</option>
-                </select>
-              </div>
+                  {editForm.status === "ON_HOLD" && (
+                    <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs space-y-1 mt-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1 text-[10px]">
+                          <PauseCircle className="h-3 w-3" /> On-Hold Active
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsOnHoldDialogOpen(true)}
+                          className="text-[9.5px] font-bold text-amber-600 dark:text-amber-400 underline"
+                        >
+                          Edit Reason
+                        </button>
+                      </div>
+                      <p className="text-[10.5px] text-foreground font-medium line-clamp-2">
+                        {holdReason || "No hold reason specified"}
+                      </p>
+                    </div>
+                  )}
+                </div>
 
-              {/* Amount Received / Proforma Paid Amount Input */}
-              {(editForm.payment_status === "PARTIALLY_PAID" || editForm.payment_status === "PAID") && (
-                <div className="space-y-2 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                      {editForm.payment_status === "PARTIALLY_PAID" ? "Amount Received / Proforma Paid (IDR)" : "Total Amount Received (IDR)"}
+                {/* Payment Status */}
+                <div className="space-y-1 bg-muted/20 p-2 rounded-lg border border-border/60">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1">
+                    <DollarSign className="h-3 w-3 text-emerald-600" />
+                    <span>Payment Status</span>
+                  </label>
+                  <select
+                    required
+                    value={editForm.payment_status}
+                    onChange={(e) => {
+                      const newStatus = e.target.value;
+                      let defaultPaidAmt = editForm.proforma_paid_amount;
+                      if (newStatus === "PARTIALLY_PAID" && (defaultPaidAmt === undefined || defaultPaidAmt === null || defaultPaidAmt === 0)) {
+                        defaultPaidAmt = Math.round(editItemsTotal * (selectedOrderGroup?.proforma_stage_percent || 50) / 100);
+                      } else if (newStatus === "PAID") {
+                        defaultPaidAmt = editItemsTotal;
+                      }
+                      setEditForm(prev => ({ ...prev, payment_status: newStatus, proforma_paid_amount: defaultPaidAmt }));
+                    }}
+                    className="flex h-8 w-full rounded-md border border-border/70 bg-background px-2.5 py-1 text-xs font-bold shadow-2xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                  >
+                    <option value="UNPAID">UNPAID</option>
+                    <option value="PARTIALLY_PAID">PARTIALLY PAID</option>
+                    <option value="PAID">PAID</option>
+                  </select>
+                  <p className="text-[9px] text-muted-foreground">
+                    Tracks billing payment receipt from client
+                  </p>
+                </div>
+
+                {/* Amount Received / Proforma Paid (if partially or fully paid) */}
+                <div className="space-y-1 bg-muted/20 p-2 rounded-lg border border-border/60">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-foreground">
+                      {editForm.payment_status === "PARTIALLY_PAID" ? "Amount Received (IDR)" : "Total Amount (IDR)"}
                     </label>
-                    {selectedOrderGroup?.total_amount && editForm.proforma_paid_amount ? (
-                      <span className="text-[10px] font-mono text-muted-foreground font-semibold">
-                        {((Number(editForm.proforma_paid_amount) / selectedOrderGroup.total_amount) * 100).toFixed(1)}% of total
+                    {editItemsTotal > 0 && editForm.proforma_paid_amount ? (
+                      <span className="text-[9.5px] font-mono text-muted-foreground font-semibold">
+                        {((Number(editForm.proforma_paid_amount) / editItemsTotal) * 100).toFixed(0)}%
                       </span>
                     ) : null}
                   </div>
                   <Input
                     type="number"
                     min="0"
-                    placeholder="e.g. 2000000"
+                    disabled={editForm.payment_status === "UNPAID"}
+                    placeholder={editForm.payment_status === "UNPAID" ? "0 (Unpaid)" : "e.g. 2000000"}
                     value={editForm.proforma_paid_amount ?? ""}
                     onChange={(e) => {
                       const val = e.target.value === "" ? null : Number(e.target.value);
-                      setEditForm({ ...editForm, proforma_paid_amount: val });
+                      setEditForm(prev => ({ ...prev, proforma_paid_amount: val }));
                     }}
-                    className="h-8 text-xs font-mono font-bold bg-background"
+                    className="h-8 text-xs font-mono font-bold bg-background disabled:opacity-50"
                   />
-                  {selectedOrderGroup?.total_amount && editForm.payment_status === "PARTIALLY_PAID" && (
-                    <div className="text-[11px] text-muted-foreground flex justify-between pt-1 border-t border-amber-500/15">
-                      <span>Remaining for Final Invoice:</span>
+                  {editItemsTotal > 0 && editForm.payment_status === "PARTIALLY_PAID" && (
+                    <div className="text-[9px] text-muted-foreground flex justify-between pt-0.5">
+                      <span>Remaining:</span>
                       <span className="font-bold text-foreground font-mono">
-                        IDR {Math.max(0, (selectedOrderGroup.total_amount || 0) - (Number(editForm.proforma_paid_amount) || 0)).toLocaleString("id-ID")}
+                        {formatCurrency(Math.max(0, editItemsTotal - (Number(editForm.proforma_paid_amount) || 0)))}
                       </span>
                     </div>
                   )}
                 </div>
-              )}
+              </CardContent>
+            </Card>
 
-              {/* Roster Allocation (Hidden for Pipeline Orders) */}
-              {!isPipelineOrder && (
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Roster Allocation</label>
-                  <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto p-2 bg-background rounded-lg border border-border/40">
+            {/* STEP 4: CONSULTANT ROSTER */}
+            {!isPipelineOrder && (
+              <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
+                <CardHeader className="py-2 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5 text-primary" />
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+                      4. Consultant Roster ({editForm.consultant_ids.length})
+                    </CardTitle>
+                  </div>
+                  {editForm.consultant_ids.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEditForm(prev => ({ ...prev, consultant_ids: [] }))}
+                      className="h-4.5 px-1.5 text-[9px] text-muted-foreground hover:text-destructive gap-0.5 font-medium"
+                    >
+                      Clear All
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent className="p-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto pr-1">
                     {(() => {
                       const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
                       const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
                       const licensingEmployees = employees.filter((emp) => licensingMemberIds.includes(emp.id));
 
                       if (licensingEmployees.length === 0) {
-                        return <span className="text-xs text-muted-foreground italic py-2 text-center col-span-3">No licensing consultants</span>;
+                        return <span className="text-xs text-muted-foreground italic py-2 text-center col-span-2">No licensing consultants available</span>;
                       }
 
                       return licensingEmployees.map((emp) => {
-                        const isChecked = (editForm.consultant_ids || []).includes(emp.id);
+                        const isSelected = (editForm.consultant_ids || []).includes(emp.id);
+                        const isReviewer = editForm.reviewer_id === emp.id;
                         return (
                           <label
                             key={emp.id}
-                            className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer select-none text-[11px] transition-colors ${isChecked ? "border-primary bg-primary/10 text-primary font-bold shadow-xs" : "border-border/60 hover:bg-muted/40"}`}
+                            title={isReviewer ? `${emp.first_name} ${emp.last_name} is currently selected as the Designated Order Reviewer.` : undefined}
+                            className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-[10.5px] transition-colors ${
+                              isReviewer
+                                ? "opacity-50 border-dashed border-purple-300 dark:border-purple-800 bg-purple-50/40 dark:bg-purple-950/20 cursor-not-allowed"
+                                : isSelected 
+                                  ? "border-primary bg-primary/10 text-primary font-bold shadow-2xs cursor-pointer" 
+                                  : "border-border/60 bg-background/50 hover:bg-muted/40 cursor-pointer"
+                            }`}
                           >
                             <input
                               type="checkbox"
-                              checked={isChecked}
+                              checked={isSelected}
+                              disabled={isReviewer}
                               onChange={() => toggleEditConsultantSelect(emp.id)}
-                              className="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary accent-primary"
+                              className="h-3 w-3 rounded border-gray-300 text-primary focus:ring-primary accent-primary shrink-0 cursor-pointer disabled:cursor-not-allowed"
                             />
-                            <div className="truncate">
-                              <div className="font-semibold text-foreground truncate">{emp.first_name} {emp.last_name}</div>
+                            <div className="truncate flex-1">
+                              <div className="font-semibold text-foreground truncate flex items-center justify-between gap-1">
+                                <span>{emp.first_name} {emp.last_name}</span>
+                                {isReviewer && (
+                                  <span className="text-[8px] font-bold text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/50 px-1 py-0.2 rounded shrink-0">
+                                    Reviewer
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-[9px] text-muted-foreground truncate">{emp.job_title || "Consultant"}</div>
                             </div>
                           </label>
@@ -1182,44 +1430,143 @@ export default function EditClientOrderPage() {
                       });
                     })()}
                   </div>
-                </div>
-              )}
+                </CardContent>
+              </Card>
+            )}
 
-              {/* Internal Instructions */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                  <span>Internal Instructions / Notes</span>
-                  <span className="text-[9px] font-mono text-muted-foreground/70 italic">For Delivery Manager (not shown to processing team)</span>
-                </label>
+            {/* STEP 5: DESIGNATED REVIEWER */}
+            {!isPipelineOrder && (
+              <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
+                <CardHeader className="py-2 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+                      5. Designated Reviewer ({editForm.reviewer_id ? "1 Selected" : "Optional"})
+                    </CardTitle>
+                  </div>
+                  {editForm.reviewer_id && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEditForm(prev => ({ ...prev, reviewer_id: null }))}
+                      className="h-4.5 px-1.5 text-[9px] text-muted-foreground hover:text-destructive gap-0.5 font-medium"
+                    >
+                      <X className="h-2.5 w-2.5" /> Clear Reviewer
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent className="p-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
+                    {(() => {
+                      const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
+                      const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
+                      const licensingEmployees = employees.filter((emp) => licensingMemberIds.includes(emp.id));
+
+                      if (licensingEmployees.length === 0) {
+                        return <span className="text-xs text-muted-foreground italic py-2 text-center col-span-2">No licensing consultants available</span>;
+                      }
+
+                      return licensingEmployees.map((emp) => {
+                        const isSelected = editForm.reviewer_id === emp.id;
+                        const isConsultant = (editForm.consultant_ids || []).includes(emp.id);
+                        return (
+                          <div
+                            key={emp.id}
+                            title={isConsultant ? `${emp.first_name} ${emp.last_name} is already allocated as an executing consultant.` : undefined}
+                            onClick={() => handleSelectEditReviewer(emp.id)}
+                            className={`flex items-center gap-1.5 p-1.5 rounded-lg border select-none text-[10.5px] transition-all ${
+                              isConsultant
+                                ? "opacity-50 border-dashed border-primary/40 bg-primary/5 cursor-not-allowed"
+                                : isSelected 
+                                  ? "border-purple-500/80 bg-purple-500/15 text-purple-800 dark:text-purple-300 font-bold shadow-2xs ring-1 ring-purple-500/40 cursor-pointer" 
+                                  : "border-border/60 bg-background/50 hover:bg-muted/40 hover:border-border cursor-pointer"
+                            }`}
+                          >
+                            <div className={`h-3 w-3 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                              isSelected 
+                                ? "border-purple-600 bg-purple-600 text-white" 
+                                : isConsultant
+                                  ? "border-primary/40 bg-transparent text-primary"
+                                  : "border-gray-400 bg-background"
+                            }`}>
+                              {isSelected && <div className="h-1 w-1 rounded-full bg-white" />}
+                              {isConsultant && <div className="h-1 w-1 rounded-full bg-primary" />}
+                            </div>
+                            <div className="truncate flex-1">
+                              <div className="font-semibold text-foreground truncate flex items-center justify-between gap-1">
+                                <span>{emp.first_name} {emp.last_name}</span>
+                                {isConsultant && (
+                                  <span className="text-[8px] font-bold text-primary bg-primary/10 px-1 py-0.2 rounded shrink-0">
+                                    Consultant
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[9px] text-muted-foreground truncate">{emp.job_title || "Reviewer"}</div>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* STEP 6: INTERNAL DELIVERY NOTES */}
+            <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
+              <CardHeader className="py-2 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5 text-primary" />
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+                    {isPipelineOrder ? "4. Pipeline Lead Notes" : "6. Internal Delivery Notes"}
+                  </CardTitle>
+                </div>
+                <span className="text-[9px] text-muted-foreground font-mono italic">For Delivery Manager</span>
+              </CardHeader>
+              <CardContent className="p-2.5">
                 <textarea
                   name="notes"
                   value={editForm.notes || ""}
-                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
                   rows={2}
-                  className="flex w-full rounded-lg border border-border/60 bg-background p-2.5 text-xs placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary leading-normal font-semibold transition-all"
-                  placeholder="Notes from order creator to delivery manager..."
+                  className="flex w-full rounded-lg border border-border/60 bg-background p-2 text-xs placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary leading-relaxed font-normal resize-none"
+                  placeholder="Note from order creator to delivery manager (internal only)..."
                 />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* Sticky Actions Bar */}
-          <div className="flex items-center justify-between gap-3 pt-2">
-            <Link href={isPipelineOrder ? "/business/clients/orders/pipeline" : "/business/clients/orders"} className="flex-1">
-              <Button type="button" variant="outline" className="w-full rounded-xl h-10 px-4 font-bold">
+          </div>
+
+        </div>
+
+        {/* Bottom Sticky Action Controls Bar */}
+        <div className="flex items-center justify-between gap-3 p-2.5 sm:p-3 rounded-xl bg-card/80 border border-border/60 shadow-xs backdrop-blur-md">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-bold text-muted-foreground">Order Summary:</span>
+            <Badge variant="secondary" className="font-mono text-xs font-semibold px-2 py-0.5">
+              {(editForm.items || []).length} {(editForm.items || []).length === 1 ? "Line Item" : "Line Items"}
+            </Badge>
+            <span className="font-mono font-black text-sm text-foreground">
+              {formatCurrency(editItemsTotal)}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Link href={isPipelineOrder ? "/business/clients/orders/pipeline" : "/business/clients/orders"}>
+              <Button type="button" variant="outline" className="rounded-lg h-8 px-3.5 font-bold text-xs">
                 Cancel
               </Button>
             </Link>
             <Button 
               type="submit" 
               disabled={saving} 
-              className="flex-1 font-bold shadow-md gap-2 rounded-xl h-10"
+              className="font-bold shadow-xs gap-1.5 rounded-lg h-8 px-4 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
             >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              Save Changes
+              {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+              {saving ? "Saving Changes..." : "Save Changes"}
             </Button>
           </div>
-
         </div>
 
       </form>
@@ -1239,19 +1586,19 @@ export default function EditClientOrderPage() {
                     Create New Company Entity
                   </DialogTitle>
                   <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                    Register a corporate entity profile for <span className="font-semibold text-foreground">invoicing & billing recipient</span>.
+                    Register a corporate entity profile for <span className="font-semibold text-foreground">{createCompanyTarget === "billing" ? "invoicing & billing recipient" : "service delivery target"}</span>.
                   </DialogDescription>
                 </div>
               </div>
               <Badge variant="outline" className="hidden sm:inline-flex px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-wider bg-background border-border/70">
-                Billing Entity
+                {createCompanyTarget === "billing" ? "Billing Entity" : "Target Entity"}
               </Badge>
             </div>
           </div>
 
           <form onSubmit={handleCreateCompanySubmit} className="p-6 sm:p-7 space-y-6">
             
-            {/* Section 1: Corporate Profile */}
+            {/* Section 1: Company Profile */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 pb-2 border-b border-border/50">
                 <Briefcase className="h-4 w-4 text-primary" />
@@ -1275,6 +1622,24 @@ export default function EditClientOrderPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground">
+                    Parent Client Representative
+                  </label>
+                  <select
+                    value={newCompanyForm.client_id}
+                    onChange={(e) => setNewCompanyForm(prev => ({ ...prev, client_id: e.target.value }))}
+                    className="flex h-10 w-full rounded-xl border border-border/70 bg-background px-3 py-2 text-xs font-semibold shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <option value="">-- Standalone (No parent client selected) --</option>
+                    {clients.map((cli) => (
+                      <option key={cli.id} value={String(cli.id)}>
+                        {cli.contact_person} ({cli.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">
                     Industry / Business Sector
                   </label>
                   <Input
@@ -1285,7 +1650,7 @@ export default function EditClientOrderPage() {
                   />
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
                     <span>Tax Identification Number (NPWP)</span>
                     <span className="text-[10px] text-muted-foreground/80 italic font-mono">Optional</span>
@@ -1413,165 +1778,77 @@ export default function EditClientOrderPage() {
         </DialogContent>
       </Dialog>
 
-      {/* POP-UP DIALOG FOR PLACING ORDER ON HOLD */}
-      <Dialog 
-        open={isOnHoldDialogOpen} 
-        onOpenChange={(open) => {
-          if (!open) handleCancelOnHold();
-        }}
-      >
-        <DialogContent className="max-w-lg p-0 overflow-hidden rounded-2xl border border-amber-500/30 shadow-2xl bg-background dark:bg-zinc-950">
-          <div className="p-6 pb-4 border-b border-border/60 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                <PauseCircle className="h-5 w-5" />
-              </div>
-              <div>
-                <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-                  Place Order On Hold
-                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px] font-bold px-2 py-0.5">
-                    {orderNumber || "ORDER"}
-                  </Badge>
-                </DialogTitle>
-                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                  {selectedOrderGroup?.company_name || selectedOrderGroup?.client_name || "Order Modification"}
-                </DialogDescription>
-              </div>
+      {/* On-Hold Reason Dialog Modal */}
+      <Dialog open={isOnHoldDialogOpen} onOpenChange={(open) => {
+        if (!open) handleCancelOnHold();
+      }}>
+        <DialogContent className="max-w-md p-6 rounded-2xl">
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+              <PauseCircle className="h-5 w-5" />
+              <DialogTitle className="text-base font-bold">Specify On-Hold Reason</DialogTitle>
             </div>
-          </div>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Please provide the reason why this order is being paused or placed on hold.
+            </DialogDescription>
+          </DialogHeader>
 
-          <div className="p-6 space-y-5">
-            {/* Warning Banner */}
-            <div className="p-3.5 rounded-xl border border-amber-500/25 bg-amber-500/10 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2.5">
-              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-              <div className="leading-relaxed">
-                <span className="font-semibold block">Order Execution Will Be Paused</span>
-                The status will change to <span className="font-bold underline decoration-amber-500">ON HOLD</span> upon saving and your reason will be posted into the order activity log and chat stream.
-              </div>
-            </div>
-
-            {/* Quick Reason Chips */}
-            <div className="space-y-2">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                <span>Select Quick Reason</span>
-                <span className="text-[10px] font-normal lowercase text-muted-foreground/80">(click to autofill)</span>
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  "Waiting for Client Documents",
-                  "Awaiting Client Confirmation / Approval",
-                  "Pending Client Payment",
-                  "Government / OSS System Revision",
-                  "Legal / Notary Verification Pending",
-                  "Technical Clarification Required"
-                ].map((reasonChip) => (
-                  <button
-                    key={reasonChip}
-                    type="button"
-                    onClick={() => setHoldReason(reasonChip)}
-                    className={cn(
-                      "text-xs px-2.5 py-1 rounded-lg border transition-all text-left font-medium",
-                      holdReason === reasonChip
-                        ? "bg-amber-500 text-white border-amber-500 font-semibold shadow-xs"
-                        : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground border-border/60"
-                    )}
-                  >
-                    {reasonChip}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Custom Reason Textarea */}
+          <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label htmlFor="edit-hold-reason-input" className="text-xs font-bold uppercase tracking-wider text-foreground">
-                  Reason for Hold <span className="text-rose-500">*</span>
-                </label>
-                <span className="text-[10px] text-muted-foreground font-mono">
-                  {holdReason.length} characters
-                </span>
-              </div>
-              <Textarea
-                id="edit-hold-reason-input"
+              <label className="text-xs font-bold text-foreground">Reason for Hold *</label>
+              <textarea
+                required
+                rows={3}
                 value={holdReason}
                 onChange={(e) => setHoldReason(e.target.value)}
-                rows={3}
-                placeholder="Detail why this order is being put on hold (e.g. Missing signed articles of association, waiting on response from client)..."
-                className="text-xs resize-none rounded-xl border-border/80 focus-visible:ring-amber-500"
+                placeholder="e.g. Waiting for client to provide certified passport copies..."
+                className="flex w-full rounded-xl border border-border/70 bg-background p-3 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary leading-relaxed resize-none"
               />
             </div>
 
-            {/* Chat Target Channel Toggle */}
-            <div className="space-y-2 pt-1 border-t border-border/40">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
-                Broadcast Reason To Chat
-              </label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">Broadcast Visibility</label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setHoldChannel("CLIENT")}
-                  className={cn(
-                    "p-3 rounded-xl border text-left transition-all flex flex-col gap-1",
-                    holdChannel === "CLIENT"
-                      ? "border-amber-500/60 bg-amber-500/10 text-foreground ring-1 ring-amber-500/40"
-                      : "border-border/60 bg-muted/20 hover:bg-muted/40 text-muted-foreground"
-                  )}
+                  className={`p-2.5 rounded-xl border text-left transition-colors ${holdChannel === "CLIENT" ? "border-primary bg-primary/10 text-primary font-bold" : "border-border/60 hover:bg-muted/40 text-xs"}`}
                 >
-                  <div className="flex items-center gap-1.5 font-bold text-xs">
-                    <MessageSquare className="h-3.5 w-3.5 text-amber-500" />
-                    <span>Client & Team Chat</span>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground leading-tight">
-                    Client & internal staff both see this reason in chat
-                  </span>
+                  <div className="font-semibold text-xs">Client & Team</div>
+                  <div className="text-[10px] text-muted-foreground">Visible to client in order chat</div>
                 </button>
-
                 <button
                   type="button"
                   onClick={() => setHoldChannel("INTERNAL")}
-                  className={cn(
-                    "p-3 rounded-xl border text-left transition-all flex flex-col gap-1",
-                    holdChannel === "INTERNAL"
-                      ? "border-amber-500/60 bg-amber-500/10 text-foreground ring-1 ring-amber-500/40"
-                      : "border-border/60 bg-muted/20 hover:bg-muted/40 text-muted-foreground"
-                  )}
+                  className={`p-2.5 rounded-xl border text-left transition-colors ${holdChannel === "INTERNAL" ? "border-primary bg-primary/10 text-primary font-bold" : "border-border/60 hover:bg-muted/40 text-xs"}`}
                 >
-                  <div className="flex items-center gap-1.5 font-bold text-xs">
-                    <Lock className="h-3.5 w-3.5 text-amber-500" />
-                    <span>Internal Staff Only</span>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground leading-tight">
-                    Private note logged only for processing consultants
-                  </span>
+                  <div className="font-semibold text-xs">Internal Only</div>
+                  <div className="text-[10px] text-muted-foreground">Visible only to internal staff</div>
                 </button>
               </div>
             </div>
           </div>
 
-          <DialogFooter className="p-4 border-t border-border/60 bg-muted/10 shrink-0 flex items-center justify-between sm:justify-end gap-2">
+          <DialogFooter className="flex items-center justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"
-              size="sm"
               onClick={handleCancelOnHold}
-              className="text-xs font-semibold"
+              className="text-xs font-bold h-9 rounded-xl"
             >
               Cancel
             </Button>
             <Button
               type="button"
-              size="sm"
-              disabled={!holdReason.trim()}
               onClick={handleConfirmOnHold}
-              className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs gap-1.5 shadow-sm"
+              className="text-xs font-bold h-9 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white"
             >
-              <PauseCircle className="h-3.5 w-3.5" />
-              Confirm Hold Reason
+              Confirm Hold Status
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }

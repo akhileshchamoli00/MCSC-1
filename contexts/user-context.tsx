@@ -5,13 +5,23 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 if (typeof window !== "undefined") {
   const win = window as any;
   if (!win.fetchIntercepted) {
-    const originalFetch = window.fetch;
+    const originalFetch = window.fetch.bind(window);
     window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
-      const urlStr = input.toString();
+      let urlStr = "";
+      if (typeof input === "string") {
+        urlStr = input;
+      } else if (input instanceof URL) {
+        urlStr = input.toString();
+      } else if (input && typeof (input as any).url === "string") {
+        urlStr = (input as any).url;
+      }
+
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
       if (urlStr.includes("/api/") || (apiUrl && urlStr.startsWith(apiUrl))) {
         if (!init) init = {};
-        init.credentials = "include";
+        if (!init.credentials) {
+          init.credentials = "include";
+        }
       }
       return originalFetch(input, init);
     };

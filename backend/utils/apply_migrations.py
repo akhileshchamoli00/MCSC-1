@@ -326,8 +326,8 @@ def run_migrations():
             conn.rollback()
             handle_migration_error("is_final_invoice_finalized", "client_orders", e)
 
-        # Add payment_link, xendit_invoice_id, and payment_link_created_at to client_orders table
-        for col, col_type in [("payment_link", "VARCHAR(500)"), ("xendit_invoice_id", "VARCHAR(255)"), ("payment_link_created_at", "TIMESTAMP")]:
+        # Add payment_link, xendit_invoice_id, payment_link_created_at, and reviewer_id to client_orders table
+        for col, col_type in [("payment_link", "VARCHAR(500)"), ("xendit_invoice_id", "VARCHAR(255)"), ("payment_link_created_at", "TIMESTAMP"), ("reviewer_id", "INTEGER REFERENCES employees(id) ON DELETE SET NULL")]:
             try:
                 conn.execute(text(f"ALTER TABLE client_orders ADD COLUMN {col} {col_type}"))
                 conn.commit()
@@ -568,6 +568,8 @@ def run_migrations():
             ("last_invoice_sent_at", "TIMESTAMP"),
             ("last_invoice_sent_to", "VARCHAR(255)"),
             ("invoice_delivery_channel", "VARCHAR(50)"),
+            ("signed_docs_sent_at", "TIMESTAMP"),
+            ("signed_docs_sent_to", "VARCHAR(255)"),
             ("deliverables_sent_at", "TIMESTAMP"),
             ("deliverables_sent_to", "VARCHAR(255)"),
             ("notary_voucher_sent_at", "TIMESTAMP"),
@@ -609,6 +611,15 @@ def run_migrations():
             conn.rollback()
             handle_migration_error("service_instructions", "client_orders", e)
 
+        # Add reviewer_id to client_orders
+        try:
+            conn.execute(text("ALTER TABLE client_orders ADD COLUMN reviewer_id INTEGER REFERENCES employees(id) ON DELETE SET NULL"))
+            conn.commit()
+            print("Added column 'reviewer_id' to 'client_orders' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("reviewer_id", "client_orders", e)
+
         # Create client_order_progress_reactions table if not exists
         try:
             conn.execute(text("""
@@ -633,6 +644,7 @@ def run_migrations():
             ("CREATE INDEX IF NOT EXISTS ix_clients_company_id ON clients (company_id)", "ix_clients_company_id"),
             ("CREATE INDEX IF NOT EXISTS ix_client_companies_customer_id ON client_companies (customer_id)", "ix_client_companies_customer_id"),
             ("CREATE INDEX IF NOT EXISTS ix_client_orders_customer_id ON client_orders (customer_id)", "ix_client_orders_customer_id"),
+            ("CREATE INDEX IF NOT EXISTS ix_client_orders_reviewer_id ON client_orders (reviewer_id)", "ix_client_orders_reviewer_id"),
             ("CREATE UNIQUE INDEX IF NOT EXISTS uq_order_user_reads_order_chan_user ON client_order_user_reads (order_number, channel, user_id)", "uq_order_user_reads_order_chan_user"),
             ("CREATE INDEX IF NOT EXISTS ix_order_user_reads_order_chan ON client_order_user_reads (order_number, channel)", "ix_order_user_reads_order_chan"),
             ("CREATE INDEX IF NOT EXISTS ix_order_msg_reactions_progress_id ON client_order_progress_reactions (progress_id)", "ix_order_msg_reactions_progress_id"),

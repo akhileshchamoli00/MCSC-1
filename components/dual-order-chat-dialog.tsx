@@ -38,7 +38,9 @@ import {
   CheckCheck,
   Reply,
   Quote,
-  Ban
+  Ban,
+  Cloud,
+  FileDown
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -53,6 +55,17 @@ import { resolveImageUrl } from "@/lib/utils";
 import { toast } from "sonner";
 import { ChatEmojiPicker } from "@/components/chat-emoji-picker";
 import { ChatMessageReactions, WhatsAppReactionHoverBar } from "@/components/chat-message-reactions";
+
+const deduplicateMessages = (msgs: any[]) => {
+  if (!Array.isArray(msgs)) return [];
+  const map = new Map<string | number, any>();
+  for (const m of msgs) {
+    if (!m) continue;
+    const key = m.id !== undefined && m.id !== null ? `id-${m.id}` : `msg-${m.created_at || ""}-${m.message || ""}`;
+    map.set(key, m);
+  }
+  return Array.from(map.values());
+};
 
 const formatSeenTime = (dateStr?: string) => {
   if (!dateStr) return "";
@@ -165,19 +178,21 @@ const SeenReceiptsIndicator = ({
 
 const isSystemMessage = (msg: any) => {
   if (!msg) return false;
-  if (!msg.user_id) return true;
+  if (msg.pending) return false;
+  if (msg.is_client || (msg.sender_role || "").toUpperCase() === "CLIENT") return false;
   const role = (msg.sender_role || "").toUpperCase();
   if (role === "MILESTONE" || role === "SYSTEM") return true;
   const name = (msg.sender_name || "").toUpperCase();
   if (name === "SYSTEM" || name === "MILESTONE") return true;
-  const txt = (msg.message || "").toLowerCase();
+  if (!msg.user_id && !msg.sender_name) return true;
+  const txt = (msg.message || "").toLowerCase().trim();
+  if (!txt) return false;
   return (
     txt.startsWith("order execution status") ||
     txt.includes("order placed on hold") ||
     txt.includes("⏸️") ||
     txt.startsWith("pipeline order") ||
     txt.startsWith("order moved") ||
-    txt.startsWith("payment") ||
     txt.startsWith("proforma payment") ||
     txt.startsWith("final invoice payment") ||
     txt.startsWith("additional payment") ||
@@ -188,7 +203,11 @@ const isSystemMessage = (msg: any) => {
     txt.includes("uploaded to dropbox") ||
     txt.includes("emailed to client") ||
     txt.includes("assigned to review") ||
-    txt.includes("consultant is actively")
+    txt.includes("consultant is actively") ||
+    txt.includes("has been reopened") ||
+    txt.includes("reopened and moved back") ||
+    txt.includes("marked as cancelled") ||
+    txt.includes("has been cancelled")
   );
 };
 
@@ -196,6 +215,12 @@ const getMilestoneIcon = (message: string) => {
   const txt = (message || "").toLowerCase();
   if (txt.includes("on hold") || txt.includes("⏸️") || txt.includes("pause")) {
     return <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />;
+  }
+  if (txt.includes("reopened")) {
+    return <RotateCw className="h-3.5 w-3.5 text-blue-500 shrink-0" />;
+  }
+  if (txt.includes("cancelled")) {
+    return <Ban className="h-3.5 w-3.5 text-rose-500 shrink-0" />;
   }
   if (txt.includes("payment") || txt.includes("amount received") || txt.includes("paid")) {
     return <CreditCard className="h-3.5 w-3.5 text-emerald-500 shrink-0" />;
@@ -298,6 +323,8 @@ export function DualOrderChatDialog({
   const [loadingClient, setLoadingClient] = useState(false);
   const [loadingInternal, setLoadingInternal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [savingToDropbox, setSavingToDropbox] = useState(false);
+  const [downloadingTranscript, setDownloadingTranscript] = useState(false);
 
   // Order Details Summary State
   const [orderSummary, setOrderSummary] = useState<any | null>(null);
@@ -313,6 +340,70 @@ export function DualOrderChatDialog({
     setPreviewAttachment(msg);
     const url = `/api-proxy/api/clients/orders/${orderNumber}/attachments/preview?path=${encodeURIComponent(msg.attachment_url)}`;
     setPreviewUrl(url);
+  };
+
+  const handleSaveToDropbox = async () => {
+    if (!orderNumber || savingToDropbox) return;
+    try {
+      setSavingToDropbox(true);
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/export-chat-dropbox`,
+        {
+          method: "POST",
+          credentials: "include"
+        }
+      );
+      const data = await res.json();
+      if (res.ok && data.status === "success") {
+        toast.success(
+          <div className="space-y-0.5">
+            <p className="font-semibold text-xs">Chat Archived to Dropbox!</p>
+            <p className="text-[10px] text-muted-foreground font-mono truncate">{data.path}</p>
+          </div>
+        );
+      } else {
+        toast.error(data.detail || data.error || "Failed to save chat to Dropbox");
+      }
+    } catch (err) {
+      console.error("Error saving to Dropbox:", err);
+      toast.error("Network error saving chat to Dropbox");
+    } finally {
+      setSavingToDropbox(false);
+    }
+  };
+
+  const handleDownloadTranscript = async () => {
+    if (!orderNumber || downloadingTranscript) return;
+    try {
+      setDownloadingTranscript(true);
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/download-chat-transcript`,
+        {
+          method: "GET",
+          credentials: "include"
+        }
+      );
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Chat_History_${orderNumber}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success("Chat transcript downloaded!");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || "Failed to download transcript");
+      }
+    } catch (err) {
+      console.error("Error downloading transcript:", err);
+      toast.error("Error downloading transcript");
+    } finally {
+      setDownloadingTranscript(false);
+    }
   };
 
   // Inputs
@@ -587,7 +678,7 @@ export function DualOrderChatDialog({
       }
       if (res.ok) {
         const data = await res.json();
-        setClientMessages(data || []);
+        setClientMessages(deduplicateMessages(data || []));
         if (data && data.length > 0) {
           const maxId = Math.max(...data.map((m: any) => m.id || 0));
           if (maxId > lastMarkedClientMsgIdRef.current) {
@@ -619,7 +710,7 @@ export function DualOrderChatDialog({
       }
       if (res.ok) {
         const data = await res.json();
-        setInternalMessages(data || []);
+        setInternalMessages(deduplicateMessages(data || []));
         if (data && data.length > 0) {
           const maxId = Math.max(...data.map((m: any) => m.id || 0));
           if (maxId > lastMarkedInternalMsgIdRef.current) {
@@ -642,14 +733,14 @@ export function DualOrderChatDialog({
       const [tagRes, teamRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/taggable-users`, {
           credentials: "include"
-        }),
+        }).catch(() => null),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, {
           credentials: "include"
-        })
+        }).catch(() => null)
       ]);
 
-      const employees = tagRes.ok ? await tagRes.json() : [];
-      const teams = teamRes.ok ? await teamRes.json() : [];
+      const employees = tagRes && tagRes.ok ? await tagRes.json().catch(() => []) : [];
+      const teams = teamRes && teamRes.ok ? await teamRes.json().catch(() => []) : [];
 
       const formattedEmployees = (employees || []).map((e: any) => ({
         ...e,
@@ -780,7 +871,7 @@ export function DualOrderChatDialog({
       );
       if (res.ok) {
         const newMsg = await res.json();
-        setClientMessages(prev => [...prev, newMsg]);
+        setClientMessages(prev => deduplicateMessages([...prev, newMsg]));
         setClientInput("");
         setPendingClientMessage("");
         setQuotedClientMessage(null);
@@ -829,7 +920,7 @@ export function DualOrderChatDialog({
       );
       if (res.ok) {
         const newMsg = await res.json();
-        setInternalMessages(prev => [...prev, newMsg]);
+        setInternalMessages(prev => deduplicateMessages([...prev, newMsg]));
         setQuotedInternalMessage(null);
       } else {
         const err = await res.json();
@@ -1275,7 +1366,7 @@ export function DualOrderChatDialog({
 
                         if (isSystem) {
                           return (
-                            <div key={msg.id || idx} className="flex justify-center my-3 px-2">
+                            <div key={`client-sys-${msg.id ?? 'sys'}-${idx}`} className="flex justify-center my-3 px-2">
                               <div className="bg-muted/70 dark:bg-zinc-900/80 border border-border/80 dark:border-zinc-800 rounded-full px-3.5 py-1.5 text-xs text-muted-foreground dark:text-zinc-400 flex items-center gap-2 shadow-2xs backdrop-blur-md max-w-[92%] text-center">
                                 <div className="h-5 w-5 rounded-full bg-muted dark:bg-zinc-800 flex items-center justify-center shrink-0">
                                   {getMilestoneIcon(msg.message)}
@@ -1305,7 +1396,7 @@ export function DualOrderChatDialog({
 
                         return (
                           <div
-                            key={msg.id || idx}
+                            key={`client-msg-${msg.id ?? 'item'}-${idx}`}
                             className={`group flex flex-col ${isClientSender ? "items-start" : "items-end"} max-w-[85%] ${
                               isClientSender ? "mr-auto" : "ml-auto"
                             } ${isSameSenderAsPrev ? "mt-1" : "mt-3.5"}`}
@@ -1722,7 +1813,7 @@ export function DualOrderChatDialog({
 
                         if (isSystem) {
                           return (
-                            <div key={msg.id || idx} className="flex justify-center my-3 px-2">
+                            <div key={`internal-sys-${msg.id ?? 'sys'}-${idx}`} className="flex justify-center my-3 px-2">
                               <div className="bg-muted/70 dark:bg-zinc-900/80 border border-border/80 dark:border-zinc-800 rounded-full px-3.5 py-1.5 text-xs text-muted-foreground dark:text-zinc-400 flex items-center gap-2 shadow-2xs backdrop-blur-md max-w-[92%] text-center">
                                 <div className="h-5 w-5 rounded-full bg-muted dark:bg-zinc-800 flex items-center justify-center shrink-0">
                                   {getMilestoneIcon(msg.message)}
@@ -1750,7 +1841,7 @@ export function DualOrderChatDialog({
 
                         return (
                           <div
-                            key={msg.id || idx}
+                            key={`internal-msg-${msg.id ?? 'item'}-${idx}`}
                             className={`group flex flex-col items-start max-w-[90%] mr-auto ${isSameSenderAsPrev ? "mt-1" : "mt-3.5"}`}
                           >
                             {!isSameSenderAsPrev && (

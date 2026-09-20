@@ -37,10 +37,12 @@ interface DropboxItem {
 
 export function DropboxFileManager({ 
   basePath, 
-  title = "Client Documents" 
+  title = "Client Documents",
+  onActivityTriggered
 }: { 
   basePath: string, 
-  title?: string 
+  title?: string,
+  onActivityTriggered?: () => void
 }) {
   const [currentPath, setCurrentPath] = useState(basePath);
   const [items, setItems] = useState<DropboxItem[]>([]);
@@ -118,6 +120,7 @@ export function DropboxFileManager({
         setNewFolderName("");
       }
       fetchItems(currentPath);
+      if (onActivityTriggered) onActivityTriggered();
     } catch (err: any) {
       if (!silent) toast.error(err.message || "Failed to create folder");
     } finally {
@@ -147,6 +150,7 @@ export function DropboxFileManager({
       setIsUploadOpen(false);
       setSelectedFile(null);
       fetchItems(currentPath);
+      if (onActivityTriggered) onActivityTriggered();
     } catch (err: any) {
       toast.error(err.message || "Failed to upload file");
     } finally {
@@ -156,8 +160,9 @@ export function DropboxFileManager({
 
   const handleDownload = async (path: string, openInNewTab = false) => {
     try {
-      const toastId = toast.loading("Generating secure link...");
-      const res = await fetch(`${API_URL}/api/dropbox/download?path=${encodeURIComponent(path)}`, {
+      const action = openInNewTab ? "VIEW" : "DOWNLOAD";
+      const toastId = toast.loading(openInNewTab ? "Opening preview..." : "Generating secure download link...");
+      const res = await fetch(`${API_URL}/api/dropbox/download?path=${encodeURIComponent(path)}&action=${action}`, {
         credentials: "include"
       });
       const data = await res.json();
@@ -174,11 +179,12 @@ export function DropboxFileManager({
           link.click();
           document.body.removeChild(link);
         }
+        if (onActivityTriggered) onActivityTriggered();
       } else {
           throw new Error(data.detail || data.error || "Failed to get download link");
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to download file");
+      toast.error(err.message || "Failed to process file request");
     }
   };
 
@@ -203,6 +209,7 @@ export function DropboxFileManager({
       setIsDeleteOpen(false);
       setItemToDelete(null);
       fetchItems(currentPath);
+      if (onActivityTriggered) onActivityTriggered();
     } catch (err: any) {
       toast.error(err.message || "Failed to delete item");
     } finally {

@@ -23,9 +23,10 @@ interface StakeholderRecipientsSelectorProps {
     role?: string;
     phone?: string;
   };
-  accentColor?: "primary" | "sky" | "emerald";
+  accentColor?: "primary" | "sky" | "emerald" | "indigo";
   title?: string;
   subtitle?: string;
+  compact?: boolean;
 }
 
 export function StakeholderRecipientsSelector({
@@ -35,7 +36,8 @@ export function StakeholderRecipientsSelector({
   fallbackContact,
   accentColor = "primary",
   title = "Recipient Email Selection (Registered Contacts)",
-  subtitle = "Emails are sent strictly to verified company contacts stored in the system."
+  subtitle = "Emails are sent strictly to verified company contacts stored in the system.",
+  compact = false
 }: StakeholderRecipientsSelectorProps) {
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
   const [loading, setLoading] = useState(false);
@@ -124,9 +126,12 @@ export function StakeholderRecipientsSelector({
     }
   }, [selectedEmails.length]);
 
-  const primaryEmail = primaryContact?.email?.trim() || "";
+  // Currently selected Primary & CC
+  const primaryEmail = useMemo(() => {
+    return selectedEmails[0] || (primaryContact?.email ? primaryContact.email.trim() : "");
+  }, [selectedEmails, primaryContact]);
+
   const selectedCcEmails = useMemo(() => {
-    if (selectedEmails.length <= 1 || !primaryEmail) return [];
     return selectedEmails.slice(1);
   }, [selectedEmails, primaryEmail]);
 
@@ -176,18 +181,24 @@ export function StakeholderRecipientsSelector({
     ? "focus:ring-sky-500 text-sky-600 dark:text-sky-400 accent-sky-600"
     : accentColor === "emerald"
     ? "focus:ring-emerald-500 text-emerald-600 dark:text-emerald-400 accent-emerald-600"
+    : accentColor === "indigo"
+    ? "focus:ring-indigo-500 text-indigo-600 dark:text-indigo-400 accent-indigo-600"
     : "focus:ring-primary text-primary accent-primary";
 
   const primaryBadgeClass = accentColor === "sky"
     ? "bg-sky-500/20 text-sky-700 dark:text-sky-300 border-sky-500/40"
     : accentColor === "emerald"
     ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+    : accentColor === "indigo"
+    ? "bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-500/40"
     : "bg-primary/20 text-primary border-primary/40";
 
   const primaryCardBorder = accentColor === "sky"
     ? "border-sky-500/40 bg-sky-500/5 dark:bg-sky-950/20"
     : accentColor === "emerald"
     ? "border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/20"
+    : accentColor === "indigo"
+    ? "border-indigo-500/40 bg-indigo-500/5 dark:bg-indigo-950/20"
     : "border-primary/40 bg-primary/5 dark:bg-primary/10";
 
   const isCcSelected = (email?: string) => {
@@ -197,23 +208,25 @@ export function StakeholderRecipientsSelector({
   };
 
   return (
-    <div className="rounded-2xl border border-border/80 bg-muted/20 dark:bg-zinc-950/40 p-4 sm:p-5 space-y-4 transition-all">
+    <div className={`rounded-xl border border-border/80 bg-muted/20 dark:bg-zinc-950/40 transition-all ${
+      compact ? "p-3 sm:p-3.5 space-y-2.5" : "p-4 sm:p-5 space-y-4 rounded-2xl"
+    }`}>
       {/* Header section */}
-      <div className="flex flex-wrap items-start justify-between gap-2.5">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="space-y-0.5 min-w-0">
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-primary shrink-0" />
-            <h4 className="text-sm font-bold text-foreground truncate">{title}</h4>
+            <Users className={`text-primary shrink-0 ${compact ? "h-3.5 w-3.5" : "h-4 w-4"}`} />
+            <h4 className={`font-bold text-foreground truncate ${compact ? "text-xs sm:text-sm" : "text-sm"}`}>{title}</h4>
             <Badge variant="outline" className="text-[10px] font-mono font-semibold px-2 py-0.5 bg-background shadow-2xs">
               {selectedEmails.length} {selectedEmails.length === 1 ? "recipient" : "recipients"}
             </Badge>
           </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
+          <p className={`text-muted-foreground leading-relaxed ${compact ? "text-[11px]" : "text-xs"}`}>
             {subtitle}
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground shrink-0">
+        <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-muted-foreground shrink-0">
           <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
           <span className="font-medium">System Registered</span>
         </div>
@@ -221,13 +234,13 @@ export function StakeholderRecipientsSelector({
 
       {/* Loading state */}
       {loading ? (
-        <div className="py-6 text-center text-xs text-muted-foreground flex items-center justify-center gap-2 bg-background/50 rounded-xl border border-border/40">
+        <div className="py-4 text-center text-xs text-muted-foreground flex items-center justify-center gap-2 bg-background/50 rounded-xl border border-border/40">
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
           <span>Loading registered company contacts...</span>
         </div>
       ) : validContacts.length === 0 ? (
         /* Empty state: No contacts found */
-        <div className="py-4 px-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-900 dark:text-amber-300 flex items-start gap-2.5">
+        <div className="py-3 px-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-900 dark:text-amber-300 flex items-start gap-2.5">
           <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <p className="font-semibold">No registered contacts with email found for this company.</p>
@@ -237,19 +250,23 @@ export function StakeholderRecipientsSelector({
           </div>
         </div>
       ) : (
-        <div className="space-y-3.5">
+        <div className={compact ? "space-y-2.5" : "space-y-3.5"}>
           {/* PRIMARY RECIPIENT CARD (Always To) */}
           {primaryContact && (
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <UserCheck className="h-3.5 w-3.5 text-primary" />
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <UserCheck className="h-3 w-3 text-primary" />
                 Primary Recipient (To)
               </label>
 
-              <div className={`flex items-center justify-between p-3 rounded-xl border transition-all ${primaryCardBorder}`}>
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="h-8 w-8 rounded-lg bg-background border border-border flex items-center justify-center text-primary font-bold text-xs shrink-0 shadow-2xs">
-                    <Mail className="h-4 w-4" />
+              <div className={`flex items-center justify-between rounded-xl border transition-all ${primaryCardBorder} ${
+                compact ? "p-2.5" : "p-3"
+              }`}>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className={`rounded-lg bg-background border border-border flex items-center justify-center text-primary font-bold text-xs shrink-0 shadow-2xs ${
+                    compact ? "h-7 w-7" : "h-8 w-8"
+                  }`}>
+                    <Mail className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -265,14 +282,14 @@ export function StakeholderRecipientsSelector({
                         </Badge>
                       )}
                     </div>
-                    <span className="text-[11px] font-mono text-muted-foreground truncate block mt-0.5">
+                    <span className="text-[10px] sm:text-[11px] font-mono text-muted-foreground truncate block mt-0.5">
                       {primaryContact.email}
                     </span>
                   </div>
                 </div>
 
                 <div className="shrink-0 pl-2">
-                  <Badge variant="outline" className={`text-[10px] font-semibold py-0.5 px-2.5 shadow-2xs ${primaryBadgeClass}`}>
+                  <Badge variant="outline" className={`text-[10px] font-semibold py-0.5 px-2 shadow-2xs ${primaryBadgeClass}`}>
                     Primary (To)
                   </Badge>
                 </div>
@@ -282,45 +299,47 @@ export function StakeholderRecipientsSelector({
 
           {/* CC EXPANSION CHECKBOX (Toggles other available contacts) */}
           {otherContacts.length > 0 ? (
-            <div className="space-y-2.5 pt-1">
-              <div className="flex items-center justify-between bg-background/60 dark:bg-zinc-900/60 p-3 rounded-xl border border-border/70 hover:border-border transition-colors">
-                <label className="flex items-center gap-2.5 cursor-pointer select-none text-xs font-semibold text-foreground">
+            <div className="space-y-2 pt-0.5">
+              <div className={`flex items-center justify-between bg-background/60 dark:bg-zinc-900/60 rounded-xl border border-border/70 hover:border-border transition-colors ${
+                compact ? "p-2 sm:p-2.5" : "p-3"
+              }`}>
+                <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-foreground">
                   <input
                     type="checkbox"
                     checked={isCcEnabled}
                     onChange={(e) => handleToggleCcCheckbox(e.target.checked)}
-                    className={`h-4 w-4 rounded border-border cursor-pointer shrink-0 ${ringColorClass}`}
+                    className={`h-3.5 w-3.5 sm:h-4 sm:w-4 rounded border-border cursor-pointer shrink-0 ${ringColorClass}`}
                   />
                   <span>Send copy to additional company contacts (CC)</span>
                 </label>
 
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-[10px] font-mono font-medium px-2 py-0.5">
-                    {otherContacts.length} {otherContacts.length === 1 ? "contact available" : "contacts available"}
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <Badge variant="secondary" className="text-[10px] font-mono font-medium px-1.5 sm:px-2 py-0.5">
+                    {otherContacts.length} {otherContacts.length === 1 ? "contact" : "contacts"}
                   </Badge>
                   <button
                     type="button"
                     onClick={() => handleToggleCcCheckbox(!isCcEnabled)}
                     className="text-muted-foreground hover:text-foreground cursor-pointer p-0.5 rounded transition-colors"
                   >
-                    {isCcEnabled ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    {isCcEnabled ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                   </button>
                 </div>
               </div>
 
-              {/* EXPANDED CC CONTACTS LIST (Shows 3 items, scroll for the rest) */}
+              {/* EXPANDED CC CONTACTS LIST */}
               {isCcEnabled && (
-                <div className="space-y-2 pl-2 sm:pl-3 border-l-2 border-primary/30 pt-1 animate-in fade-in-50 duration-200">
+                <div className="space-y-1.5 pl-2 sm:pl-3 border-l-2 border-primary/30 pt-0.5 animate-in fade-in-50 duration-200">
                   {/* CC Toolbar / Controls */}
-                  <div className="flex items-center justify-between text-xs pb-1">
-                    <span className="text-[11px] font-medium text-muted-foreground">
+                  <div className="flex items-center justify-between text-xs pb-0.5">
+                    <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground">
                       Select contacts to include as CC:
                     </span>
                     <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
                         onClick={handleSelectAllCc}
-                        className="text-[11px] font-bold text-primary hover:underline cursor-pointer transition-colors"
+                        className="text-[10px] sm:text-[11px] font-bold text-primary hover:underline cursor-pointer transition-colors"
                       >
                         Select All
                       </button>
@@ -328,16 +347,16 @@ export function StakeholderRecipientsSelector({
                       <button
                         type="button"
                         onClick={handleClearCc}
-                        className="text-[11px] font-medium text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                        className="text-[10px] sm:text-[11px] font-medium text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
                       >
                         Clear CC
                       </button>
                     </div>
                   </div>
 
-                  {/* Scrollable list: Exactly 3 items visible (~176px), scrollable with scrollbar */}
+                  {/* Scrollable list */}
                   <div
-                    className="max-h-[176px] overflow-y-auto space-y-2 pr-1.5"
+                    className="max-h-[140px] overflow-y-auto space-y-1.5 pr-1"
                     style={{ scrollbarWidth: "thin" }}
                   >
                     {otherContacts.map((stk, idx) => {
@@ -352,7 +371,7 @@ export function StakeholderRecipientsSelector({
                               handleToggleCcEmail(stk.email);
                             }
                           }}
-                          className={`flex items-center justify-between p-2.5 sm:p-3 rounded-xl border transition-all select-none ${
+                          className={`flex items-center justify-between p-2 sm:p-2.5 rounded-lg border transition-all select-none ${
                             !hasEmail
                               ? "bg-muted/10 border-border/30 opacity-40 cursor-not-allowed"
                               : selected
@@ -360,7 +379,7 @@ export function StakeholderRecipientsSelector({
                               : "bg-background/90 hover:bg-muted/50 border-border/70 cursor-pointer"
                           }`}
                         >
-                          <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="flex items-center gap-2 min-w-0">
                             <input
                               type="checkbox"
                               disabled={!hasEmail}
@@ -370,18 +389,18 @@ export function StakeholderRecipientsSelector({
                                   handleToggleCcEmail(stk.email);
                                 }
                               }}
-                              className={`h-4 w-4 rounded border-border cursor-pointer shrink-0 ${ringColorClass}`}
+                              className={`h-3.5 w-3.5 rounded border-border cursor-pointer shrink-0 ${ringColorClass}`}
                             />
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="font-bold text-xs text-foreground truncate">{stk.name}</span>
                                 {stk.role && (
-                                  <Badge variant="secondary" className="text-[9px] py-0 px-1.5 font-semibold">
+                                  <Badge variant="secondary" className="text-[9px] py-0 px-1 font-semibold">
                                     {stk.role}
                                   </Badge>
                                 )}
                               </div>
-                              <span className="text-[11px] text-muted-foreground font-mono truncate block mt-0.5">
+                              <span className="text-[10px] text-muted-foreground font-mono truncate block">
                                 {stk.email}
                               </span>
                             </div>
@@ -389,11 +408,11 @@ export function StakeholderRecipientsSelector({
 
                           <div className="shrink-0 pl-2">
                             {selected ? (
-                              <Badge variant="outline" className="text-[10px] font-semibold py-0.5 px-2 bg-primary/20 text-primary border-primary/30">
+                              <Badge variant="outline" className="text-[9px] font-semibold py-0 px-1.5 bg-primary/20 text-primary border-primary/30">
                                 Copy (CC)
                               </Badge>
                             ) : (
-                              <span className="text-[10px] text-muted-foreground hover:text-foreground">
+                              <span className="text-[9px] text-muted-foreground hover:text-foreground">
                                 + Add CC
                               </span>
                             )}
@@ -406,7 +425,7 @@ export function StakeholderRecipientsSelector({
               )}
             </div>
           ) : (
-            <div className="text-[11px] text-muted-foreground italic px-1">
+            <div className="text-[10px] text-muted-foreground italic px-1">
               No additional registered contacts available for CC for this company.
             </div>
           )}
@@ -415,19 +434,19 @@ export function StakeholderRecipientsSelector({
 
       {/* Recipient summary footer */}
       {selectedEmails.length > 0 && (
-        <div className="pt-2 border-t border-border/50 flex flex-wrap items-center justify-between text-xs text-muted-foreground gap-2">
+        <div className="pt-1.5 border-t border-border/50 flex flex-wrap items-center justify-between text-xs text-muted-foreground gap-1.5">
           <div className="flex items-center gap-1.5 min-w-0 truncate">
-            <Mail className="h-3.5 w-3.5 text-primary shrink-0" />
-            <span className="font-mono text-[11px] text-foreground font-semibold truncate">
+            <Mail className="h-3 w-3 text-primary shrink-0" />
+            <span className="font-mono text-[10px] sm:text-[11px] text-foreground font-semibold truncate">
               To: {selectedEmails[0]}
             </span>
             {selectedEmails.length > 1 && (
-              <span className="text-[10px] text-primary font-mono font-medium">
-                (+{selectedEmails.length - 1} CC: {selectedEmails.slice(1).join(", ")})
+              <span className="text-[10px] text-primary font-mono font-medium truncate max-w-[200px] sm:max-w-none">
+                (+{selectedEmails.length - 1} CC)
               </span>
             )}
           </div>
-          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 shrink-0">
             <CheckCircle2 className="h-3 w-3" />
             {selectedEmails.length} Registered Recipient{selectedEmails.length > 1 ? "s" : ""}
           </span>

@@ -66,31 +66,56 @@ export default function BusinessDashboard() {
   };
 
   useEffect(() => {
+    let isMounted = true;
     const fetchData = async () => {
       try {
-        const [clientsRes, ordersRes, docsRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
-            credentials: "include"
-          }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
-            credentials: "include"
-          }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/documents/expiring`, {
-            credentials: "include"
-          })
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "/api-proxy";
+        const [clientsRes, ordersRes, docsRes] = await Promise.allSettled([
+          fetch(`${apiUrl}/api/clients`, { credentials: "include" }),
+          fetch(`${apiUrl}/api/clients/orders`, { credentials: "include" }),
+          fetch(`${apiUrl}/api/clients/documents/expiring`, { credentials: "include" })
         ]);
 
-        if (clientsRes.ok) setClients(await clientsRes.json());
-        if (ordersRes.ok) setOrders(await ordersRes.json());
-        if (docsRes.ok) setExpiringDocs(await docsRes.json());
+        if (!isMounted) return;
+
+        if (clientsRes.status === "fulfilled" && clientsRes.value.ok) {
+          try {
+            const data = await clientsRes.value.json();
+            if (isMounted) setClients(Array.isArray(data) ? data : []);
+          } catch (e) {
+            console.warn("Failed to parse clients response:", e);
+          }
+        }
+
+        if (ordersRes.status === "fulfilled" && ordersRes.value.ok) {
+          try {
+            const data = await ordersRes.value.json();
+            if (isMounted) setOrders(Array.isArray(data) ? data : []);
+          } catch (e) {
+            console.warn("Failed to parse orders response:", e);
+          }
+        }
+
+        if (docsRes.status === "fulfilled" && docsRes.value.ok) {
+          try {
+            const data = await docsRes.value.json();
+            if (isMounted) setExpiringDocs(Array.isArray(data) ? data : []);
+          } catch (e) {
+            console.warn("Failed to parse expiring docs response:", e);
+          }
+        }
       } catch (err) {
-        console.error("Failed to load dashboard metrics:", err);
+        console.warn("Failed to load dashboard metrics:", err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     fetchData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const getOrderStatusBadge = (status: string) => {
@@ -136,6 +161,21 @@ export default function BusinessDashboard() {
           <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-teal-500/10 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400 border-teal-500/20">
             <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-teal-500" />
             REVIEW DOCS
+          </span>
+        );
+      case "DOCUMENTS_REVIEWED":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-indigo-500" />
+            DOCS REVIEWED
+          </span>
+        );
+      case "PRE_DOC_SENT_FOR_SIGNATURE":
+      case "PRE_DOCS_SENT":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-purple-500" />
+            PRE DOCS SENT
           </span>
         );
       case "FINAL_DOCUMENT_PREPARATION":

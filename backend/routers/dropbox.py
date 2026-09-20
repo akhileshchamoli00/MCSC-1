@@ -1,6 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status, Query
 from typing import Optional, List
 from sqlalchemy.orm import Session
+from sqlalchemy import func
+from pydantic import BaseModel
+import re
 import os
 import models
 import auth
@@ -12,6 +15,96 @@ router = APIRouter(
     tags=["dropbox"],
     responses={404: {"description": "Not found"}},
 )
+
+def resolve_company_and_order_from_path(path: str, db: Session):
+    """
+    Parses a Dropbox path to determine company_id, client_id, and order_number.
+    E.g. /Clients/A261226/MCSX-260001/Pre Docs/passport.pdf
+    """
+    if not path:
+        return None, None, None
+        
+    normalized = path.replace("\\", "/").strip().strip("/")
+    parts = [p.strip() for p in normalized.split("/") if p.strip()]
+    
+    company = None
+    order_number = None
+    
+    # 1. Look for order number in path parts (e.g. MCSX-260001, MSCX-260001, MCS-..., ORD-...)
+    order_regex = re.compile(r"^(MCSX|MSCX|MCS|ORD)-?\d+", re.IGNORECASE)
+    for part in parts:
+        if order_regex.match(part):
+            order_number = part.upper()
+            break
+            
+    # 2. Extract company code or comp_{id}
+    candidate_codes = []
+    for idx, part in enumerate(parts):
+        if part.lower() == "clients" and idx + 1 < len(parts):
+            candidate_codes.append(parts[idx + 1])
+        else:
+            candidate_codes.append(part)
+            
+    for cand in candidate_codes:
+        if not cand or cand.lower() == "clients":
+            continue
+            
+        # Check comp_{id}
+        if cand.lower().startswith("comp_"):
+            try:
+                comp_id = int(cand.lower().replace("comp_", ""))
+                comp = db.query(models.ClientCompany).filter(models.ClientCompany.id == comp_id).first()
+                if comp:
+                    company = comp
+                    break
+            except Exception:
+                pass
+                
+        # Check company_code
+        comp = db.query(models.ClientCompany).filter(
+            func.upper(models.ClientCompany.company_code) == cand.upper()
+        ).first()
+        if comp:
+            company = comp
+            break
+
+    # If order_number was found and company was not resolved, look up in ClientOrder
+    if not company and order_number:
+        db_order = db.query(models.ClientOrder).filter(
+            func.upper(models.ClientOrder.order_number) == order_number
+        ).first()
+        if db_order and db_order.company_id:
+            company = db.query(models.ClientCompany).filter(
+                models.ClientCompany.id == db_order.company_id
+            ).first()
+
+    company_id = company.id if company else None
+    client_id = (company.client_id or company.customer_id) if company else None
+    
+    return company_id, client_id, order_number
+
+def log_dropbox_activity(
+    db: Session, 
+    action_type: str, 
+    description: str, 
+    company_id: Optional[int] = None, 
+    client_id: Optional[int] = None, 
+    user_id: Optional[int] = None
+):
+    """Safely records an audit log entry for Dropbox file operations."""
+    try:
+        log_entry = models.ClientActivityLog(
+            company_id=company_id,
+            client_id=client_id,
+            user_id=user_id,
+            action_type=action_type,
+            description=description
+        )
+        db.add(log_entry)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print("Failed to record Dropbox activity log:", e)
 
 def is_invoice_path_or_item(path_or_name: str) -> bool:
     """Checks if a Dropbox path or item name corresponds to an Invoice folder or invoice file."""
@@ -161,6 +254,19 @@ async def upload_file(
     res = dbx_client.upload_file(contents, destination_path)
     if not res.get("success"):
         raise HTTPException(status_code=400, detail=res.get("error", "Failed to upload file"))
+
+    # Audit Logging
+    comp_id, client_id, order_num = resolve_company_and_order_from_path(destination_path, db)
+    order_suffix = f" for order {order_num}" if order_num else ""
+    log_dropbox_activity(
+        db,
+        action_type="DROPBOX_FILE_UPLOADED",
+        description=f"Uploaded file '{file.filename}' to Dropbox ({destination_path}){order_suffix}",
+        company_id=comp_id,
+        client_id=client_id,
+        user_id=current_user.id
+    )
+
     return res
 
 @router.post("/folder")
@@ -169,7 +275,7 @@ async def create_folder(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(database.get_db)
 ):
-    """Create a new folder."""
+    """Create a new folder in Dropbox."""
     validate_user_dropbox_access(current_user, path, db)
     if is_invoice_path_or_item(path) and not check_invoice_permission(current_user, "create", db):
         raise HTTPException(
@@ -180,11 +286,26 @@ async def create_folder(
     res = dbx_client.create_folder(path)
     if not res.get("success"):
         raise HTTPException(status_code=400, detail=res.get("error", "Failed to create folder"))
+
+    # Audit Logging
+    folder_name = os.path.basename(path.rstrip("/"))
+    comp_id, client_id, order_num = resolve_company_and_order_from_path(path, db)
+    order_suffix = f" for order {order_num}" if order_num else ""
+    log_dropbox_activity(
+        db,
+        action_type="DROPBOX_FOLDER_CREATED",
+        description=f"Created folder '{folder_name}' in Dropbox ({path}){order_suffix}",
+        company_id=comp_id,
+        client_id=client_id,
+        user_id=current_user.id
+    )
+
     return res
 
 @router.get("/download")
 async def get_download_link(
     path: str, 
+    action: str = Query("DOWNLOAD"),
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(database.get_db)
 ):
@@ -199,6 +320,25 @@ async def get_download_link(
     res = dbx_client.get_temporary_link(path)
     if not res.get("success"):
         raise HTTPException(status_code=400, detail=res.get("error", "Failed to get download link"))
+
+    # Audit Logging
+    comp_id, client_id, order_num = resolve_company_and_order_from_path(path, db)
+    file_name = os.path.basename(path.rstrip("/"))
+    order_suffix = f" for order {order_num}" if order_num else ""
+    
+    is_view = action.strip().upper() in ("VIEW", "PREVIEW")
+    action_type = "DROPBOX_FILE_VIEWED" if is_view else "DROPBOX_FILE_DOWNLOADED"
+    verb = "Viewed" if is_view else "Downloaded"
+    
+    log_dropbox_activity(
+        db,
+        action_type=action_type,
+        description=f"{verb} file '{file_name}' from Dropbox ({path}){order_suffix}",
+        company_id=comp_id,
+        client_id=client_id,
+        user_id=current_user.id
+    )
+
     return res
 
 @router.delete("/delete")
@@ -218,4 +358,70 @@ async def delete_item(
     res = dbx_client.delete_path(path)
     if not res.get("success"):
         raise HTTPException(status_code=400, detail=res.get("error", "Failed to delete item"))
+
+    # Audit Logging
+    comp_id, client_id, order_num = resolve_company_and_order_from_path(path, db)
+    item_name = os.path.basename(path.rstrip("/"))
+    order_suffix = f" from order {order_num}" if order_num else ""
+    log_dropbox_activity(
+        db,
+        action_type="DROPBOX_FILE_DELETED",
+        description=f"Deleted '{item_name}' from Dropbox ({path}){order_suffix}",
+        company_id=comp_id,
+        client_id=client_id,
+        user_id=current_user.id
+    )
+
     return {"message": f"Successfully deleted {path}"}
+
+class DropboxActionLogRequest(BaseModel):
+    path: str
+    action_type: str # VIEW, DOWNLOAD, DELETE, UPLOAD
+    description: Optional[str] = None
+    order_number: Optional[str] = None
+    company_id: Optional[int] = None
+
+@router.post("/log-action")
+def log_dropbox_action_endpoint(
+    req: DropboxActionLogRequest,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """Generic endpoint to record a custom document activity log."""
+    comp_id = req.company_id
+    client_id = None
+    order_num = req.order_number
+    
+    if not comp_id or not order_num:
+        r_comp_id, r_client_id, r_order_num = resolve_company_and_order_from_path(req.path, db)
+        comp_id = comp_id or r_comp_id
+        client_id = r_client_id
+        order_num = order_num or r_order_num
+        
+    file_name = os.path.basename(req.path.rstrip("/"))
+    order_suffix = f" for order {order_num}" if order_num else ""
+    
+    action_upper = req.action_type.strip().upper()
+    if action_upper in ("VIEW", "PREVIEW", "DROPBOX_FILE_VIEWED", "DOCUMENT_VIEWED"):
+        act_type = "DROPBOX_FILE_VIEWED"
+        desc = req.description or f"Viewed file '{file_name}' ({req.path}){order_suffix}"
+    elif action_upper in ("DOWNLOAD", "DROPBOX_FILE_DOWNLOADED", "DOCUMENT_DOWNLOADED"):
+        act_type = "DROPBOX_FILE_DOWNLOADED"
+        desc = req.description or f"Downloaded file '{file_name}' ({req.path}){order_suffix}"
+    elif action_upper in ("DELETE", "DROPBOX_FILE_DELETED", "DOCUMENT_DELETED"):
+        act_type = "DROPBOX_FILE_DELETED"
+        desc = req.description or f"Deleted '{file_name}' ({req.path}){order_suffix}"
+    else:
+        act_type = req.action_type
+        desc = req.description or f"Performed {req.action_type} on '{file_name}' ({req.path}){order_suffix}"
+
+    log_dropbox_activity(
+        db,
+        action_type=act_type,
+        description=desc,
+        company_id=comp_id,
+        client_id=client_id,
+        user_id=current_user.id
+    )
+    return {"success": True}
+

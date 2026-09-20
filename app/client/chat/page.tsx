@@ -42,7 +42,8 @@ import {
   Quote,
   Eye,
   Smile,
-  Ban
+  Ban,
+  FileDown
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,17 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { ChatEmojiPicker } from "@/components/chat-emoji-picker";
 import { ChatMessageReactions, WhatsAppReactionHoverBar } from "@/components/chat-message-reactions";
+
+const deduplicateMessages = (msgs: any[]) => {
+  if (!Array.isArray(msgs)) return [];
+  const map = new Map<string | number, any>();
+  for (const m of msgs) {
+    if (!m) continue;
+    const key = m.id !== undefined && m.id !== null ? `id-${m.id}` : `msg-${m.created_at || ""}-${m.message || ""}`;
+    map.set(key, m);
+  }
+  return Array.from(map.values());
+};
 
 const formatSeenTime = (dateStr?: string) => {
   if (!dateStr) return "";
@@ -171,17 +183,21 @@ const SeenReceiptsIndicator = ({
 
 const isSystemMessage = (msg: any) => {
   if (!msg) return false;
-  if (!msg.user_id) return true;
+  if (msg.pending) return false;
+  if (msg.is_client || (msg.sender_role || "").toUpperCase() === "CLIENT") return false;
   const role = (msg.sender_role || "").toUpperCase();
   if (role === "MILESTONE" || role === "SYSTEM") return true;
   const name = (msg.sender_name || "").toUpperCase();
   if (name === "SYSTEM" || name === "MILESTONE") return true;
-  const txt = (msg.message || "").toLowerCase();
+  if (!msg.user_id && !msg.sender_name) return true;
+  const txt = (msg.message || "").toLowerCase().trim();
+  if (!txt) return false;
   return (
     txt.startsWith("order execution status") ||
     txt.startsWith("pipeline order") ||
     txt.startsWith("order moved") ||
-    txt.startsWith("payment") ||
+    txt.startsWith("order placed on hold") ||
+    txt.includes("⏸️") ||
     txt.startsWith("proforma payment") ||
     txt.startsWith("final invoice payment") ||
     txt.startsWith("additional payment") ||
@@ -192,12 +208,25 @@ const isSystemMessage = (msg: any) => {
     txt.includes("uploaded to dropbox") ||
     txt.includes("emailed to client") ||
     txt.includes("assigned to review") ||
-    txt.includes("consultant is actively")
+    txt.includes("consultant is actively") ||
+    txt.includes("has been reopened") ||
+    txt.includes("reopened and moved back") ||
+    txt.includes("marked as cancelled") ||
+    txt.includes("has been cancelled")
   );
 };
 
 const getMilestoneIcon = (message: string) => {
   const txt = (message || "").toLowerCase();
+  if (txt.includes("on hold") || txt.includes("⏸️") || txt.includes("pause")) {
+    return <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />;
+  }
+  if (txt.includes("reopened")) {
+    return <RotateCw className="h-3.5 w-3.5 text-blue-500 shrink-0" />;
+  }
+  if (txt.includes("cancelled")) {
+    return <Ban className="h-3.5 w-3.5 text-rose-500 shrink-0" />;
+  }
   if (txt.includes("payment") || txt.includes("amount received") || txt.includes("paid")) {
     return <CreditCard className="h-3.5 w-3.5 text-emerald-500 shrink-0" />;
   }
@@ -223,6 +252,9 @@ const STATUS_CONFIG: Record<
   IN_PROGRESS: { label: "In Progress", color: "text-sky-600 dark:text-sky-400", bg: "bg-sky-500/10", border: "border-sky-500/20", step: 2 },
   ON_HOLD: { label: "On Hold", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", step: 2 },
   REVIEW_DOCS: { label: "Reviewing", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20", step: 3 },
+  DOCUMENTS_REVIEWED: { label: "Documents Reviewed", color: "text-indigo-600 dark:text-indigo-400", bg: "bg-indigo-500/10", border: "border-indigo-500/20", step: 3 },
+  PRE_DOC_SENT_FOR_SIGNATURE: { label: "Pre Doc sent for Signature", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20", step: 3 },
+  PRE_DOCS_SENT: { label: "Pre Doc sent for Signature", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20", step: 3 },
   FINAL_DOCUMENT_PREPARATION: { label: "Doc Prep", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", step: 4 },
   FINAL_DOC_READY: { label: "Final Docs Ready", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", step: 4 },
   WAITING_ON_CLIENT: { label: "Action Needed", color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10", border: "border-rose-500/20", step: 3 },
@@ -294,6 +326,43 @@ export default function ClientOrderChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const lastMarkedMsgIdRef = useRef<number>(0);
+
+  const [downloadingTranscript, setDownloadingTranscript] = useState(false);
+
+  const handleDownloadTranscript = async () => {
+    if (!selectedOrderGroup || downloadingTranscript) return;
+    try {
+      setDownloadingTranscript(true);
+      const orderNo = selectedOrderGroup.orderNumber;
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNo}/download-chat-transcript`,
+        {
+          method: "GET",
+          credentials: "include"
+        }
+      );
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Chat_History_${orderNo}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success("Chat transcript downloaded!");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || "Failed to download transcript");
+      }
+    } catch (err) {
+      console.error("Error downloading transcript:", err);
+      toast.error("Error downloading transcript");
+    } finally {
+      setDownloadingTranscript(false);
+    }
+  };
 
   const markOrderChatRead = async (orderNo: string, lastMsgId: number) => {
     if (!orderNo || !lastMsgId) return;
@@ -525,8 +594,9 @@ export default function ClientOrderChatPage() {
       if (res.ok) {
         const data = await res.json();
         setMessages(prev => {
-          if (JSON.stringify(prev) !== JSON.stringify(data)) {
-            return data || [];
+          const deduplicated = deduplicateMessages(data || []);
+          if (JSON.stringify(prev) !== JSON.stringify(deduplicated)) {
+            return deduplicated;
           }
           return prev;
         });
@@ -605,6 +675,7 @@ export default function ClientOrderChatPage() {
     const optimisticMsg = {
       id: tempId,
       order_number: selectedOrderGroup.orderNumber,
+      user_id: clientProfile?.id || clientProfile?.user_id || 1,
       message: messageText || (fileToUpload ? `Uploaded document: ${fileToUpload.name}` : ""),
       channel: "CLIENT",
       attachment_url: fileToUpload ? "uploading..." : null,
@@ -932,6 +1003,30 @@ export default function ClientOrderChatPage() {
                     </div>
                   )}
 
+                  <TooltipProvider delayDuration={150}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleDownloadTranscript}
+                          disabled={downloadingTranscript}
+                          className="h-8 px-2.5 text-xs font-semibold gap-1.5 rounded-xl border-border/50 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/30"
+                        >
+                          {downloadingTranscript ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <FileDown className="h-3.5 w-3.5" />
+                          )}
+                          <span className="hidden sm:inline">Export .txt</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="text-xs">
+                        Download offline conversation transcript (.txt)
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+
                   <Button
                     variant="ghost"
                     size="icon"
@@ -1031,7 +1126,7 @@ export default function ClientOrderChatPage() {
 
                     if (isSystem) {
                       return (
-                        <div key={msg.id || idx} className="flex justify-center my-3 px-2">
+                        <div key={`client-sys-${msg.id ?? 'sys'}-${idx}`} className="flex justify-center my-3 px-2">
                           <div className="bg-muted/70 dark:bg-zinc-900/80 border border-border/80 dark:border-zinc-800 rounded-full px-3.5 py-1.5 text-xs text-muted-foreground dark:text-zinc-400 flex items-center gap-2 shadow-2xs backdrop-blur-md max-w-[90%] text-center">
                             <div className="h-5 w-5 rounded-full bg-muted dark:bg-zinc-800 flex items-center justify-center shrink-0">
                               {getMilestoneIcon(msg.message)}
@@ -1059,7 +1154,7 @@ export default function ClientOrderChatPage() {
 
                         return (
                           <div
-                            key={msg.id || idx}
+                            key={`client-msg-${msg.id ?? 'item'}-${idx}`}
                             className={`group flex flex-col ${isSelf ? "items-end" : "items-start"} max-w-[85%] ${
                               isSelf ? "ml-auto" : "mr-auto"
                             } ${isSameSenderAsPrev ? "mt-1" : "mt-3"}`}

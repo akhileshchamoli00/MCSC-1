@@ -24,7 +24,8 @@ import {
   FileText,
   Briefcase,
   Layers,
-  Scale
+  Scale,
+  ShieldCheck
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -130,6 +131,8 @@ export default function PipelineOrdersPage() {
         payment_status: ord.payment_status,
         consultant_ids: ord.consultant_ids || [],
         consultants: ord.consultants || [],
+        reviewer_id: ord.reviewer_id || null,
+        reviewer: ord.reviewer || null,
         total_amount: 0,
         notes: ord.notes,
         created_at: ord.created_at,
@@ -149,6 +152,8 @@ export default function PipelineOrdersPage() {
     if (ord.client_name) group.client_name = ord.client_name;
     if (ord.notes) group.notes = ord.notes;
     if (ord.created_at) group.created_at = ord.created_at;
+    if (ord.reviewer_id) group.reviewer_id = ord.reviewer_id;
+    if (ord.reviewer) group.reviewer = ord.reviewer;
 
     if (Array.isArray(ord.consultants) && ord.consultants.length > 0) {
       const existingIds = new Set(group.consultants.map((c: any) => c.id));
@@ -750,6 +755,22 @@ export default function PipelineOrdersPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Designated Reviewer (if any) */}
+              {selectedOrderGroup.reviewer && (
+                <div>
+                  <h4 className="font-bold text-xs text-foreground mb-1.5 flex items-center gap-1.5">
+                    <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" /> Designated Order Reviewer
+                  </h4>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30 font-semibold flex items-center gap-1.5 py-1 px-2.5">
+                      <ShieldCheck className="h-3.5 w-3.5 text-purple-600" />
+                      {selectedOrderGroup.reviewer.name}
+                      <span className="text-[10px] text-muted-foreground ml-1">({selectedOrderGroup.reviewer.job_title || "Reviewer"})</span>
+                    </Badge>
+                  </div>
+                </div>
+              )}
 
               {/* Consultants Allocation (if any) */}
               {selectedOrderGroup.consultants && selectedOrderGroup.consultants.length > 0 && (
