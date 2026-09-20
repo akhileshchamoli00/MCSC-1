@@ -2164,13 +2164,14 @@ def upload_company_logo(company_id: int, file: UploadFile = File(...), db: Sessi
     if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_company", "edit", db) or is_admin_or_hr(current_user) or is_employee_role(current_user) or is_client_themselves_for_company(current_user, company_id, db)):
         raise HTTPException(status_code=403, detail="Not authorized to change logo")
         
-    if file.content_type not in ["image/png", "image/jpeg", "image/jpg"]:
-        raise HTTPException(status_code=400, detail="Only PNG and JPEG images are allowed")
-        
     try:
-        file_bytes = file.file.read()
-        unique_filename = f"logos/{uuid.uuid4()}_{file.filename}"
+        raw_bytes = file.file.read()
+        from utils.file_sanitizer import validate_file_security
+        file_bytes, safe_filename = validate_file_security(raw_bytes, file.filename or "logo.png", max_size_mb=10, allowed_category="image")
+        unique_filename = f"logos/{uuid.uuid4()}_{safe_filename}"
         public_url = upload_file(file_bytes, unique_filename, "client-documents")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload to storage: {str(e)}")
         
@@ -2323,15 +2324,16 @@ def upload_client_document(
     if not file:
         raise HTTPException(status_code=400, detail="A file upload is mandatory.")
 
+    # Security validation & sanitization
+    raw_bytes = file.file.read()
+    from utils.file_sanitizer import validate_file_security
+    file_bytes, filename = validate_file_security(raw_bytes, file.filename or "document.pdf", max_size_mb=50, allowed_category="all")
+
     # Determine company directory folder name
     company_code = company.company_code or f"comp_{company.id}"
     
     # Sanitize document type to use as folder name
     doc_type_folder = (document_type or "General").strip().replace("/", "_").replace("\\", "_")
-    
-    filename = file.filename
-    # Prevent path traversal in filename
-    filename = os.path.basename(filename)
     
     # Determine order folder name
     order_folder = (order_number or "No_Order").strip().replace("/", "_").replace("\\", "_")
@@ -2342,11 +2344,12 @@ def upload_client_document(
         destination_path = destination_path[1:]
         
     try:
-        file_bytes = file.file.read()
         from utils.dropbox_client import upload_file
         res = upload_file(file_bytes, destination_path)
         if not res.get("success"):
             raise HTTPException(status_code=500, detail=f"Failed to upload to Dropbox: {res.get('error')}")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save file to Dropbox: {str(e)}")
         
@@ -2550,15 +2553,15 @@ def update_client_document(
         raise HTTPException(status_code=404, detail="Document not found")
         
     if file:
+        raw_bytes = file.file.read()
+        from utils.file_sanitizer import validate_file_security
+        file_bytes, filename = validate_file_security(raw_bytes, file.filename or "document.pdf", max_size_mb=50, allowed_category="all")
+
         # Determine company directory folder name
         company_code = company.company_code or f"comp_{company.id}"
         
         # Sanitize document type to use as folder name
         doc_type_folder = (document_type or db_doc.document_type or "General").strip().replace("/", "_").replace("\\", "_")
-        
-        filename = file.filename
-        # Prevent path traversal in filename
-        filename = os.path.basename(filename)
         
         # Determine order folder name
         order_folder = (order_number or db_doc.order_number or "No_Order").strip().replace("/", "_").replace("\\", "_")
@@ -2569,11 +2572,12 @@ def update_client_document(
             destination_path = destination_path[1:]
             
         try:
-            file_bytes = file.file.read()
             from utils.dropbox_client import upload_file
             res = upload_file(file_bytes, destination_path)
             if not res.get("success"):
                 raise HTTPException(status_code=500, detail=f"Failed to upload to Dropbox: {res.get('error')}")
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to save file to Dropbox: {str(e)}")
             
@@ -4351,16 +4355,15 @@ async def upload_order_attachment(
     company_code = company.company_code if (company and company.company_code) else (f"comp_{company_id}" if company_id else "General")
     order_folder = (order_number or "No_Order").strip().replace("/", "_").replace("\\", "_")
     
-    raw_filename = os.path.basename(file.filename or "shared_document")
-    sanitized_filename = raw_filename.replace("/", "_").replace("\\", "_")
+    raw_bytes = await file.read()
+    from utils.file_sanitizer import validate_file_security
+    file_bytes, sanitized_filename = validate_file_security(raw_bytes, file.filename or "shared_document.pdf", max_size_mb=50, allowed_category="all")
     
     # Destination path: /Clients/{company_code}/{order_number}/Client Shared Docs/{filename}
     destination_path = f"/Clients/{company_code}/{order_folder}/Client Shared Docs/{sanitized_filename}"
     if destination_path.startswith("//"):
         destination_path = destination_path[1:]
         
-    file_bytes = await file.read()
-    
     # 1. Local disk fallback cache
     local_rel = destination_path.replace("/Clients/", "", 1)
     local_full_path = os.path.join("uploads", local_rel)
@@ -6341,15 +6344,14 @@ async def upload_public_order_attachment(
     company_code = company.company_code if (company and company.company_code) else (f"comp_{company_id}" if company_id else "General")
     order_folder = (first_order.order_number or "No_Order").strip().replace("/", "_").replace("\\", "_")
     
-    raw_filename = os.path.basename(file.filename or "shared_document")
-    sanitized_filename = raw_filename.replace("/", "_").replace("\\", "_")
+    raw_bytes = await file.read()
+    from utils.file_sanitizer import validate_file_security
+    file_bytes, sanitized_filename = validate_file_security(raw_bytes, file.filename or "shared_document.pdf", max_size_mb=50, allowed_category="all")
     
     destination_path = f"/Clients/{company_code}/{order_folder}/Client Shared Docs/{sanitized_filename}"
     if destination_path.startswith("//"):
         destination_path = destination_path[1:]
         
-    file_bytes = await file.read()
-    
     # 1. Local disk fallback cache
     local_rel = destination_path.replace("/Clients/", "", 1)
     local_full_path = os.path.join("uploads", local_rel)

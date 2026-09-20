@@ -240,7 +240,11 @@ async def upload_file(
 ):
     """Upload a file to a specific path in Dropbox."""
     validate_user_dropbox_access(current_user, path, db)
-    destination_path = f"{path.rstrip('/')}/{file.filename}"
+    contents = await file.read()
+    from utils.file_sanitizer import validate_file_security
+    contents, safe_filename = validate_file_security(contents, file.filename or "uploaded_file", max_size_mb=100, allowed_category="all")
+    
+    destination_path = f"{path.rstrip('/')}/{safe_filename}"
     if destination_path.startswith("//"):
         destination_path = destination_path[1:] # clean up double slashes
         
@@ -250,7 +254,6 @@ async def upload_file(
             detail="Access denied. You do not have permission to upload invoice documents."
         )
         
-    contents = await file.read()
     res = dbx_client.upload_file(contents, destination_path)
     if not res.get("success"):
         raise HTTPException(status_code=400, detail=res.get("error", "Failed to upload file"))
@@ -261,7 +264,7 @@ async def upload_file(
     log_dropbox_activity(
         db,
         action_type="DROPBOX_FILE_UPLOADED",
-        description=f"Uploaded file '{file.filename}' to Dropbox ({destination_path}){order_suffix}",
+        description=f"Uploaded file '{safe_filename}' to Dropbox ({destination_path}){order_suffix}",
         company_id=comp_id,
         client_id=client_id,
         user_id=current_user.id
