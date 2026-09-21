@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bell, Trash2, Calendar, Wallet, Monitor, CheckCircle2, Clock, Package, MessageSquare, FileText, Megaphone, Briefcase, Users, Building2 } from "lucide-react";
+import { Bell, Trash2, Calendar, Wallet, Monitor, CheckCircle2, Clock, Package, MessageSquare, FileText, Megaphone, Briefcase, Users, Building2, ShieldCheck, UserCheck } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -252,8 +252,9 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
 
       // Dispatch custom event in case user is already viewing the target orders page
       if (orderNum) {
+        const shouldOpenChat = !targetUrl.includes("chat=false");
         window.dispatchEvent(new CustomEvent("open-order-chat", {
-          detail: { orderNumber: orderNum, chat: true }
+          detail: { orderNumber: orderNum, chat: shouldOpenChat }
         }));
       }
 
@@ -265,6 +266,12 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
     const lowerType = (type || "").toLowerCase();
     const lowerMod = (moduleName || "").toLowerCase();
 
+    if (lowerType.includes("review")) {
+      return <ShieldCheck className="h-4 w-4 text-purple-400" />;
+    }
+    if (lowerType.includes("consultant") || lowerType.includes("assignment")) {
+      return <UserCheck className="h-4 w-4 text-emerald-400" />;
+    }
     if (lowerMod.includes("order") || lowerType.includes("order")) {
       return <Package className="h-4 w-4 text-sky-400" />;
     }

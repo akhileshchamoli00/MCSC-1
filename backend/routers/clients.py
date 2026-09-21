@@ -186,6 +186,29 @@ def update_order_group_status(
         except Exception:
             db.rollback()
 
+        # Automatically notify assigned consultants & reviewers if moving to ORDER_ASSIGNED
+        if new_status == "ORDER_ASSIGNED" and old_status != "ORDER_ASSIGNED":
+            try:
+                c_ids = parse_consultant_ids(first_order.consultant_ids)
+                r_ids = parse_consultant_ids(getattr(first_order, "reviewer_ids", None))
+                if first_order.reviewer_id and first_order.reviewer_id not in r_ids:
+                    r_ids.append(first_order.reviewer_id)
+                if c_ids or r_ids:
+                    comp_name = first_order.company.company_name if first_order.company else None
+                    svc_names = [o.job_title for o in orders if o.job_title]
+                    send_order_assignment_notifications(
+                        db=db,
+                        order_number=first_order.order_number,
+                        consultant_employee_ids=c_ids,
+                        reviewer_employee_ids=r_ids,
+                        company_name=comp_name,
+                        service_names=svc_names,
+                        order_id=first_order.id,
+                        is_status_transition=True
+                    )
+            except Exception as notif_err:
+                print("Warning: order assigned status transition notification failed:", notif_err)
+
         # Automatically update Dropbox archive on completion / final delivery
         if new_status in ["COMPLETED", "SOFT_COPY_DELIVERED", "HARD_COPY_DELIVERED"]:
             try:
@@ -597,6 +620,114 @@ def get_consultants_data(db: Session, c_ids: Any) -> List[dict]:
         print("get_consultants_data error:", e)
         return []
 
+def send_order_assignment_notifications(
+    db: Session,
+    order_number: str,
+    consultant_employee_ids: List[int],
+    reviewer_employee_ids: List[int],
+    company_name: Optional[str] = None,
+    service_names: Optional[List[str]] = None,
+    order_id: Optional[int] = None,
+    is_status_transition: bool = False
+):
+    """
+    Dispatches in-app bell icon notifications and WebSocket push to assigned consultants and reviewers.
+    """
+    try:
+        from notification_manager import manager
+
+        if not company_name or not order_id or not service_names:
+            orders = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
+            if orders:
+                first_o = orders[0]
+                if not order_id:
+                    order_id = first_o.id
+                if not company_name:
+                    if first_o.company:
+                        company_name = first_o.company.company_name
+                    elif first_o.client and first_o.client.companies:
+                        company_name = first_o.client.companies[0].company_name
+                    elif first_o.client:
+                        company_name = first_o.client.contact_person
+                if not service_names:
+                    service_names = [o.job_title for o in orders if o.job_title]
+
+        company_info = f" for {company_name}" if company_name else ""
+        services_info = f" ({', '.join(service_names[:2])})" if service_names else ""
+        one_min_ago = datetime.utcnow() - timedelta(minutes=1)
+
+        # 1. Notify Assigned Consultants
+        for emp_id in set(consultant_employee_ids or []):
+            emp = db.query(models.Employee).filter(models.Employee.id == emp_id).first()
+            if not emp or not emp.user_id:
+                continue
+
+            notif_type = "order_assignment"
+            recent_notif = db.query(models.Notification).filter(
+                models.Notification.user_id == emp.user_id,
+                models.Notification.reference_id == order_id,
+                models.Notification.type == notif_type,
+                models.Notification.created_at >= one_min_ago
+            ).first()
+            if recent_notif:
+                continue
+
+            if is_status_transition:
+                title = f"Order #{order_number} Assigned for Execution"
+                message = f"Order #{order_number}{company_info}{services_info} has been placed in active execution."
+            else:
+                title = f"Assigned as Consultant - Order #{order_number}"
+                message = f"You have been assigned as an executing consultant on Order #{order_number}{company_info}{services_info}."
+
+            manager.notify_user_sync(
+                db=db,
+                user_id=emp.user_id,
+                title=title,
+                message=message,
+                type=notif_type,
+                module="orders",
+                system_area="shared",
+                reference_id=order_id,
+                action_url=f"/business/assigned-orders?order={order_number}&chat=false"
+            )
+
+        # 2. Notify Assigned Reviewers
+        for emp_id in set(reviewer_employee_ids or []):
+            emp = db.query(models.Employee).filter(models.Employee.id == emp_id).first()
+            if not emp or not emp.user_id:
+                continue
+
+            notif_type = "order_review_assignment"
+            recent_notif = db.query(models.Notification).filter(
+                models.Notification.user_id == emp.user_id,
+                models.Notification.reference_id == order_id,
+                models.Notification.type == notif_type,
+                models.Notification.created_at >= one_min_ago
+            ).first()
+            if recent_notif:
+                continue
+
+            if is_status_transition:
+                title = f"Order #{order_number} Ready for Review"
+                message = f"Order #{order_number}{company_info}{services_info} is now assigned and active for your review."
+            else:
+                title = f"Assigned as Reviewer - Order #{order_number}"
+                message = f"You have been assigned as a designated reviewer on Order #{order_number}{company_info}{services_info}."
+
+            manager.notify_user_sync(
+                db=db,
+                user_id=emp.user_id,
+                title=title,
+                message=message,
+                type=notif_type,
+                module="orders",
+                system_area="shared",
+                reference_id=order_id,
+                action_url=f"/business/assigned-orders?order={order_number}&chat=false"
+            )
+    except Exception as e:
+        print(f"Warning: Failed to dispatch order assignment notifications for {order_number}: {e}")
+
 @router.get("/orders/my-assigned", response_model=List[schemas.ClientOrderResponse])
 def get_my_assigned_orders(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     """
@@ -934,6 +1065,26 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
             res.reviewer_id = res.reviewers[0]["id"]
         created_rows.append(res)
         
+    # Dispatch bell notifications to assigned consultants and reviewers
+    try:
+        first_row = created_rows[0] if created_rows else None
+        first_comp_name = getattr(first_row, "company_name", None) if first_row else None
+        svc_names = [item.job_title for item in order_req.items if getattr(item, "job_title", None)]
+        first_id = getattr(first_row, "id", None) if first_row else None
+        if req_consultant_ids or req_reviewer_ids:
+            send_order_assignment_notifications(
+                db=db,
+                order_number=order_num,
+                consultant_employee_ids=req_consultant_ids,
+                reviewer_employee_ids=req_reviewer_ids,
+                company_name=first_comp_name,
+                service_names=svc_names,
+                order_id=first_id,
+                is_status_transition=False
+            )
+    except Exception as notif_create_err:
+        print("Warning: Failed to dispatch assignment notifications on order create:", notif_create_err)
+
     return created_rows
 
 @router.post("/orders/group/{order_number}/move-to-active")
@@ -1371,6 +1522,12 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
 
     # Mutual exclusion check: same person cannot be consultant and reviewer
     fields_set = getattr(order_update, '__fields_set__', None) or getattr(order_update, 'model_fields_set', set())
+    old_consultant_ids = set(parse_consultant_ids(db_order.consultant_ids))
+    old_reviewer_ids = set(parse_consultant_ids(getattr(db_order, "reviewer_ids", None)))
+    if not old_reviewer_ids and db_order.reviewer_id:
+        old_reviewer_ids.add(db_order.reviewer_id)
+    old_status = db_order.status
+
     if "reviewer_ids" in fields_set and order_update.reviewer_ids is not None:
         effective_reviewer_ids = list(order_update.reviewer_ids)
     elif "reviewer_id" in fields_set or order_update.reviewer_id is not None:
@@ -1575,7 +1732,39 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
         
     db.commit()
     db.refresh(db_order)
-    
+
+    # Check for newly added consultants or reviewers, or assignment status transition
+    try:
+        new_cids = [cid for cid in (effective_consultant_ids or []) if cid not in old_consultant_ids]
+        new_rids = [rid for rid in (effective_reviewer_ids or []) if rid not in old_reviewer_ids]
+        comp_name = db_order.company.company_name if db_order.company else (db_order.client.contact_person if db_order.client else None)
+        svc_names = [o.job_title for o in orders_in_group if o.job_title]
+
+        if new_cids or new_rids:
+            send_order_assignment_notifications(
+                db=db,
+                order_number=db_order.order_number,
+                consultant_employee_ids=new_cids,
+                reviewer_employee_ids=new_rids,
+                company_name=comp_name,
+                service_names=svc_names,
+                order_id=db_order.id,
+                is_status_transition=False
+            )
+        elif order_update.status == "ORDER_ASSIGNED" and old_status != "ORDER_ASSIGNED":
+            send_order_assignment_notifications(
+                db=db,
+                order_number=db_order.order_number,
+                consultant_employee_ids=effective_consultant_ids or [],
+                reviewer_employee_ids=effective_reviewer_ids or [],
+                company_name=comp_name,
+                service_names=svc_names,
+                order_id=db_order.id,
+                is_status_transition=True
+            )
+    except Exception as notif_e:
+        print(f"Warning: Failed to dispatch assignment notifications on update: {notif_e}")
+
     log_activity(db, "ORDER_UPDATED", f"Order {db_order.order_number} status updated: {db_order.status}", client_id=db_order.client_id, company_id=db_order.company_id, user_id=current_user.id)
     
     res = schemas.ClientOrderResponse.model_validate(db_order) if hasattr(schemas.ClientOrderResponse, "model_validate") else schemas.ClientOrderResponse.from_orm(db_order)
