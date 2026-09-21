@@ -588,6 +588,8 @@ export default function ClientOrdersPage() {
         consultants: ord.consultants || [],
         reviewer_id: ord.reviewer_id || null,
         reviewer: ord.reviewer || null,
+        reviewer_ids: ord.reviewer_ids || (ord.reviewer_id ? [ord.reviewer_id] : []),
+        reviewers: ord.reviewers || (ord.reviewer ? [ord.reviewer] : []),
         notes: ord.notes || "",
         total_amount: 0,
         items: [],
@@ -636,6 +638,15 @@ export default function ClientOrdersPage() {
 
     if (ord.reviewer_id) group.reviewer_id = ord.reviewer_id;
     if (ord.reviewer) group.reviewer = ord.reviewer;
+    if (ord.reviewer_ids && ord.reviewer_ids.length > 0) {
+      group.reviewer_ids = Array.from(new Set([...(group.reviewer_ids || []), ...ord.reviewer_ids]));
+    }
+    if (ord.reviewers && ord.reviewers.length > 0) {
+      const existingRevIds = new Set((group.reviewers || []).map((r: any) => r.id));
+      ord.reviewers.forEach((r: any) => {
+        if (!existingRevIds.has(r.id)) (group.reviewers || []).push(r);
+      });
+    }
 
     if (ord.proforma_sent_at) group.proforma_sent_at = ord.proforma_sent_at;
     if (ord.proforma_sent_to) group.proforma_sent_to = ord.proforma_sent_to;
@@ -1943,16 +1954,20 @@ export default function ClientOrdersPage() {
                             </td>
                             <td className="py-2 px-3 align-top pt-2.5 w-36 min-w-[145px] max-w-[170px]">
                               <div className="flex flex-col items-start gap-1 w-full">
-                                {ord.reviewer && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[9px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 font-semibold flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none"
-                                    title={`Reviewer: ${ord.reviewer.name}`}
-                                  >
-                                    <ShieldCheck className="h-2.5 w-2.5 text-purple-600 shrink-0" />
-                                    <span className="truncate"><span className="text-[8px] font-bold uppercase opacity-80 mr-0.5">Rev:</span>{ord.reviewer.name}</span>
-                                  </Badge>
-                                )}
+                                {(() => {
+                                  const revList = ord.reviewers && ord.reviewers.length > 0 ? ord.reviewers : (ord.reviewer ? [ord.reviewer] : []);
+                                  return revList.map((rev: any) => (
+                                    <Badge
+                                      key={rev.id}
+                                      variant="outline"
+                                      className="text-[9px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 font-semibold flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none"
+                                      title={`Reviewer: ${rev.name}`}
+                                    >
+                                      <ShieldCheck className="h-2.5 w-2.5 text-purple-600 shrink-0" />
+                                      <span className="truncate"><span className="text-[8px] font-bold uppercase opacity-80 mr-0.5">Rev:</span>{rev.name}</span>
+                                    </Badge>
+                                  ));
+                                })()}
                                 {ord.consultants && ord.consultants.length > 0 ? (
                                   ord.consultants.map((c: any) => (
                                     <Badge
@@ -1965,7 +1980,7 @@ export default function ClientOrdersPage() {
                                       <span className="truncate">{c.name}</span>
                                     </Badge>
                                   ))
-                                ) : !ord.reviewer ? (
+                                ) : (!ord.reviewer && (!ord.reviewers || ord.reviewers.length === 0)) ? (
                                   <span className="text-muted-foreground italic text-xs">Unassigned</span>
                                 ) : null}
                               </div>
@@ -2437,23 +2452,33 @@ export default function ClientOrdersPage() {
                       </div>
                     </div>
 
-                    {/* Designated Order Reviewer */}
-                    {selectedOrderGroup.reviewer && (
-                      <div className="p-3.5 rounded-2xl border border-purple-200 bg-purple-50/40 shadow-xs space-y-2">
-                        <span className="text-purple-800 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5 pb-1.5 border-b border-purple-100">
-                          <ShieldCheck className="h-3.5 w-3.5 text-purple-600" /> Designated Order Reviewer
-                        </span>
-                        <div className="flex items-center gap-2.5 py-1 px-1">
-                          <div className="h-8 w-8 rounded-full bg-purple-200 text-purple-900 font-bold flex items-center justify-center text-xs shrink-0 border border-purple-300">
-                            {selectedOrderGroup.reviewer.name?.substring(0, 2).toUpperCase() || "RV"}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <span className="font-semibold text-purple-950 block truncate text-xs">{selectedOrderGroup.reviewer.name}</span>
-                            <span className="text-[10px] text-purple-700 block truncate">{selectedOrderGroup.reviewer.job_title || "Order Reviewer"}</span>
+                    {/* Designated Order Reviewers */}
+                    {(() => {
+                      const revList = selectedOrderGroup.reviewers && selectedOrderGroup.reviewers.length > 0
+                        ? selectedOrderGroup.reviewers
+                        : (selectedOrderGroup.reviewer ? [selectedOrderGroup.reviewer] : []);
+                      if (revList.length === 0) return null;
+                      return (
+                        <div className="p-3.5 rounded-2xl border border-purple-200 bg-purple-50/40 shadow-xs space-y-2">
+                          <span className="text-purple-800 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5 pb-1.5 border-b border-purple-100">
+                            <ShieldCheck className="h-3.5 w-3.5 text-purple-600" /> Designated Order Reviewer{revList.length > 1 ? "s" : ""}
+                          </span>
+                          <div className="space-y-1.5 pt-0.5">
+                            {revList.map((rev: any) => (
+                              <div key={rev.id} className="flex items-center gap-2.5 py-1 px-1">
+                                <div className="h-8 w-8 rounded-full bg-purple-200 text-purple-900 font-bold flex items-center justify-center text-xs shrink-0 border border-purple-300">
+                                  {rev.name?.substring(0, 2).toUpperCase() || "RV"}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <span className="font-semibold text-purple-950 block truncate text-xs">{rev.name}</span>
+                                  <span className="text-[10px] text-purple-700 block truncate">{rev.job_title || "Order Reviewer"}</span>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Assigned Consultants */}
                     <div className="p-4 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-2.5">

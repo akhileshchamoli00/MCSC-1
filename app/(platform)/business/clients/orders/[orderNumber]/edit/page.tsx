@@ -83,6 +83,7 @@ export default function EditClientOrderPage() {
     invoice_number: "",
     consultant_ids: [] as number[],
     reviewer_id: null as number | null,
+    reviewer_ids: [] as number[],
     notes: "",
     items: [] as any[],
     is_proforma_finalized: false,
@@ -166,6 +167,8 @@ export default function EditClientOrderPage() {
             consultants: ord.consultants || [],
             reviewer_id: ord.reviewer_id || null,
             reviewer: ord.reviewer || null,
+            reviewer_ids: ord.reviewer_ids || (ord.reviewer_id ? [ord.reviewer_id] : []),
+            reviewers: ord.reviewers || (ord.reviewer ? [ord.reviewer] : []),
             notes: ord.notes || "",
             total_amount: 0,
             items: [],
@@ -210,6 +213,15 @@ export default function EditClientOrderPage() {
         }
         if (ord.reviewer) {
           group.reviewer = ord.reviewer;
+        }
+        if (ord.reviewer_ids && ord.reviewer_ids.length > 0) {
+          group.reviewer_ids = Array.from(new Set([...(group.reviewer_ids || []), ...ord.reviewer_ids]));
+        }
+        if (ord.reviewers && ord.reviewers.length > 0) {
+          const existingRevIds = new Set((group.reviewers || []).map((r: any) => r.id));
+          ord.reviewers.forEach((r: any) => {
+            if (!existingRevIds.has(r.id)) group.reviewers.push(r);
+          });
         }
 
         if (ord.consultants && ord.consultants.length > 0) {
@@ -274,7 +286,8 @@ export default function EditClientOrderPage() {
         proforma_paid_amount: targetGroup.proforma_paid_amount != null ? targetGroup.proforma_paid_amount : null,
         invoice_number: targetGroup.invoice_number || "",
         consultant_ids: targetGroup.consultant_ids || [],
-        reviewer_id: targetGroup.reviewer_id || null,
+        reviewer_id: targetGroup.reviewer_id || (targetGroup.reviewer_ids?.[0] ?? null),
+        reviewer_ids: targetGroup.reviewer_ids || (targetGroup.reviewer_id ? [targetGroup.reviewer_id] : []),
         notes: targetGroup.notes || "",
         items: mappedItems,
         is_proforma_finalized: targetGroup.is_proforma_finalized || false,
@@ -296,8 +309,9 @@ export default function EditClientOrderPage() {
   }, [orderNumber]);
 
   const toggleEditConsultantSelect = (empId: number) => {
-    if (editForm.reviewer_id === empId && !(editForm.consultant_ids || []).includes(empId)) {
-      toast.error("This person is currently selected as the Designated Reviewer. An employee cannot be both an executing consultant and the order reviewer.");
+    const currentReviewers = editForm.reviewer_ids || (editForm.reviewer_id ? [editForm.reviewer_id] : []);
+    if (currentReviewers.includes(empId) && !(editForm.consultant_ids || []).includes(empId)) {
+      toast.error("This person is currently selected as a Designated Reviewer. An employee cannot be both an executing consultant and an order reviewer.");
       return;
     }
     setEditForm(prev => {
@@ -307,16 +321,20 @@ export default function EditClientOrderPage() {
     });
   };
 
-  const handleSelectEditReviewer = (empId: number) => {
-    if (editForm.reviewer_id === empId) {
-      setEditForm(prev => ({ ...prev, reviewer_id: null }));
-      return;
-    }
+  const toggleEditReviewerSelect = (empId: number) => {
     if ((editForm.consultant_ids || []).includes(empId)) {
-      toast.error("This person is currently allocated as an executing consultant. An employee cannot be both an executing consultant and the order reviewer.");
+      toast.error("This person is currently allocated as an executing consultant. An employee cannot be both an executing consultant and an order reviewer.");
       return;
     }
-    setEditForm(prev => ({ ...prev, reviewer_id: empId }));
+    setEditForm(prev => {
+      const current = prev.reviewer_ids || (prev.reviewer_id ? [prev.reviewer_id] : []);
+      const updated = current.includes(empId) ? current.filter(id => id !== empId) : [...current, empId];
+      return {
+        ...prev,
+        reviewer_ids: updated,
+        reviewer_id: updated[0] || null
+      };
+    });
   };
 
   const handleEditServiceSelect = (index: number, serviceIdStr: string, customTitle?: string) => {
@@ -526,8 +544,10 @@ export default function EditClientOrderPage() {
       return;
     }
 
-    if (editForm.reviewer_id && (editForm.consultant_ids || []).includes(editForm.reviewer_id)) {
-      toast.error("The same person cannot be selected as both an executing consultant and the order reviewer.");
+    const activeReviewerIds = editForm.reviewer_ids || (editForm.reviewer_id ? [editForm.reviewer_id] : []);
+    const overlap = activeReviewerIds.filter((id: number) => (editForm.consultant_ids || []).includes(id));
+    if (overlap.length > 0) {
+      toast.error("The same person cannot be selected as both an executing consultant and an order reviewer.");
       return;
     }
 
@@ -585,7 +605,8 @@ export default function EditClientOrderPage() {
                 billing_company_id: finalBillingId,
                 invoice_number: editForm.invoice_number || null,
                 consultant_ids: editForm.consultant_ids,
-                reviewer_id: editForm.reviewer_id || null,
+                reviewer_ids: editForm.reviewer_ids || [],
+                reviewer_id: editForm.reviewer_ids?.[0] || editForm.reviewer_id || null,
                 service_instructions: item.service_instructions ? item.service_instructions.trim() : null,
                 notes: editForm.notes ? editForm.notes.trim() : null,
                 service_id: (item.service_id && item.service_id !== "CUSTOM" && !isNaN(Number(item.service_id))) ? Number(item.service_id) : null,
@@ -626,7 +647,8 @@ export default function EditClientOrderPage() {
             notary_id: item.notary_id ? Number(item.notary_id) : null
           })),
           consultant_ids: editForm.consultant_ids,
-          reviewer_id: editForm.reviewer_id || null,
+          reviewer_ids: editForm.reviewer_ids || [],
+          reviewer_id: editForm.reviewer_ids?.[0] || editForm.reviewer_id || null,
           notes: editForm.notes || null,
           internal_notes: editForm.notes || null
         };
@@ -1443,11 +1465,11 @@ export default function EditClientOrderPage() {
 
                       return licensingEmployees.map((emp) => {
                         const isSelected = (editForm.consultant_ids || []).includes(emp.id);
-                        const isReviewer = editForm.reviewer_id === emp.id;
+                        const isReviewer = (editForm.reviewer_ids || (editForm.reviewer_id ? [editForm.reviewer_id] : [])).includes(emp.id);
                         return (
                           <label
                             key={emp.id}
-                            title={isReviewer ? `${emp.first_name} ${emp.last_name} is currently selected as the Designated Order Reviewer.` : undefined}
+                            title={isReviewer ? `${emp.first_name} ${emp.last_name} is currently selected as a Designated Order Reviewer.` : undefined}
                             className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-[10.5px] transition-colors ${
                               isReviewer
                                 ? "opacity-50 border-dashed border-purple-300 dark:border-purple-800 bg-purple-50/40 dark:bg-purple-950/20 cursor-not-allowed"
@@ -1490,18 +1512,18 @@ export default function EditClientOrderPage() {
                   <div className="flex items-center gap-1.5 min-w-0">
                     <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
                     <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
-                      5. Designated Reviewer ({editForm.reviewer_id ? "1 Selected" : "Optional"})
+                      5. Designated Reviewers ({editForm.reviewer_ids && editForm.reviewer_ids.length > 0 ? `${editForm.reviewer_ids.length} Selected` : "Optional"})
                     </CardTitle>
                   </div>
-                  {editForm.reviewer_id && (
+                  {editForm.reviewer_ids && editForm.reviewer_ids.length > 0 && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => setEditForm(prev => ({ ...prev, reviewer_id: null }))}
+                      onClick={() => setEditForm(prev => ({ ...prev, reviewer_ids: [], reviewer_id: null }))}
                       className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-destructive gap-0.5 font-medium shrink-0"
                     >
-                      <X className="h-2.5 w-2.5" /> Clear Reviewer
+                      <X className="h-2.5 w-2.5" /> Clear All
                     </Button>
                   )}
                 </CardHeader>
@@ -1517,13 +1539,13 @@ export default function EditClientOrderPage() {
                       }
 
                       return licensingEmployees.map((emp) => {
-                        const isSelected = editForm.reviewer_id === emp.id;
+                        const currentReviewers = editForm.reviewer_ids || (editForm.reviewer_id ? [editForm.reviewer_id] : []);
+                        const isSelected = currentReviewers.includes(emp.id);
                         const isConsultant = (editForm.consultant_ids || []).includes(emp.id);
                         return (
-                          <div
+                          <label
                             key={emp.id}
                             title={isConsultant ? `${emp.first_name} ${emp.last_name} is already allocated as an executing consultant.` : undefined}
-                            onClick={() => handleSelectEditReviewer(emp.id)}
                             className={`flex items-center gap-1.5 p-1.5 rounded-lg border select-none text-[10.5px] transition-all ${
                               isConsultant
                                 ? "opacity-50 border-dashed border-primary/40 bg-primary/5 cursor-not-allowed"
@@ -1532,16 +1554,13 @@ export default function EditClientOrderPage() {
                                   : "border-border/60 bg-background/50 hover:bg-muted/40 hover:border-border cursor-pointer"
                             }`}
                           >
-                            <div className={`h-3 w-3 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
-                              isSelected 
-                                ? "border-purple-600 bg-purple-600 text-white" 
-                                : isConsultant
-                                  ? "border-primary/40 bg-transparent text-primary"
-                                  : "border-gray-400 bg-background"
-                            }`}>
-                              {isSelected && <div className="h-1 w-1 rounded-full bg-white" />}
-                              {isConsultant && <div className="h-1 w-1 rounded-full bg-primary" />}
-                            </div>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              disabled={isConsultant}
+                              onChange={() => toggleEditReviewerSelect(emp.id)}
+                              className="h-3 w-3 rounded border-gray-300 text-purple-600 focus:ring-purple-500 accent-purple-600 shrink-0 cursor-pointer disabled:cursor-not-allowed"
+                            />
                             <div className="truncate flex-1">
                               <div className="font-semibold text-foreground truncate flex items-center justify-between gap-1">
                                 <span>{emp.first_name} {emp.last_name}</span>
@@ -1553,7 +1572,7 @@ export default function EditClientOrderPage() {
                               </div>
                               <div className="text-[9px] text-muted-foreground truncate">{emp.job_title || "Reviewer"}</div>
                             </div>
-                          </div>
+                          </label>
                         );
                       });
                     })()}

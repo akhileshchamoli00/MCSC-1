@@ -216,6 +216,10 @@ export default function CancelledOrdersPage() {
         invoice_number: ord.invoice_number || null,
         consultant_ids: ord.consultant_ids || [],
         consultants: ord.consultants || [],
+        reviewer_id: ord.reviewer_id || null,
+        reviewer: ord.reviewer || null,
+        reviewer_ids: ord.reviewer_ids || (ord.reviewer_id ? [ord.reviewer_id] : []),
+        reviewers: ord.reviewers || (ord.reviewer ? [ord.reviewer] : []),
         notes: ord.notes || "",
         total_amount: 0,
         total_notary_fee: 0,
@@ -242,6 +246,21 @@ export default function CancelledOrdersPage() {
     }
     if (ord.is_final_invoice_finalized) {
       group.is_final_invoice_finalized = true;
+    }
+
+    if (ord.reviewer_id) group.reviewer_id = ord.reviewer_id;
+    if (ord.reviewer) group.reviewer = ord.reviewer;
+    if (ord.reviewer_ids && Array.isArray(ord.reviewer_ids)) {
+      group.reviewer_ids = Array.from(new Set([...(group.reviewer_ids || []), ...ord.reviewer_ids]));
+    }
+    if (ord.reviewers && Array.isArray(ord.reviewers)) {
+      const existingIds = new Set((group.reviewers || []).map((r: any) => r.id));
+      for (const r of ord.reviewers) {
+        if (!existingIds.has(r.id)) {
+          group.reviewers.push(r);
+          existingIds.add(r.id);
+        }
+      }
     }
 
     if (ord.consultants && ord.consultants.length > 0) {
@@ -866,18 +885,32 @@ export default function CancelledOrdersPage() {
                             )}
                           </td>
                           <td className="py-2 px-3 align-top pt-2.5 w-36 min-w-[145px] max-w-[170px]">
-                            {ord.consultants && ord.consultants.length > 0 ? (
-                              <div className="flex flex-col items-start gap-1 w-full">
-                                {ord.consultants.map((c: any) => (
+                            <div className="flex flex-col items-start gap-1 w-full">
+                              {(() => {
+                                const revs = ord.reviewers && ord.reviewers.length > 0 ? ord.reviewers : (ord.reviewer ? [ord.reviewer] : []);
+                                return revs.map((r: any) => (
+                                  <Badge
+                                    key={r.id}
+                                    variant="outline"
+                                    className="text-[9px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 font-semibold flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none"
+                                    title={`Reviewer: ${r.name}`}
+                                  >
+                                    <ShieldCheck className="h-2.5 w-2.5 text-purple-600 shrink-0" />
+                                    <span className="truncate"><span className="text-[8px] font-bold uppercase opacity-80 mr-0.5">Rev:</span>{r.name}</span>
+                                  </Badge>
+                                ));
+                              })()}
+                              {ord.consultants && ord.consultants.length > 0 ? (
+                                ord.consultants.map((c: any) => (
                                   <Badge key={c.id} variant="outline" className="text-[9.5px] bg-zinc-500/10 text-zinc-700 dark:text-zinc-400 border-zinc-500/20 font-medium flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none">
                                     <UserCheck className="h-2.5 w-2.5 text-zinc-500 shrink-0" />
                                     <span className="truncate">{c.name}</span>
                                   </Badge>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground italic text-xs">Unassigned</span>
-                            )}
+                                ))
+                              ) : (!ord.reviewers || ord.reviewers.length === 0) && !ord.reviewer ? (
+                                <span className="text-muted-foreground italic text-xs">Unassigned</span>
+                              ) : null}
+                            </div>
                           </td>
                           <td className="py-2 px-2.5 text-right font-mono font-bold text-sm text-muted-foreground line-through align-top pt-2.5 whitespace-nowrap">
                             {formatCurrency(ord.total_amount)}
@@ -1106,6 +1139,34 @@ export default function CancelledOrdersPage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Designated Order Reviewers */}
+                    {(() => {
+                      const revList = selectedOrderGroup.reviewers && selectedOrderGroup.reviewers.length > 0
+                        ? selectedOrderGroup.reviewers
+                        : (selectedOrderGroup.reviewer ? [selectedOrderGroup.reviewer] : []);
+                      if (revList.length === 0) return null;
+                      return (
+                        <div className="p-3.5 rounded-2xl border border-purple-200 bg-purple-50/40 shadow-xs space-y-2">
+                          <span className="text-purple-800 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5 pb-1.5 border-b border-purple-100">
+                            <ShieldCheck className="h-3.5 w-3.5 text-purple-600" /> Designated Order Reviewer{revList.length > 1 ? "s" : ""}
+                          </span>
+                          <div className="space-y-1.5 pt-0.5">
+                            {revList.map((rev: any) => (
+                              <div key={rev.id} className="flex items-center gap-2.5 py-1 px-1">
+                                <div className="h-8 w-8 rounded-full bg-purple-200 text-purple-900 font-bold flex items-center justify-center text-xs shrink-0 border border-purple-300">
+                                  {rev.name?.substring(0, 2).toUpperCase() || "RV"}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <span className="font-semibold text-purple-950 block truncate text-xs">{rev.name}</span>
+                                  <span className="text-[10px] text-purple-700 block truncate">{rev.job_title || "Order Reviewer"}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Assigned Consultants */}
                     <div className="p-4 rounded-2xl border border-zinc-200 bg-white shadow-xs space-y-2.5">

@@ -835,7 +835,8 @@ class ClientOrder(Base):
     proforma_paid_amount = Column(Float, nullable=True, default=None)
     is_final_invoice_finalized = Column(Boolean, default=False)
     consultant_ids = Column(JSON, nullable=True, default=list) # List of assigned employee/consultant IDs
-    reviewer_id = Column(Integer, ForeignKey("employees.id", ondelete="SET NULL"), nullable=True) # Designated Order Reviewer
+    reviewer_id = Column(Integer, ForeignKey("employees.id", ondelete="SET NULL"), nullable=True) # Designated Order Reviewer (Primary/Legacy)
+    reviewer_ids = Column(JSON, nullable=True, default=list) # List of designated reviewer employee IDs
     service_instructions = Column(String, nullable=True) # Service item specific instructions for processing team
     notes = Column(String, nullable=True) # Internal Instructions / Notes from order creator to delivery manager
     payment_link = Column(String, nullable=True)

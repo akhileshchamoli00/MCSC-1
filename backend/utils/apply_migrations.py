@@ -620,6 +620,28 @@ def run_migrations():
             conn.rollback()
             handle_migration_error("reviewer_id", "client_orders", e)
 
+        # Add reviewer_ids to client_orders
+        try:
+            conn.execute(text("ALTER TABLE client_orders ADD COLUMN reviewer_ids JSON DEFAULT '[]'::json"))
+            conn.commit()
+            print("Added column 'reviewer_ids' to 'client_orders' table.")
+        except Exception as e:
+            conn.rollback()
+            handle_migration_error("reviewer_ids", "client_orders", e)
+
+        # Backfill reviewer_ids from existing reviewer_id if empty
+        try:
+            conn.execute(text("""
+                UPDATE client_orders 
+                SET reviewer_ids = json_build_array(reviewer_id)
+                WHERE reviewer_id IS NOT NULL 
+                  AND (reviewer_ids IS NULL OR reviewer_ids::text = '[]' OR reviewer_ids::text = 'null')
+            """))
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            pass
+
         # Create client_order_progress_reactions table if not exists
         try:
             conn.execute(text("""

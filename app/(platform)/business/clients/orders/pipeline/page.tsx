@@ -134,6 +134,8 @@ export default function PipelineOrdersPage() {
         consultants: ord.consultants || [],
         reviewer_id: ord.reviewer_id || null,
         reviewer: ord.reviewer || null,
+        reviewer_ids: ord.reviewer_ids || (ord.reviewer_id ? [ord.reviewer_id] : []),
+        reviewers: ord.reviewers || (ord.reviewer ? [ord.reviewer] : []),
         total_amount: 0,
         notes: ord.notes,
         created_at: ord.created_at,
@@ -155,6 +157,15 @@ export default function PipelineOrdersPage() {
     if (ord.created_at) group.created_at = ord.created_at;
     if (ord.reviewer_id) group.reviewer_id = ord.reviewer_id;
     if (ord.reviewer) group.reviewer = ord.reviewer;
+    if (ord.reviewer_ids && ord.reviewer_ids.length > 0) {
+      group.reviewer_ids = Array.from(new Set([...(group.reviewer_ids || []), ...ord.reviewer_ids]));
+    }
+    if (ord.reviewers && ord.reviewers.length > 0) {
+      const existingRevIds = new Set((group.reviewers || []).map((r: any) => r.id));
+      ord.reviewers.forEach((r: any) => {
+        if (!existingRevIds.has(r.id)) (group.reviewers || []).push(r);
+      });
+    }
 
     if (Array.isArray(ord.consultants) && ord.consultants.length > 0) {
       const existingIds = new Set(group.consultants.map((c: any) => c.id));
@@ -776,21 +787,29 @@ export default function PipelineOrdersPage() {
                 </div>
               </div>
 
-              {/* Designated Reviewer (if any) */}
-              {selectedOrderGroup.reviewer && (
-                <div>
-                  <h4 className="font-bold text-xs text-foreground mb-1.5 flex items-center gap-1.5">
-                    <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" /> Designated Order Reviewer
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30 font-semibold flex items-center gap-1.5 py-1 px-2.5">
-                      <ShieldCheck className="h-3.5 w-3.5 text-purple-600" />
-                      {selectedOrderGroup.reviewer.name}
-                      <span className="text-[10px] text-muted-foreground ml-1">({selectedOrderGroup.reviewer.job_title || "Reviewer"})</span>
-                    </Badge>
+              {/* Designated Reviewers (if any) */}
+              {(() => {
+                const revList = selectedOrderGroup.reviewers && selectedOrderGroup.reviewers.length > 0
+                  ? selectedOrderGroup.reviewers
+                  : (selectedOrderGroup.reviewer ? [selectedOrderGroup.reviewer] : []);
+                if (revList.length === 0) return null;
+                return (
+                  <div>
+                    <h4 className="font-bold text-xs text-foreground mb-1.5 flex items-center gap-1.5">
+                      <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" /> Designated Order Reviewer{revList.length > 1 ? "s" : ""}
+                    </h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {revList.map((rev: any) => (
+                        <Badge key={rev.id} variant="outline" className="text-xs bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30 font-semibold flex items-center gap-1.5 py-1 px-2.5">
+                          <ShieldCheck className="h-3.5 w-3.5 text-purple-600" />
+                          {rev.name}
+                          <span className="text-[10px] text-muted-foreground ml-1">({rev.job_title || "Reviewer"})</span>
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Consultants Allocation (if any) */}
               {selectedOrderGroup.consultants && selectedOrderGroup.consultants.length > 0 && (

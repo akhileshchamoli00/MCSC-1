@@ -71,7 +71,7 @@ function NewClientOrderContent() {
   const [sameBillingCompany, setSameBillingCompany] = useState<boolean>(true);
   const [billingCompanyId, setBillingCompanyId] = useState<string>("");
   const [selectedConsultantIds, setSelectedConsultantIds] = useState<number[]>([]);
-  const [selectedReviewerId, setSelectedReviewerId] = useState<number | null>(null);
+  const [selectedReviewerIds, setSelectedReviewerIds] = useState<number[]>([]);
   const [notes, setNotes] = useState("");
 
   const fetchNextOrderNumber = async () => {
@@ -195,8 +195,8 @@ function NewClientOrderContent() {
   }, []);
 
   const toggleConsultantSelect = (empId: number) => {
-    if (selectedReviewerId === empId && !selectedConsultantIds.includes(empId)) {
-      toast.error("This person is currently selected as the Designated Reviewer. An employee cannot be both an executing consultant and the order reviewer.");
+    if (selectedReviewerIds.includes(empId) && !selectedConsultantIds.includes(empId)) {
+      toast.error("This person is currently selected as a Designated Reviewer. An employee cannot be both an executing consultant and an order reviewer.");
       return;
     }
     setSelectedConsultantIds(prev =>
@@ -204,16 +204,14 @@ function NewClientOrderContent() {
     );
   };
 
-  const handleSelectReviewer = (empId: number) => {
-    if (selectedReviewerId === empId) {
-      setSelectedReviewerId(null);
+  const toggleReviewerSelect = (empId: number) => {
+    if (selectedConsultantIds.includes(empId) && !selectedReviewerIds.includes(empId)) {
+      toast.error("This person is currently allocated as an executing consultant. An employee cannot be both an executing consultant and an order reviewer.");
       return;
     }
-    if (selectedConsultantIds.includes(empId)) {
-      toast.error("This person is currently allocated as an executing consultant. An employee cannot be both an executing consultant and the order reviewer.");
-      return;
-    }
-    setSelectedReviewerId(empId);
+    setSelectedReviewerIds(prev =>
+      prev.includes(empId) ? prev.filter(id => id !== empId) : [...prev, empId]
+    );
   };
 
   const handleAddOrderItem = () => {
@@ -383,8 +381,9 @@ function NewClientOrderContent() {
       return;
     }
 
-    if (selectedReviewerId && selectedConsultantIds.includes(selectedReviewerId)) {
-      toast.error("The same person cannot be selected as both an executing consultant and the order reviewer.");
+    const overlap = selectedReviewerIds.filter(id => selectedConsultantIds.includes(id));
+    if (overlap.length > 0) {
+      toast.error("The same person cannot be selected as both an executing consultant and an order reviewer.");
       return;
     }
 
@@ -420,7 +419,8 @@ function NewClientOrderContent() {
         billing_company_id: finalBillingCompanyId,
         items: validItems,
         consultant_ids: selectedConsultantIds,
-        reviewer_id: selectedReviewerId || null,
+        reviewer_ids: selectedReviewerIds,
+        reviewer_id: selectedReviewerIds[0] || null,
         notes: notes || null,
         status: isPipeline ? "PIPELINE" : undefined
       };
@@ -1116,11 +1116,11 @@ function NewClientOrderContent() {
 
                       return licensingEmployees.map((emp) => {
                         const isSelected = selectedConsultantIds.includes(emp.id);
-                        const isReviewer = selectedReviewerId === emp.id;
+                        const isReviewer = selectedReviewerIds.includes(emp.id);
                         return (
                           <label
                             key={emp.id}
-                            title={isReviewer ? `${emp.first_name} ${emp.last_name} is currently selected as the Designated Order Reviewer.` : undefined}
+                            title={isReviewer ? `${emp.first_name} ${emp.last_name} is currently selected as a Designated Order Reviewer.` : undefined}
                             className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-[10.5px] transition-colors ${isReviewer
                                 ? "opacity-50 border-dashed border-purple-300 dark:border-purple-800 bg-purple-50/40 dark:bg-purple-950/20 cursor-not-allowed"
                                 : isSelected
@@ -1162,18 +1162,18 @@ function NewClientOrderContent() {
                   <div className="flex items-center gap-1.5 min-w-0">
                     <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
                     <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
-                      4. Designated Reviewer ({selectedReviewerId ? "1 Selected" : "Optional"})
+                      4. Designated Reviewers ({selectedReviewerIds.length > 0 ? `${selectedReviewerIds.length} Selected` : "Optional"})
                     </CardTitle>
                   </div>
-                  {selectedReviewerId && (
+                  {selectedReviewerIds.length > 0 && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => setSelectedReviewerId(null)}
+                      onClick={() => setSelectedReviewerIds([])}
                       className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-destructive gap-0.5 font-medium shrink-0"
                     >
-                      <X className="h-2.5 w-2.5" /> Clear Reviewer
+                      <X className="h-2.5 w-2.5" /> Clear All
                     </Button>
                   )}
                 </CardHeader>
@@ -1189,13 +1189,12 @@ function NewClientOrderContent() {
                       }
 
                       return licensingEmployees.map((emp) => {
-                        const isSelected = selectedReviewerId === emp.id;
+                        const isSelected = selectedReviewerIds.includes(emp.id);
                         const isConsultant = selectedConsultantIds.includes(emp.id);
                         return (
-                          <div
+                          <label
                             key={emp.id}
                             title={isConsultant ? `${emp.first_name} ${emp.last_name} is already allocated as an executing consultant.` : undefined}
-                            onClick={() => handleSelectReviewer(emp.id)}
                             className={`flex items-center gap-1.5 p-1.5 rounded-lg border select-none text-[10.5px] transition-all ${isConsultant
                                 ? "opacity-50 border-dashed border-primary/40 bg-primary/5 cursor-not-allowed"
                                 : isSelected
@@ -1203,15 +1202,13 @@ function NewClientOrderContent() {
                                   : "border-border/60 bg-background/50 hover:bg-muted/40 hover:border-border cursor-pointer"
                               }`}
                           >
-                            <div className={`h-3 w-3 rounded-full border flex items-center justify-center shrink-0 transition-colors ${isSelected
-                                ? "border-purple-600 bg-purple-600 text-white"
-                                : isConsultant
-                                  ? "border-primary/40 bg-transparent text-primary"
-                                  : "border-gray-400 bg-background"
-                              }`}>
-                              {isSelected && <div className="h-1 w-1 rounded-full bg-white" />}
-                              {isConsultant && <div className="h-1 w-1 rounded-full bg-primary" />}
-                            </div>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              disabled={isConsultant}
+                              onChange={() => toggleReviewerSelect(emp.id)}
+                              className="h-3 w-3 rounded border-gray-300 text-purple-600 focus:ring-purple-500 accent-purple-600 shrink-0 cursor-pointer disabled:cursor-not-allowed"
+                            />
                             <div className="truncate flex-1">
                               <div className="font-semibold text-foreground truncate flex items-center justify-between gap-1">
                                 <span>{emp.first_name} {emp.last_name}</span>
@@ -1223,7 +1220,7 @@ function NewClientOrderContent() {
                               </div>
                               <div className="text-[9px] text-muted-foreground truncate">{emp.job_title || "Reviewer"}</div>
                             </div>
-                          </div>
+                          </label>
                         );
                       });
                     })()}

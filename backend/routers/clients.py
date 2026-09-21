@@ -476,6 +476,8 @@ def build_consultants_cache(db: Session, orders: List[models.ClientOrder]) -> di
     for o in orders:
         for cid in parse_consultant_ids(o.consultant_ids):
             all_emp_ids.add(cid)
+        for rid in parse_consultant_ids(getattr(o, "reviewer_ids", None)):
+            all_emp_ids.add(rid)
         if getattr(o, "reviewer_id", None):
             all_emp_ids.add(o.reviewer_id)
             
@@ -537,9 +539,22 @@ def format_order_response(ord_obj: models.ClientOrder, consultants_cache: dict, 
     parsed_cids = parse_consultant_ids(ord_obj.consultant_ids)
     res.consultants = [consultants_cache[cid] for cid in parsed_cids if cid in consultants_cache]
     res.consultant_ids = parsed_cids
+
+    parsed_rids = parse_consultant_ids(getattr(ord_obj, "reviewer_ids", None))
+    if not parsed_rids and ord_obj.reviewer_id:
+        parsed_rids = [ord_obj.reviewer_id]
+    res.reviewer_ids = parsed_rids
+    res.reviewers = [consultants_cache[rid] for rid in parsed_rids if rid in consultants_cache]
+
     if ord_obj.reviewer_id:
         res.reviewer_id = ord_obj.reviewer_id
         res.reviewer = consultants_cache.get(ord_obj.reviewer_id)
+    elif parsed_rids:
+        res.reviewer_id = parsed_rids[0]
+        res.reviewer = consultants_cache.get(parsed_rids[0])
+    else:
+        res.reviewer_id = None
+        res.reviewer = None
 
     svc_title = ""
     if ord_obj.service and getattr(ord_obj.service, "job_title", None):
@@ -619,7 +634,10 @@ def get_my_assigned_orders(db: Session = Depends(database.get_db), current_user:
     filtered_orders = []
     for ord_obj in all_orders:
         c_ids = parse_consultant_ids(ord_obj.consultant_ids)
-        is_assigned = is_admin or bool(target_emp_id and (target_emp_id in c_ids or ord_obj.reviewer_id == target_emp_id))
+        r_ids = parse_consultant_ids(getattr(ord_obj, "reviewer_ids", None))
+        if ord_obj.reviewer_id and ord_obj.reviewer_id not in r_ids:
+            r_ids.append(ord_obj.reviewer_id)
+        is_assigned = is_admin or bool(target_emp_id and (target_emp_id in c_ids or target_emp_id in r_ids or ord_obj.reviewer_id == target_emp_id))
             
         if is_assigned and (ord_obj.status or "").upper() in ALLOWED_ASSIGNED_STATUSES:
             filtered_orders.append(ord_obj)
@@ -698,7 +716,10 @@ def get_client_orders(db: Session = Depends(database.get_db), current_user: mode
         filtered = []
         for ord_obj in all_orders:
             c_ids = parse_consultant_ids(ord_obj.consultant_ids)
-            is_assigned = emp_id is not None and (emp_id in c_ids or ord_obj.reviewer_id == emp_id)
+            r_ids = parse_consultant_ids(getattr(ord_obj, "reviewer_ids", None))
+            if ord_obj.reviewer_id and ord_obj.reviewer_id not in r_ids:
+                r_ids.append(ord_obj.reviewer_id)
+            is_assigned = emp_id is not None and (emp_id in c_ids or emp_id in r_ids or ord_obj.reviewer_id == emp_id)
             
             # If user has access to active orders and order is active
             if can_view_active and ord_obj.status not in ["COMPLETED", "CANCELLED", "PROSPECT", "PIPELINE"]:
@@ -815,12 +836,20 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
     if existing_item and not order_req.allow_append:
         raise HTTPException(status_code=400, detail=f"Order ID '{order_num}' already exists in the system (Order: {existing_item.order_number}). Please enter a unique Order ID.")
 
+    # Determine effective reviewer IDs (from reviewer_ids list or fallback to reviewer_id)
+    req_reviewer_ids = list(order_req.reviewer_ids or [])
+    if order_req.reviewer_id and order_req.reviewer_id not in req_reviewer_ids:
+        req_reviewer_ids.append(order_req.reviewer_id)
+    req_consultant_ids = list(order_req.consultant_ids or [])
+
     # Mutual exclusion check: same person cannot be consultant and reviewer
-    if order_req.reviewer_id and order_req.consultant_ids and order_req.reviewer_id in order_req.consultant_ids:
-        raise HTTPException(
-            status_code=400,
-            detail="The same person cannot be allocated as both an executing consultant and the order reviewer."
-        )
+    if req_reviewer_ids and req_consultant_ids:
+        overlap = set(req_reviewer_ids).intersection(set(req_consultant_ids))
+        if overlap:
+            raise HTTPException(
+                status_code=400,
+                detail="The same person cannot be allocated as both an executing consultant and an order reviewer."
+            )
 
     # Purge any lingering progress records for this order number to ensure clean state ONLY for brand new orders
     if not existing_item:
@@ -865,8 +894,9 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
             custom_price_text=item.custom_price_text,
             status=order_status,
             payment_status=payment_status,
-            consultant_ids=order_req.consultant_ids or [],
-            reviewer_id=order_req.reviewer_id,
+            consultant_ids=req_consultant_ids,
+            reviewer_id=req_reviewer_ids[0] if req_reviewer_ids else None,
+            reviewer_ids=req_reviewer_ids,
             service_instructions=service_inst.strip() if (service_inst and service_inst.strip()) else None,
             notes=order_internal_notes.strip() if (order_internal_notes and order_internal_notes.strip()) else None,
             notary_id=item.notary_id,
@@ -893,10 +923,15 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
             
         res.consultants = get_consultants_data(db, db_order.consultant_ids)
         res.consultant_ids = db_order.consultant_ids or []
+        res.reviewer_ids = db_order.reviewer_ids or []
+        res.reviewers = get_consultants_data(db, db_order.reviewer_ids or [])
+        res.reviewer_id = db_order.reviewer_id
         if db_order.reviewer_id:
-            res.reviewer_id = db_order.reviewer_id
             rev_data = get_consultants_data(db, [db_order.reviewer_id])
             res.reviewer = rev_data[0] if rev_data else None
+        elif res.reviewers:
+            res.reviewer = res.reviewers[0]
+            res.reviewer_id = res.reviewers[0]["id"]
         created_rows.append(res)
         
     return created_rows
@@ -1336,13 +1371,23 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
 
     # Mutual exclusion check: same person cannot be consultant and reviewer
     fields_set = getattr(order_update, '__fields_set__', None) or getattr(order_update, 'model_fields_set', set())
-    effective_reviewer_id = order_update.reviewer_id if ("reviewer_id" in fields_set or order_update.reviewer_id is not None) else db_order.reviewer_id
+    if "reviewer_ids" in fields_set and order_update.reviewer_ids is not None:
+        effective_reviewer_ids = list(order_update.reviewer_ids)
+    elif "reviewer_id" in fields_set or order_update.reviewer_id is not None:
+        effective_reviewer_ids = [order_update.reviewer_id] if order_update.reviewer_id else []
+    else:
+        effective_reviewer_ids = parse_consultant_ids(getattr(db_order, "reviewer_ids", None))
+        if not effective_reviewer_ids and db_order.reviewer_id:
+            effective_reviewer_ids = [db_order.reviewer_id]
+
     effective_consultant_ids = order_update.consultant_ids if order_update.consultant_ids is not None else parse_consultant_ids(db_order.consultant_ids)
-    if effective_reviewer_id and effective_consultant_ids and effective_reviewer_id in effective_consultant_ids:
-        raise HTTPException(
-            status_code=400,
-            detail="The same person cannot be allocated as both an executing consultant and the order reviewer."
-        )
+    if effective_reviewer_ids and effective_consultant_ids:
+        overlap = set(effective_reviewer_ids).intersection(set(effective_consultant_ids))
+        if overlap:
+            raise HTTPException(
+                status_code=400,
+                detail="The same person cannot be allocated as both an executing consultant and an order reviewer."
+            )
 
     if order_update.status:
         update_order_group_status(
@@ -1386,10 +1431,21 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
             db_order.consultant_ids = order_update.consultant_ids
             for o_item in orders_in_group:
                 o_item.consultant_ids = order_update.consultant_ids
-        if "reviewer_id" in fields_set or order_update.reviewer_id is not None:
+        if "reviewer_ids" in fields_set or order_update.reviewer_ids is not None:
+            r_ids = order_update.reviewer_ids or []
+            primary_r_id = r_ids[0] if r_ids else None
+            db_order.reviewer_ids = r_ids
+            db_order.reviewer_id = primary_r_id
+            for o_item in orders_in_group:
+                o_item.reviewer_ids = r_ids
+                o_item.reviewer_id = primary_r_id
+        elif "reviewer_id" in fields_set or order_update.reviewer_id is not None:
+            r_ids = [order_update.reviewer_id] if order_update.reviewer_id else []
             db_order.reviewer_id = order_update.reviewer_id
+            db_order.reviewer_ids = r_ids
             for o_item in orders_in_group:
                 o_item.reviewer_id = order_update.reviewer_id
+                o_item.reviewer_ids = r_ids
         if order_update.service_id is not None:
             db_order.service_id = order_update.service_id
         if order_update.job_id is not None:
@@ -1531,10 +1587,14 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
         res.company_name = db_order.client.companies[0].company_name
     res.consultants = get_consultants_data(db, db_order.consultant_ids)
     res.consultant_ids = db_order.consultant_ids or []
-    if db_order.reviewer_id:
-        res.reviewer_id = db_order.reviewer_id
-        rev_data = get_consultants_data(db, [db_order.reviewer_id])
+    res.reviewer_ids = getattr(db_order, "reviewer_ids", None) or ([db_order.reviewer_id] if db_order.reviewer_id else [])
+    res.reviewers = get_consultants_data(db, res.reviewer_ids)
+    res.reviewer_id = db_order.reviewer_id or (res.reviewer_ids[0] if res.reviewer_ids else None)
+    if res.reviewer_id:
+        rev_data = get_consultants_data(db, [res.reviewer_id])
         res.reviewer = rev_data[0] if rev_data else None
+    elif res.reviewers:
+        res.reviewer = res.reviewers[0]
     return res
 
 @router.get("/companies/{company_id}/stakeholders", response_model=List[schemas.CompanyStakeholderResponse])
@@ -2906,7 +2966,10 @@ def check_order_authorization_for_chat(user: models.User, order_number: str, db:
         if auth.has_permission(user, "clients_my", "view", db):
             for o in orders_in_group:
                 c_ids = parse_consultant_ids(o.consultant_ids)
-                if emp_id in c_ids or o.reviewer_id == emp_id:
+                r_ids = parse_consultant_ids(getattr(o, "reviewer_ids", None))
+                if o.reviewer_id and o.reviewer_id not in r_ids:
+                    r_ids.append(o.reviewer_id)
+                if emp_id in c_ids or emp_id in r_ids or o.reviewer_id == emp_id:
                     return True
 
         return False
@@ -3098,11 +3161,14 @@ def get_order_summary(
     unique_cids = list(dict.fromkeys(all_cids))
     consultants = get_consultants_data(db, unique_cids)
 
-    reviewer_data = None
-    if first_order.reviewer_id:
-        rev_list = get_consultants_data(db, [first_order.reviewer_id])
-        if rev_list:
-            reviewer_data = rev_list[0]
+    all_rids = []
+    for o in orders:
+        all_rids.extend(parse_consultant_ids(getattr(o, "reviewer_ids", None)))
+        if o.reviewer_id and o.reviewer_id not in all_rids:
+            all_rids.append(o.reviewer_id)
+    unique_rids = list(dict.fromkeys(all_rids))
+    reviewers = get_consultants_data(db, unique_rids)
+    reviewer_data = reviewers[0] if reviewers else None
 
     items = []
     total_amount = 0.0
@@ -3172,8 +3238,10 @@ def get_order_summary(
         "company": company_data,
         "client": client_data,
         "consultants": consultants,
-        "reviewer_id": first_order.reviewer_id,
+        "reviewer_id": first_order.reviewer_id or (unique_rids[0] if unique_rids else None),
         "reviewer": reviewer_data,
+        "reviewer_ids": unique_rids,
+        "reviewers": reviewers,
         "items": items
     }
 
@@ -3999,6 +4067,8 @@ def get_taggable_users_for_order(order_number: str, db: Session) -> List[models.
     for o in orders_in_group:
         c_ids = parse_consultant_ids(o.consultant_ids)
         consultant_employee_ids.update(c_ids)
+        r_ids = parse_consultant_ids(getattr(o, "reviewer_ids", None))
+        consultant_employee_ids.update(r_ids)
         if getattr(o, "reviewer_id", None):
             consultant_employee_ids.add(o.reviewer_id)
         

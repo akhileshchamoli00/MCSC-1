@@ -398,6 +398,8 @@ export default function CompanyDocumentsManagementPage() {
               items: matchingItems,
               consultants: first.consultants || [],
               reviewer: first.reviewer || null,
+              reviewer_ids: first.reviewer_ids || (first.reviewer_id ? [first.reviewer_id] : []),
+              reviewers: first.reviewers || (first.reviewer ? [first.reviewer] : []),
               created_at: first.created_at
             });
             setActiveOrderItems(matchingItems);
@@ -809,15 +811,21 @@ export default function CompanyDocumentsManagementPage() {
                   </div>
                 )}
 
-                {activeOrder.reviewer && (
-                  <div className="flex items-center gap-1 bg-background/80 px-2 py-0.5 rounded-md border border-border/60 text-[11px] text-muted-foreground font-medium">
-                    <ShieldCheck className="h-3 w-3 text-purple-500" />
-                    <span>Reviewer:</span>
-                    <span className="text-foreground font-semibold">
-                      {activeOrder.reviewer.name}
-                    </span>
-                  </div>
-                )}
+                {(() => {
+                  const revs = activeOrder.reviewers && activeOrder.reviewers.length > 0
+                    ? activeOrder.reviewers
+                    : (activeOrder.reviewer ? [activeOrder.reviewer] : []);
+                  if (revs.length === 0) return null;
+                  return (
+                    <div className="flex items-center gap-1 bg-background/80 px-2 py-0.5 rounded-md border border-border/60 text-[11px] text-muted-foreground font-medium">
+                      <ShieldCheck className="h-3 w-3 text-purple-500" />
+                      <span>Reviewer{revs.length > 1 ? "s" : ""}:</span>
+                      <span className="text-foreground font-semibold">
+                        {revs.map((r: any) => r.name).join(", ")}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Service Scope items */}

@@ -926,6 +926,7 @@ class ClientOrderCreateRequest(BaseModel):
     items: List[ClientOrderItemCreate]
     consultant_ids: Optional[List[int]] = []
     reviewer_id: Optional[int] = None
+    reviewer_ids: Optional[List[int]] = []
     internal_notes: Optional[str] = None
     notes: Optional[str] = None
     order_number: Optional[str] = None
@@ -982,6 +983,8 @@ class ClientOrderResponse(BaseModel):
     consultants: Optional[List[dict]] = []
     reviewer_id: Optional[int] = None
     reviewer: Optional[Any] = None
+    reviewer_ids: Optional[List[int]] = []
+    reviewers: Optional[List[dict]] = []
     internal_notes: Optional[str] = None
     notes: Optional[str] = None
     payment_link: Optional[str] = None
@@ -1157,6 +1160,7 @@ class ClientOrderUpdate(BaseModel):
     invoice_number: Optional[str] = None
     consultant_ids: Optional[List[int]] = None
     reviewer_id: Optional[int] = None
+    reviewer_ids: Optional[List[int]] = None
     service_instructions: Optional[str] = None
     internal_notes: Optional[str] = None
     notes: Optional[str] = None

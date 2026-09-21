@@ -375,6 +375,8 @@ export default function AssignedOrdersPage() {
           consultant_ids: ord.consultant_ids ? [...ord.consultant_ids] : [],
           reviewer_id: ord.reviewer_id || null,
           reviewer: ord.reviewer || null,
+          reviewer_ids: ord.reviewer_ids || (ord.reviewer_id ? [ord.reviewer_id] : []),
+          reviewers: ord.reviewers || (ord.reviewer ? [ord.reviewer] : []),
           notes: ord.notes || "",
           document_count: ord.document_count || 0,
           items: []
@@ -392,6 +394,18 @@ export default function AssignedOrdersPage() {
       if (ord.reviewer && !group.reviewer) {
         group.reviewer = ord.reviewer;
       }
+      if (ord.reviewer_ids && Array.isArray(ord.reviewer_ids)) {
+        group.reviewer_ids = Array.from(new Set([...(group.reviewer_ids || []), ...ord.reviewer_ids]));
+      }
+      if (ord.reviewers && Array.isArray(ord.reviewers)) {
+        const existingIds = new Set((group.reviewers || []).map((r: any) => r.id));
+        for (const r of ord.reviewers) {
+          if (!existingIds.has(r.id)) {
+            group.reviewers.push(r);
+            existingIds.add(r.id);
+          }
+        }
+      }
       if (ord.consultants && ord.consultants.length > 0) {
         const existingIds = new Set(group.consultants.map((c: any) => c.id));
         ord.consultants.forEach((c: any) => {
@@ -406,6 +420,17 @@ export default function AssignedOrdersPage() {
     });
 
     return Array.from(groupedOrdersMap.values()).map((group) => {
+      // Enrich reviewers from employees list if missing
+      if (group.reviewer_ids && group.reviewer_ids.length > 0 && (!group.reviewers || group.reviewers.length === 0) && employees.length > 0) {
+        group.reviewers = group.reviewer_ids.map((rid: number) => {
+          const emp = employees.find((e: any) => e.id === rid);
+          return emp ? {
+            id: emp.id,
+            name: `${emp.first_name || ""} ${emp.last_name || ""}`.trim(),
+            job_title: emp.job_title || "Designated Reviewer"
+          } : null;
+        }).filter(Boolean);
+      }
       // Enrich reviewer from employees list if missing
       if (group.reviewer_id && !group.reviewer && employees.length > 0) {
         const emp = employees.find((e: any) => e.id === group.reviewer_id);
@@ -624,10 +649,15 @@ export default function AssignedOrdersPage() {
   // Checks if user is designated reviewer on the order
   const checkIsReviewer = (ord: any) => {
     if (!myEmpId && isAdmin) {
-      return Boolean(ord.reviewer_id || ord.reviewer);
+      return Boolean(ord.reviewer_id || ord.reviewer || (ord.reviewer_ids && ord.reviewer_ids.length > 0) || (ord.reviewers && ord.reviewers.length > 0));
     }
     return Boolean(
-      myEmpId && (ord.reviewer_id === myEmpId || ord.reviewer?.id === myEmpId)
+      myEmpId && (
+        ord.reviewer_id === myEmpId ||
+        ord.reviewer?.id === myEmpId ||
+        (Array.isArray(ord.reviewer_ids) && ord.reviewer_ids.includes(myEmpId)) ||
+        (Array.isArray(ord.reviewers) && ord.reviewers.some((r: any) => r.id === myEmpId))
+      )
     );
   };
 
@@ -1489,16 +1519,20 @@ export default function AssignedOrdersPage() {
                                 ) : (
                                   <span className="text-muted-foreground italic text-[11px]">Unassigned</span>
                                 )}
-                                {ord.reviewer && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/25 font-semibold flex items-center gap-1.5 py-0.5 px-2 max-w-full truncate shadow-none"
-                                    title={`Designated Reviewer: ${ord.reviewer.name}`}
-                                  >
-                                    <ShieldCheck className="h-3 w-3 text-purple-600 dark:text-purple-400 shrink-0" />
-                                    <span className="truncate">Rev: {ord.reviewer.name}</span>
-                                  </Badge>
-                                )}
+                                {(() => {
+                                  const revs = ord.reviewers && ord.reviewers.length > 0 ? ord.reviewers : (ord.reviewer ? [ord.reviewer] : []);
+                                  return revs.map((r: any) => (
+                                    <Badge
+                                      key={r.id}
+                                      variant="outline"
+                                      className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/25 font-semibold flex items-center gap-1.5 py-0.5 px-2 max-w-full truncate shadow-none"
+                                      title={`Designated Reviewer: ${r.name}`}
+                                    >
+                                      <ShieldCheck className="h-3 w-3 text-purple-600 dark:text-purple-400 shrink-0" />
+                                      <span className="truncate">Rev: {r.name}</span>
+                                    </Badge>
+                                  ));
+                                })()}
                               </div>
                             </td>
                             <td className="p-4 font-mono font-medium text-muted-foreground align-top pt-5">
@@ -1737,22 +1771,32 @@ export default function AssignedOrdersPage() {
                       <span className="text-muted-foreground italic block">No team assigned</span>
                     )}
 
-                    {selectedGroup.reviewer && (
-                      <div className="pt-2.5 mt-2 border-t border-border/40 space-y-2">
-                        <span className="text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
-                          <ShieldCheck className="h-3 w-3" /> Designated Order Reviewer
-                        </span>
-                        <div className="flex items-center gap-2.5 p-2 rounded-lg bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-800/40">
-                          <div className="h-7 w-7 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center text-xs shrink-0">
-                            {selectedGroup.reviewer.name.substring(0, 2).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <span className="font-bold text-foreground block truncate text-[11px]">{selectedGroup.reviewer.name}</span>
-                            <span className="text-[9px] text-muted-foreground block truncate">{selectedGroup.reviewer.job_title || "Designated Reviewer"}</span>
+                    {(() => {
+                      const revList = selectedGroup.reviewers && selectedGroup.reviewers.length > 0
+                        ? selectedGroup.reviewers
+                        : (selectedGroup.reviewer ? [selectedGroup.reviewer] : []);
+                      if (revList.length === 0) return null;
+                      return (
+                        <div className="pt-2.5 mt-2 border-t border-border/40 space-y-2">
+                          <span className="text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
+                            <ShieldCheck className="h-3 w-3" /> Designated Order Reviewer{revList.length > 1 ? "s" : ""}
+                          </span>
+                          <div className="flex flex-col gap-2">
+                            {revList.map((r: any) => (
+                              <div key={r.id} className="flex items-center gap-2.5 p-2 rounded-lg bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-800/40">
+                                <div className="h-7 w-7 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center text-xs shrink-0">
+                                  {r.name?.substring(0, 2).toUpperCase() || "RV"}
+                                </div>
+                                <div className="min-w-0">
+                                  <span className="font-bold text-foreground block truncate text-[11px]">{r.name}</span>
+                                  <span className="text-[9px] text-muted-foreground block truncate">{r.job_title || "Designated Reviewer"}</span>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
 
                   {/* Logs Stream */}
