@@ -184,17 +184,54 @@ def generate_monthly_payroll(req: GeneratePayrollRequest, db: Session = Depends(
     total_weekends = 0
     total_public_holidays = 0
     
+    # Pre-fetch all public holidays in a single query and compute holiday date set
+    holidays_query = db.query(models.PublicHoliday).all()
+    holiday_dates = set()
+    for h in holidays_query:
+        if h.holiday_date and start_date <= h.holiday_date <= end_date:
+            holiday_dates.add(h.holiday_date)
+        if h.recurring and h.holiday_date:
+            c = start_date
+            while c <= end_date:
+                if c.month == h.holiday_date.month and c.day == h.holiday_date.day:
+                    holiday_dates.add(c)
+                c += datetime.timedelta(days=1)
+
     curr_dt = start_date
     while curr_dt <= end_date:
         if curr_dt.weekday() >= 5:
             total_weekends += 1
         else:
-            if is_public_holiday(db, curr_dt):
+            if curr_dt in holiday_dates:
                 total_public_holidays += 1
         curr_dt += datetime.timedelta(days=1)
                 
     total_working_days = num_days - total_weekends - total_public_holidays
     
+    # Batch-fetch existing payrolls and approved leaves to eliminate N+1 loops
+    from collections import defaultdict
+    eligible_emp_ids = [emp.id for emp in active_employees if emp.base_salary is not None]
+
+    existing_payroll_emp_ids = set()
+    if eligible_emp_ids:
+        existing_rows = db.query(models.Payroll.employee_id).filter(
+            models.Payroll.employee_id.in_(eligible_emp_ids),
+            models.Payroll.payroll_month == req.month,
+            models.Payroll.payroll_year == req.year
+        ).all()
+        existing_payroll_emp_ids = {r[0] for r in existing_rows}
+
+    emp_leave_map = defaultdict(list)
+    if eligible_emp_ids:
+        all_leave_requests = db.query(models.LeaveRequest).filter(
+            models.LeaveRequest.employee_id.in_(eligible_emp_ids),
+            models.LeaveRequest.status == "APPROVED",
+            models.LeaveRequest.start_date <= end_date,
+            models.LeaveRequest.end_date >= start_date
+        ).all()
+        for lr in all_leave_requests:
+            emp_leave_map[lr.employee_id].append(lr)
+
     generated_count = 0
     payrolls_to_notify = []
     
@@ -202,22 +239,11 @@ def generate_monthly_payroll(req: GeneratePayrollRequest, db: Session = Depends(
         if emp.base_salary is None:
             continue
             
-        existing = db.query(models.Payroll).filter(
-            models.Payroll.employee_id == emp.id,
-            models.Payroll.payroll_month == req.month,
-            models.Payroll.payroll_year == req.year
-        ).first()
-        
-        if existing:
+        if emp.id in existing_payroll_emp_ids:
             continue
         base_total_working_days = num_days - total_weekends - total_public_holidays
 
-        requests = db.query(models.LeaveRequest).filter(
-            models.LeaveRequest.employee_id == emp.id,
-            models.LeaveRequest.status == "APPROVED",
-            models.LeaveRequest.start_date <= end_date,
-            models.LeaveRequest.end_date >= start_date
-        ).all()
+        requests = emp_leave_map.get(emp.id, [])
         
         annual_days = 0.0
         sick_days = 0.0
@@ -242,7 +268,7 @@ def generate_monthly_payroll(req: GeneratePayrollRequest, db: Session = Depends(
                 curr = max(start_date, leave_req.start_date)
                 limit_date = min(end_date, leave_req.end_date)
                 while curr <= limit_date:
-                    if curr.weekday() < 5 and not is_public_holiday(db, curr):
+                    if curr.weekday() < 5 and curr not in holiday_dates:
                         days_in_month += 1.0
                     curr += datetime.timedelta(days=1)
                 days_in_month = min(days_in_month, leave_req.days_requested)

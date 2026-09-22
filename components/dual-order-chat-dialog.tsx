@@ -417,8 +417,8 @@ export function DualOrderChatDialog({
   const [quotedInternalMessage, setQuotedInternalMessage] = useState<any | null>(null);
 
   // Input refs
-  const clientInputRef = useRef<HTMLInputElement | null>(null);
-  const internalInputRef = useRef<HTMLInputElement | null>(null);
+  const clientInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const internalInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Client Confirmation Dialog State
   const [isConfirmClientOpen, setIsConfirmClientOpen] = useState(false);
@@ -836,8 +836,8 @@ export function DualOrderChatDialog({
   }, [isOpen, isConfirmClientOpen, onClose]);
 
   // 5. Handle Client Message Confirmation
-  const handleClientSendClick = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleClientSendClick = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!clientInput.trim()) return;
     setPendingClientMessage(clientInput.trim());
     setIsConfirmClientOpen(true);
@@ -873,6 +873,9 @@ export function DualOrderChatDialog({
         const newMsg = await res.json();
         setClientMessages(prev => deduplicateMessages([...prev, newMsg]));
         setClientInput("");
+        if (clientInputRef.current) {
+          clientInputRef.current.style.height = "auto";
+        }
         setPendingClientMessage("");
         setQuotedClientMessage(null);
         toast.success("Message sent to Client successfully!");
@@ -902,6 +905,9 @@ export function DualOrderChatDialog({
     try {
       setSendingInternal(true);
       setInternalInput("");
+      if (internalInputRef.current) {
+        internalInputRef.current.style.height = "auto";
+      }
       setShowSuggestions(false);
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/progress`,
@@ -969,6 +975,15 @@ export function DualOrderChatDialog({
 
     setInternalInput(newText);
     setShowSuggestions(false);
+    requestAnimationFrame(() => {
+      if (internalInputRef.current) {
+        internalInputRef.current.style.height = "auto";
+        internalInputRef.current.style.height = `${Math.min(internalInputRef.current.scrollHeight, 160)}px`;
+        const newPos = atIndex + item.displayName.length + 2;
+        internalInputRef.current.selectionStart = internalInputRef.current.selectionEnd = newPos;
+        internalInputRef.current.focus();
+      }
+    });
   };
 
   // Helper to render internal messages with clean inline colored tags (single unified bubble background)
@@ -1428,9 +1443,26 @@ export function DualOrderChatDialog({
                                 <textarea
                                   value={editingMessageText}
                                   onChange={e => setEditingMessageText(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === "Enter" && e.shiftKey) {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      const target = e.currentTarget;
+                                      const start = target.selectionStart;
+                                      const end = target.selectionEnd;
+                                      const val = target.value;
+                                      setEditingMessageText(val.substring(0, start) + "\n" + val.substring(end));
+                                      requestAnimationFrame(() => {
+                                        target.selectionStart = target.selectionEnd = start + 1;
+                                      });
+                                    } else if (e.key === "Enter" && !e.shiftKey) {
+                                      e.preventDefault();
+                                      handleSaveEdit(msg.id, "CLIENT");
+                                    }
+                                  }}
                                   className="w-full text-xs sm:text-[13px] bg-muted/40 border border-border rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-sky-500 min-h-[60px] text-foreground resize-y"
                                   autoFocus
-                                  placeholder="Edit message..."
+                                  placeholder="Edit message (Enter to save, Shift + Enter for new line)..."
                                 />
                                 <div className="flex items-center justify-end gap-1.5">
                                   <Button
@@ -1724,23 +1756,56 @@ export function DualOrderChatDialog({
 
                     <form
                       onSubmit={handleClientSendClick}
-                      className="flex items-center gap-2"
+                      className="flex items-end gap-2"
                     >
                       <ChatEmojiPicker
                         onSelectEmoji={emoji => {
-                          setClientInput(prev => prev + emoji);
+                          setClientInput(prev => {
+                            const next = prev + emoji;
+                            requestAnimationFrame(() => {
+                              if (clientInputRef.current) {
+                                clientInputRef.current.style.height = "auto";
+                                clientInputRef.current.style.height = `${Math.min(clientInputRef.current.scrollHeight, 160)}px`;
+                              }
+                            });
+                            return next;
+                          });
                           clientInputRef.current?.focus();
                         }}
                         side="top"
                         align="start"
                       />
-                      <input
+                      <textarea
                         ref={clientInputRef}
-                        type="text"
-                        placeholder="Message the Client (confirmation will be requested)..."
+                        rows={1}
+                        placeholder="Message the Client (Enter to send, Shift + Enter for new line)..."
                         value={clientInput}
-                        onChange={e => setClientInput(e.target.value)}
-                        className="flex-1 text-xs sm:text-sm bg-background border border-input rounded-xl px-3.5 py-2 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                        onChange={e => {
+                          setClientInput(e.target.value);
+                          e.target.style.height = "auto";
+                          e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === "Enter" && e.shiftKey) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const target = e.currentTarget;
+                            const start = target.selectionStart;
+                            const end = target.selectionEnd;
+                            const val = target.value;
+                            const newVal = val.substring(0, start) + "\n" + val.substring(end);
+                            setClientInput(newVal);
+                            requestAnimationFrame(() => {
+                              target.selectionStart = target.selectionEnd = start + 1;
+                              target.style.height = "auto";
+                              target.style.height = `${Math.min(target.scrollHeight, 160)}px`;
+                            });
+                          } else if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleClientSendClick();
+                          }
+                        }}
+                        className="flex-1 text-xs sm:text-sm bg-background border border-input rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-1 focus:ring-sky-500 resize-none min-h-[40px] max-h-40 leading-relaxed overflow-y-auto"
                         disabled={sendingClient}
                       />
                       <Button
@@ -1862,9 +1927,26 @@ export function DualOrderChatDialog({
                                 <textarea
                                   value={editingMessageText}
                                   onChange={e => setEditingMessageText(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === "Enter" && e.shiftKey) {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      const target = e.currentTarget;
+                                      const start = target.selectionStart;
+                                      const end = target.selectionEnd;
+                                      const val = target.value;
+                                      setEditingMessageText(val.substring(0, start) + "\n" + val.substring(end));
+                                      requestAnimationFrame(() => {
+                                        target.selectionStart = target.selectionEnd = start + 1;
+                                      });
+                                    } else if (e.key === "Enter" && !e.shiftKey) {
+                                      e.preventDefault();
+                                      handleSaveEdit(msg.id, "INTERNAL");
+                                    }
+                                  }}
                                   className="w-full text-xs sm:text-[13px] bg-muted/40 border border-border rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-amber-500 min-h-[60px] text-foreground resize-y"
                                   autoFocus
-                                  placeholder="Edit note..."
+                                  placeholder="Edit note (Enter to save, Shift + Enter for new line)..."
                                 />
                                 <div className="flex items-center justify-end gap-1.5">
                                   <Button
@@ -2105,28 +2187,58 @@ export function DualOrderChatDialog({
                       </div>
                     )}
 
-                    <form onSubmit={handleInternalSend} className="flex items-center gap-2">
+                    <form onSubmit={handleInternalSend} className="flex items-end gap-2">
                       <ChatEmojiPicker
                         onSelectEmoji={emoji => {
-                          setInternalInput(prev => prev + emoji);
+                          setInternalInput(prev => {
+                            const next = prev + emoji;
+                            requestAnimationFrame(() => {
+                              if (internalInputRef.current) {
+                                internalInputRef.current.style.height = "auto";
+                                internalInputRef.current.style.height = `${Math.min(internalInputRef.current.scrollHeight, 160)}px`;
+                              }
+                            });
+                            return next;
+                          });
                           internalInputRef.current?.focus();
                         }}
                         side="top"
                         align="start"
                       />
-                      <input
+                      <textarea
                         ref={internalInputRef}
-                        type="text"
-                        placeholder="Internal team note (use @ to tag teammates)..."
+                        rows={1}
+                        placeholder="Internal team note (use @ to tag teammates, Shift + Enter for new line)..."
                         value={internalInput}
-                        onChange={e => handleInternalTextChange(e.target.value, e.target.selectionStart || 0)}
+                        onChange={e => {
+                          handleInternalTextChange(e.target.value, e.target.selectionStart || 0);
+                          e.target.style.height = "auto";
+                          e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+                        }}
                         onKeyDown={e => {
                           if (e.key === "Enter" && showSuggestions && filteredSuggestions.length > 0) {
                             e.preventDefault();
                             selectSuggestion(filteredSuggestions[0]);
+                          } else if (e.key === "Enter" && e.shiftKey) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const target = e.currentTarget;
+                            const start = target.selectionStart;
+                            const end = target.selectionEnd;
+                            const val = target.value;
+                            const newVal = val.substring(0, start) + "\n" + val.substring(end);
+                            handleInternalTextChange(newVal, start + 1);
+                            requestAnimationFrame(() => {
+                              target.selectionStart = target.selectionEnd = start + 1;
+                              target.style.height = "auto";
+                              target.style.height = `${Math.min(target.scrollHeight, 160)}px`;
+                            });
+                          } else if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleInternalSend();
                           }
                         }}
-                        className="flex-1 text-xs sm:text-sm bg-background border border-input rounded-xl px-3.5 py-2 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        className="flex-1 text-xs sm:text-sm bg-background border border-input rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-1 focus:ring-amber-500 resize-none min-h-[40px] max-h-40 leading-relaxed overflow-y-auto"
                         disabled={sendingInternal}
                       />
                       <Button

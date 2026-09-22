@@ -10,9 +10,12 @@ if root_env_path.exists():
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from datetime import timedelta
+import time
+import logging
 
 import models, schemas, auth, database
 from database import engine
@@ -20,7 +23,35 @@ from database import engine
 # Note: We rely on Alembic for migrations, so we don't strictly need create_all
 # models.Base.metadata.create_all(bind=engine)
 
+logger = logging.getLogger("api.performance")
+
 app = FastAPI(title="MCSC HRMS API")
+
+# GZip compression (reduces payloads > 1000 bytes by 70-85% over the wire)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# CORS configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-Total-Count", "X-Process-Time"]
+)
+
+@app.middleware("http")
+async def log_request_timing(request: Request, call_next):
+    start_time = time.perf_counter()
+    response = await call_next(request)
+    process_time = time.perf_counter() - start_time
+    # Warn in console if any endpoint takes longer than 500ms
+    if process_time > 0.5:
+        logger.warning(
+            f"[SLOW ENDPOINT] {request.method} {request.url.path} took {process_time:.3f}s (status {response.status_code})"
+        )
+    response.headers["X-Process-Time"] = f"{process_time:.4f}"
+    return response
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):

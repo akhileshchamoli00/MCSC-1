@@ -24,7 +24,7 @@ def get_admin_kpis(db: Session = Depends(get_db), current_user: models.User = De
     
     # 2. Present Today
     present_today = db.query(models.Attendance).filter(
-        func.date(models.Attendance.attendance_date) == today,
+        models.Attendance.attendance_date == today,
         models.Attendance.status == "Present"
     ).count()
     

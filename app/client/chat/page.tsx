@@ -666,6 +666,9 @@ export default function ClientOrderChatPage() {
 
     // Immediate optimistic clearing
     setInputText("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
     setSelectedFile(null);
     setQuotedMessage(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -1180,9 +1183,26 @@ export default function ClientOrderChatPage() {
                                 <textarea
                                   value={editingMessageText}
                                   onChange={e => setEditingMessageText(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === "Enter" && e.shiftKey) {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      const target = e.currentTarget;
+                                      const start = target.selectionStart;
+                                      const end = target.selectionEnd;
+                                      const val = target.value;
+                                      setEditingMessageText(val.substring(0, start) + "\n" + val.substring(end));
+                                      requestAnimationFrame(() => {
+                                        target.selectionStart = target.selectionEnd = start + 1;
+                                      });
+                                    } else if (e.key === "Enter" && !e.shiftKey) {
+                                      e.preventDefault();
+                                      handleSaveEdit(msg.id);
+                                    }
+                                  }}
                                   className="w-full text-xs sm:text-[13px] bg-muted/40 border border-border rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 min-h-[60px] text-foreground resize-y"
                                   autoFocus
-                                  placeholder="Edit message..."
+                                  placeholder="Edit message (Enter to save, Shift + Enter for new line)..."
                                 />
                                 <div className="flex items-center justify-end gap-1.5">
                                   <Button
@@ -1503,7 +1523,16 @@ export default function ClientOrderChatPage() {
                   {/* Insert Emoji Button on Left */}
                   <ChatEmojiPicker
                     onSelectEmoji={emoji => {
-                      setInputText(prev => prev + emoji);
+                      setInputText(prev => {
+                        const next = prev + emoji;
+                        requestAnimationFrame(() => {
+                          if (textareaRef.current) {
+                            textareaRef.current.style.height = "auto";
+                            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`;
+                          }
+                        });
+                        return next;
+                      });
                       textareaRef.current?.focus();
                     }}
                     side="top"
@@ -1523,19 +1552,37 @@ export default function ClientOrderChatPage() {
                     ref={textareaRef}
                     placeholder={
                       selectedFile
-                        ? `Add an optional note with ${selectedFile.name} (Press Enter to send)...`
-                        : `Message your consultant regarding ${selectedOrderGroup.orderNumber} (Press Enter to send)...`
+                        ? `Add an optional note with ${selectedFile.name} (Press Enter to send, Shift + Enter for new line)...`
+                        : `Message your consultant regarding ${selectedOrderGroup.orderNumber} (Press Enter to send, Shift + Enter for new line)...`
                     }
                     value={inputText}
-                    onChange={e => setInputText(e.target.value)}
+                    onChange={e => {
+                      setInputText(e.target.value);
+                      e.target.style.height = "auto";
+                      e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+                    }}
                     onKeyDown={e => {
-                      if (e.key === "Enter" && !e.shiftKey) {
+                      if (e.key === "Enter" && e.shiftKey) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const target = e.currentTarget;
+                        const start = target.selectionStart;
+                        const end = target.selectionEnd;
+                        const val = target.value;
+                        const newVal = val.substring(0, start) + "\n" + val.substring(end);
+                        setInputText(newVal);
+                        requestAnimationFrame(() => {
+                          target.selectionStart = target.selectionEnd = start + 1;
+                          target.style.height = "auto";
+                          target.style.height = `${Math.min(target.scrollHeight, 160)}px`;
+                        });
+                      } else if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
                         handleSendMessage();
                       }
                     }}
                     rows={1}
-                    className="flex-1 text-xs sm:text-sm bg-background/70 border border-border/50 rounded-xl px-3.5 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 resize-none placeholder:text-muted-foreground min-h-[46px] max-h-32 leading-relaxed"
+                    className="flex-1 text-xs sm:text-sm bg-background/70 border border-border/50 rounded-xl px-3.5 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 resize-none placeholder:text-muted-foreground min-h-[46px] max-h-40 leading-relaxed overflow-y-auto"
                   />
 
                   <Button

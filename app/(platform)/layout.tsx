@@ -101,6 +101,14 @@ function getHeaderInfo(pathname: string, currentMode: string): {
       iconColor: "text-amber-400 bg-amber-500/15 border-amber-500/30 shadow-[0_0_8px_rgba(251,191,36,0.25)]"
     };
   }
+  if (pathname.includes("/clients/orders/workload")) {
+    return {
+      title: "Team Workload",
+      subtitle: "Consultant & reviewer assignment matrix, capacity distribution, and productivity overview.",
+      icon: Users,
+      iconColor: "text-purple-400 bg-purple-500/15 border-purple-500/30 shadow-[0_0_8px_rgba(168,85,247,0.25)]"
+    };
+  }
   if (pathname.includes("/clients/orders/completed")) {
     return {
       title: "Completed Orders",

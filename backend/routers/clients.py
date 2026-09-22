@@ -9,6 +9,7 @@ import shutil
 import uuid
 import threading
 from datetime import datetime, timedelta, timezone
+from collections import defaultdict
 
 import models, schemas, auth, database
 from storage import upload_file, delete_file
@@ -656,20 +657,33 @@ def send_order_assignment_notifications(
         services_info = f" ({', '.join(service_names[:2])})" if service_names else ""
         one_min_ago = datetime.utcnow() - timedelta(minutes=1)
 
+        consultant_set = set(consultant_employee_ids or [])
+        reviewer_set = set(reviewer_employee_ids or [])
+        all_emp_ids = list(consultant_set | reviewer_set)
+
+        emp_map = {}
+        recent_notif_set = set()
+        if all_emp_ids:
+            employees = db.query(models.Employee).filter(models.Employee.id.in_(all_emp_ids)).all()
+            emp_map = {e.id: e for e in employees if e.user_id}
+            user_ids = [e.user_id for e in emp_map.values()]
+            if user_ids:
+                recent_notifs = db.query(models.Notification.user_id, models.Notification.type).filter(
+                    models.Notification.user_id.in_(user_ids),
+                    models.Notification.reference_id == order_id,
+                    models.Notification.type.in_(["order_assignment", "order_review_assignment"]),
+                    models.Notification.created_at >= one_min_ago
+                ).all()
+                recent_notif_set = {(n[0], n[1]) for n in recent_notifs}
+
         # 1. Notify Assigned Consultants
-        for emp_id in set(consultant_employee_ids or []):
-            emp = db.query(models.Employee).filter(models.Employee.id == emp_id).first()
-            if not emp or not emp.user_id:
+        for emp_id in consultant_set:
+            emp = emp_map.get(emp_id)
+            if not emp:
                 continue
 
             notif_type = "order_assignment"
-            recent_notif = db.query(models.Notification).filter(
-                models.Notification.user_id == emp.user_id,
-                models.Notification.reference_id == order_id,
-                models.Notification.type == notif_type,
-                models.Notification.created_at >= one_min_ago
-            ).first()
-            if recent_notif:
+            if (emp.user_id, notif_type) in recent_notif_set:
                 continue
 
             if is_status_transition:
@@ -692,19 +706,13 @@ def send_order_assignment_notifications(
             )
 
         # 2. Notify Assigned Reviewers
-        for emp_id in set(reviewer_employee_ids or []):
-            emp = db.query(models.Employee).filter(models.Employee.id == emp_id).first()
-            if not emp or not emp.user_id:
+        for emp_id in reviewer_set:
+            emp = emp_map.get(emp_id)
+            if not emp:
                 continue
 
             notif_type = "order_review_assignment"
-            recent_notif = db.query(models.Notification).filter(
-                models.Notification.user_id == emp.user_id,
-                models.Notification.reference_id == order_id,
-                models.Notification.type == notif_type,
-                models.Notification.created_at >= one_min_ago
-            ).first()
-            if recent_notif:
+            if (emp.user_id, notif_type) in recent_notif_set:
                 continue
 
             if is_status_transition:
@@ -777,8 +785,253 @@ def get_my_assigned_orders(db: Session = Depends(database.get_db), current_user:
     doc_counts_cache = build_doc_counts_cache(db, filtered_orders)
     return [format_order_response(ord_obj, consultants_cache, doc_counts_cache) for ord_obj in filtered_orders]
 
+@router.get("/orders/workload-matrix")
+def get_order_workload_matrix(
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Returns an assignment and capacity matrix of all employees,
+    including their counts as Executing Consultant and Designated Reviewer,
+    workload distribution across lifecycle stages, and the list of assigned orders.
+    """
+    if not (
+        auth.is_super_admin(current_user) 
+        or is_admin_or_hr(current_user) 
+        or auth.has_permission(current_user, "clients_orders_active", "view", db)
+        or auth.has_permission(current_user, "clients_orders", "view", db)
+        or auth.has_permission(current_user, "clients_my", "view", db)
+    ):
+        raise HTTPException(status_code=403, detail="Not authorized to view workload matrix")
+
+    # Fetch all orders
+    all_orders = db.query(models.ClientOrder).options(
+        joinedload(models.ClientOrder.company),
+        joinedload(models.ClientOrder.client),
+        joinedload(models.ClientOrder.service)
+    ).order_by(models.ClientOrder.id.desc()).all()
+
+    # Group by order_number
+    orders_by_num = defaultdict(list)
+    for o in all_orders:
+        if o.order_number:
+            orders_by_num[o.order_number].append(o)
+
+    # Fetch all active employees
+    all_employees = db.query(models.Employee).options(
+        joinedload(models.Employee.user),
+        joinedload(models.Employee.department)
+    ).filter(models.Employee.status == models.EmploymentStatus.ACTIVE).all()
+
+    emp_map = {e.id: e for e in all_employees}
+
+    # Pre-calculate assigned sets and order objects
+    consultant_orders_map = defaultdict(dict)  # emp_id -> {order_num: order_data}
+    reviewer_orders_map = defaultdict(dict)    # emp_id -> {order_num: order_data}
+    
+    total_active_orders = 0
+    unassigned_orders = 0
+
+    for order_num, items in orders_by_num.items():
+        first_item = items[0]
+        status = (first_item.status or "DRAFT").upper()
+        is_active = status not in ["COMPLETED", "CANCELLED"]
+        if is_active:
+            total_active_orders += 1
+
+        # Company name
+        comp_name = None
+        if first_item.company:
+            comp_name = first_item.company.company_name
+        elif first_item.client and getattr(first_item.client, "companies", None):
+            comp_name = first_item.client.companies[0].company_name
+        elif first_item.client:
+            comp_name = first_item.client.contact_person
+
+        # Collect unique consultant and reviewer IDs
+        c_ids = set()
+        r_ids = set()
+        total_group_amount = 0.0
+        services = []
+
+        for item in items:
+            c_ids.update(parse_consultant_ids(item.consultant_ids))
+            r_list = parse_consultant_ids(getattr(item, "reviewer_ids", None))
+            if item.reviewer_id and item.reviewer_id not in r_list:
+                r_list.append(item.reviewer_id)
+            r_ids.update(r_list)
+            total_group_amount += float(item.unit_price or item.total_amount or 0.0)
+            if item.job_title:
+                services.append(item.job_title)
+
+        if is_active and not c_ids and not r_ids:
+            unassigned_orders += 1
+
+        # Build order summary payload for drill-down
+        order_summary = {
+            "order_number": order_num,
+            "id": first_item.id,
+            "status": status,
+            "payment_status": first_item.payment_status or "UNPAID",
+            "company_name": comp_name or "Individual Client",
+            "client_name": first_item.client.contact_person if first_item.client else None,
+            "services": services[:3],
+            "services_count": len(services),
+            "total_amount": total_group_amount,
+            "created_at": first_item.created_at.isoformat() if first_item.created_at else None,
+            "is_active": is_active,
+            "consultant_ids": list(c_ids),
+            "reviewer_ids": list(r_ids)
+        }
+
+        # Populate consultant map
+        for cid in c_ids:
+            consultant_orders_map[cid][order_num] = {
+                **order_summary,
+                "role": "CONSULTANT"
+            }
+
+        # Populate reviewer map
+        for rid in r_ids:
+            reviewer_orders_map[rid][order_num] = {
+                **order_summary,
+                "role": "REVIEWER"
+            }
+
+    # Also include any inactive employees who happen to have assignments
+    all_assigned_emp_ids = set(consultant_orders_map.keys()) | set(reviewer_orders_map.keys())
+    missing_emp_ids = [eid for eid in all_assigned_emp_ids if eid not in emp_map]
+    if missing_emp_ids:
+        missing_emps = db.query(models.Employee).options(
+            joinedload(models.Employee.user),
+            joinedload(models.Employee.department)
+        ).filter(models.Employee.id.in_(missing_emp_ids)).all()
+        for me in missing_emps:
+            emp_map[me.id] = me
+
+    # Build response list for Legal team and assigned staff only
+    matrix_rows = []
+    total_consultants_engaged = 0
+    total_reviewers_engaged = 0
+
+    # Filter to Legal team employees or anyone with order assignments
+    legal_team_emp_ids = [
+        eid for eid, emp in emp_map.items()
+        if (emp.department and "legal" in emp.department.name.lower()) or eid in all_assigned_emp_ids
+    ]
+
+    for emp_id in legal_team_emp_ids:
+        emp = emp_map[emp_id]
+        c_orders_dict = consultant_orders_map.get(emp_id, {})
+        r_orders_dict = reviewer_orders_map.get(emp_id, {})
+
+        c_orders_list = list(c_orders_dict.values())
+        r_orders_list = list(r_orders_dict.values())
+
+        c_active = [o for o in c_orders_list if o["is_active"]]
+        r_active = [o for o in r_orders_list if o["is_active"]]
+
+        # Combined unique active orders
+        active_order_nums = set(o["order_number"] for o in c_active) | set(o["order_number"] for o in r_active)
+        all_order_nums = set(o["order_number"] for o in c_orders_list) | set(o["order_number"] for o in r_orders_list)
+
+        if len(c_active) > 0:
+            total_consultants_engaged += 1
+        if len(r_active) > 0:
+            total_reviewers_engaged += 1
+
+        # Status breakdown of active orders for this employee
+        status_counts = defaultdict(int)
+        for o in c_active:
+            status_counts[o["status"]] += 1
+        for o in r_active:
+            status_counts[o["status"]] += 1
+
+        # Workload capacity evaluation
+        total_active_count = len(active_order_nums)
+        if total_active_count == 0:
+            capacity_status = "AVAILABLE"
+        elif total_active_count <= 5:
+            capacity_status = "LIGHT"
+        elif total_active_count <= 15:
+            capacity_status = "OPTIMAL"
+        else:
+            capacity_status = "HEAVY"
+
+        full_name = f"{emp.first_name or ''} {emp.last_name or ''}".strip()
+        phone_val = getattr(emp, "phone", None) or getattr(emp, "phone_number", None) or getattr(emp, "mobile_number", None)
+
+        # Merge orders list for drilldown
+        merged_orders = {}
+        for o in c_orders_list:
+            merged_orders[o["order_number"]] = {**o, "assigned_as": "CONSULTANT"}
+        for o in r_orders_list:
+            if o["order_number"] in merged_orders:
+                merged_orders[o["order_number"]]["assigned_as"] = "BOTH"
+            else:
+                merged_orders[o["order_number"]] = {**o, "assigned_as": "REVIEWER"}
+
+        # Enrich orders with names of team members
+        final_orders_list = list(merged_orders.values())
+        for fo in final_orders_list:
+            fo["co_consultants"] = [
+                f"{emp_map[cid].first_name} {emp_map[cid].last_name}".strip() 
+                for cid in fo.get("consultant_ids", []) if cid in emp_map and cid != emp_id
+            ]
+            fo["reviewers_names"] = [
+                f"{emp_map[rid].first_name} {emp_map[rid].last_name}".strip() 
+                for rid in fo.get("reviewer_ids", []) if rid in emp_map
+            ]
+
+        matrix_rows.append({
+            "employee_id": emp.id,
+            "user_id": emp.user_id,
+            "name": full_name or "Staff Member",
+            "job_title": emp.job_title or "Staff",
+            "department": emp.department.name if emp.department else None,
+            "email": emp.user.email if emp.user else (emp.email if hasattr(emp, "email") else None),
+            "phone": phone_val,
+            "profile_photo": getattr(emp, "profile_photo", None),
+            "consultant_active_count": len(c_active),
+            "consultant_total_count": len(c_orders_list),
+            "reviewer_active_count": len(r_active),
+            "reviewer_total_count": len(r_orders_list),
+            "total_active_load": total_active_count,
+            "total_all_load": len(all_order_nums),
+            "capacity_status": capacity_status,
+            "status_breakdown": dict(status_counts),
+            "orders": final_orders_list
+        })
+
+    # Sort matrix rows: highest active load first, then alphabetically
+    matrix_rows.sort(key=lambda r: (-r["total_active_load"], -r["total_all_load"], r["name"]))
+
+    avg_c_load = round(sum(r["consultant_active_count"] for r in matrix_rows) / max(total_consultants_engaged, 1), 1)
+    avg_r_load = round(sum(r["reviewer_active_count"] for r in matrix_rows) / max(total_reviewers_engaged, 1), 1)
+
+    return {
+        "summary": {
+            "total_active_orders": total_active_orders,
+            "total_order_groups": len(orders_by_num),
+            "total_consultants_engaged": total_consultants_engaged,
+            "total_reviewers_engaged": total_reviewers_engaged,
+            "unassigned_orders_count": unassigned_orders,
+            "avg_consultant_load": avg_c_load,
+            "avg_reviewer_load": avg_r_load
+        },
+        "team_workload": matrix_rows
+    }
+
 @router.get("/orders", response_model=List[schemas.ClientOrderResponse])
-def get_client_orders(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+def get_client_orders(
+    response: Response,
+    limit: Optional[int] = Query(None, ge=1, le=500),
+    offset: Optional[int] = Query(0, ge=0),
+    status: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
     role_name = current_user.role.name.upper() if current_user.role else ""
     orders_query = db.query(models.ClientOrder).options(
         joinedload(models.ClientOrder.partner).joinedload(models.Partner.companies),
@@ -787,6 +1040,18 @@ def get_client_orders(db: Session = Depends(database.get_db), current_user: mode
         joinedload(models.ClientOrder.service),
         joinedload(models.ClientOrder.notary)
     ).order_by(models.ClientOrder.id.desc())
+
+    if status:
+        orders_query = orders_query.filter(models.ClientOrder.status == status)
+
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        orders_query = orders_query.filter(
+            or_(
+                models.ClientOrder.order_number.ilike(term),
+                models.ClientOrder.job_title.ilike(term)
+            )
+        )
     
     if is_admin_or_hr(current_user):
         orders = orders_query.all()
@@ -874,6 +1139,12 @@ def get_client_orders(db: Session = Depends(database.get_db), current_user: mode
         orders = filtered
     else:
         raise HTTPException(status_code=403, detail="Access denied. You do not have permission to view orders.")
+
+    total_count = len(orders)
+    if limit is not None:
+        orders = orders[offset : offset + limit]
+        response.headers["X-Total-Count"] = str(total_count)
+        response.headers["Access-Control-Expose-Headers"] = "X-Total-Count"
 
     consultants_cache = build_consultants_cache(db, orders)
     doc_counts_cache = build_doc_counts_cache(db, orders)
@@ -992,6 +1263,23 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
 
     created_rows = []
     
+    # Batch lookup notary fees if not explicitly provided
+    needed_notary_pairs = [
+        (item.notary_id, item.service_id)
+        for item in order_req.items
+        if item.notary_id and getattr(item, "notary_fee", None) is None
+    ]
+    notary_fee_cache = {}
+    if needed_notary_pairs:
+        notary_ids = list({p[0] for p in needed_notary_pairs})
+        service_ids = list({p[1] for p in needed_notary_pairs})
+        fee_records = db.query(models.NotaryServiceFee).filter(
+            models.NotaryServiceFee.notary_id.in_(notary_ids),
+            models.NotaryServiceFee.service_id.in_(service_ids)
+        ).all()
+        for fr in fee_records:
+            notary_fee_cache[(fr.notary_id, fr.service_id)] = fr.fee or 0.0
+
     for item in order_req.items:
         # Determine notary fee if notary is selected
         fee = 0.0
@@ -999,12 +1287,7 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
             if getattr(item, "notary_fee", None) is not None:
                 fee = item.notary_fee
             else:
-                notary_fee_rec = db.query(models.NotaryServiceFee).filter(
-                    models.NotaryServiceFee.notary_id == item.notary_id,
-                    models.NotaryServiceFee.service_id == item.service_id
-                ).first()
-                if notary_fee_rec:
-                    fee = notary_fee_rec.fee or 0.0
+                fee = notary_fee_cache.get((item.notary_id, item.service_id), 0.0)
 
         service_inst = getattr(item, 'service_instructions', None)
         order_internal_notes = getattr(order_req, 'internal_notes', None) or getattr(order_req, 'notes', None)

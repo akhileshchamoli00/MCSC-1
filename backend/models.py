@@ -130,7 +130,7 @@ class EmployeeDocument(Base):
     __tablename__ = "employee_documents"
 
     id = Column(Integer, primary_key=True, index=True)
-    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"))
+    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), index=True)
     document_type = Column(String)
     file_name = Column(String)
     file_url = Column(String)
@@ -200,7 +200,7 @@ class LeaveRequest(Base):
     __tablename__ = "leave_requests"
     
     id = Column(Integer, primary_key=True, index=True)
-    employee_id = Column(Integer, ForeignKey("employees.id"))
+    employee_id = Column(Integer, ForeignKey("employees.id"), index=True)
     start_date = Column(Date)
     end_date = Column(Date)
     leave_type = Column(String)
@@ -209,7 +209,7 @@ class LeaveRequest(Base):
     half_day_session = Column(String, nullable=True) # MORNING, AFTERNOON
     reason = Column(String, nullable=True)
     attachment_url = Column(String, nullable=True)
-    status = Column(Enum(LeaveStatus), default=LeaveStatus.PENDING)
+    status = Column(Enum(LeaveStatus), default=LeaveStatus.PENDING, index=True)
     approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     approved_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -270,10 +270,10 @@ class Payroll(Base):
     __tablename__ = "payrolls"
     
     id = Column(Integer, primary_key=True, index=True)
-    employee_id = Column(Integer, ForeignKey("employees.id"))
+    employee_id = Column(Integer, ForeignKey("employees.id"), index=True)
     
-    payroll_month = Column(Integer)
-    payroll_year = Column(Integer)
+    payroll_month = Column(Integer, index=True)
+    payroll_year = Column(Integer, index=True)
     
     total_calendar_days = Column(Integer, default=0)
     total_weekends = Column(Integer, default=0)
@@ -382,8 +382,8 @@ class AssetAssignment(Base):
     __tablename__ = "asset_assignments"
     
     id = Column(Integer, primary_key=True, index=True)
-    asset_id = Column(Integer, ForeignKey("assets.id", ondelete="CASCADE"))
-    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"))
+    asset_id = Column(Integer, ForeignKey("assets.id", ondelete="CASCADE"), index=True)
+    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), index=True)
     assigned_date = Column(Date)
     returned_date = Column(Date, nullable=True)
     assigned_by = Column(Integer, ForeignKey("users.id"))
@@ -814,11 +814,11 @@ class ClientOrder(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     order_number = Column(String, index=True) # e.g. MCSX-260001
-    client_id = Column(Integer, ForeignKey("partners.id", ondelete="CASCADE"), nullable=False)
-    company_id = Column(Integer, ForeignKey("client_companies.id", ondelete="SET NULL"), nullable=True)
-    billing_company_id = Column(Integer, ForeignKey("client_companies.id", ondelete="SET NULL"), nullable=True)
-    service_id = Column(Integer, ForeignKey("client_services.id", ondelete="SET NULL"), nullable=True)
-    customer_id = Column(Integer, ForeignKey("clients.id", ondelete="SET NULL"), nullable=True)
+    client_id = Column(Integer, ForeignKey("partners.id", ondelete="CASCADE"), nullable=False, index=True)
+    company_id = Column(Integer, ForeignKey("client_companies.id", ondelete="SET NULL"), nullable=True, index=True)
+    billing_company_id = Column(Integer, ForeignKey("client_companies.id", ondelete="SET NULL"), nullable=True, index=True)
+    service_id = Column(Integer, ForeignKey("client_services.id", ondelete="SET NULL"), nullable=True, index=True)
+    customer_id = Column(Integer, ForeignKey("clients.id", ondelete="SET NULL"), nullable=True, index=True)
     job_id = Column(String, nullable=True) # e.g. OA-001
     job_title = Column(String, nullable=False)
     branch_name = Column(String, nullable=True) # e.g. Bali Branch, HQ
@@ -827,7 +827,7 @@ class ClientOrder(Base):
     unit_price = Column(Float, default=0.0)
     total_amount = Column(Float, default=0.0)
     custom_price_text = Column(String, nullable=True)
-    status = Column(String, default="CONFIRMED") # DRAFT, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED
+    status = Column(String, default="CONFIRMED", index=True) # DRAFT, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED
     payment_status = Column(String, default="UNPAID") # UNPAID, PARTIALLY_PAID, PAID
     invoice_number = Column(String, nullable=True) # e.g. INV-260001
     is_proforma_finalized = Column(Boolean, default=False)
@@ -835,14 +835,14 @@ class ClientOrder(Base):
     proforma_paid_amount = Column(Float, nullable=True, default=None)
     is_final_invoice_finalized = Column(Boolean, default=False)
     consultant_ids = Column(JSON, nullable=True, default=list) # List of assigned employee/consultant IDs
-    reviewer_id = Column(Integer, ForeignKey("employees.id", ondelete="SET NULL"), nullable=True) # Designated Order Reviewer (Primary/Legacy)
+    reviewer_id = Column(Integer, ForeignKey("employees.id", ondelete="SET NULL"), nullable=True, index=True) # Designated Order Reviewer (Primary/Legacy)
     reviewer_ids = Column(JSON, nullable=True, default=list) # List of designated reviewer employee IDs
     service_instructions = Column(String, nullable=True) # Service item specific instructions for processing team
     notes = Column(String, nullable=True) # Internal Instructions / Notes from order creator to delivery manager
     payment_link = Column(String, nullable=True)
     xendit_invoice_id = Column(String, nullable=True)
     payment_link_created_at = Column(DateTime(timezone=True), nullable=True)
-    notary_id = Column(Integer, ForeignKey("notaries.id", ondelete="SET NULL"), nullable=True)
+    notary_id = Column(Integer, ForeignKey("notaries.id", ondelete="SET NULL"), nullable=True, index=True)
     notary_fee = Column(Float, default=0.0)
     notary_payment_status = Column(String, default="UNPAID") # UNPAID, PAID
     notary_payment_date = Column(Date, nullable=True)
@@ -1127,8 +1127,8 @@ class NotaryServiceFee(Base):
     __tablename__ = "notary_service_fees"
     
     id = Column(Integer, primary_key=True, index=True)
-    notary_id = Column(Integer, ForeignKey("notaries.id", ondelete="CASCADE"), nullable=False)
-    service_id = Column(Integer, ForeignKey("client_services.id", ondelete="CASCADE"), nullable=False)
+    notary_id = Column(Integer, ForeignKey("notaries.id", ondelete="CASCADE"), nullable=False, index=True)
+    service_id = Column(Integer, ForeignKey("client_services.id", ondelete="CASCADE"), nullable=False, index=True)
     fee = Column(Float, default=0.0)
     
     notary = relationship("Notary", back_populates="service_fees")

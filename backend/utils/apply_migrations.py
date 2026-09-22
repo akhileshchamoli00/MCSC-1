@@ -717,6 +717,13 @@ def run_migrations():
     except Exception as e:
         print(f"Note on MCS0017 customer migration: {e}")
 
+    # Ensure performance indexes
+    try:
+        from utils.apply_performance_indexes import apply_performance_indexes
+        apply_performance_indexes()
+    except Exception as e:
+        print(f"Note on performance indexes migration: {e}")
+
     print("Migration check complete.")
 
 if __name__ == "__main__":

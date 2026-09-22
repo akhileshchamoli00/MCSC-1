@@ -1079,7 +1079,7 @@ function NewClientOrderContent() {
           </div>
 
           {/* RIGHT COLUMN: Frequently Changed Operational Modules (Roster, Reviewer, Notes) */}
-          <div className="xl:col-span-5 2xl:col-span-4 space-y-3 min-w-0 xl:sticky xl:top-2 xl:max-h-[calc(100vh-5.5rem)] xl:overflow-y-auto pr-0.5">
+          <div className="xl:col-span-5 2xl:col-span-4 space-y-3 min-w-0">
 
             {/* Licensing Roster Allocation */}
             {!isPipeline && (
@@ -1104,7 +1104,7 @@ function NewClientOrderContent() {
                   )}
                 </CardHeader>
                 <CardContent className="p-2.5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                     {(() => {
                       const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
                       const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
@@ -1178,7 +1178,7 @@ function NewClientOrderContent() {
                   )}
                 </CardHeader>
                 <CardContent className="p-2.5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                     {(() => {
                       const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
                       const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
