@@ -914,10 +914,20 @@ def get_order_workload_matrix(
     total_consultants_engaged = 0
     total_reviewers_engaged = 0
 
-    # Filter to Legal team employees or anyone with order assignments
+    # Filter to Legal team consulting/processing staff or anyone with order assignments
+    # Operational support roles (e.g. Courier, Office Boy, Driver) are excluded unless specifically assigned to an order
+    NON_WORKLOAD_ROLES = {"courier", "courier staff", "office boy", "driver", "general affair", "cleaning staff", "intern"}
+
     legal_team_emp_ids = [
         eid for eid, emp in emp_map.items()
-        if (emp.department and "legal" in emp.department.name.lower()) or eid in all_assigned_emp_ids
+        if (
+            eid in all_assigned_emp_ids
+            or (
+                emp.department
+                and "legal" in emp.department.name.lower()
+                and (not emp.job_title or emp.job_title.strip().lower() not in NON_WORKLOAD_ROLES)
+            )
+        )
     ]
 
     for emp_id in legal_team_emp_ids:
@@ -958,7 +968,10 @@ def get_order_workload_matrix(
         else:
             capacity_status = "HEAVY"
 
-        full_name = f"{emp.first_name or ''} {emp.last_name or ''}".strip()
+        if emp.first_name and emp.last_name and emp.first_name.strip().lower() == emp.last_name.strip().lower():
+            full_name = emp.first_name.strip()
+        else:
+            full_name = f"{emp.first_name or ''} {emp.last_name or ''}".strip()
         phone_val = getattr(emp, "phone", None) or getattr(emp, "phone_number", None) or getattr(emp, "mobile_number", None)
 
         # Merge orders list for drilldown
@@ -975,11 +988,13 @@ def get_order_workload_matrix(
         final_orders_list = list(merged_orders.values())
         for fo in final_orders_list:
             fo["co_consultants"] = [
-                f"{emp_map[cid].first_name} {emp_map[cid].last_name}".strip() 
+                emp_map[cid].first_name.strip() if (emp_map[cid].first_name and emp_map[cid].last_name and emp_map[cid].first_name.strip().lower() == emp_map[cid].last_name.strip().lower())
+                else f"{emp_map[cid].first_name or ''} {emp_map[cid].last_name or ''}".strip()
                 for cid in fo.get("consultant_ids", []) if cid in emp_map and cid != emp_id
             ]
             fo["reviewers_names"] = [
-                f"{emp_map[rid].first_name} {emp_map[rid].last_name}".strip() 
+                emp_map[rid].first_name.strip() if (emp_map[rid].first_name and emp_map[rid].last_name and emp_map[rid].first_name.strip().lower() == emp_map[rid].last_name.strip().lower())
+                else f"{emp_map[rid].first_name or ''} {emp_map[rid].last_name or ''}".strip()
                 for rid in fo.get("reviewer_ids", []) if rid in emp_map
             ]
 
