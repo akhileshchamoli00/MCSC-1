@@ -1035,16 +1035,17 @@ def get_client_orders(
     role_name = current_user.role.name.upper() if current_user.role else ""
     orders_query = db.query(models.ClientOrder).options(
         joinedload(models.ClientOrder.partner).joinedload(models.Partner.companies),
+        joinedload(models.ClientOrder.client).joinedload(models.Client.companies),
         joinedload(models.ClientOrder.company),
         joinedload(models.ClientOrder.billing_company),
         joinedload(models.ClientOrder.service),
         joinedload(models.ClientOrder.notary)
     ).order_by(models.ClientOrder.id.desc())
 
-    if status:
-        orders_query = orders_query.filter(models.ClientOrder.status == status)
+    if isinstance(status, str) and status.strip():
+        orders_query = orders_query.filter(models.ClientOrder.status == status.strip())
 
-    if search and search.strip():
+    if isinstance(search, str) and search.strip():
         term = f"%{search.strip()}%"
         orders_query = orders_query.filter(
             or_(
@@ -1141,8 +1142,9 @@ def get_client_orders(
         raise HTTPException(status_code=403, detail="Access denied. You do not have permission to view orders.")
 
     total_count = len(orders)
-    if limit is not None:
-        orders = orders[offset : offset + limit]
+    if isinstance(limit, int):
+        offset_val = offset if isinstance(offset, int) else 0
+        orders = orders[offset_val : offset_val + limit]
         response.headers["X-Total-Count"] = str(total_count)
         response.headers["Access-Control-Expose-Headers"] = "X-Total-Count"
 

@@ -440,38 +440,49 @@ export default function ClientOrdersPage() {
     if (userLoading || !canView) return;
     try {
       setLoading(true);
-      const [ordRes, cliRes, compRes, serRes, empRes, teamRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
-          credentials: "include",
-        }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
-          credentials: "include",
-        }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, {
-          credentials: "include",
-        }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, {
-          credentials: "include",
-        }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, {
-          credentials: "include",
-        }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, {
-          credentials: "include",
-        })
-      ]);
 
-      if (ordRes.ok) {
-        const ordData = await ordRes.json();
-        setOrders(Array.isArray(ordData) ? ordData : []);
-      } else {
-        setOrders([]);
-      }
-      if (cliRes.ok) setClients(await cliRes.json());
-      if (compRes.ok) setCompanies(await compRes.json());
-      if (serRes.ok) setServices(await serRes.json());
-      if (empRes.ok) setEmployees(await empRes.json());
-      if (teamRes.ok) setTeams(await teamRes.json());
+      // 1. Fetch Orders and unblock the UI spinner immediately
+      const fetchOrdersPromise = fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
+        credentials: "include",
+      })
+        .then(async res => {
+          if (res.ok) {
+            const ordData = await res.json();
+            setOrders(Array.isArray(ordData) ? ordData : []);
+          } else {
+            setOrders([]);
+          }
+        })
+        .catch(err => {
+          console.error("Error fetching orders:", err);
+          setOrders([]);
+        })
+        .finally(() => {
+          setLoading(false); // Unblock table render immediately!
+        });
+
+      // 2. Fetch auxiliary lookups concurrently in background without blocking table view
+      const fetchAuxPromise = Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, { credentials: "include" })
+          .then(r => (r.ok ? r.json() : []))
+          .then(setClients),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, { credentials: "include" })
+          .then(r => (r.ok ? r.json() : []))
+          .then(setCompanies),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, { credentials: "include" })
+          .then(r => (r.ok ? r.json() : []))
+          .then(setServices),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, { credentials: "include" })
+          .then(r => (r.ok ? r.json() : []))
+          .then(setEmployees),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, { credentials: "include" })
+          .then(r => (r.ok ? r.json() : []))
+          .then(setTeams)
+      ]).catch(err => {
+        console.error("Error loading auxiliary lookups:", err);
+      });
+
+      await Promise.all([fetchOrdersPromise, fetchAuxPromise]);
     } catch (err) {
       console.error("Error fetching data:", err);
       toast.error("Error fetching orders data");
