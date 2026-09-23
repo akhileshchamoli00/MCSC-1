@@ -245,6 +245,9 @@ const isEmojiOnlyText = (str?: string | null) => {
   return emojiRegex.test(trimmed) && trimmed.length <= 32;
 };
 
+const EMAIL_REGEX = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
+const EMAIL_PATTERN_STR = "@?[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)+";
+
 const renderMessageContent = (
   text?: string,
   isInternal: boolean = false,
@@ -260,42 +263,59 @@ const renderMessageContent = (
     );
   }
 
-  if (isInternal && text.includes("@")) {
-    const names = taggableList
-      .map(u => u.displayName || (u.first_name ? `${u.first_name} ${u.last_name || ""}`.trim() : null) || u.name)
-      .filter(Boolean)
-      .sort((a: string, b: string) => b.length - a.length)
-      .map((name: string) => name.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"));
-
+  if (text.includes("@")) {
     let regex: RegExp;
-    if (names.length > 0) {
-      const namesPattern = names.join("|");
-      regex = new RegExp(`(@\\[[^\\]]+\\]|@(?:${namesPattern})|@[A-Za-z0-9_.-]+(?:\\s+[A-Z][a-z0-9_.-]+)*)`, "g");
+
+    if (isInternal) {
+      const names = taggableList
+        .map(u => u.displayName || (u.first_name ? `${u.first_name} ${u.last_name || ""}`.trim() : null) || u.name)
+        .filter(Boolean)
+        .sort((a: string, b: string) => b.length - a.length)
+        .map((name: string) => name.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"));
+
+      if (names.length > 0) {
+        const namesPattern = names.join("|");
+        regex = new RegExp(
+          `(@\\[[^\\]]+\\]|${EMAIL_PATTERN_STR}|@(?:${namesPattern})|@[A-Za-z0-9_.-]+(?:\\s+[A-Z][a-z0-9_.-]+)*)`,
+          "g"
+        );
+      } else {
+        regex = new RegExp(
+          `(@\\[[^\\]]+\\]|${EMAIL_PATTERN_STR}|@[A-Za-z0-9_.-]+(?:\\s+[A-Z][a-z0-9_.-]+)*)`,
+          "g"
+        );
+      }
     } else {
-      regex = /(@\[[^\]]+\]|@[A-Za-z0-9_.-]+(?:\s+[A-Z][a-z0-9_.-]+)*)/g;
+      regex = new RegExp(`(${EMAIL_PATTERN_STR})`, "g");
     }
 
     const parts = text.split(regex);
     return (
-      <span className="whitespace-pre-wrap leading-relaxed text-foreground">
+      <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-relaxed text-foreground">
         {parts.map((part, i) => {
-          if (part && part.startsWith("@")) {
+          if (!part) return null;
+
+          const isEmail = EMAIL_REGEX.test(part.startsWith("@") ? part.slice(1) : part);
+          const isMention = isInternal && part.startsWith("@");
+
+          if (isEmail || isMention) {
             return (
               <span
                 key={i}
-                className="font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/15 dark:bg-amber-950/40 border border-amber-500/20 px-1.5 py-0.5 rounded-md text-[11px] sm:text-xs inline-block align-baseline mr-0.5"
+                className="font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/15 dark:bg-amber-950/40 border border-amber-500/20 px-1.5 py-0.5 rounded-md text-[11px] sm:text-xs inline-block align-baseline mr-0.5 break-all select-text"
               >
                 {part}
               </span>
             );
           }
-          return <span key={i}>{part}</span>;
+
+          return <span key={i} className="break-words [overflow-wrap:anywhere]">{part}</span>;
         })}
       </span>
     );
   }
 
-  return <span className="whitespace-pre-wrap leading-relaxed">{text}</span>;
+  return <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-relaxed">{text}</span>;
 };
 
 interface DualOrderChatDialogProps {
@@ -1355,7 +1375,7 @@ export function DualOrderChatDialog({
                   {/* Client Messages Stream */}
                   <div
                     ref={clientMessagesContainerRef}
-                    className="flex-1 min-h-0 max-h-full overflow-y-auto p-4 space-y-3.5 bg-background/30 overscroll-contain"
+                    className="flex-1 min-h-0 max-h-full overflow-y-auto overflow-x-hidden p-4 space-y-3.5 bg-background/30 overscroll-contain w-full min-w-0"
                     style={{
                       scrollbarWidth: "thin",
                       scrollbarColor: "rgba(125, 125, 125, 0.4) transparent"
@@ -1412,7 +1432,7 @@ export function DualOrderChatDialog({
                         return (
                           <div
                             key={`client-msg-${msg.id ?? 'item'}-${idx}`}
-                            className={`group flex flex-col ${isClientSender ? "items-start" : "items-end"} max-w-[85%] ${
+                            className={`group flex flex-col ${isClientSender ? "items-start" : "items-end"} max-w-[85%] sm:max-w-[80%] min-w-0 w-fit ${
                               isClientSender ? "mr-auto" : "ml-auto"
                             } ${isSameSenderAsPrev ? "mt-1" : "mt-3.5"}`}
                           >
@@ -1439,7 +1459,7 @@ export function DualOrderChatDialog({
                             )}
 
                             {isEditing ? (
-                              <div className="w-full space-y-2 p-2.5 rounded-xl bg-background border border-sky-500/40 shadow-md">
+                              <div className="w-full max-w-full min-w-0 space-y-2 p-2.5 rounded-xl bg-background border border-sky-500/40 shadow-md">
                                 <textarea
                                   value={editingMessageText}
                                   onChange={e => setEditingMessageText(e.target.value)}
@@ -1537,11 +1557,11 @@ export function DualOrderChatDialog({
                                 </div>
                               </div>
                             ) : (
-                              <div className={`flex flex-col max-w-full ${isClientSender ? "self-start" : "self-end"}`}>
-                                <div className="flex items-center gap-1.5 max-w-full">
+                              <div className={`flex flex-col max-w-full min-w-0 ${isClientSender ? "self-start" : "self-end"}`}>
+                                <div className="flex items-center gap-1.5 max-w-full min-w-0">
                                   {/* For outgoing (staff) message, show WhatsApp reaction trigger + actions on left */}
                                   {!isClientSender && (
-                                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                       {canModify && (
                                         <>
                                           {/* Edit button hidden for now - can be re-enabled later */}
@@ -1580,7 +1600,7 @@ export function DualOrderChatDialog({
                                   )}
 
                                   <div
-                                    className={`rounded-2xl leading-relaxed shadow-xs ${
+                                    className={`rounded-2xl leading-relaxed shadow-xs max-w-full min-w-0 break-words [overflow-wrap:anywhere] ${
                                       emojiOnly
                                         ? "px-2.5 py-1"
                                         : "px-3.5 py-2 text-xs sm:text-[13px]"
@@ -1593,23 +1613,23 @@ export function DualOrderChatDialog({
                                     {/* Quoted / Replied Message Header */}
                                     {msg.quoted_message_text && (
                                       <div
-                                        className={`mb-2 p-2 rounded-lg border-l-2 text-left text-xs select-none ${
+                                        className={`mb-2 p-2 rounded-lg border-l-2 text-left text-xs select-none max-w-full min-w-0 overflow-hidden ${
                                           isClientSender
                                             ? "bg-emerald-500/15 dark:bg-emerald-950/50 border-l-emerald-600 text-foreground"
                                             : "bg-sky-700/80 border-l-white text-sky-100"
                                         }`}
                                       >
-                                        <div className="flex items-center gap-1 font-bold text-[10px] opacity-90">
-                                          <Reply className="h-2.5 w-2.5" />
-                                          <span>{msg.quoted_sender_name || "Quoted Message"}</span>
+                                        <div className="flex items-center gap-1 font-bold text-[10px] opacity-90 min-w-0">
+                                          <Reply className="h-2.5 w-2.5 shrink-0" />
+                                          <span className="truncate">{msg.quoted_sender_name || "Quoted Message"}</span>
                                         </div>
-                                        <p className="text-[11px] opacity-80 truncate italic mt-0.5">
+                                        <p className="text-[11px] opacity-80 line-clamp-2 break-words italic mt-0.5">
                                           "{msg.quoted_message_text}"
                                         </p>
                                       </div>
                                     )}
 
-                                    <div>{renderMessageContent(msg.message, false)}</div>
+                                    <div className="break-words [overflow-wrap:anywhere] min-w-0 max-w-full">{renderMessageContent(msg.message, false)}</div>
 
                                     {/* Client Uploaded Document Preview Button (Preview Only - No Download) */}
                                     {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
@@ -1664,7 +1684,7 @@ export function DualOrderChatDialog({
 
                                   {/* For incoming (client) message, show WhatsApp reaction trigger + actions on right */}
                                   {isClientSender && (
-                                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                       <WhatsAppReactionHoverBar
                                         onToggleReaction={emoji => handleToggleReaction(msg.id, emoji, false)}
                                         align="start"
@@ -1805,7 +1825,7 @@ export function DualOrderChatDialog({
                             handleClientSendClick();
                           }
                         }}
-                        className="flex-1 text-xs sm:text-sm bg-background border border-input rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-1 focus:ring-sky-500 resize-none min-h-[40px] max-h-40 leading-relaxed overflow-y-auto"
+                        className="flex-1 min-w-0 text-xs sm:text-sm bg-background border border-input rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-1 focus:ring-sky-500 resize-none min-h-[40px] max-h-40 leading-relaxed overflow-y-auto break-words [overflow-wrap:anywhere]"
                         disabled={sendingClient}
                       />
                       <Button
@@ -1852,7 +1872,7 @@ export function DualOrderChatDialog({
                   {/* Internal Messages Stream */}
                   <div
                     ref={internalMessagesContainerRef}
-                    className="flex-1 min-h-0 max-h-full overflow-y-auto p-4 space-y-3.5 bg-background/30 overscroll-contain"
+                    className="flex-1 min-h-0 max-h-full overflow-y-auto overflow-x-hidden p-4 space-y-3.5 bg-background/30 overscroll-contain w-full min-w-0"
                     style={{
                       scrollbarWidth: "thin",
                       scrollbarColor: "rgba(125, 125, 125, 0.4) transparent"
@@ -1907,7 +1927,7 @@ export function DualOrderChatDialog({
                         return (
                           <div
                             key={`internal-msg-${msg.id ?? 'item'}-${idx}`}
-                            className={`group flex flex-col items-start max-w-[90%] mr-auto ${isSameSenderAsPrev ? "mt-1" : "mt-3.5"}`}
+                            className={`group flex flex-col items-start max-w-[85%] sm:max-w-[80%] min-w-0 w-fit mr-auto ${isSameSenderAsPrev ? "mt-1" : "mt-3.5"}`}
                           >
                             {!isSameSenderAsPrev && (
                               <div className="flex items-center gap-1.5 mb-1 px-1">
@@ -1923,7 +1943,7 @@ export function DualOrderChatDialog({
                             )}
 
                             {isEditing ? (
-                              <div className="w-full space-y-2 p-2.5 rounded-xl bg-background border border-amber-500/40 shadow-md">
+                              <div className="w-full max-w-full min-w-0 space-y-2 p-2.5 rounded-xl bg-background border border-amber-500/40 shadow-md">
                                 <textarea
                                   value={editingMessageText}
                                   onChange={e => setEditingMessageText(e.target.value)}
@@ -2017,10 +2037,10 @@ export function DualOrderChatDialog({
                                 </div>
                               </div>
                             ) : (
-                              <div className="flex flex-col max-w-full self-start">
-                                <div className="flex items-center gap-1.5 max-w-full">
+                              <div className="flex flex-col max-w-full min-w-0 self-start">
+                                <div className="flex items-center gap-1.5 max-w-full min-w-0">
                                   <div
-                                    className={`rounded-2xl leading-relaxed shadow-xs bg-muted/40 dark:bg-zinc-900/60 text-foreground border border-border/60 dark:border-zinc-800 rounded-tl-sm ${
+                                    className={`rounded-2xl leading-relaxed shadow-xs bg-muted/40 dark:bg-zinc-900/60 text-foreground border border-border/60 dark:border-zinc-800 rounded-tl-sm max-w-full min-w-0 break-words [overflow-wrap:anywhere] ${
                                       emojiOnly
                                         ? "px-2.5 py-1"
                                         : "px-3.5 py-2 text-xs sm:text-[13px]"
@@ -2028,18 +2048,18 @@ export function DualOrderChatDialog({
                                   >
                                     {/* Quoted Message Header */}
                                     {msg.quoted_message_text && (
-                                      <div className="mb-2 p-2 rounded-lg border-l-2 border-l-amber-600 bg-amber-500/15 dark:bg-amber-950/50 text-foreground text-left text-xs select-none">
-                                        <div className="flex items-center gap-1 font-bold text-[10px] text-amber-700 dark:text-amber-400">
-                                          <Reply className="h-2.5 w-2.5" />
-                                          <span>{msg.quoted_sender_name || "Quoted Message"}</span>
+                                      <div className="mb-2 p-2 rounded-lg border-l-2 border-l-amber-600 bg-amber-500/15 dark:bg-amber-950/50 text-foreground text-left text-xs select-none max-w-full min-w-0 overflow-hidden">
+                                        <div className="flex items-center gap-1 font-bold text-[10px] text-amber-700 dark:text-amber-400 min-w-0">
+                                          <Reply className="h-2.5 w-2.5 shrink-0" />
+                                          <span className="truncate">{msg.quoted_sender_name || "Quoted Message"}</span>
                                         </div>
-                                        <p className="text-[11px] text-muted-foreground truncate italic mt-0.5">
+                                        <p className="text-[11px] text-muted-foreground line-clamp-2 break-words italic mt-0.5">
                                           "{msg.quoted_message_text}"
                                         </p>
                                       </div>
                                     )}
 
-                                    <div>{renderMessageContent(msg.message, true, taggableUsers)}</div>
+                                    <div className="break-words [overflow-wrap:anywhere] min-w-0 max-w-full">{renderMessageContent(msg.message, true, taggableUsers)}</div>
 
                                     {/* Attached Document Card (Preview Only) */}
                                     {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
@@ -2073,7 +2093,7 @@ export function DualOrderChatDialog({
                                   </div>
 
                                   {/* Actions & WhatsApp Reaction Hover Trigger right next to bubble */}
-                                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                     <WhatsAppReactionHoverBar
                                       onToggleReaction={emoji => handleToggleReaction(msg.id, emoji, true)}
                                       align="start"
@@ -2238,7 +2258,7 @@ export function DualOrderChatDialog({
                             handleInternalSend();
                           }
                         }}
-                        className="flex-1 text-xs sm:text-sm bg-background border border-input rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-1 focus:ring-amber-500 resize-none min-h-[40px] max-h-40 leading-relaxed overflow-y-auto"
+                        className="flex-1 min-w-0 text-xs sm:text-sm bg-background border border-input rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-1 focus:ring-amber-500 resize-none min-h-[40px] max-h-40 leading-relaxed overflow-y-auto break-words [overflow-wrap:anywhere]"
                         disabled={sendingInternal}
                       />
                       <Button

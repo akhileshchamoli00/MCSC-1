@@ -201,10 +201,14 @@ export default function AssignedOrdersPage() {
     const allPatterns = [...namePatterns, ...teamPatterns]
       .map((name: string) => name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
 
+    const emailPattern = '@?[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)+';
+    const isEmailStr = (str: string) => /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/.test(str.startsWith("@") ? str.slice(1) : str);
+
     if (allPatterns.length === 0) {
-      const parts = msg.split(/(@[^\s,.:;!?]+)/g);
+      const parts = msg.split(new RegExp(`(${emailPattern}|@[^\\s,.:;!?]+)`, 'g'));
       return parts.map((part, index) => {
-        if (part.startsWith("@")) {
+        if (!part) return null;
+        if (isEmailStr(part) || part.startsWith("@")) {
           return (
             <span key={index} className="bg-emerald-500/10 text-emerald-600 font-bold px-1.5 py-0.5 rounded-md border border-emerald-500/25 text-[10px] inline-block">
               {part}
@@ -216,14 +220,15 @@ export default function AssignedOrdersPage() {
     }
 
     const escapedNamesPattern = allPatterns.join('|');
-    const emailPattern = '[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+';
-    const pattern = new RegExp(`(@(?:${escapedNamesPattern}|${emailPattern}))`, 'g');
+    const pattern = new RegExp(`(${emailPattern}|@(?:${escapedNamesPattern}))`, 'g');
 
     const parts = msg.split(pattern);
     return parts.map((part, index) => {
-      if (part.startsWith("@")) {
-        const entityName = part.slice(1);
-        const matchedTeam = teamMap.get(entityName.toLowerCase());
+      if (!part) return null;
+      const isEmail = isEmailStr(part);
+      if (isEmail || part.startsWith("@")) {
+        const entityName = part.startsWith("@") ? part.slice(1) : part;
+        const matchedTeam = !isEmail ? teamMap.get(entityName.toLowerCase()) : null;
 
         if (matchedTeam) {
           const tColor = matchedTeam.color || "#10b981";

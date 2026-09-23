@@ -282,6 +282,9 @@ const isEmojiOnlyText = (str?: string | null) => {
   return emojiRegex.test(trimmed) && trimmed.length <= 32;
 };
 
+const EMAIL_REGEX = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
+const EMAIL_PATTERN_STR = "@?[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)+";
+
 const renderMessageContent = (text?: string) => {
   if (!text) return null;
 
@@ -293,7 +296,31 @@ const renderMessageContent = (text?: string) => {
     );
   }
 
-  return <span className="whitespace-pre-wrap leading-relaxed">{text}</span>;
+  if (text.includes("@")) {
+    const regex = new RegExp(`(${EMAIL_PATTERN_STR})`, "g");
+    const parts = text.split(regex);
+    return (
+      <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-relaxed text-foreground">
+        {parts.map((part, i) => {
+          if (!part) return null;
+          const isEmail = EMAIL_REGEX.test(part.startsWith("@") ? part.slice(1) : part);
+          if (isEmail) {
+            return (
+              <span
+                key={i}
+                className="font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/15 dark:bg-amber-950/40 border border-amber-500/20 px-1.5 py-0.5 rounded-md text-[11px] sm:text-xs inline-block align-baseline mr-0.5 break-all select-text"
+              >
+                {part}
+              </span>
+            );
+          }
+          return <span key={i} className="break-words [overflow-wrap:anywhere]">{part}</span>;
+        })}
+      </span>
+    );
+  }
+
+  return <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-relaxed">{text}</span>;
 };
 
 export default function ClientOrderChatPage() {
@@ -1103,7 +1130,7 @@ export default function ClientOrderChatPage() {
               {/* Message Stream */}
               <div
                 ref={messagesContainerRef}
-                className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 bg-background/20 overscroll-contain"
+                className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-4 bg-background/20 overscroll-contain w-full min-w-0"
               >
                 {loadingMessages ? (
                   <div className="flex h-full items-center justify-center">
@@ -1158,7 +1185,7 @@ export default function ClientOrderChatPage() {
                         return (
                           <div
                             key={`client-msg-${msg.id ?? 'item'}-${idx}`}
-                            className={`group flex flex-col ${isSelf ? "items-end" : "items-start"} max-w-[85%] ${
+                            className={`group flex flex-col ${isSelf ? "items-end" : "items-start"} max-w-[85%] sm:max-w-[80%] min-w-0 w-fit ${
                               isSelf ? "ml-auto" : "mr-auto"
                             } ${isSameSenderAsPrev ? "mt-1" : "mt-3"}`}
                           >
@@ -1277,11 +1304,11 @@ export default function ClientOrderChatPage() {
                                 </div>
                               </div>
                             ) : (
-                              <div className={`flex flex-col max-w-full ${isSelf ? "self-end" : "self-start"}`}>
-                                <div className="flex items-center gap-1.5 max-w-full">
+                              <div className={`flex flex-col max-w-full min-w-0 ${isSelf ? "self-end" : "self-start"}`}>
+                                <div className="flex items-center gap-1.5 max-w-full min-w-0">
                                   {/* For outgoing (client) messages, show actions & WhatsApp reaction trigger on left */}
                                   {isSelf && (
-                                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                       {canModify && (
                                         <>
                                           {/* Edit button hidden for now - can be re-enabled later */}
@@ -1320,7 +1347,7 @@ export default function ClientOrderChatPage() {
                                   )}
 
                                   <div
-                                    className={`rounded-2xl leading-relaxed shadow-xs ${
+                                    className={`rounded-2xl leading-relaxed shadow-xs max-w-full min-w-0 break-words [overflow-wrap:anywhere] ${
                                       emojiOnly
                                         ? "px-2.5 py-1"
                                         : "px-3.5 py-2 text-xs sm:text-[13px]"
@@ -1333,23 +1360,23 @@ export default function ClientOrderChatPage() {
                                     {/* Quoted Message Header Preview */}
                                     {(msg.quoted_message_text || msg.quoted_sender_name) && (
                                       <div
-                                        className={`mb-2 p-2 rounded-lg border-l-2 text-xs flex flex-col gap-0.5 ${
+                                        className={`mb-2 p-2 rounded-lg border-l-2 text-xs flex flex-col gap-0.5 max-w-full min-w-0 overflow-hidden ${
                                           isSelf
                                             ? "bg-black/20 border-white/80 text-white/90"
                                             : "bg-muted/50 border-emerald-500 text-muted-foreground"
                                         }`}
                                       >
-                                        <div className="flex items-center gap-1 font-semibold text-[11px] opacity-90">
+                                        <div className="flex items-center gap-1 font-semibold text-[11px] opacity-90 min-w-0">
                                           <Quote className="h-3 w-3 shrink-0" />
-                                          <span>{msg.quoted_sender_name || "Original Message"}</span>
+                                          <span className="truncate">{msg.quoted_sender_name || "Original Message"}</span>
                                         </div>
-                                        <div className="text-[11px] truncate line-clamp-1 italic">
+                                        <div className="text-[11px] line-clamp-2 break-words italic">
                                           {msg.quoted_message_text}
                                         </div>
                                       </div>
                                     )}
 
-                                    <div>{renderMessageContent(msg.message)}</div>
+                                    <div className="break-words [overflow-wrap:anywhere] min-w-0 max-w-full">{renderMessageContent(msg.message)}</div>
 
                                     {/* Client Uploaded Attachment Receipt */}
                                     {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
@@ -1582,7 +1609,7 @@ export default function ClientOrderChatPage() {
                       }
                     }}
                     rows={1}
-                    className="flex-1 text-xs sm:text-sm bg-background/70 border border-border/50 rounded-xl px-3.5 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 resize-none placeholder:text-muted-foreground min-h-[46px] max-h-40 leading-relaxed overflow-y-auto"
+                    className="flex-1 min-w-0 text-xs sm:text-sm bg-background/70 border border-border/50 rounded-xl px-3.5 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 resize-none placeholder:text-muted-foreground min-h-[46px] max-h-40 leading-relaxed overflow-y-auto break-words [overflow-wrap:anywhere]"
                   />
 
                   <Button
