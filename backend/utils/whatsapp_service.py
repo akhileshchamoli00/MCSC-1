@@ -83,9 +83,14 @@ def send_whatsapp_text(recipient_phone: str, message: str) -> dict:
         print(f"Exception sending WhatsApp message: {str(e)}")
         return {"success": False, "error": str(e)}
 
-def send_whatsapp_template(recipient_phone: str, template_name: str = "hello_world", language_code: str = "en_US") -> dict:
+def send_whatsapp_template(
+    recipient_phone: str,
+    template_name: str = "mcsc_order_invoice",
+    language_code: str = "en",
+    body_parameters: list = None
+) -> dict:
     """
-    Sends a pre-approved template message via Meta WhatsApp Cloud API (e.g. hello_world sandbox test).
+    Sends a pre-approved template message via Meta WhatsApp Cloud API with optional body parameters.
     """
     token, phone_id, version = get_whatsapp_config()
 
@@ -93,22 +98,37 @@ def send_whatsapp_template(recipient_phone: str, template_name: str = "hello_wor
         return {"success": False, "error": "WhatsApp credentials not configured"}
 
     target = sanitize_phone_number(recipient_phone)
+    if not target:
+        return {"success": False, "error": "Invalid recipient phone number"}
+
     url = f"https://graph.facebook.com/{version}/{phone_id}/messages"
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
 
+    template_payload = {
+        "name": template_name,
+        "language": {
+            "code": language_code
+        }
+    }
+
+    if body_parameters:
+        template_payload["components"] = [
+            {
+                "type": "body",
+                "parameters": [
+                    {"type": "text", "text": str(p)} for p in body_parameters
+                ]
+            }
+        ]
+
     payload = {
         "messaging_product": "whatsapp",
         "to": target,
         "type": "template",
-        "template": {
-            "name": template_name,
-            "language": {
-                "code": language_code
-            }
-        }
+        "template": template_payload
     }
 
     try:
@@ -211,13 +231,33 @@ def send_whatsapp_invoice_notification(
     including the text summary, payment link, and the actual PDF document.
     """
     inv_title = f"{invoice_type.title()} Invoice"
+    client_label = recipient_name or company_name or 'Valued Client'
+    company_label = company_name or 'PT Mandiri Cipta Solusi'
 
-    message = f"""*PT MANDIRI CIPTA SOLUSI (MCS CONSULTING)*
+    # 1. Primary: Dispatch pre-approved utility template (reaches anyone 24/7)
+    tpl_params = [
+        client_label,
+        inv_title,
+        order_number,
+        company_label,
+        amount_formatted
+    ]
+    dispatch_res = send_whatsapp_template(
+        recipient_phone=recipient_phone,
+        template_name="mcsc_order_invoice",
+        language_code="en",
+        body_parameters=tpl_params
+    )
+
+    # 2. Fallback: If template is still pending approval or fails, try direct text
+    if not dispatch_res.get("success"):
+        print(f"Notice: Template send failed ({dispatch_res.get('error')}), falling back to direct text...")
+        message = f"""*PT MANDIRI CIPTA SOLUSI (MCS CONSULTING)*
 Official Billing & Invoice Notification
 
-Dear *{recipient_name or company_name or 'Valued Client'}*,
+Dear *{client_label}*,
 
-Your *{inv_title}* for order *{order_number}* ({company_name or 'Client Entity'}) has been finalized and issued.
+Your *{inv_title}* for order *{order_number}* ({company_label}) has been finalized and issued.
 
 📋 *Invoice Details:*
 • *Order Reference:* {order_number}
@@ -237,21 +277,13 @@ Thank you,
 *PT Mandiri Cipta Solusi*
 Springhill Office Tower, Jakarta
 www.mcsc.co.id"""
+        dispatch_res = send_whatsapp_text(recipient_phone, message)
 
-    text_res = send_whatsapp_text(recipient_phone, message)
-    if not text_res.get("success"):
-        # Fallback to template if outside 24h conversation window
-        if "template" in str(text_res.get("error", "")).lower() or text_res.get("status_code") == 400:
-            print("Notice: Attempting fallback to hello_world template...")
-            tpl_res = send_whatsapp_template(recipient_phone, "hello_world")
-            if tpl_res.get("success"):
-                text_res = {"success": True, "note": "Sent via template", "data": tpl_res.get("data")}
-
-    # If PDF bytes are supplied, send the actual PDF file as a WhatsApp document
+    # 3. If PDF bytes are supplied, send the actual PDF file as a WhatsApp document
     doc_res = None
     if pdf_content:
         clean_filename = pdf_filename or f"MCSC_{invoice_type.title()}_Invoice_{order_number}.pdf"
-        caption = f"📄 {inv_title} - {order_number} ({company_name or 'PT Mandiri Cipta Solusi'})"
+        caption = f"📄 {inv_title} - {order_number} ({company_label})"
         doc_res = send_whatsapp_document(
             recipient_phone=recipient_phone,
             file_bytes=pdf_content,
@@ -260,8 +292,8 @@ www.mcsc.co.id"""
         )
 
     return {
-        "success": text_res.get("success") or (doc_res and doc_res.get("success", False)),
-        "text_result": text_res,
+        "success": dispatch_res.get("success") or (doc_res and doc_res.get("success", False)),
+        "text_result": dispatch_res,
         "doc_result": doc_res
     }
 

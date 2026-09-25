@@ -1803,18 +1803,31 @@ def update_client_order(id: int, order_update: schemas.ClientOrderUpdate, db: Se
     # Query the entire order group to update them together and prevent duplicate progress entries
     orders_in_group = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == db_order.order_number).all()
     
-    c_ids = db_order.consultant_ids or []
-    if isinstance(c_ids, str):
-        try:
-            c_ids = json.loads(c_ids)
-        except Exception:
-            c_ids = [int(x.strip()) for x in c_ids.split(",") if x.strip().isdigit()]
-            
-    is_assigned_consultant = False
-    if current_user.employee and isinstance(c_ids, list) and current_user.employee.id in c_ids:
-        is_assigned_consultant = True
+    c_ids = parse_consultant_ids(db_order.consultant_ids)
+    r_ids = parse_consultant_ids(getattr(db_order, "reviewer_ids", None))
+    if not r_ids and db_order.reviewer_id:
+        r_ids = [db_order.reviewer_id]
 
-    if not is_admin_hr and not is_assigned_consultant:
+    for o_item in orders_in_group:
+        for cid in parse_consultant_ids(o_item.consultant_ids):
+            if cid not in c_ids:
+                c_ids.append(cid)
+        for rid in parse_consultant_ids(getattr(o_item, "reviewer_ids", None)):
+            if rid not in r_ids:
+                r_ids.append(rid)
+        if o_item.reviewer_id and o_item.reviewer_id not in r_ids:
+            r_ids.append(o_item.reviewer_id)
+
+    is_assigned_consultant = False
+    is_designated_reviewer = False
+    if current_user.employee:
+        emp_id = current_user.employee.id
+        if emp_id in c_ids:
+            is_assigned_consultant = True
+        if emp_id in r_ids:
+            is_designated_reviewer = True
+
+    if not is_admin_hr and not is_assigned_consultant and not is_designated_reviewer:
         raise HTTPException(status_code=403, detail="You do not have permission to update this order")
         
     if db_order.status == "COMPLETED" and not is_admin_hr:

@@ -212,12 +212,23 @@ def validate_file_security(
 
     # 4. Binary Malware Signatures Check
     header_1024 = file_bytes[:1024]
+    stripped_header = header_1024.lstrip(b"\xef\xbb\xbf \t\r\n")
     for bad_sig, desc in BLOCKED_BINARY_SIGNATURES:
-        if header_1024.startswith(bad_sig) or (bad_sig in header_1024 and bad_sig in [b"<?php", b"<script", b"#!"]):
+        # Binary executables and scripts must start at offset 0 (or after optional text BOM/whitespace for scripts)
+        if header_1024.startswith(bad_sig) or stripped_header.startswith(bad_sig):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Security violation: File header matches blocked executable format ({desc})."
             )
+
+    # For text formats (.txt, .csv), prevent embedded scripts anywhere in the header
+    if ext in ["txt", "csv"]:
+        for script_sig, desc in [(b"<?php", "PHP executable script"), (b"<script", "Inline HTML/JS script execution")]:
+            if script_sig in header_1024:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Security violation: File content matches blocked executable format ({desc})."
+                )
 
     # 5. Magic Bytes Matching for Declared Extensions
     if ext in ["jpg", "jpeg"]:

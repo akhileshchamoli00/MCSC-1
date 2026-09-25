@@ -27,7 +27,8 @@ import {
   AlertCircle,
   Lock,
   Edit,
-  DollarSign,
+  CreditCard,
+  Receipt,
   PauseCircle,
   AlertTriangle,
   MessageSquare
@@ -1294,7 +1295,7 @@ export default function EditClientOrderPage() {
             <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
               <CardHeader className="py-2 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <DollarSign className="h-3.5 w-3.5 text-primary" />
+                  <CreditCard className="h-3.5 w-3.5 text-primary" />
                   <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
                     3. Order Lifecycle & Financial Controls
                   </CardTitle>
@@ -1367,7 +1368,7 @@ export default function EditClientOrderPage() {
                 {/* Payment Status */}
                 <div className="space-y-1 bg-muted/20 p-2 rounded-lg border border-border/60">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-foreground flex items-center gap-1">
-                    <DollarSign className="h-3 w-3 text-emerald-600" />
+                    <Receipt className="h-3 w-3 text-emerald-600" />
                     <span>Payment Status</span>
                   </label>
                   <select

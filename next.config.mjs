@@ -154,6 +154,14 @@ const nextConfig = {
     const backendUrl = process.env.BACKEND_URL || 'http://127.0.0.1:8000';
     return [
       {
+        source: '/api/v1/webhooks/:path*',
+        destination: `${backendUrl}/api/v1/webhooks/:path*`
+      },
+      {
+        source: '/api/webhooks/:path*',
+        destination: `${backendUrl}/api/webhooks/:path*`
+      },
+      {
         source: '/api-proxy/api/:path*',
         destination: `${backendUrl}/api/:path*`
       },

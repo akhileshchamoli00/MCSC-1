@@ -478,8 +478,15 @@ export default function CompanyDocumentsManagementPage() {
       });
 
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || "Save failed");
+        let msg = "Save failed";
+        try {
+          const errJson = await res.json();
+          msg = errJson.detail || errJson.message || JSON.stringify(errJson);
+        } catch {
+          const errText = await res.text();
+          if (errText) msg = errText;
+        }
+        throw new Error(msg);
       }
 
       const newDoc = await res.json();

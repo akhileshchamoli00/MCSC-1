@@ -518,7 +518,7 @@ export default function AssignedOrdersPage() {
     setSubmittingHold(true);
     try {
       const cleanedReason = holdReason.trim();
-      await Promise.all(
+      const responses = await Promise.all(
         pendingHoldGroup.items.map((itemRow: any) =>
           fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${itemRow.id}`, {
             credentials: "include",
@@ -535,6 +535,13 @@ export default function AssignedOrdersPage() {
         )
       );
 
+      for (const res of responses) {
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || "Failed to put order on hold");
+        }
+      }
+
       toast.success(`Order ${pendingHoldGroup.order_number} status updated to ON HOLD`);
       setIsOnHoldDialogOpen(false);
       setPendingHoldGroup(null);
@@ -543,9 +550,9 @@ export default function AssignedOrdersPage() {
       if (selectedGroup && selectedGroup.order_number === pendingHoldGroup.order_number) {
         setSelectedGroup({ ...selectedGroup, status: "ON_HOLD" });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error("Failed to put order on hold");
+      toast.error(err.message || "Failed to put order on hold");
     } finally {
       setSubmittingHold(false);
     }
@@ -555,7 +562,7 @@ export default function AssignedOrdersPage() {
     if (!group || !group.items) return;
     setSavingStatus(true);
     try {
-      await Promise.all(
+      const responses = await Promise.all(
         group.items.map((itemRow: any) =>
           fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${itemRow.id}`, {
             credentials: "include",
@@ -567,6 +574,14 @@ export default function AssignedOrdersPage() {
           })
         )
       );
+
+      for (const res of responses) {
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || "Failed to update order status");
+        }
+      }
+
       if (newStatus === "FINAL_DOC_READY") {
         toast.success(`Order ${group.order_number} marked as Final Docs Ready and moved to Completed Orders`);
       } else {
@@ -577,9 +592,9 @@ export default function AssignedOrdersPage() {
       if (selectedGroup && selectedGroup.order_number === group.order_number) {
         setSelectedGroup({ ...selectedGroup, status: newStatus });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error("Failed to update order status");
+      toast.error(err.message || "Failed to update order status");
     } finally {
       setSavingStatus(false);
       setPendingConfirmGroup(null);
