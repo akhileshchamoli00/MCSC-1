@@ -178,6 +178,27 @@ export default function BusinessDashboard() {
             PRE DOCS SENT
           </span>
         );
+      case "AWAITING_SIGNING_NOTARIZATION":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-violet-500/10 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-violet-500" />
+            AWAITING SIGNING
+          </span>
+        );
+      case "AWAITING_DOCUMENT_RETURN":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-blue-500" />
+            AWAITING DOC RETURN
+          </span>
+        );
+      case "AWAITING_THIRD_PARTY_RESPONSE":
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20">
+            <span className="h-1.5 w-1.5 rounded-full mr-1.5 bg-amber-500" />
+            AWAITING VENDOR
+          </span>
+        );
       case "FINAL_DOCUMENT_PREPARATION":
         return (
           <span className="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-orange-500/10 dark:bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/20">

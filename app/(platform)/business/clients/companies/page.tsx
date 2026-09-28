@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { 
   Building, 
   Search, 
@@ -20,7 +20,9 @@ import {
   Clock,
   AlertTriangle,
   Trash2,
-  MailCheck
+  MailCheck,
+  SlidersHorizontal,
+  X
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -68,6 +70,8 @@ const formatUserName = (userObj: any, fallback = "Staff") => {
   return fallback;
 };
 
+const FILTERS_STORAGE_KEY = "mcsc_companies_directory_filters";
+
 export default function CompaniesDirectory() {
   const router = useRouter();
   const { isAdmin, hasPermission, loading: userLoading } = useUser();
@@ -84,6 +88,105 @@ export default function CompaniesDirectory() {
   const [validationFilter, setValidationFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Column-Specific Filters State
+  const [showColumnFilters, setShowColumnFilters] = useState(true);
+  const [colFilterCompany, setColFilterCompany] = useState("");
+  const [colFilterClient, setColFilterClient] = useState("");
+  const [colFilterContact, setColFilterContact] = useState("");
+  const [colFilterTaxLocation, setColFilterTaxLocation] = useState("");
+
+  const isRestoredRef = useRef(false);
+  const prevFiltersRef = useRef<string>("");
+
+  const saveCurrentFilters = () => {
+    if (typeof window === "undefined") return;
+    try {
+      const dataToSave = {
+        searchTerm,
+        statusFilter,
+        validationFilter,
+        showColumnFilters,
+        colFilterCompany,
+        colFilterClient,
+        colFilterContact,
+        colFilterTaxLocation,
+        currentPage,
+      };
+      sessionStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(dataToSave));
+      localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(dataToSave));
+    } catch (e) {
+      console.error("Error saving company directory filters:", e);
+    }
+  };
+
+  // Restore saved search and filter parameters on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = sessionStorage.getItem(FILTERS_STORAGE_KEY) || localStorage.getItem(FILTERS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed.searchTerm === "string") setSearchTerm(parsed.searchTerm);
+        if (typeof parsed.statusFilter === "string") setStatusFilter(parsed.statusFilter);
+        if (typeof parsed.validationFilter === "string") setValidationFilter(parsed.validationFilter);
+        if (typeof parsed.showColumnFilters === "boolean") setShowColumnFilters(parsed.showColumnFilters);
+        if (typeof parsed.colFilterCompany === "string") setColFilterCompany(parsed.colFilterCompany);
+        if (typeof parsed.colFilterClient === "string") setColFilterClient(parsed.colFilterClient);
+        if (typeof parsed.colFilterContact === "string") setColFilterContact(parsed.colFilterContact);
+        if (typeof parsed.colFilterTaxLocation === "string") setColFilterTaxLocation(parsed.colFilterTaxLocation);
+        if (typeof parsed.currentPage === "number" && parsed.currentPage > 0) setCurrentPage(parsed.currentPage);
+      }
+    } catch (e) {
+      console.error("Error reading saved company directory filters:", e);
+    } finally {
+      setTimeout(() => {
+        isRestoredRef.current = true;
+      }, 100);
+    }
+  }, []);
+
+  // Auto-save whenever filters change after restoration
+  useEffect(() => {
+    if (!isRestoredRef.current || typeof window === "undefined") return;
+    saveCurrentFilters();
+  }, [
+    searchTerm,
+    statusFilter,
+    validationFilter,
+    showColumnFilters,
+    colFilterCompany,
+    colFilterClient,
+    colFilterContact,
+    colFilterTaxLocation,
+    currentPage,
+  ]);
+
+  const activeColFilterCount = useMemo(() => {
+    return [
+      colFilterCompany.trim(),
+      colFilterClient.trim(),
+      colFilterContact.trim(),
+      colFilterTaxLocation.trim(),
+      statusFilter !== "ALL" ? statusFilter : "",
+      validationFilter !== "ALL" ? validationFilter : "",
+    ].filter(Boolean).length;
+  }, [colFilterCompany, colFilterClient, colFilterContact, colFilterTaxLocation, statusFilter, validationFilter]);
+
+  const handleClearAllFilters = () => {
+    setSearchTerm("");
+    setColFilterCompany("");
+    setColFilterClient("");
+    setColFilterContact("");
+    setColFilterTaxLocation("");
+    setStatusFilter("ALL");
+    setValidationFilter("ALL");
+    setCurrentPage(1);
+    try {
+      sessionStorage.removeItem(FILTERS_STORAGE_KEY);
+      localStorage.removeItem(FILTERS_STORAGE_KEY);
+    } catch (e) {}
+  };
+
   // Authorization Check & Redirect
   useEffect(() => {
     if (!userLoading && !canView) {
@@ -96,9 +199,31 @@ export default function CompaniesDirectory() {
     }
   }, [userLoading, canView, hasPermission, router]);
 
+  // Reset page to 1 only when user actually changes a search/filter criterion (not during hydration)
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, statusFilter, validationFilter]);
+    if (!isRestoredRef.current) return;
+    const currentFiltersStr = JSON.stringify([
+      searchTerm,
+      statusFilter,
+      validationFilter,
+      colFilterCompany,
+      colFilterClient,
+      colFilterContact,
+      colFilterTaxLocation,
+    ]);
+    if (prevFiltersRef.current && prevFiltersRef.current !== currentFiltersStr) {
+      setCurrentPage(1);
+    }
+    prevFiltersRef.current = currentFiltersStr;
+  }, [
+    searchTerm,
+    statusFilter,
+    validationFilter,
+    colFilterCompany,
+    colFilterClient,
+    colFilterContact,
+    colFilterTaxLocation,
+  ]);
 
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -241,24 +366,87 @@ export default function CompaniesDirectory() {
   };
 
   const filteredCompanies = companies.filter(c => {
-    const name = c.company_name || "";
-    const code = c.company_code || "";
-    const ind = c.industry || "";
-    const contact = c.key_contact_person || "";
-    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          ind.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          contact.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === "ALL" || c.status === statusFilter;
-    
-    const valStatus = c.validation_status || "PENDING_VALIDATION";
-    const matchesValidation = validationFilter === "ALL" || 
-      (validationFilter === "VALIDATED" && valStatus === "VALIDATED") ||
-      (validationFilter === "PENDING" && valStatus === "PENDING_VALIDATION") ||
-      (validationFilter === "REVISION" && valStatus === "NEEDS_REVISION");
+    // 1. Global Search (now includes contact email, client email, phone, tax, address, contact, etc.)
+    const term = searchTerm.trim().toLowerCase();
+    if (term) {
+      const name = (c.company_name || "").toLowerCase();
+      const code = (c.company_code || "").toLowerCase();
+      const ind = (c.industry || "").toLowerCase();
+      const contactPerson = (c.key_contact_person || "").toLowerCase();
+      const contactEmail = (c.key_contact_email || "").toLowerCase();
+      const contactPhone = (c.key_contact_phone || "").toLowerCase();
+      const clientPerson = (c.client?.contact_person || "").toLowerCase();
+      const clientEmail = (c.client?.email || "").toLowerCase();
+      const clientPhone = (c.client?.phone || "").toLowerCase();
+      const tax = (c.tax_number || "").toLowerCase();
+      const aol = (c.accurate_customer_no || "").toLowerCase();
+      const addr = (c.address || "").toLowerCase();
 
-    return matchesSearch && matchesStatus && matchesValidation;
+      const matchesGlobal = (
+        name.includes(term) ||
+        code.includes(term) ||
+        ind.includes(term) ||
+        contactPerson.includes(term) ||
+        contactEmail.includes(term) ||
+        contactPhone.includes(term) ||
+        clientPerson.includes(term) ||
+        clientEmail.includes(term) ||
+        clientPhone.includes(term) ||
+        tax.includes(term) ||
+        aol.includes(term) ||
+        addr.includes(term)
+      );
+      if (!matchesGlobal) return false;
+    }
+
+    // 2. Column: Company Profile
+    if (colFilterCompany.trim()) {
+      const q = colFilterCompany.trim().toLowerCase();
+      const name = (c.company_name || "").toLowerCase();
+      const code = (c.company_code || "").toLowerCase();
+      const ind = (c.industry || "").toLowerCase();
+      if (!name.includes(q) && !code.includes(q) && !ind.includes(q)) return false;
+    }
+
+    // 3. Column: Parent Client
+    if (colFilterClient.trim()) {
+      const q = colFilterClient.trim().toLowerCase();
+      const clientPerson = (c.client?.contact_person || "").toLowerCase();
+      const clientEmail = (c.client?.email || "").toLowerCase();
+      const clientPhone = (c.client?.phone || "").toLowerCase();
+      if (!clientPerson.includes(q) && !clientEmail.includes(q) && !clientPhone.includes(q)) return false;
+    }
+
+    // 4. Column: Key Contact
+    if (colFilterContact.trim()) {
+      const q = colFilterContact.trim().toLowerCase();
+      const contactPerson = (c.key_contact_person || "").toLowerCase();
+      const contactEmail = (c.key_contact_email || "").toLowerCase();
+      const contactPhone = (c.key_contact_phone || "").toLowerCase();
+      if (!contactPerson.includes(q) && !contactEmail.includes(q) && !contactPhone.includes(q)) return false;
+    }
+
+    // 5. Column: Tax & Location
+    if (colFilterTaxLocation.trim()) {
+      const q = colFilterTaxLocation.trim().toLowerCase();
+      const tax = (c.tax_number || "").toLowerCase();
+      const aol = (c.accurate_customer_no || "").toLowerCase();
+      const addr = (c.address || "").toLowerCase();
+      if (!tax.includes(q) && !aol.includes(q) && !addr.includes(q)) return false;
+    }
+
+    // 6. Operational Status (ACTIVE / DISABLED)
+    if (statusFilter !== "ALL" && c.status !== statusFilter) {
+      return false;
+    }
+
+    // 7. Validation Status (VALIDATED / PENDING / REVISION)
+    const valStatus = c.validation_status || "PENDING_VALIDATION";
+    if (validationFilter === "VALIDATED" && valStatus !== "VALIDATED") return false;
+    if (validationFilter === "PENDING" && valStatus !== "PENDING_VALIDATION") return false;
+    if (validationFilter === "REVISION" && valStatus !== "NEEDS_REVISION") return false;
+
+    return true;
   });
 
   const totalPages = Math.ceil(filteredCompanies.length / 10);
@@ -370,12 +558,41 @@ export default function CompaniesDirectory() {
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search name, code, contact or industry..."
+                placeholder="Search name, code, contact or email..."
                 className="pl-9 h-9 text-xs rounded-xl bg-background/70 border-border/50 focus:border-ring"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+
+            {/* Column Filters Toggle Button */}
+            <Button
+              type="button"
+              variant={showColumnFilters ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setShowColumnFilters(!showColumnFilters)}
+              className="h-9 px-3 text-xs font-semibold gap-1.5 rounded-xl border-border/50 shrink-0"
+              title="Toggle per-column table filters"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              <span>Column Filters</span>
+              {activeColFilterCount > 0 && (
+                <Badge variant="default" className="h-4 px-1.5 text-[9px] font-bold rounded-full ml-0.5">
+                  {activeColFilterCount}
+                </Badge>
+              )}
+            </Button>
+            {(activeColFilterCount > 0 || searchTerm) && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleClearAllFilters}
+                className="h-9 px-2.5 text-xs text-muted-foreground hover:text-destructive gap-1 shrink-0"
+              >
+                <X className="h-3.5 w-3.5" /> Clear Filters
+              </Button>
+            )}
 
             {/* Validation Filter Tabs */}
             <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/40">
@@ -425,26 +642,129 @@ export default function CompaniesDirectory() {
         </div>
 
         <CardContent className="p-0">
-          {filteredCompanies.length === 0 ? (
-            <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
-              <Building2 className="h-10 w-10 text-muted-foreground/35" />
-              <span className="text-sm font-semibold">No Companies Found</span>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                    <th className="p-4 pl-5">Company Profile</th>
-                    <th className="p-4">Parent Client</th>
-                    <th className="p-4">Key Contact</th>
-                    <th className="p-4">Tax & Location</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4 text-right pr-5">Actions</th>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
+                  <th className="p-3 pl-4 min-w-[220px]">Company Profile</th>
+                  <th className="p-3 min-w-[170px]">Parent Client</th>
+                  <th className="p-3 min-w-[180px]">Key Contact</th>
+                  <th className="p-3 min-w-[170px]">Tax & Location</th>
+                  <th className="p-3 min-w-[140px]">Status</th>
+                  <th className="p-3 text-right pr-4 min-w-[100px]">Actions</th>
+                </tr>
+                {showColumnFilters && (
+                  <tr className="bg-muted/15 border-b border-border/50 text-xs">
+                    {/* 1. Company Profile */}
+                    <th className="py-1.5 px-2 pl-4">
+                      <Input
+                        placeholder="Company name, code, industry..."
+                        value={colFilterCompany}
+                        onChange={(e) => setColFilterCompany(e.target.value)}
+                        className="h-7 text-[11px] px-2 rounded-md bg-background/80 border-border/60 placeholder:text-muted-foreground/50 w-full"
+                      />
+                    </th>
+                    {/* 2. Parent Client */}
+                    <th className="py-1.5 px-2">
+                      <Input
+                        placeholder="Representative or client email..."
+                        value={colFilterClient}
+                        onChange={(e) => setColFilterClient(e.target.value)}
+                        className="h-7 text-[11px] px-2 rounded-md bg-background/80 border-border/60 placeholder:text-muted-foreground/50 w-full"
+                      />
+                    </th>
+                    {/* 3. Key Contact */}
+                    <th className="py-1.5 px-2">
+                      <Input
+                        placeholder="Contact person, email, phone..."
+                        value={colFilterContact}
+                        onChange={(e) => setColFilterContact(e.target.value)}
+                        className="h-7 text-[11px] px-2 rounded-md bg-background/80 border-border/60 placeholder:text-muted-foreground/50 w-full"
+                      />
+                    </th>
+                    {/* 4. Tax & Location */}
+                    <th className="py-1.5 px-2">
+                      <Input
+                        placeholder="Tax ID, AOL code, address..."
+                        value={colFilterTaxLocation}
+                        onChange={(e) => setColFilterTaxLocation(e.target.value)}
+                        className="h-7 text-[11px] px-2 rounded-md bg-background/80 border-border/60 placeholder:text-muted-foreground/50 w-full"
+                      />
+                    </th>
+                    {/* 5. Status */}
+                    <th className="py-1.5 px-2">
+                      <div className="flex items-center gap-1">
+                        <select
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value)}
+                          className="h-7 w-1/2 text-[10px] px-1 rounded-md bg-background/80 border border-border/60 font-medium text-foreground truncate"
+                          title="Filter operational status"
+                        >
+                          <option value="ALL">All Status</option>
+                          <option value="ACTIVE">ACTIVE</option>
+                          <option value="DISABLED">DISABLED</option>
+                        </select>
+                        <select
+                          value={validationFilter}
+                          onChange={(e) => setValidationFilter(e.target.value)}
+                          className="h-7 w-1/2 text-[10px] px-1 rounded-md bg-background/80 border border-border/60 font-medium text-foreground truncate"
+                          title="Filter verification status"
+                        >
+                          <option value="ALL">All Verify</option>
+                          <option value="VALIDATED">Verified</option>
+                          <option value="PENDING">Pending</option>
+                          <option value="REVISION">Revision</option>
+                        </select>
+                      </div>
+                    </th>
+                    {/* 6. Actions */}
+                    <th className="py-1.5 px-2 pr-4 text-right">
+                      {activeColFilterCount > 0 ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleClearAllFilters}
+                          className="h-7 px-2 text-[10px] text-destructive hover:bg-destructive/10 font-bold w-full gap-0.5 justify-center"
+                          title="Reset all filters"
+                        >
+                          <X className="h-3 w-3" /> Reset
+                        </Button>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground/40 italic block text-right pr-2">Filter</span>
+                      )}
+                    </th>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-border/30">
-                  {paginatedCompanies.map((company) => {
+                )}
+              </thead>
+              <tbody className="divide-y divide-border/30">
+                {paginatedCompanies.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-14 text-center text-muted-foreground">
+                      <div className="flex flex-col items-center justify-center gap-2.5">
+                        <Building2 className="h-10 w-10 text-muted-foreground/30 stroke-[1.5]" />
+                        <span className="text-sm font-semibold text-foreground/80">No Companies Found</span>
+                        <p className="text-xs max-w-sm text-muted-foreground">
+                          {activeColFilterCount > 0 || searchTerm
+                            ? "No companies match the specified search or filter criteria. You can adjust or reset the filters above."
+                            : 'Click "Add Company" above to register your first corporate client profile.'}
+                        </p>
+                        {(activeColFilterCount > 0 || searchTerm) && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleClearAllFilters}
+                            className="mt-1 text-xs font-semibold h-8 px-3"
+                          >
+                            Reset All Filters
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedCompanies.map((company) => {
                     const isRep = company.key_contact_person === company.client?.contact_person &&
                                   company.key_contact_email === company.client?.email &&
                                   (company.key_contact_phone || "") === (company.client?.phone || "");
@@ -645,7 +965,7 @@ export default function CompaniesDirectory() {
                             )}
 
                             {company.validation_status !== "VALIDATED" && (
-                              <Link href={`/business/clients/companies/${company.id}`}>
+                              <Link href={`/business/clients/companies/${company.id}`} onClick={saveCurrentFilters}>
                                 <Button 
                                   size="sm" 
                                   variant="outline" 
@@ -657,7 +977,7 @@ export default function CompaniesDirectory() {
                               </Link>
                             )}
                             {canEdit && (
-                              <Link href={`/business/clients/companies/${company.id}`}>
+                              <Link href={`/business/clients/companies/${company.id}`} onClick={saveCurrentFilters}>
                                 <Button 
                                   size="icon" 
                                   variant="ghost" 
@@ -686,20 +1006,22 @@ export default function CompaniesDirectory() {
                         </td>
                       </tr>
                     );
-                  })}
+                  })
+                )}
                 </tbody>
               </table>
             </div>
-          )}
 
-          <TablePagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            startIndex={startIndex}
-            endIndex={startIndex + 10}
-            totalEntries={filteredCompanies.length}
-          />
+          {filteredCompanies.length > 0 && (
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              startIndex={startIndex}
+              endIndex={startIndex + 10}
+              totalEntries={filteredCompanies.length}
+            />
+          )}
         </CardContent>
       </Card>
 

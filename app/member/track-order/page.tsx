@@ -115,6 +115,30 @@ const getMilestoneIcon = (message: string) => {
   return <Clock className="h-3.5 w-3.5 text-primary shrink-0" />;
 };
 
+const cleanClientMilestoneMessage = (message: string) => {
+  if (!message) return "";
+  const lower = message.toLowerCase();
+  if (lower.includes("order placed on hold") && lower.includes("reason:")) {
+    return "⏸️ Order placed ON HOLD.";
+  }
+  return message;
+};
+
+export const formatExternalTeamName = (name?: string | null) => {
+  if (!name) return "Consultant MCS";
+  const trimmed = name.trim();
+  if (!trimmed) return "Consultant MCS";
+  const lower = trimmed.toLowerCase();
+  if (lower === "client" || lower === "you (client)" || lower === "you" || lower === "member" || lower === "system" || lower === "milestone") {
+    return trimmed;
+  }
+  if (trimmed.toUpperCase().endsWith(" MCS")) {
+    return trimmed;
+  }
+  const first = trimmed.split(/\s+/)[0];
+  return `${first} MCS`;
+};
+
 function MemberTrackOrderContent() {
   const searchParams = useSearchParams();
 
@@ -542,7 +566,7 @@ function MemberTrackOrderContent() {
                           <div className="h-5 w-5 rounded-full bg-muted dark:bg-zinc-800 flex items-center justify-center shrink-0">
                             {getMilestoneIcon(msg.message)}
                           </div>
-                          <span className="font-medium text-[11px] sm:text-xs leading-snug">{msg.message}</span>
+                          <span className="font-medium text-[11px] sm:text-xs leading-snug">{cleanClientMilestoneMessage(msg.message)}</span>
                           <span className="text-[10px] text-muted-foreground/60 dark:text-zinc-500 shrink-0 font-mono ml-0.5">
                             {msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
                           </span>
@@ -567,7 +591,7 @@ function MemberTrackOrderContent() {
                           </Badge>
                         )}
                         <span className="text-[11px] font-bold text-foreground">
-                          {msg.sender_name || (isClientSender ? "Member" : "Consultant")}
+                          {isClientSender ? (msg.sender_name || "Member") : formatExternalTeamName(msg.sender_name)}
                         </span>
                         {msg.sender_role && !isClientSender && (
                           <span className="text-[10px] text-muted-foreground font-normal">

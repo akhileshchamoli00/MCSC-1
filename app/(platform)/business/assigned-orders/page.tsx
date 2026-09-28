@@ -269,7 +269,7 @@ export default function AssignedOrdersPage() {
   const [isOnHoldDialogOpen, setIsOnHoldDialogOpen] = useState(false);
   const [pendingHoldGroup, setPendingHoldGroup] = useState<any>(null);
   const [holdReason, setHoldReason] = useState("");
-  const [holdChannel, setHoldChannel] = useState<"CLIENT" | "INTERNAL">("CLIENT");
+  const [holdChannel, setHoldChannel] = useState<"CLIENT" | "INTERNAL">("INTERNAL");
   const [submittingHold, setSubmittingHold] = useState(false);
 
   const fetchProgressUpdates = async (orderNum: string) => {
@@ -472,7 +472,7 @@ export default function AssignedOrdersPage() {
     if (newStatus === "ON_HOLD") {
       setPendingHoldGroup(group);
       setHoldReason("");
-      setHoldChannel("CLIENT");
+      setHoldChannel("INTERNAL");
       setIsOnHoldDialogOpen(true);
 
       if (orderNum) {
@@ -612,6 +612,9 @@ export default function AssignedOrdersPage() {
     "DOCUMENTS_REVIEWED",
     "PRE_DOC_SENT_FOR_SIGNATURE",
     "PRE_DOCS_SENT",
+    "AWAITING_SIGNING_NOTARIZATION",
+    "AWAITING_DOCUMENT_RETURN",
+    "AWAITING_THIRD_PARTY_RESPONSE",
     "FINAL_DOCUMENT_PREPARATION",
     "FINAL_DOC_READY",
     "WAITING_FOR_FINAL_PAYMENT",
@@ -634,6 +637,9 @@ export default function AssignedOrdersPage() {
     "DOCUMENTS_REVIEWED",
     "PRE_DOC_SENT_FOR_SIGNATURE",
     "PRE_DOCS_SENT",
+    "AWAITING_SIGNING_NOTARIZATION",
+    "AWAITING_DOCUMENT_RETURN",
+    "AWAITING_THIRD_PARTY_RESPONSE",
     "FINAL_DOCUMENT_PREPARATION",
     "WAITING_FOR_FINAL_PAYMENT",
     "FINAL_PAYMENT_COMPLETED"
@@ -660,6 +666,9 @@ export default function AssignedOrdersPage() {
     "DOCUMENTS_REVIEWED",
     "PRE_DOC_SENT_FOR_SIGNATURE",
     "PRE_DOCS_SENT",
+    "AWAITING_SIGNING_NOTARIZATION",
+    "AWAITING_DOCUMENT_RETURN",
+    "AWAITING_THIRD_PARTY_RESPONSE",
     "FINAL_DOCUMENT_PREPARATION",
     "FINAL_DOC_READY"
   ];
@@ -913,6 +922,9 @@ export default function AssignedOrdersPage() {
       case "DOCUMENTS_REVIEWED": return "bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 font-bold";
       case "PRE_DOC_SENT_FOR_SIGNATURE": return "bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20 font-bold";
       case "PRE_DOCS_SENT": return "bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20 font-bold";
+      case "AWAITING_SIGNING_NOTARIZATION": return "bg-violet-500/10 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/20 font-bold";
+      case "AWAITING_DOCUMENT_RETURN": return "bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20 font-bold";
+      case "AWAITING_THIRD_PARTY_RESPONSE": return "bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20 font-bold";
       case "FINAL_DOCUMENT_PREPARATION": return "bg-orange-500/10 dark:bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/20 font-bold";
       case "FINAL_DOC_READY": return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold";
       case "INVOICE_GENERATED": return "bg-pink-500/10 dark:bg-pink-500/15 text-pink-600 dark:text-pink-400 border-pink-500/20 font-bold";
@@ -952,7 +964,7 @@ export default function AssignedOrdersPage() {
 
   const reviewPrepOrdersCount = groupedOrders.filter(o => {
     const st = (o.status || "").toUpperCase();
-    return !checkIsReviewOnly(o) && checkIsExecuting(o) && ["REVIEW_DOCS", "DOCUMENTS_REVIEWED", "PRE_DOC_SENT_FOR_SIGNATURE", "PRE_DOCS_SENT", "FINAL_DOCUMENT_PREPARATION"].includes(st);
+    return !checkIsReviewOnly(o) && checkIsExecuting(o) && ["REVIEW_DOCS", "DOCUMENTS_REVIEWED", "PRE_DOC_SENT_FOR_SIGNATURE", "PRE_DOCS_SENT", "AWAITING_SIGNING_NOTARIZATION", "AWAITING_DOCUMENT_RETURN", "AWAITING_THIRD_PARTY_RESPONSE", "FINAL_DOCUMENT_PREPARATION"].includes(st);
   }).length;
 
   const totalAllocatedCount = groupedOrders.filter(o => {
@@ -1571,6 +1583,9 @@ export default function AssignedOrdersPage() {
                                   <option value="REVIEW_DOCS">REVIEW DOCS</option>
                                   <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
                                   <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
+                                  <option value="AWAITING_SIGNING_NOTARIZATION">AWAITING SIGNING / NOTARIZATION</option>
+                                  <option value="AWAITING_DOCUMENT_RETURN">AWAITING DOCUMENT RETURN FROM CLIENT</option>
+                                  <option value="AWAITING_THIRD_PARTY_RESPONSE">AWAITING THIRD-PARTY RESPONSE (VENDOR)</option>
                                   <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
                                   <option value="FINAL_DOC_READY">FINAL DOC READY</option>
                                   <option value="ON_HOLD">ON HOLD</option>
@@ -1754,6 +1769,9 @@ export default function AssignedOrdersPage() {
                         <option value="REVIEW_DOCS">REVIEW DOCS</option>
                         <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
                         <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
+                        <option value="AWAITING_SIGNING_NOTARIZATION">AWAITING SIGNING / NOTARIZATION</option>
+                        <option value="AWAITING_DOCUMENT_RETURN">AWAITING DOCUMENT RETURN FROM CLIENT</option>
+                        <option value="AWAITING_THIRD_PARTY_RESPONSE">AWAITING THIRD-PARTY RESPONSE (VENDOR)</option>
                         <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
                         <option value="FINAL_DOC_READY">FINAL DOC READY</option>
                         <option value="ON_HOLD">ON HOLD</option>
@@ -2200,49 +2218,17 @@ export default function AssignedOrdersPage() {
               />
             </div>
 
-            {/* Chat Target Channel Toggle */}
-            <div className="space-y-2 pt-1 border-t border-border/40">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
-                Broadcast Reason To Chat
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setHoldChannel("CLIENT")}
-                  className={cn(
-                    "p-3 rounded-xl border text-left transition-all flex flex-col gap-1",
-                    holdChannel === "CLIENT"
-                      ? "border-amber-500/60 bg-amber-500/10 text-foreground ring-1 ring-amber-500/40"
-                      : "border-border/60 bg-muted/20 hover:bg-muted/40 text-muted-foreground"
-                  )}
-                >
-                  <div className="flex items-center gap-1.5 font-bold text-xs">
-                    <MessageSquare className="h-3.5 w-3.5 text-amber-500" />
-                    <span>Client & Team Chat</span>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground leading-tight">
-                    Client & internal staff both see this reason in chat
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setHoldChannel("INTERNAL")}
-                  className={cn(
-                    "p-3 rounded-xl border text-left transition-all flex flex-col gap-1",
-                    holdChannel === "INTERNAL"
-                      ? "border-amber-500/60 bg-amber-500/10 text-foreground ring-1 ring-amber-500/40"
-                      : "border-border/60 bg-muted/20 hover:bg-muted/40 text-muted-foreground"
-                  )}
-                >
-                  <div className="flex items-center gap-1.5 font-bold text-xs">
-                    <Lock className="h-3.5 w-3.5 text-amber-500" />
-                    <span>Internal Staff Only</span>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground leading-tight">
-                    Private note logged only for processing consultants
-                  </span>
-                </button>
+            {/* Internal Privacy Notice */}
+            <div className="p-3 rounded-xl border border-amber-500/25 bg-amber-500/5 flex items-start gap-2.5">
+              <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <span>Visibility: Internal Only</span>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono font-bold uppercase">Private</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  This on-hold reason is strictly confidential for internal staff only. No messages or reasons will ever be sent to or visible in the client chat.
+                </p>
               </div>
             </div>
           </div>

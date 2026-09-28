@@ -33,7 +33,6 @@ import {
   FileCheck,
   Paperclip,
   X,
-  File,
   Lock,
   UploadCloud,
   Pencil,
@@ -60,6 +59,11 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { ChatEmojiPicker } from "@/components/chat-emoji-picker";
 import { ChatMessageReactions, WhatsAppReactionHoverBar } from "@/components/chat-message-reactions";
+
+const isImageFile = (filename?: string | null) => {
+  if (!filename) return false;
+  return /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(filename);
+};
 
 const deduplicateMessages = (msgs: any[]) => {
   if (!Array.isArray(msgs)) return [];
@@ -133,7 +137,7 @@ const SeenReceiptsIndicator = ({
           <button
             type="button"
             className="flex items-center gap-0.5 cursor-pointer p-0.5 rounded hover:bg-muted/60 transition-colors focus:outline-none"
-            aria-label={`Seen by ${readers.map(r => r.name).join(", ")}`}
+            aria-label={`Seen by ${readers.map(r => r.is_client ? r.name : formatExternalTeamName(r.name)).join(", ")}`}
           >
             <CheckCheck className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 transition-colors" />
           </button>
@@ -160,7 +164,7 @@ const SeenReceiptsIndicator = ({
                   </div>
                   <div className="min-w-0">
                     <span className="font-semibold text-[11px] text-foreground block truncate">
-                      {r.name}
+                      {r.is_client ? r.name : formatExternalTeamName(r.name)}
                     </span>
                     {r.role && (
                       <span className="text-[9px] text-muted-foreground block truncate -mt-0.5">
@@ -242,6 +246,30 @@ const getMilestoneIcon = (message: string) => {
   return <Clock className="h-3.5 w-3.5 text-emerald-500 shrink-0" />;
 };
 
+const cleanClientMilestoneMessage = (message: string) => {
+  if (!message) return "";
+  const lower = message.toLowerCase();
+  if (lower.includes("order placed on hold") && lower.includes("reason:")) {
+    return "⏸️ Order placed ON HOLD.";
+  }
+  return message;
+};
+
+export const formatExternalTeamName = (name?: string | null) => {
+  if (!name) return "Consultant MCS";
+  const trimmed = name.trim();
+  if (!trimmed) return "Consultant MCS";
+  const lower = trimmed.toLowerCase();
+  if (lower === "client" || lower === "you (client)" || lower === "you" || lower === "member" || lower === "system" || lower === "milestone") {
+    return trimmed;
+  }
+  if (trimmed.toUpperCase().endsWith(" MCS")) {
+    return trimmed;
+  }
+  const first = trimmed.split(/\s+/)[0];
+  return `${first} MCS`;
+};
+
 const STATUS_CONFIG: Record<
   string,
   { label: string; color: string; bg: string; border: string; step: number }
@@ -255,6 +283,9 @@ const STATUS_CONFIG: Record<
   DOCUMENTS_REVIEWED: { label: "Documents Reviewed", color: "text-indigo-600 dark:text-indigo-400", bg: "bg-indigo-500/10", border: "border-indigo-500/20", step: 3 },
   PRE_DOC_SENT_FOR_SIGNATURE: { label: "Pre Doc sent for Signature", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20", step: 3 },
   PRE_DOCS_SENT: { label: "Pre Doc sent for Signature", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20", step: 3 },
+  AWAITING_SIGNING_NOTARIZATION: { label: "Awaiting Signing / Notarization", color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-500/10", border: "border-violet-500/20", step: 3 },
+  AWAITING_DOCUMENT_RETURN: { label: "Awaiting Document Return from Client", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20", step: 3 },
+  AWAITING_THIRD_PARTY_RESPONSE: { label: "Awaiting Third-Party Response (Vendor)", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", step: 3 },
   FINAL_DOCUMENT_PREPARATION: { label: "Doc Prep", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", step: 4 },
   FINAL_DOC_READY: { label: "Final Docs Ready", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", step: 4 },
   WAITING_ON_CLIENT: { label: "Action Needed", color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10", border: "border-rose-500/20", step: 3 },
@@ -333,6 +364,32 @@ export default function ClientOrderChatPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFilePreview, setSelectedFilePreview] = useState<string | null>(null);
+
+  const handlePasteSnippet = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf("image") !== -1 || (item.kind === "file" && item.type.startsWith("image/"))) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          const ext = file.name && file.name.includes(".") ? file.name.split(".").pop() : (item.type.split("/")[1] || "png");
+          const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(11, 19);
+          const snippetName = file.name && file.name !== "image.png" && file.name.length > 5
+            ? file.name
+            : `snippet_${timestamp}.${ext}`;
+          const snippetFile = new File([file], snippetName, { type: file.type || "image/png" });
+          setSelectedFile(snippetFile);
+          setSelectedFilePreview(URL.createObjectURL(snippetFile));
+          toast.success("Image snippet pasted! Add optional note and press Send.");
+          return;
+        }
+      }
+    }
+  };
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
@@ -696,7 +753,11 @@ export default function ClientOrderChatPage() {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
+    if (selectedFilePreview) {
+      URL.revokeObjectURL(selectedFilePreview);
+    }
     setSelectedFile(null);
+    setSelectedFilePreview(null);
     setQuotedMessage(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
 
@@ -733,6 +794,8 @@ export default function ClientOrderChatPage() {
         // Multipart upload endpoint: /upload-attachment
         const formData = new FormData();
         formData.append("file", fileToUpload);
+        const isSnippet = fileToUpload.name.startsWith("snippet_") || fileToUpload.type.startsWith("image/");
+        formData.append("is_snippet", isSnippet ? "true" : "false");
         if (messageText) {
           formData.append("message", messageText);
         }
@@ -1130,7 +1193,22 @@ export default function ClientOrderChatPage() {
               {/* Message Stream */}
               <div
                 ref={messagesContainerRef}
-                className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-4 bg-background/20 overscroll-contain w-full min-w-0"
+                className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-4 bg-background/20 overscroll-contain w-full min-w-0 outline-none"
+                onPaste={handlePasteSnippet}
+                onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={e => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (e.dataTransfer.files?.[0]) {
+                    const f = e.dataTransfer.files[0];
+                    setSelectedFile(f);
+                    if (f.type.startsWith("image/")) {
+                      setSelectedFilePreview(URL.createObjectURL(f));
+                    } else {
+                      setSelectedFilePreview(null);
+                    }
+                  }
+                }}
               >
                 {loadingMessages ? (
                   <div className="flex h-full items-center justify-center">
@@ -1161,7 +1239,7 @@ export default function ClientOrderChatPage() {
                             <div className="h-5 w-5 rounded-full bg-muted dark:bg-zinc-800 flex items-center justify-center shrink-0">
                               {getMilestoneIcon(msg.message)}
                             </div>
-                            <span className="font-medium text-[11px] sm:text-xs leading-snug">{msg.message}</span>
+                            <span className="font-medium text-[11px] sm:text-xs leading-snug">{cleanClientMilestoneMessage(msg.message)}</span>
                             <span className="text-[10px] text-muted-foreground/60 dark:text-zinc-500 shrink-0 font-mono ml-0.5">
                               {msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
                             </span>
@@ -1195,7 +1273,7 @@ export default function ClientOrderChatPage() {
                                   Consultant
                                 </Badge>
                                 <span className="text-[11px] font-bold text-foreground">
-                                  {msg.sender_name || "MCSC Consultant"}
+                                  {formatExternalTeamName(msg.sender_name)}
                                 </span>
                                 {msg.sender_role && (
                                   <span className="text-[10px] text-muted-foreground">
@@ -1368,7 +1446,7 @@ export default function ClientOrderChatPage() {
                                       >
                                         <div className="flex items-center gap-1 font-semibold text-[11px] opacity-90 min-w-0">
                                           <Quote className="h-3 w-3 shrink-0" />
-                                          <span className="truncate">{msg.quoted_sender_name || "Original Message"}</span>
+                                          <span className="truncate">{msg.quoted_sender_name ? (msg.quoted_sender_name.toLowerCase().includes("client") ? msg.quoted_sender_name : formatExternalTeamName(msg.quoted_sender_name)) : "Original Message"}</span>
                                         </div>
                                         <div className="text-[11px] line-clamp-2 break-words italic">
                                           {msg.quoted_message_text}
@@ -1378,38 +1456,88 @@ export default function ClientOrderChatPage() {
 
                                     <div className="break-words [overflow-wrap:anywhere] min-w-0 max-w-full">{renderMessageContent(msg.message)}</div>
 
-                                    {/* Client Uploaded Attachment Receipt */}
+                                    {/* Client Uploaded Attachment or Snippet Receipt */}
                                     {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
-                                      <div
-                                        className={`mt-2 flex items-center gap-2.5 p-2 rounded-xl border text-xs shadow-2xs backdrop-blur-xs ${
-                                          isSelf
-                                            ? "bg-white/10 dark:bg-black/25 border-white/20 text-white"
-                                            : "bg-background dark:bg-zinc-950/70 border-border/50 text-foreground"
-                                        }`}
-                                      >
-                                        <div
-                                          className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 border ${
-                                            isSelf
-                                              ? "bg-white/20 text-white border-white/30"
-                                              : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                                          }`}
-                                        >
-                                          <ShieldCheck className="h-3.5 w-3.5" />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                          <span className="font-bold truncate block text-[11px] sm:text-xs">
-                                            {msg.attachment_name || "Shared Document"}
-                                          </span>
-                                          <span
-                                            className={`text-[9px] sm:text-[10px] flex items-center gap-1 mt-0.5 ${
-                                              isSelf ? "text-white/80" : "text-muted-foreground"
+                                      isImageFile(msg.attachment_name || msg.attachment_url) ? (
+                                        <div className="mt-2 rounded-xl overflow-hidden border border-border/60 shadow-xs max-w-sm">
+                                          <div
+                                            className="relative cursor-pointer group/img overflow-hidden bg-muted/30 flex items-center justify-center max-h-60"
+                                            onClick={() => {
+                                              if (msg.attachment_url && msg.attachment_url !== "uploading...") {
+                                                const url = `/api-proxy/api/clients/orders/${selectedOrderGroup.orderNumber}/attachments/preview?path=${encodeURIComponent(msg.attachment_url)}`;
+                                                window.open(url, "_blank");
+                                              }
+                                            }}
+                                          >
+                                            <img
+                                              src={`/api-proxy/api/clients/orders/${selectedOrderGroup.orderNumber}/attachments/preview?path=${encodeURIComponent(msg.attachment_url)}`}
+                                              alt={msg.attachment_name || "Snippet"}
+                                              loading="lazy"
+                                              className="w-full h-auto max-h-60 object-contain transition-transform duration-200 group-hover/img:scale-[1.02]"
+                                            />
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-xs font-semibold backdrop-blur-[2px]">
+                                              <Eye className="h-4 w-4" />
+                                              <span>Click to Enlarge</span>
+                                            </div>
+                                          </div>
+                                          <div
+                                            className={`p-2 border-t flex items-center justify-between gap-2 text-xs ${
+                                              isSelf ? "bg-emerald-800/90 border-emerald-600/40 text-white" : "bg-background/95 border-border/40 text-foreground"
                                             }`}
                                           >
-                                            <Lock className="h-2.5 w-2.5 shrink-0 text-emerald-400" />
-                                            Stored in Company Vault (Order #{selectedOrderGroup.orderNumber})
-                                          </span>
+                                            <span className="truncate font-semibold text-[11px] block min-w-0">
+                                              {msg.attachment_name || "Image Snippet"}
+                                            </span>
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => {
+                                                if (msg.attachment_url && msg.attachment_url !== "uploading...") {
+                                                  const url = `/api-proxy/api/clients/orders/${selectedOrderGroup.orderNumber}/attachments/preview?path=${encodeURIComponent(msg.attachment_url)}`;
+                                                  window.open(url, "_blank");
+                                                }
+                                              }}
+                                              className={`h-6 px-2 text-[10px] font-bold gap-1 shrink-0 ${
+                                                isSelf ? "text-white hover:bg-white/20" : "text-emerald-600 hover:text-emerald-700"
+                                              }`}
+                                            >
+                                              <Eye className="h-3 w-3" /> Full View
+                                            </Button>
+                                          </div>
                                         </div>
-                                      </div>
+                                      ) : (
+                                        <div
+                                          className={`mt-2 flex items-center gap-2.5 p-2 rounded-xl border text-xs shadow-2xs backdrop-blur-xs ${
+                                            isSelf
+                                              ? "bg-white/10 dark:bg-black/25 border-white/20 text-white"
+                                              : "bg-background dark:bg-zinc-950/70 border-border/50 text-foreground"
+                                          }`}
+                                        >
+                                          <div
+                                            className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 border ${
+                                              isSelf
+                                                ? "bg-white/20 text-white border-white/30"
+                                                : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                            }`}
+                                          >
+                                            <ShieldCheck className="h-3.5 w-3.5" />
+                                          </div>
+                                          <div className="min-w-0 flex-1">
+                                            <span className="font-bold truncate block text-[11px] sm:text-xs">
+                                              {msg.attachment_name || "Shared Document"}
+                                            </span>
+                                            <span
+                                              className={`text-[9px] sm:text-[10px] flex items-center gap-1 mt-0.5 ${
+                                                isSelf ? "text-white/80" : "text-muted-foreground"
+                                              }`}
+                                            >
+                                              <Lock className="h-2.5 w-2.5 shrink-0 text-emerald-400" />
+                                              Stored in Company Vault (Order #{selectedOrderGroup.orderNumber})
+                                            </span>
+                                          </div>
+                                        </div>
+                                      )
                                     )}
                                   </div>
 
@@ -1465,7 +1593,7 @@ export default function ClientOrderChatPage() {
                       <Quote className="h-4 w-4 text-emerald-500 shrink-0" />
                       <div className="min-w-0">
                         <span className="font-semibold text-foreground truncate block text-xs">
-                          Replying to {quotedMessage.sender_name || (quotedMessage.is_client ? "Client" : "Consultant")}
+                          Replying to {quotedMessage.is_client ? (quotedMessage.sender_name || "Client") : formatExternalTeamName(quotedMessage.sender_name)}
                         </span>
                         <span className="text-[11px] text-muted-foreground truncate block">
                           {quotedMessage.message || quotedMessage.attachment_name || "Attachment"}
@@ -1487,17 +1615,30 @@ export default function ClientOrderChatPage() {
 
                 {/* Selected File Indicator Chip */}
                 {selectedFile && (
-                  <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs shadow-xs animate-in fade-in">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="h-6 w-6 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                        <FileText className="h-3.5 w-3.5" />
-                      </div>
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs shadow-xs animate-in fade-in">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {selectedFilePreview ? (
+                        <img
+                          src={selectedFilePreview}
+                          alt="Snippet preview"
+                          className="h-10 w-10 object-cover rounded-lg border border-emerald-500/30 shrink-0 bg-background"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                          <FileText className="h-5 w-5" />
+                        </div>
+                      )}
                       <div className="min-w-0">
-                        <span className="font-bold text-foreground truncate block text-xs">
-                          {selectedFile.name}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {(selectedFile.size / 1024).toFixed(1)} KB • Storing in Vault → {selectedOrderGroup.orderNumber}
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-foreground truncate block text-xs">
+                            {selectedFile.name}
+                          </span>
+                          <Badge variant="outline" className="text-[10px] py-0 px-1.5 bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 shrink-0">
+                            {selectedFile.type.startsWith("image/") ? "Snippet / Image" : "Document"}
+                          </Badge>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground block truncate">
+                          {(selectedFile.size / 1024).toFixed(1)} KB • Storing in Client Shared Docs Vault
                         </span>
                       </div>
                     </div>
@@ -1506,12 +1647,14 @@ export default function ClientOrderChatPage() {
                       variant="ghost"
                       size="icon"
                       onClick={() => {
+                        if (selectedFilePreview) URL.revokeObjectURL(selectedFilePreview);
                         setSelectedFile(null);
+                        setSelectedFilePreview(null);
                         if (fileInputRef.current) fileInputRef.current.value = "";
                       }}
-                      className="h-5 w-5 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      className="h-7 w-7 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
                     >
-                      <X className="h-3 w-3" />
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
                 )}
@@ -1526,7 +1669,13 @@ export default function ClientOrderChatPage() {
                     className="hidden"
                     onChange={e => {
                       if (e.target.files?.[0]) {
-                        setSelectedFile(e.target.files[0]);
+                        const f = e.target.files[0];
+                        setSelectedFile(f);
+                        if (f.type.startsWith("image/")) {
+                          setSelectedFilePreview(URL.createObjectURL(f));
+                        } else {
+                          setSelectedFilePreview(null);
+                        }
                       }
                     }}
                   />
@@ -1580,9 +1729,10 @@ export default function ClientOrderChatPage() {
                     placeholder={
                       selectedFile
                         ? `Add an optional note with ${selectedFile.name} (Press Enter to send, Shift + Enter for new line)...`
-                        : `Message your consultant regarding ${selectedOrderGroup.orderNumber} (Press Enter to send, Shift + Enter for new line)...`
+                        : `Message your consultant (Paste screenshot snippet directly here, Enter to send)...`
                     }
                     value={inputText}
+                    onPaste={handlePasteSnippet}
                     onChange={e => {
                       setInputText(e.target.value);
                       e.target.style.height = "auto";

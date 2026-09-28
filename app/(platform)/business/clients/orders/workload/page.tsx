@@ -30,7 +30,8 @@ import {
   CheckCircle2,
   BarChart3,
   SlidersHorizontal,
-  ChevronUp
+  ChevronUp,
+  Banknote
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,11 +52,25 @@ interface OrderSummaryItem {
   services: string[];
   services_count: number;
   total_amount: number;
+  gross_amount?: number;
+  vendor_deductions?: number;
+  net_amount?: number;
+  vendor_details?: Array<{
+    vendor_id?: number;
+    vendor_name: string;
+    vendor_type: string;
+    fee: number;
+    job_title?: string;
+  }>;
   created_at: string | null;
   is_active: boolean;
   assigned_as: "CONSULTANT" | "REVIEWER" | "BOTH";
   co_consultants: string[];
   reviewers_names: string[];
+  contribution_percent?: number;
+  contribution_amount?: number;
+  consultant_share_percent?: number;
+  reviewer_share_percent?: number;
 }
 
 interface TeamMemberWorkload {
@@ -73,6 +88,10 @@ interface TeamMemberWorkload {
   reviewer_total_count: number;
   total_active_load: number;
   total_all_load: number;
+  active_contribution_value?: number;
+  total_contribution_value?: number;
+  active_portfolio_share_pct?: number;
+  total_portfolio_share_pct?: number;
   capacity_status: "AVAILABLE" | "LIGHT" | "OPTIMAL" | "HEAVY";
   status_breakdown: Record<string, number>;
   orders: OrderSummaryItem[];
@@ -86,6 +105,12 @@ interface WorkloadSummary {
   unassigned_orders_count: number;
   avg_consultant_load: number;
   avg_reviewer_load: number;
+  total_active_portfolio_value?: number;
+  total_active_gross_value?: number;
+  total_active_vendor_deductions?: number;
+  total_all_portfolio_value?: number;
+  total_all_gross_value?: number;
+  total_all_vendor_deductions?: number;
 }
 
 export default function TeamWorkloadPage() {
@@ -100,7 +125,7 @@ export default function TeamWorkloadPage() {
   // Filtering and Sorting States
   const [searchQuery, setSearchQuery] = useState("");
   const [scopeMode, setScopeMode] = useState<"ACTIVE" | "ALL">("ACTIVE");
-  const [sortBy, setSortBy] = useState<"LOAD_DESC" | "CONSULTANT_DESC" | "REVIEWER_DESC" | "NAME_ASC">("LOAD_DESC");
+  const [sortBy, setSortBy] = useState<"LOAD_DESC" | "VALUE_DESC" | "CONSULTANT_DESC" | "REVIEWER_DESC" | "NAME_ASC">("LOAD_DESC");
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -198,6 +223,12 @@ export default function TeamWorkloadPage() {
           if (loadB !== loadA) return loadB - loadA;
           return a.name.localeCompare(b.name);
         }
+        if (sortBy === "VALUE_DESC") {
+          const valA = scopeMode === "ACTIVE" ? (a.active_contribution_value || 0) : (a.total_contribution_value || 0);
+          const valB = scopeMode === "ACTIVE" ? (b.active_contribution_value || 0) : (b.total_contribution_value || 0);
+          if (valB !== valA) return valB - valA;
+          return a.name.localeCompare(b.name);
+        }
         if (sortBy === "CONSULTANT_DESC") {
           const cA = scopeMode === "ACTIVE" ? a.consultant_active_count : a.consultant_total_count;
           const cB = scopeMode === "ACTIVE" ? b.consultant_active_count : b.consultant_total_count;
@@ -248,6 +279,15 @@ export default function TeamWorkloadPage() {
         return "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/25";
       case "DOCUMENTS_REVIEWED":
         return "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25";
+      case "PRE_DOC_SENT_FOR_SIGNATURE":
+      case "PRE_DOCS_SENT":
+        return "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/25";
+      case "AWAITING_SIGNING_NOTARIZATION":
+        return "bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/25";
+      case "AWAITING_DOCUMENT_RETURN":
+        return "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25";
+      case "AWAITING_THIRD_PARTY_RESPONSE":
+        return "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/25";
       case "FINAL_DOCUMENT_PREPARATION":
         return "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/25";
       case "FINAL_DOC_READY":
@@ -316,7 +356,7 @@ export default function TeamWorkloadPage() {
       {/* Minimalist Metrics Strip & Action Button Row */}
       <div className="flex flex-col md:flex-row items-stretch gap-3 w-full">
         {/* Minimalist Metric Strip - Expanded Horizontally */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs flex-1 gap-2 sm:gap-0 divide-y sm:divide-y-0 sm:divide-x divide-border/50">
+        <div className="grid grid-cols-2 lg:grid-cols-4 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2 sm:px-4 sm:py-2.5 shadow-xs flex-1 gap-2 sm:gap-0 divide-y sm:divide-y-0 sm:divide-x divide-border/50">
           
           {/* Active Orders */}
           <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 sm:py-0 justify-start sm:justify-center">
@@ -326,6 +366,24 @@ export default function TeamWorkloadPage() {
             <div className="min-w-0">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Active Orders</p>
               <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{summary?.total_active_orders ?? 0}</p>
+            </div>
+          </div>
+
+          {/* Active Portfolio Value */}
+          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 sm:py-0 justify-start sm:justify-center">
+            <div className="h-9 w-9 rounded-xl bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-500/20 shrink-0">
+              <Banknote className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Net Contributable Value</p>
+              <p className="text-base sm:text-lg font-bold text-foreground leading-tight truncate">
+                {formatCurrency(summary?.total_active_portfolio_value || 0)}
+              </p>
+              {Boolean((summary?.total_active_vendor_deductions || 0) > 0) && (
+                <p className="text-[9.5px] text-muted-foreground truncate">
+                  Gross: {formatCurrency(summary?.total_active_gross_value || 0)}
+                </p>
+              )}
             </div>
           </div>
 
@@ -361,6 +419,35 @@ export default function TeamWorkloadPage() {
         >
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-purple-600" : ""}`} /> Refresh Data
         </Button>
+      </div>
+
+      {/* Share Matrix Policy Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-blue-500/[0.06] dark:bg-blue-950/20 border border-blue-500/20 text-xs">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider text-[11px] flex items-center gap-1">
+            <TrendingUp className="h-3.5 w-3.5" /> Contribution Matrix:
+          </span>
+          <span className="text-muted-foreground">
+            <strong className="text-foreground">1 Consultant + 1 Reviewer:</strong> 95% Exec / 5% Review
+          </span>
+          <span className="text-muted-foreground/40">•</span>
+          <span className="text-muted-foreground">
+            <strong className="text-foreground">2+ Consultants + 1 Reviewer:</strong> 47.5% each (95% total) / 5% Review
+          </span>
+          <span className="text-muted-foreground/40">•</span>
+          <span className="text-muted-foreground">
+            <strong className="text-foreground">Deductions:</strong> Notary, Govt Body &amp; Vendor costs deducted from Gross
+          </span>
+        </div>
+        <div className="hidden lg:flex items-center gap-2 font-mono text-[11px] text-muted-foreground shrink-0">
+          <span>Active Net:</span>
+          <span className="font-bold text-foreground">{formatCurrency(summary?.total_active_portfolio_value || 0)}</span>
+          {Boolean((summary?.total_active_vendor_deductions || 0) > 0) && (
+            <span className="text-[10px] text-amber-600 dark:text-amber-400">
+              (-{formatCurrency(summary?.total_active_vendor_deductions || 0)} vendors)
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Team Workload & Allocation Display Card */}
@@ -412,6 +499,7 @@ export default function TeamWorkloadPage() {
               className="h-9 px-3 text-xs font-semibold rounded-xl border border-border/50 bg-background/70 text-foreground focus:outline-none focus:ring-1 focus:ring-purple-500 shadow-xs"
             >
               <option value="LOAD_DESC">Sort: Highest Total Load</option>
+              <option value="VALUE_DESC">Sort: Highest Contributed Value</option>
               <option value="CONSULTANT_DESC">Sort: Most Consultant Orders</option>
               <option value="REVIEWER_DESC">Sort: Most Reviewer Orders</option>
               <option value="NAME_ASC">Sort: Name (A to Z)</option>
@@ -449,19 +537,25 @@ export default function TeamWorkloadPage() {
                 <tr className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
                   <th className="p-4 pl-5 w-12 text-center">#</th>
                   <th className="p-4 min-w-[220px]">Legal Team Member &amp; Contact</th>
-                  <th className="p-4 min-w-[150px] text-center">
+                  <th className="p-4 min-w-[140px] text-center">
                     <div className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-bold">
                       <UserCheck className="h-3.5 w-3.5" />
                       <span>Executing Consultant</span>
                     </div>
                   </th>
-                  <th className="p-4 min-w-[150px] text-center">
+                  <th className="p-4 min-w-[140px] text-center">
                     <div className="inline-flex items-center gap-1 text-purple-700 dark:text-purple-400 font-bold">
                       <ShieldCheck className="h-3.5 w-3.5" />
                       <span>Designated Reviewer</span>
                     </div>
                   </th>
-                  <th className="p-4 min-w-[160px] text-center">Total Order Load</th>
+                  <th className="p-4 min-w-[150px] text-center">Total Order Load</th>
+                  <th className="p-4 min-w-[170px] text-right">
+                    <div className="inline-flex items-center gap-1 text-blue-700 dark:text-blue-400 font-bold">
+                      <Banknote className="h-3.5 w-3.5" />
+                      <span>Contributed Value</span>
+                    </div>
+                  </th>
                   <th className="p-4 min-w-[130px] text-center">Capacity Status</th>
                   <th className="p-4 text-right pr-5 w-28">Details</th>
                 </tr>
@@ -469,7 +563,7 @@ export default function TeamWorkloadPage() {
               <tbody className="divide-y divide-border/30">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-muted-foreground">
+                  <td colSpan={8} className="py-12 text-center text-muted-foreground">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <RefreshCw className="h-6 w-6 animate-spin text-purple-600" />
                       <span className="text-xs font-medium">Aggregating team workload matrix...</span>
@@ -478,7 +572,7 @@ export default function TeamWorkloadPage() {
                 </tr>
               ) : paginatedTeam.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-muted-foreground">
+                  <td colSpan={8} className="py-12 text-center text-muted-foreground">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Users className="h-8 w-8 text-muted-foreground/50" />
                       <span className="text-sm font-semibold text-foreground">No legal team members match criteria</span>
@@ -611,6 +705,18 @@ export default function TeamWorkloadPage() {
                           </div>
                         </td>
 
+                        {/* Contributed Value */}
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="font-mono font-bold text-foreground text-xs sm:text-sm">
+                              {formatCurrency(scopeMode === "ACTIVE" ? (member.active_contribution_value || 0) : (member.total_contribution_value || 0))}
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                              {(scopeMode === "ACTIVE" ? member.active_portfolio_share_pct : member.total_portfolio_share_pct) || 0}% portfolio share
+                            </span>
+                          </div>
+                        </td>
+
                         {/* Capacity Status */}
                         <td className="py-3.5 px-4 text-center">
                           {getCapacityStatusPill(member.capacity_status)}
@@ -640,11 +746,11 @@ export default function TeamWorkloadPage() {
                       {/* Expandable Order Drilldown Sub-table */}
                       {isExpanded && (
                         <tr className="bg-purple-500/[0.02] dark:bg-purple-950/5 border-b-2 border-purple-500/20">
-                          <td colSpan={7} className="p-4 sm:p-5">
+                          <td colSpan={8} className="p-4 sm:p-5">
                             <div className="space-y-4 rounded-xl border border-purple-500/20 bg-background/90 p-4 sm:p-5 shadow-inner">
                               {/* Drilldown Header & Filter Tabs */}
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/50">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <FolderKanban className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                                   <h4 className="font-bold text-xs uppercase tracking-wider text-foreground">
                                     Assigned Orders for {member.name}
@@ -652,6 +758,14 @@ export default function TeamWorkloadPage() {
                                   <Badge variant="outline" className="font-mono text-[10px] font-bold px-2">
                                     {displayOrders.length} {scopeMode === "ACTIVE" ? "Active" : "Total"} Orders
                                   </Badge>
+                                  <Badge variant="outline" className="font-mono text-[10px] font-bold px-2 bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">
+                                    Contributed: {formatCurrency(displayOrders.reduce((acc, o) => acc + (o.contribution_amount || 0), 0))}
+                                  </Badge>
+                                  {Boolean(displayOrders.reduce((acc, o) => acc + (o.vendor_deductions || 0), 0) > 0) && (
+                                    <Badge variant="outline" className="font-mono text-[10px] font-bold px-2 bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20">
+                                      Vendor Deductions: -{formatCurrency(displayOrders.reduce((acc, o) => acc + (o.vendor_deductions || 0), 0))}
+                                    </Badge>
+                                  )}
                                 </div>
 
                                 {/* Inner Role Filter Tabs */}
@@ -704,10 +818,13 @@ export default function TeamWorkloadPage() {
                                       <tr className="border-b border-border/40 bg-muted/20 text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                                         <th className="py-2.5 px-3">Order Number</th>
                                         <th className="py-2.5 px-3">Role Assigned</th>
-                                        <th className="py-2.5 px-3 min-w-[180px]">Client / Target Entity</th>
-                                        <th className="py-2.5 px-3 min-w-[200px]">Service Scope</th>
+                                        <th className="py-2.5 px-3 min-w-[170px]">Client / Target Entity</th>
+                                        <th className="py-2.5 px-3 min-w-[180px]">Service Scope</th>
                                         <th className="py-2.5 px-3 text-center">Lifecycle Status</th>
-                                        <th className="py-2.5 px-3 text-right">Contract Value</th>
+                                        <th className="py-2.5 px-3 text-right">Order Value</th>
+                                        <th className="py-2.5 px-3 text-right">Vendor / Notary</th>
+                                        <th className="py-2.5 px-3 text-right">Net Value</th>
+                                        <th className="py-2.5 px-3 text-right">Member Share</th>
                                         <th className="py-2.5 px-3">Co-Assignees</th>
                                         <th className="py-2.5 px-3 text-right">Actions</th>
                                       </tr>
@@ -752,11 +869,11 @@ export default function TeamWorkloadPage() {
 
                                           {/* Company Entity */}
                                           <td className="py-2 px-3">
-                                            <div className="font-semibold text-foreground text-xs leading-tight truncate max-w-[200px]">
+                                            <div className="font-semibold text-foreground text-xs leading-tight truncate max-w-[190px]">
                                               {ord.company_name}
                                             </div>
                                             {ord.client_name && (
-                                              <div className="text-[10px] text-muted-foreground truncate max-w-[180px]">
+                                              <div className="text-[10px] text-muted-foreground truncate max-w-[170px]">
                                                 {ord.client_name}
                                               </div>
                                             )}
@@ -764,10 +881,10 @@ export default function TeamWorkloadPage() {
 
                                           {/* Services */}
                                           <td className="py-2 px-3">
-                                            <div className="flex flex-wrap gap-1 max-w-[240px]">
+                                            <div className="flex flex-wrap gap-1 max-w-[220px]">
                                               {ord.services && ord.services.length > 0 ? (
                                                 ord.services.map((svc, sIdx) => (
-                                                  <span key={sIdx} className="text-[10px] font-medium bg-muted/60 px-1.5 py-0.5 rounded border border-border/40 text-foreground truncate max-w-[220px]">
+                                                  <span key={sIdx} className="text-[10px] font-medium bg-muted/60 px-1.5 py-0.5 rounded border border-border/40 text-foreground truncate max-w-[200px]">
                                                     {svc}
                                                   </span>
                                                 ))
@@ -787,9 +904,42 @@ export default function TeamWorkloadPage() {
                                             </Badge>
                                           </td>
 
-                                          {/* Contract Value */}
+                                          {/* Contract Value (Gross) */}
                                           <td className="py-2 px-3 text-right font-mono font-bold text-xs text-foreground whitespace-nowrap">
-                                            {formatCurrency(ord.total_amount)}
+                                            {formatCurrency(ord.gross_amount || ord.total_amount)}
+                                          </td>
+
+                                          {/* Vendor / Notary Deductions */}
+                                          <td className="py-2 px-3 text-right whitespace-nowrap">
+                                            {(ord.vendor_deductions || 0) > 0 ? (
+                                              <div className="flex flex-col items-end gap-0.5">
+                                                <span className="font-mono text-xs font-semibold text-rose-600 dark:text-rose-400">
+                                                  -{formatCurrency(ord.vendor_deductions || 0)}
+                                                </span>
+                                                <span className="text-[9px] text-muted-foreground truncate max-w-[110px]" title={ord.vendor_details?.map(v => `${v.vendor_name} (${formatCurrency(v.fee)})`).join(", ")}>
+                                                  {ord.vendor_details?.[0]?.vendor_name || "Vendor Cost"}
+                                                </span>
+                                              </div>
+                                            ) : (
+                                              <span className="text-muted-foreground text-xs font-mono">-</span>
+                                            )}
+                                          </td>
+
+                                          {/* Net Value */}
+                                          <td className="py-2 px-3 text-right font-mono font-bold text-xs text-foreground whitespace-nowrap">
+                                            {formatCurrency(ord.net_amount !== undefined ? ord.net_amount : ord.total_amount)}
+                                          </td>
+
+                                          {/* Member Share (Contribution Matrix on Net) */}
+                                          <td className="py-2 px-3 text-right whitespace-nowrap">
+                                            <div className="flex flex-col items-end gap-0.5">
+                                              <span className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
+                                                {formatCurrency(ord.contribution_amount || 0)}
+                                              </span>
+                                              <Badge variant="outline" className="text-[9px] font-mono font-bold px-1.5 py-0 bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25">
+                                                {ord.contribution_percent || 0}% of Net
+                                              </Badge>
+                                            </div>
                                           </td>
 
                                           {/* Co-Assignees / Team */}

@@ -59,11 +59,13 @@ import {
   Clock,
   Zap,
   MailCheck,
-  AlertTriangle
+  AlertTriangle,
+  SlidersHorizontal,
+  Copy
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, useEffect, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
@@ -75,8 +77,11 @@ import { DualOrderChatDialog } from "@/components/dual-order-chat-dialog";
 import { StakeholderRecipientsSelector } from "@/components/stakeholder-recipients-selector";
 import { useUser } from "@/contexts/user-context";
 
+const FILTERS_STORAGE_KEY = "mcsc_active_orders_filters";
+
 export default function ClientOrdersPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isAdmin, hasPermission, loading: userLoading } = useUser();
   const canView = isAdmin || hasPermission("clients_orders_active", "view");
 
@@ -90,6 +95,129 @@ export default function ClientOrdersPage() {
   const debouncedSearchTerm = useDebounce(searchTerm, 250);
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Column-Specific Filters State
+  const [colFilterOrderId, setColFilterOrderId] = useState("");
+  const [colFilterCompany, setColFilterCompany] = useState("");
+  const [colFilterService, setColFilterService] = useState("");
+  const [colFilterConsultant, setColFilterConsultant] = useState("");
+  const [colFilterAmount, setColFilterAmount] = useState("");
+  const [colFilterPayment, setColFilterPayment] = useState("ALL");
+  const [colFilterStatus, setColFilterStatus] = useState("ALL");
+  const [showColumnFilters, setShowColumnFilters] = useState(true);
+
+  // Copy Order ID State & Handler
+  const [copiedOrderNumber, setCopiedOrderNumber] = useState<string | null>(null);
+
+  const handleCopyOrderNumber = (e: React.MouseEvent, orderNum: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!orderNum) return;
+    navigator.clipboard.writeText(orderNum);
+    setCopiedOrderNumber(orderNum);
+    toast.success(`Copied Order ID "${orderNum}" to clipboard`);
+    setTimeout(() => {
+      setCopiedOrderNumber((prev) => (prev === orderNum ? null : prev));
+    }, 2000);
+  };
+
+  const isRestoredRef = useRef(false);
+  const prevFiltersRef = useRef<string>("");
+
+  const saveCurrentFilters = () => {
+    if (typeof window === "undefined") return;
+    try {
+      const dataToSave = {
+        searchTerm,
+        colFilterOrderId,
+        colFilterCompany,
+        colFilterService,
+        colFilterConsultant,
+        colFilterAmount,
+        colFilterPayment,
+        colFilterStatus,
+        showColumnFilters,
+        currentPage,
+      };
+      sessionStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(dataToSave));
+      localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(dataToSave));
+    } catch (e) {
+      console.error("Error saving filters:", e);
+    }
+  };
+
+  // Restore saved search and filter parameters on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = sessionStorage.getItem(FILTERS_STORAGE_KEY) || localStorage.getItem(FILTERS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed.searchTerm === "string") setSearchTerm(parsed.searchTerm);
+        if (typeof parsed.colFilterOrderId === "string") setColFilterOrderId(parsed.colFilterOrderId);
+        if (typeof parsed.colFilterCompany === "string") setColFilterCompany(parsed.colFilterCompany);
+        if (typeof parsed.colFilterService === "string") setColFilterService(parsed.colFilterService);
+        if (typeof parsed.colFilterConsultant === "string") setColFilterConsultant(parsed.colFilterConsultant);
+        if (typeof parsed.colFilterAmount === "string") setColFilterAmount(parsed.colFilterAmount);
+        if (typeof parsed.colFilterPayment === "string") setColFilterPayment(parsed.colFilterPayment);
+        if (typeof parsed.colFilterStatus === "string") setColFilterStatus(parsed.colFilterStatus);
+        if (typeof parsed.showColumnFilters === "boolean") setShowColumnFilters(parsed.showColumnFilters);
+        if (typeof parsed.currentPage === "number" && parsed.currentPage > 0) setCurrentPage(parsed.currentPage);
+      }
+    } catch (e) {
+      console.error("Error reading saved filters:", e);
+    } finally {
+      // Defer enabling auto-save until initial state updates have settled
+      setTimeout(() => {
+        isRestoredRef.current = true;
+      }, 100);
+    }
+  }, []);
+
+  // Save search and filter parameters whenever they change AFTER initial restoration
+  useEffect(() => {
+    if (!isRestoredRef.current || typeof window === "undefined") return;
+    saveCurrentFilters();
+  }, [
+    searchTerm,
+    colFilterOrderId,
+    colFilterCompany,
+    colFilterService,
+    colFilterConsultant,
+    colFilterAmount,
+    colFilterPayment,
+    colFilterStatus,
+    showColumnFilters,
+    currentPage,
+  ]);
+
+  const activeColFilterCount = useMemo(() => {
+    return [
+      colFilterOrderId.trim(),
+      colFilterCompany.trim(),
+      colFilterService.trim(),
+      colFilterConsultant.trim(),
+      colFilterAmount.trim(),
+      colFilterPayment !== "ALL" ? colFilterPayment : "",
+      colFilterStatus !== "ALL" ? colFilterStatus : "",
+    ].filter(Boolean).length;
+  }, [colFilterOrderId, colFilterCompany, colFilterService, colFilterConsultant, colFilterAmount, colFilterPayment, colFilterStatus]);
+
+  const handleClearAllFilters = () => {
+    setSearchTerm("");
+    setColFilterOrderId("");
+    setColFilterCompany("");
+    setColFilterService("");
+    setColFilterConsultant("");
+    setColFilterAmount("");
+    setColFilterPayment("ALL");
+    setColFilterStatus("ALL");
+    setCurrentPage(1);
+    try {
+      sessionStorage.removeItem(FILTERS_STORAGE_KEY);
+      localStorage.removeItem(FILTERS_STORAGE_KEY);
+    } catch (e) {}
+  };
+
   // Authorization Check & Redirect
   useEffect(() => {
     if (!userLoading && !canView) {
@@ -102,9 +230,33 @@ export default function ClientOrdersPage() {
     }
   }, [userLoading, canView, hasPermission, router]);
 
+  // Reset page to 1 only when user actually changes a search/filter criterion (not during hydration)
   useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearchTerm]);
+    if (!isRestoredRef.current) return;
+    const currentFiltersStr = JSON.stringify([
+      debouncedSearchTerm,
+      colFilterOrderId,
+      colFilterCompany,
+      colFilterService,
+      colFilterConsultant,
+      colFilterAmount,
+      colFilterPayment,
+      colFilterStatus,
+    ]);
+    if (prevFiltersRef.current && prevFiltersRef.current !== currentFiltersStr) {
+      setCurrentPage(1);
+    }
+    prevFiltersRef.current = currentFiltersStr;
+  }, [
+    debouncedSearchTerm,
+    colFilterOrderId,
+    colFilterCompany,
+    colFilterService,
+    colFilterConsultant,
+    colFilterAmount,
+    colFilterPayment,
+    colFilterStatus,
+  ]);
 
   // Modal States
   const [isViewOpen, setIsViewOpen] = useState(false);
@@ -508,83 +660,6 @@ export default function ClientOrdersPage() {
   }, [isViewOpen, isChatOpen, isProformaPreviewOpen, isFinalInvoicePreviewOpen]);
 
   const [highlightedOrderNum, setHighlightedOrderNum] = useState<string | null>(null);
-
-  const openOrderDirectly = (orderNum: string, openChat: boolean = true) => {
-    if (!orderNum || orders.length === 0) return;
-
-    const matched = groupedOrdersMap.get(orderNum) || Array.from(groupedOrdersMap.values()).find(g => g.order_number?.toUpperCase() === orderNum.toUpperCase());
-    if (matched) {
-      setSearchTerm("");
-      const orderIdx = Array.from(groupedOrdersMap.values()).findIndex(o => o.order_number?.toUpperCase() === orderNum.toUpperCase());
-      if (orderIdx !== -1) {
-        const targetPage = Math.floor(orderIdx / 10) + 1;
-        setCurrentPage(targetPage);
-      }
-      setSelectedOrderGroup(matched);
-      if (openChat) {
-        setIsChatOpen(true);
-        fetchProgressUpdates(matched.order_number);
-      } else {
-        setIsViewOpen(true);
-      }
-
-      setHighlightedOrderNum(matched.order_number);
-      setTimeout(() => {
-        const el = document.getElementById(`order-row-${matched.order_number}`);
-        const scrollParent = el?.closest('main') || document.querySelector('main');
-        if (el && scrollParent) {
-          const parentRect = scrollParent.getBoundingClientRect();
-          const elRect = el.getBoundingClientRect();
-          if (elRect.top < parentRect.top || elRect.bottom > parentRect.bottom) {
-            const relativeTop = elRect.top - parentRect.top + scrollParent.scrollTop;
-            scrollParent.scrollTo({ top: Math.max(0, relativeTop - 120), behavior: "smooth" });
-          }
-        }
-        if (typeof window !== "undefined") {
-          window.scrollTo(0, 0);
-          document.documentElement.scrollTop = 0;
-          document.body.scrollTop = 0;
-        }
-      }, 300);
-
-      setTimeout(() => {
-        setHighlightedOrderNum(null);
-      }, 4000);
-    }
-  };
-
-  // Auto-open chat from URL query parameter (for notifications) & custom event
-  useEffect(() => {
-    if (orders.length === 0) return;
-
-    const checkParams = () => {
-      if (typeof window === "undefined") return;
-      const params = new URLSearchParams(window.location.search);
-      const orderNum = params.get("order");
-      const openChat = params.get("chat");
-      if (orderNum) {
-        openOrderDirectly(orderNum, openChat === "true" || openChat === null);
-        const url = new URL(window.location.href);
-        url.searchParams.delete("order");
-        url.searchParams.delete("chat");
-        window.history.replaceState({}, "", url.pathname + url.search);
-      }
-    };
-
-    checkParams();
-
-    const handleCustomOpen = (e: any) => {
-      if (e.detail?.orderNumber) {
-        openOrderDirectly(e.detail.orderNumber, e.detail.chat ?? true);
-      }
-    };
-    window.addEventListener("open-order-chat", handleCustomOpen);
-
-    return () => {
-      window.removeEventListener("open-order-chat", handleCustomOpen);
-    };
-  }, [orders]);
-
   const [deletedItemIds, setDeletedItemIds] = useState<number[]>([]);
 
   // Group raw rows by order_number
@@ -708,6 +783,102 @@ export default function ClientOrdersPage() {
 
   const groupedOrders = Array.from(groupedOrdersMap.values());
 
+  const openOrderDirectly = (orderNum: string, openChat: boolean = true) => {
+    if (!orderNum) return;
+
+    const matched = groupedOrdersMap.get(orderNum) || Array.from(groupedOrdersMap.values()).find(g => g.order_number?.toUpperCase() === orderNum.toUpperCase());
+    if (matched) {
+      setSearchTerm("");
+      const orderIdx = Array.from(groupedOrdersMap.values()).findIndex(o => o.order_number?.toUpperCase() === orderNum.toUpperCase());
+      if (orderIdx !== -1) {
+        const targetPage = Math.floor(orderIdx / 10) + 1;
+        setCurrentPage(targetPage);
+      }
+      setSelectedOrderGroup(matched);
+      if (openChat) {
+        setIsChatOpen(true);
+        fetchProgressUpdates(matched.order_number);
+      } else {
+        setIsViewOpen(true);
+      }
+
+      setHighlightedOrderNum(matched.order_number);
+      setTimeout(() => {
+        const el = document.getElementById(`order-row-${matched.order_number}`);
+        const scrollParent = el?.closest('main') || document.querySelector('main');
+        if (el && scrollParent) {
+          const parentRect = scrollParent.getBoundingClientRect();
+          const elRect = el.getBoundingClientRect();
+          if (elRect.top < parentRect.top || elRect.bottom > parentRect.bottom) {
+            const relativeTop = elRect.top - parentRect.top + scrollParent.scrollTop;
+            scrollParent.scrollTo({ top: Math.max(0, relativeTop - 120), behavior: "smooth" });
+          }
+        }
+        if (typeof window !== "undefined") {
+          window.scrollTo(0, 0);
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+        }
+      }, 300);
+
+      setTimeout(() => {
+        setHighlightedOrderNum(null);
+      }, 4000);
+    } else {
+      // Fallback: If not in current active orders list, fetch directly from backend API
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/group/${encodeURIComponent(orderNum)}`, {
+        credentials: "include",
+      })
+        .then(async res => {
+          if (res.ok) {
+            const data = await res.json();
+            const groupData = Array.isArray(data) && data.length > 0 ? data[0] : data;
+            if (groupData && groupData.order_number) {
+              setSelectedOrderGroup(groupData);
+              if (openChat) {
+                setIsChatOpen(true);
+                fetchProgressUpdates(groupData.order_number);
+              } else {
+                setIsViewOpen(true);
+              }
+            }
+          }
+        })
+        .catch(err => console.error("Error fetching direct order:", err));
+    }
+  };
+
+  const openOrderDirectlyRef = useRef(openOrderDirectly);
+  openOrderDirectlyRef.current = openOrderDirectly;
+
+  // Listen to open-order-chat custom event (dispatched by notification bell & shared notifications)
+  useEffect(() => {
+    const handleCustomOpen = (e: any) => {
+      if (e.detail?.orderNumber) {
+        openOrderDirectlyRef.current(e.detail.orderNumber, e.detail.chat ?? true);
+      }
+    };
+    window.addEventListener("open-order-chat", handleCustomOpen);
+    return () => {
+      window.removeEventListener("open-order-chat", handleCustomOpen);
+    };
+  }, []);
+
+  // Auto-open chat from URL query parameter (for notifications & deep linking)
+  useEffect(() => {
+    const orderNum = searchParams?.get("order");
+    const openChat = searchParams?.get("chat");
+    if (orderNum) {
+      openOrderDirectly(orderNum, openChat === "true" || openChat === null);
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("order");
+        url.searchParams.delete("chat");
+        window.history.replaceState({}, "", url.pathname + url.search);
+      }
+    }
+  }, [searchParams, orders]);
+
   const handlePctChange = (valStr: string) => {
     setTempPercent(valStr);
     const pct = Number(valStr) || 0;
@@ -732,9 +903,15 @@ export default function ClientOrdersPage() {
     return "IDR " + new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(val);
   };
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return "-";
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch {
+      return "-";
+    }
   };
 
   const handleDeleteSubmit = async () => {
@@ -802,13 +979,89 @@ export default function ClientOrdersPage() {
   }, [groupedOrders]);
 
   const filteredOrders = activeOrders.filter((ord) => {
-    const term = debouncedSearchTerm.toLowerCase();
-    const orderNum = (ord.order_number || "").toLowerCase();
-    const clientName = (ord.client_name || "").toLowerCase();
-    const compName = (ord.company_name || "").toLowerCase();
-    const itemsStr = (ord.items || []).map((i: any) => `${i.job_title} ${i.job_id}`).join(" ").toLowerCase();
-    const consultantsStr = (ord.consultants || []).map((c: any) => c.name).join(" ").toLowerCase();
-    return orderNum.includes(term) || clientName.includes(term) || compName.includes(term) || itemsStr.includes(term) || consultantsStr.includes(term);
+    // 1. Global Search
+    if (debouncedSearchTerm) {
+      const term = debouncedSearchTerm.toLowerCase();
+      const orderNum = (ord.order_number || "").toLowerCase();
+      const clientName = (ord.client_name || "").toLowerCase();
+      const compName = (ord.company_name || "").toLowerCase();
+      const itemsStr = (ord.items || []).map((i: any) => `${i.job_title} ${i.job_id} ${i.branch_name || ""}`).join(" ").toLowerCase();
+      const consultantsStr = (ord.consultants || []).map((c: any) => c.name).join(" ").toLowerCase();
+      const dateStr = ord.created_at ? formatDate(ord.created_at).toLowerCase() : "";
+      if (!orderNum.includes(term) && !clientName.includes(term) && !compName.includes(term) && !itemsStr.includes(term) && !consultantsStr.includes(term) && !dateStr.includes(term)) {
+        return false;
+      }
+    }
+
+    // 2. Column: Order ID & Date
+    if (colFilterOrderId.trim()) {
+      const q = colFilterOrderId.trim().toLowerCase();
+      const orderNum = (ord.order_number || "").toLowerCase();
+      const dateStr = ord.created_at ? formatDate(ord.created_at).toLowerCase() : "";
+      if (!orderNum.includes(q) && !dateStr.includes(q)) return false;
+    }
+
+    // 3. Column: Company Entity / Client
+    if (colFilterCompany.trim()) {
+      const q = colFilterCompany.trim().toLowerCase();
+      const compName = (ord.company_name || "").toLowerCase();
+      const clientName = (ord.client_name || "").toLowerCase();
+      if (!compName.includes(q) && !clientName.includes(q)) return false;
+    }
+
+    // 4. Column: Service Package / Memo
+    if (colFilterService.trim()) {
+      const q = colFilterService.trim().toLowerCase();
+      const itemsStr = (ord.items || []).map((i: any) => `${i.job_title} ${i.job_id} ${i.branch_name || ""}`).join(" ").toLowerCase();
+      if (!itemsStr.includes(q)) return false;
+    }
+
+    // 5. Column: Assigned Consultants
+    if (colFilterConsultant.trim()) {
+      const q = colFilterConsultant.trim().toLowerCase();
+      const consultantsStr = (ord.consultants || []).map((c: any) => c.name).join(" ").toLowerCase();
+      const reviewerStr = ord.reviewer?.name?.toLowerCase() || "";
+      const reviewersStr = (ord.reviewers || []).map((r: any) => r.name).join(" ").toLowerCase();
+      if (!consultantsStr.includes(q) && !reviewerStr.includes(q) && !reviewersStr.includes(q)) return false;
+    }
+
+    // 6. Column: Total Amount
+    if (colFilterAmount.trim()) {
+      const q = colFilterAmount.trim().replace(/,/g, "");
+      const total = ord.total_amount || 0;
+      if (q.startsWith(">=")) {
+        const val = parseFloat(q.slice(2));
+        if (!isNaN(val) && total < val) return false;
+      } else if (q.startsWith("<=")) {
+        const val = parseFloat(q.slice(2));
+        if (!isNaN(val) && total > val) return false;
+      } else if (q.startsWith(">")) {
+        const val = parseFloat(q.slice(1));
+        if (!isNaN(val) && total <= val) return false;
+      } else if (q.startsWith("<")) {
+        const val = parseFloat(q.slice(1));
+        if (!isNaN(val) && total >= val) return false;
+      } else {
+        const val = parseFloat(q);
+        if (!isNaN(val)) {
+          if (!String(Math.round(total)).includes(q) && Math.abs(total - val) > 1) return false;
+        } else {
+          if (!String(Math.round(total)).includes(q)) return false;
+        }
+      }
+    }
+
+    // 7. Column: Payment Status
+    if (colFilterPayment !== "ALL") {
+      if ((ord.payment_status || "UNPAID").toUpperCase() !== colFilterPayment.toUpperCase()) return false;
+    }
+
+    // 8. Column: Lifecycle Status
+    if (colFilterStatus !== "ALL") {
+      if ((ord.status || "").toUpperCase() !== colFilterStatus.toUpperCase()) return false;
+    }
+
+    return true;
   });
 
   const totalPages = Math.ceil(filteredOrders.length / 10);
@@ -846,6 +1099,9 @@ export default function ClientOrdersPage() {
       case "DOCUMENTS_REVIEWED": return "bg-indigo-500/15 text-indigo-600 border-indigo-500/30 font-bold";
       case "PRE_DOC_SENT_FOR_SIGNATURE": return "bg-purple-500/15 text-purple-600 border-purple-500/30 font-bold";
       case "PRE_DOCS_SENT": return "bg-purple-500/15 text-purple-600 border-purple-500/30 font-bold";
+      case "AWAITING_SIGNING_NOTARIZATION": return "bg-violet-500/15 text-violet-600 border-violet-500/30 font-bold";
+      case "AWAITING_DOCUMENT_RETURN": return "bg-blue-500/15 text-blue-600 border-blue-500/30 font-bold";
+      case "AWAITING_THIRD_PARTY_RESPONSE": return "bg-amber-500/15 text-amber-600 border-amber-500/30 font-bold";
       case "FINAL_DOCUMENT_PREPARATION": return "bg-orange-500/15 text-orange-600 border-orange-500/30";
       case "FINAL_DOC_READY": return "bg-lime-500/15 text-lime-600 border-lime-500/30";
       case "INVOICE_GENERATED": return "bg-pink-500/15 text-pink-600 border-pink-500/30";
@@ -1843,35 +2099,55 @@ export default function ClientOrdersPage() {
         {/* Main Orders Table */}
         <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
           <div className="p-4 bg-muted/20 border-b border-border/40 flex flex-col sm:flex-row gap-3 items-center justify-between">
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search Order ID, Company..."
-                className="pl-8 h-9 text-xs rounded-xl bg-background/70 border-border/50"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+            <div className="flex items-center gap-2.5 w-full sm:w-auto flex-1 flex-wrap">
+              <div className="relative w-full sm:w-80">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search across all fields..."
+                  className="pl-8 h-9 text-xs rounded-xl bg-background/70 border-border/50"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <Button
+                type="button"
+                variant={showColumnFilters ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setShowColumnFilters(!showColumnFilters)}
+                className="h-9 px-3 rounded-xl text-xs font-semibold gap-1.5 shrink-0"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                <span>Column Filters</span>
+                {activeColFilterCount > 0 && (
+                  <Badge variant="default" className="h-4 px-1.5 text-[9px] font-bold rounded-full ml-0.5">
+                    {activeColFilterCount}
+                  </Badge>
+                )}
+              </Button>
+              {activeColFilterCount > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClearAllFilters}
+                  className="h-9 px-2.5 text-xs text-muted-foreground hover:text-destructive gap-1 shrink-0"
+                >
+                  <X className="h-3.5 w-3.5" /> Clear Filters
+                </Button>
+              )}
             </div>
-            <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold tracking-wider">
+            <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold tracking-wider shrink-0">
               Showing {paginatedOrders.length} of {filteredOrders.length} entries
             </span>
           </div>
 
           <CardContent className="p-0">
-            {filteredOrders.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
-                <ShoppingCart className="h-10 w-10 text-muted-foreground/35" />
-                <span className="text-sm font-semibold">No Client Orders Found</span>
-                <p className="text-xs max-w-sm">Click "Create New Order" above to issue your first service order.</p>
-              </div>
-            ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
                         <th className="py-2.5 px-2 w-8 text-center">No.</th>
-                        <th className="py-2.5 px-2 whitespace-nowrap w-24">Order ID</th>
+                        <th className="py-2.5 px-2 whitespace-nowrap w-28">Order ID & Date</th>
                         <th className="py-2.5 px-2 min-w-[130px] max-w-[170px]">Company Entity</th>
                         <th className="py-2.5 px-2.5 min-w-[240px] max-w-[340px]">Service Package</th>
                         <th className="py-2.5 px-3 w-36 min-w-[145px] max-w-[170px] whitespace-nowrap text-left">Assigned Consultants</th>
@@ -1880,9 +2156,160 @@ export default function ClientOrdersPage() {
                         <th className="py-2.5 px-2 text-left whitespace-nowrap">Lifecycle Status</th>
                         <th className="py-2.5 px-2 text-right whitespace-nowrap">Actions</th>
                       </tr>
+                      {showColumnFilters && (
+                        <tr className="bg-muted/15 border-b border-border/50 text-xs">
+                          {/* 1. No. */}
+                          <th className="py-1.5 px-1 text-center align-middle">
+                            {activeColFilterCount > 0 ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleClearAllFilters}
+                                className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 mx-auto"
+                                title="Reset all column filters"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground/40 font-mono">#</span>
+                            )}
+                          </th>
+                          {/* 2. Order ID */}
+                          <th className="py-1.5 px-1.5">
+                            <Input
+                              placeholder="ID / date..."
+                              value={colFilterOrderId}
+                              onChange={(e) => setColFilterOrderId(e.target.value)}
+                              className="h-7 text-[11px] px-1.5 rounded-md bg-background/80 border-border/60 font-mono placeholder:text-muted-foreground/50 w-full"
+                            />
+                          </th>
+                          {/* 3. Company Entity */}
+                          <th className="py-1.5 px-1.5">
+                            <Input
+                              placeholder="Company / client..."
+                              value={colFilterCompany}
+                              onChange={(e) => setColFilterCompany(e.target.value)}
+                              className="h-7 text-[11px] px-2 rounded-md bg-background/80 border-border/60 placeholder:text-muted-foreground/50 w-full"
+                            />
+                          </th>
+                          {/* 4. Service Package */}
+                          <th className="py-1.5 px-1.5">
+                            <Input
+                              placeholder="Service / code / memo..."
+                              value={colFilterService}
+                              onChange={(e) => setColFilterService(e.target.value)}
+                              className="h-7 text-[11px] px-2 rounded-md bg-background/80 border-border/60 placeholder:text-muted-foreground/50 w-full"
+                            />
+                          </th>
+                          {/* 5. Assigned Consultants */}
+                          <th className="py-1.5 px-1.5">
+                            <Input
+                              placeholder="Consultant / reviewer..."
+                              value={colFilterConsultant}
+                              onChange={(e) => setColFilterConsultant(e.target.value)}
+                              className="h-7 text-[11px] px-2 rounded-md bg-background/80 border-border/60 placeholder:text-muted-foreground/50 w-full"
+                            />
+                          </th>
+                          {/* 6. Total Amount */}
+                          <th className="py-1.5 px-1.5">
+                            <Input
+                              placeholder="e.g. >5M"
+                              value={colFilterAmount}
+                              onChange={(e) => setColFilterAmount(e.target.value)}
+                              className="h-7 text-[11px] px-2 rounded-md bg-background/80 border-border/60 font-mono text-right placeholder:text-muted-foreground/50 w-full"
+                            />
+                          </th>
+                          {/* 7. Payment */}
+                          <th className="py-1.5 px-1.5">
+                            <select
+                              value={colFilterPayment}
+                              onChange={(e) => setColFilterPayment(e.target.value)}
+                              className="h-7 w-full text-[11px] px-1 rounded-md bg-background/80 border border-border/60 font-bold text-foreground text-center"
+                            >
+                              <option value="ALL">All</option>
+                              <option value="PAID">PAID</option>
+                              <option value="PARTIALLY_PAID">PARTIAL</option>
+                              <option value="UNPAID">UNPAID</option>
+                            </select>
+                          </th>
+                          {/* 8. Lifecycle Status */}
+                          <th className="py-1.5 px-1.5">
+                            <select
+                              value={colFilterStatus}
+                              onChange={(e) => setColFilterStatus(e.target.value)}
+                              className="h-7 w-full text-[11px] px-1 rounded-md bg-background/80 border border-border/60 font-bold text-foreground truncate"
+                            >
+                              <option value="ALL">All Stages</option>
+                              <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
+                              <option value="IN_PROGRESS">IN PROGRESS</option>
+                              <option value="REVIEW_DOCS">REVIEW DOCS</option>
+                              <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
+                              <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
+                              <option value="AWAITING_SIGNING_NOTARIZATION">AWAITING SIGNING / NOTARIZATION</option>
+                              <option value="AWAITING_DOCUMENT_RETURN">AWAITING DOCUMENT RETURN FROM CLIENT</option>
+                              <option value="AWAITING_THIRD_PARTY_RESPONSE">AWAITING THIRD-PARTY RESPONSE (VENDOR)</option>
+                              <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOC PREP</option>
+                              <option value="FINAL_DOC_READY">FINAL DOC READY</option>
+                              <option value="WAITING_ON_CLIENT">WAITING ON CLIENT</option>
+                              <option value="WAITING_FOR_FINAL_PAYMENT">WAITING FINAL PAYMENT</option>
+                              <option value="FINAL_PAYMENT_COMPLETED">FINAL PAYMENT COMPLETED</option>
+                              <option value="SOFT_COPY_DELIVERED">SOFT COPY DELIVERED</option>
+                              <option value="HARD_COPY_DELIVERED">HARD COPY DELIVERED</option>
+                              <option value="ON_HOLD">ON HOLD</option>
+                              <option value="CONFIRMED">CONFIRMED</option>
+                              <option value="DRAFT">DRAFT</option>
+                              <option value="PROFORMA_GENERATED">PROFORMA GENERATED</option>
+                            </select>
+                          </th>
+                          {/* 9. Actions */}
+                          <th className="py-1.5 px-1.5 text-right">
+                            {activeColFilterCount > 0 ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleClearAllFilters}
+                                className="h-7 px-2 text-[10px] text-destructive hover:bg-destructive/10 font-bold w-full gap-0.5"
+                                title="Reset all filters"
+                              >
+                                <X className="h-3 w-3" /> Reset
+                              </Button>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground/40 italic block text-right pr-2">Filter</span>
+                            )}
+                          </th>
+                        </tr>
+                      )}
                     </thead>
                     <tbody className="divide-y divide-border/30">
-                      {paginatedOrders.map((ord, index) => {
+                      {paginatedOrders.length === 0 ? (
+                        <tr>
+                          <td colSpan={9} className="py-14 text-center text-muted-foreground">
+                            <div className="flex flex-col items-center justify-center gap-2.5">
+                              <ShoppingCart className="h-10 w-10 text-muted-foreground/30 stroke-[1.5]" />
+                              <span className="text-sm font-semibold text-foreground/80">No Client Orders Found</span>
+                              <p className="text-xs max-w-sm text-muted-foreground">
+                                {activeColFilterCount > 0 || searchTerm
+                                  ? "No orders match the specified filter criteria. You can adjust or reset the column filters above."
+                                  : 'Click "Create New Order" above to issue your first service order.'}
+                              </p>
+                              {(activeColFilterCount > 0 || searchTerm) && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={handleClearAllFilters}
+                                  className="mt-1 text-xs font-semibold h-8 px-3"
+                                >
+                                  Reset All Filters
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedOrders.map((ord, index) => {
                         const isHighlighted = highlightedOrderNum === ord.order_number;
                         return (
                           <tr
@@ -1897,20 +2324,46 @@ export default function ClientOrdersPage() {
                               #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + index))}
                             </td>
                             <td className="py-2 px-2 align-top pt-2.5 whitespace-nowrap">
-                              {ord.company_id ? (
-                                <Link href={`/business/clients/documents/${ord.company_id}?from=orders`}>
-                                  <Badge
-                                    variant="outline"
-                                    className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2 py-0.5 rounded hover:border-emerald-500/40 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
-                                    title="Go to Company Documents Folder"
-                                  >
+                              <div className="inline-flex items-center gap-1.5 group/copy">
+                                {ord.company_id ? (
+                                  <Link href={`/business/clients/documents/${ord.company_id}?from=orders`}>
+                                    <Badge
+                                      variant="outline"
+                                      className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2 py-0.5 rounded hover:border-emerald-500/40 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
+                                      title="Go to Company Documents Folder"
+                                    >
+                                      {ord.order_number}
+                                    </Badge>
+                                  </Link>
+                                ) : (
+                                  <Badge variant="outline" className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2 py-0.5 rounded">
                                     {ord.order_number}
                                   </Badge>
-                                </Link>
-                              ) : (
-                                <Badge variant="outline" className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2 py-0.5 rounded">
-                                  {ord.order_number}
-                                </Badge>
+                                )}
+                                {ord.order_number && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleCopyOrderNumber(e, ord.order_number)}
+                                    className="h-5 w-5 inline-flex items-center justify-center rounded border border-transparent hover:border-border/60 hover:bg-muted/70 text-muted-foreground hover:text-foreground transition-all cursor-pointer opacity-50 group-hover/copy:opacity-100 hover:!opacity-100"
+                                    title="Copy Order ID"
+                                    aria-label="Copy Order ID"
+                                  >
+                                    {copiedOrderNumber === ord.order_number ? (
+                                      <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                    ) : (
+                                      <Copy className="h-3 w-3" />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                              {ord.created_at && (
+                                <div
+                                  className="text-[10.5px] text-muted-foreground font-medium flex items-center gap-1 mt-1 tracking-tight"
+                                  title={`Order Created: ${new Date(ord.created_at).toLocaleString()}`}
+                                >
+                                  <Calendar className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+                                  <span>{formatDate(ord.created_at)}</span>
+                                </div>
                               )}
                             </td>
                             <td className="py-2 px-2 font-bold text-foreground align-top pt-2.5 min-w-[130px] max-w-[170px]">
@@ -2187,7 +2640,7 @@ export default function ClientOrdersPage() {
                             </td>
                             <td className="py-2 px-2 text-right align-top pt-2.5 whitespace-nowrap">
                               <div className="flex items-center justify-end gap-1">
-                                {['DOCUMENTS_REVIEWED', 'PRE_DOC_SENT_FOR_SIGNATURE', 'PRE_DOCS_SENT'].includes(ord.status) && (
+                                {['DOCUMENTS_REVIEWED', 'PRE_DOC_SENT_FOR_SIGNATURE', 'PRE_DOCS_SENT', 'AWAITING_SIGNING_NOTARIZATION', 'AWAITING_DOCUMENT_RETURN', 'AWAITING_THIRD_PARTY_RESPONSE'].includes(ord.status) && (
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -2218,7 +2671,10 @@ export default function ClientOrdersPage() {
                                   variant="ghost"
                                   className="h-6 w-6 rounded p-0"
                                   title="Edit Order & Consultants"
-                                  onClick={() => router.push(`/business/clients/orders/${ord.order_number}/edit`)}
+                                  onClick={() => {
+                                    saveCurrentFilters();
+                                    router.push(`/business/clients/orders/${ord.order_number}/edit`);
+                                  }}
                                 >
                                   <Edit className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                                 </Button>
@@ -2273,23 +2729,24 @@ export default function ClientOrdersPage() {
                             </td>
                           </tr>
                         );
-                      })}
+                      })
+                    )}
                     </tbody>
                   </table>
                 </div>
 
                 {/* Pagination Controls */}
-                <TablePagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={setCurrentPage}
-                  startIndex={startIndex}
-                  endIndex={endIndex}
-                  totalEntries={filteredOrders.length}
-                />
-              </>
-            )}
-          </CardContent>
+                {filteredOrders.length > 0 && (
+                  <TablePagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    startIndex={startIndex}
+                    endIndex={endIndex}
+                    totalEntries={filteredOrders.length}
+                  />
+                )}
+              </CardContent>
         </Card>
 
 
@@ -2340,6 +2797,12 @@ export default function ClientOrdersPage() {
                   <Badge variant="outline" className="font-mono text-xs font-bold px-3 py-1 bg-zinc-100 text-zinc-800 border border-zinc-300 rounded-lg">
                     {selectedOrderGroup.order_number}
                   </Badge>
+                  {selectedOrderGroup.created_at && (
+                    <Badge variant="outline" className="font-mono text-xs font-medium px-2.5 py-1 bg-zinc-50 text-zinc-600 border border-zinc-200 rounded-lg flex items-center gap-1.5" title={`Order Created: ${new Date(selectedOrderGroup.created_at).toLocaleString()}`}>
+                      <Calendar className="h-3 w-3 text-zinc-400" />
+                      {formatDate(selectedOrderGroup.created_at)}
+                    </Badge>
+                  )}
                   <Button variant="ghost" size="icon" onClick={() => setIsViewOpen(false)} className="rounded-full h-8 w-8 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100">
                     <X className="h-4 w-4" />
                   </Button>
@@ -2684,7 +3147,7 @@ export default function ClientOrdersPage() {
                         </p>
                       )}
 
-                      {['DOCUMENTS_REVIEWED', 'PRE_DOC_SENT_FOR_SIGNATURE', 'PRE_DOCS_SENT'].includes(selectedOrderGroup?.status) && (
+                      {['DOCUMENTS_REVIEWED', 'PRE_DOC_SENT_FOR_SIGNATURE', 'PRE_DOCS_SENT', 'AWAITING_SIGNING_NOTARIZATION', 'AWAITING_DOCUMENT_RETURN', 'AWAITING_THIRD_PARTY_RESPONSE'].includes(selectedOrderGroup?.status) && (
                         <div className="space-y-1.5">
                           <Button
                             type="button"

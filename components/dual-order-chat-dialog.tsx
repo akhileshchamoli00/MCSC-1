@@ -40,7 +40,9 @@ import {
   Quote,
   Ban,
   Cloud,
-  FileDown
+  FileDown,
+  Paperclip,
+  Image as ImageIcon
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -55,6 +57,19 @@ import { resolveImageUrl } from "@/lib/utils";
 import { toast } from "sonner";
 import { ChatEmojiPicker } from "@/components/chat-emoji-picker";
 import { ChatMessageReactions, WhatsAppReactionHoverBar } from "@/components/chat-message-reactions";
+
+const isImageFile = (filename?: string | null) => {
+  if (!filename) return false;
+  return /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(filename);
+};
+
+const formatFileSize = (bytes?: number) => {
+  if (!bytes || bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+};
 
 const deduplicateMessages = (msgs: any[]) => {
   if (!Array.isArray(msgs)) return [];
@@ -235,6 +250,21 @@ const getMilestoneIcon = (message: string) => {
     return <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />;
   }
   return <Clock className="h-3.5 w-3.5 text-primary shrink-0" />;
+};
+
+export const formatExternalTeamName = (name?: string | null) => {
+  if (!name) return "Consultant MCS";
+  const trimmed = name.trim();
+  if (!trimmed) return "Consultant MCS";
+  const lower = trimmed.toLowerCase();
+  if (lower === "client" || lower === "you (client)" || lower === "you" || lower === "member" || lower === "system" || lower === "milestone") {
+    return trimmed;
+  }
+  if (trimmed.toUpperCase().endsWith(" MCS")) {
+    return trimmed;
+  }
+  const first = trimmed.split(/\s+/)[0];
+  return `${first} MCS`;
 };
 
 const isEmojiOnlyText = (str?: string | null) => {
@@ -439,6 +469,97 @@ export function DualOrderChatDialog({
   // Input refs
   const clientInputRef = useRef<HTMLTextAreaElement | null>(null);
   const internalInputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Attachment & Snippet States
+  const [clientAttachment, setClientAttachment] = useState<File | null>(null);
+  const [clientAttachmentPreview, setClientAttachmentPreview] = useState<string | null>(null);
+  const clientFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [internalAttachment, setInternalAttachment] = useState<File | null>(null);
+  const [internalAttachmentPreview, setInternalAttachmentPreview] = useState<string | null>(null);
+  const internalFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleClientAttachmentSelect = (file: File) => {
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("File exceeds 50MB maximum size limit.");
+      return;
+    }
+    setClientAttachment(file);
+    if (file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setClientAttachmentPreview(url);
+    } else {
+      setClientAttachmentPreview(null);
+    }
+    clientInputRef.current?.focus();
+  };
+
+  const handleRemoveClientAttachment = () => {
+    if (clientAttachmentPreview) {
+      URL.revokeObjectURL(clientAttachmentPreview);
+    }
+    setClientAttachment(null);
+    setClientAttachmentPreview(null);
+    if (clientFileInputRef.current) {
+      clientFileInputRef.current.value = "";
+    }
+  };
+
+  const handleInternalAttachmentSelect = (file: File) => {
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("File exceeds 50MB maximum size limit.");
+      return;
+    }
+    setInternalAttachment(file);
+    if (file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setInternalAttachmentPreview(url);
+    } else {
+      setInternalAttachmentPreview(null);
+    }
+    internalInputRef.current?.focus();
+  };
+
+  const handleRemoveInternalAttachment = () => {
+    if (internalAttachmentPreview) {
+      URL.revokeObjectURL(internalAttachmentPreview);
+    }
+    setInternalAttachment(null);
+    setInternalAttachmentPreview(null);
+    if (internalFileInputRef.current) {
+      internalFileInputRef.current.value = "";
+    }
+  };
+
+  const handlePasteSnippet = (
+    e: React.ClipboardEvent,
+    onAttach: (file: File) => void,
+    channelName: string
+  ) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf("image") !== -1 || (item.kind === "file" && item.type.startsWith("image/"))) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          const ext = file.name && file.name.includes(".") ? file.name.split(".").pop() : (item.type.split("/")[1] || "png");
+          const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(11, 19);
+          const snippetName = file.name && file.name !== "image.png" && file.name.length > 5
+            ? file.name
+            : `snippet_${timestamp}.${ext}`;
+          const snippetFile = new File([file], snippetName, { type: file.type || "image/png" });
+          onAttach(snippetFile);
+          toast.success(`Image snippet attached to ${channelName}! Press Send to post.`);
+          return;
+        }
+      }
+    }
+  };
 
   // Client Confirmation Dialog State
   const [isConfirmClientOpen, setIsConfirmClientOpen] = useState(false);
@@ -858,50 +979,88 @@ export function DualOrderChatDialog({
   // 5. Handle Client Message Confirmation
   const handleClientSendClick = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!clientInput.trim()) return;
+    if (!clientInput.trim() && !clientAttachment) return;
     setPendingClientMessage(clientInput.trim());
     setIsConfirmClientOpen(true);
   };
 
   const handleConfirmSendClientMessage = async () => {
-    if (!pendingClientMessage || !orderNumber || sendingClient) return;
+    if ((!pendingClientMessage && !clientAttachment) || !orderNumber || sendingClient) return;
     try {
       setSendingClient(true);
       setIsConfirmClientOpen(false);
       const quotePayload = quotedClientMessage ? {
         quoted_message_id: quotedClientMessage.id,
         quoted_message_text: quotedClientMessage.message || quotedClientMessage.attachment_name || "Attachment",
-        quoted_sender_name: quotedClientMessage.sender_name || (quotedClientMessage.is_client ? "Client" : "Consultant")
+        quoted_sender_name: quotedClientMessage.is_client
+          ? (quotedClientMessage.sender_name || "Client")
+          : formatExternalTeamName(quotedClientMessage.sender_name)
       } : {};
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/progress`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            message: pendingClientMessage,
-            channel: "CLIENT",
-            ...quotePayload
-          })
+      if (clientAttachment) {
+        const formData = new FormData();
+        formData.append("file", clientAttachment);
+        if (pendingClientMessage) formData.append("message", pendingClientMessage);
+        formData.append("channel", "CLIENT");
+        const isSnippet = clientAttachment.name.startsWith("snippet_") || clientAttachment.type.startsWith("image/");
+        formData.append("is_snippet", isSnippet ? "true" : "false");
+        if (quotePayload.quoted_message_id) formData.append("quoted_message_id", String(quotePayload.quoted_message_id));
+        if (quotePayload.quoted_message_text) formData.append("quoted_message_text", quotePayload.quoted_message_text);
+        if (quotePayload.quoted_sender_name) formData.append("quoted_sender_name", quotePayload.quoted_sender_name);
+
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/upload-attachment`,
+          {
+            method: "POST",
+            credentials: "include",
+            body: formData
+          }
+        );
+        if (res.ok) {
+          const newMsg = await res.json();
+          setClientMessages(prev => deduplicateMessages([...prev, newMsg]));
+          setClientInput("");
+          if (clientInputRef.current) {
+            clientInputRef.current.style.height = "auto";
+          }
+          setPendingClientMessage("");
+          setQuotedClientMessage(null);
+          handleRemoveClientAttachment();
+          toast.success("Attachment and message sent to Client successfully!");
+        } else {
+          const err = await res.json();
+          toast.error(err.detail || "Failed to upload attachment to client");
         }
-      );
-      if (res.ok) {
-        const newMsg = await res.json();
-        setClientMessages(prev => deduplicateMessages([...prev, newMsg]));
-        setClientInput("");
-        if (clientInputRef.current) {
-          clientInputRef.current.style.height = "auto";
-        }
-        setPendingClientMessage("");
-        setQuotedClientMessage(null);
-        toast.success("Message sent to Client successfully!");
       } else {
-        const err = await res.json();
-        toast.error(err.detail || "Failed to send message to client");
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/progress`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              message: pendingClientMessage,
+              channel: "CLIENT",
+              ...quotePayload
+            })
+          }
+        );
+        if (res.ok) {
+          const newMsg = await res.json();
+          setClientMessages(prev => deduplicateMessages([...prev, newMsg]));
+          setClientInput("");
+          if (clientInputRef.current) {
+            clientInputRef.current.style.height = "auto";
+          }
+          setPendingClientMessage("");
+          setQuotedClientMessage(null);
+          toast.success("Message sent to Client successfully!");
+        } else {
+          const err = await res.json();
+          toast.error(err.detail || "Failed to send message to client");
+        }
       }
     } catch (err) {
       console.error("Error sending client message:", err);
@@ -914,7 +1073,7 @@ export function DualOrderChatDialog({
   // 6. Handle Internal Message Send (Instant, No Confirmation)
   const handleInternalSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!internalInput.trim() || !orderNumber || sendingInternal) return;
+    if ((!internalInput.trim() && !internalAttachment) || !orderNumber || sendingInternal) return;
     const msgToSend = internalInput.trim();
     const quotePayload = quotedInternalMessage ? {
       quoted_message_id: quotedInternalMessage.id,
@@ -929,29 +1088,62 @@ export function DualOrderChatDialog({
         internalInputRef.current.style.height = "auto";
       }
       setShowSuggestions(false);
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/progress`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            message: msgToSend,
-            channel: "INTERNAL",
-            ...quotePayload
-          })
+
+      if (internalAttachment) {
+        const formData = new FormData();
+        formData.append("file", internalAttachment);
+        if (msgToSend) formData.append("message", msgToSend);
+        formData.append("channel", "INTERNAL");
+        const isSnippet = internalAttachment.name.startsWith("snippet_") || internalAttachment.type.startsWith("image/");
+        formData.append("is_snippet", isSnippet ? "true" : "false");
+        if (quotePayload.quoted_message_id) formData.append("quoted_message_id", String(quotePayload.quoted_message_id));
+        if (quotePayload.quoted_message_text) formData.append("quoted_message_text", quotePayload.quoted_message_text);
+        if (quotePayload.quoted_sender_name) formData.append("quoted_sender_name", quotePayload.quoted_sender_name);
+
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/upload-attachment`,
+          {
+            method: "POST",
+            credentials: "include",
+            body: formData
+          }
+        );
+        if (res.ok) {
+          const newMsg = await res.json();
+          setInternalMessages(prev => deduplicateMessages([...prev, newMsg]));
+          setQuotedInternalMessage(null);
+          handleRemoveInternalAttachment();
+          toast.success("Internal note and attachment posted!");
+        } else {
+          const err = await res.json();
+          toast.error(err.detail || "Failed to upload internal attachment");
+          setInternalInput(msgToSend);
         }
-      );
-      if (res.ok) {
-        const newMsg = await res.json();
-        setInternalMessages(prev => deduplicateMessages([...prev, newMsg]));
-        setQuotedInternalMessage(null);
       } else {
-        const err = await res.json();
-        toast.error(err.detail || "Failed to post internal message");
-        setInternalInput(msgToSend);
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/progress`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              message: msgToSend,
+              channel: "INTERNAL",
+              ...quotePayload
+            })
+          }
+        );
+        if (res.ok) {
+          const newMsg = await res.json();
+          setInternalMessages(prev => deduplicateMessages([...prev, newMsg]));
+          setQuotedInternalMessage(null);
+        } else {
+          const err = await res.json();
+          toast.error(err.detail || "Failed to post internal message");
+          setInternalInput(msgToSend);
+        }
       }
     } catch (err) {
       console.error("Error posting internal message:", err);
@@ -1347,7 +1539,18 @@ export function DualOrderChatDialog({
                 {/* ============================================================ */}
                 {/* PANE 1 (LEFT): CLIENT & CONSULTANT CHAT (EXTERNAL)           */}
                 {/* ============================================================ */}
-                <div className="flex flex-col h-full min-h-0 max-h-full bg-background/50 overflow-hidden">
+                <div
+                  className="flex flex-col h-full min-h-0 max-h-full bg-background/50 overflow-hidden outline-none"
+                  onPaste={e => handlePasteSnippet(e, handleClientAttachmentSelect, "Client Channel")}
+                  onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (e.dataTransfer.files?.[0]) {
+                      handleClientAttachmentSelect(e.dataTransfer.files[0]);
+                    }
+                  }}
+                >
                   {/* Client Pane Subheader */}
                   <div className="px-4 py-2.5 border-b border-border/40 bg-sky-500/5 dark:bg-sky-950/20 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-2.5">
@@ -1448,7 +1651,7 @@ export function DualOrderChatDialog({
                                   </Badge>
                                 )}
                                 <span className="text-[11px] font-bold text-foreground">
-                                  {msg.sender_name || (isClientSender ? "Client" : "Consultant")}
+                                  {isClientSender ? (msg.sender_name || "Client") : formatExternalTeamName(msg.sender_name)}
                                 </span>
                                 {msg.sender_role && !isClientSender && (
                                   <span className="text-[10px] text-muted-foreground">
@@ -1621,7 +1824,7 @@ export function DualOrderChatDialog({
                                       >
                                         <div className="flex items-center gap-1 font-bold text-[10px] opacity-90 min-w-0">
                                           <Reply className="h-2.5 w-2.5 shrink-0" />
-                                          <span className="truncate">{msg.quoted_sender_name || "Quoted Message"}</span>
+                                          <span className="truncate">{msg.quoted_sender_name ? (msg.quoted_sender_name.toLowerCase().includes("client") ? msg.quoted_sender_name : formatExternalTeamName(msg.quoted_sender_name)) : "Quoted Message"}</span>
                                         </div>
                                         <p className="text-[11px] opacity-80 line-clamp-2 break-words italic mt-0.5">
                                           "{msg.quoted_message_text}"
@@ -1631,54 +1834,94 @@ export function DualOrderChatDialog({
 
                                     <div className="break-words [overflow-wrap:anywhere] min-w-0 max-w-full">{renderMessageContent(msg.message, false)}</div>
 
-                                    {/* Client Uploaded Document Preview Button (Preview Only - No Download) */}
+                                    {/* Client Uploaded Document or Image Snippet Preview */}
                                     {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
-                                      <div
-                                        className={`mt-2 p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs shadow-2xs ${
-                                          isClientSender
-                                            ? "bg-background/90 border-border/60 text-foreground"
-                                            : "bg-sky-700/80 border-sky-500/30 text-white"
-                                        }`}
-                                      >
-                                        <div className="flex items-center gap-2 min-w-0">
+                                      isImageFile(msg.attachment_name || msg.attachment_url) ? (
+                                        <div className="mt-2 rounded-xl overflow-hidden border border-border/60 shadow-xs max-w-sm">
                                           <div
-                                            className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 border ${
-                                              isClientSender
-                                                ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20"
-                                                : "bg-white/10 text-white border-white/20"
+                                            className="relative cursor-pointer group/img overflow-hidden bg-muted/30 flex items-center justify-center max-h-60"
+                                            onClick={() => handlePreviewAttachment(msg)}
+                                          >
+                                            <img
+                                              src={`/api-proxy/api/clients/orders/${orderNumber}/attachments/preview?path=${encodeURIComponent(msg.attachment_url)}`}
+                                              alt={msg.attachment_name || "Snippet"}
+                                              loading="lazy"
+                                              className="w-full h-auto max-h-60 object-contain transition-transform duration-200 group-hover/img:scale-[1.02]"
+                                            />
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-xs font-semibold backdrop-blur-[2px]">
+                                              <Eye className="h-4 w-4" />
+                                              <span>Click to Enlarge</span>
+                                            </div>
+                                          </div>
+                                          <div
+                                            className={`p-2 border-t flex items-center justify-between gap-2 text-xs ${
+                                              isClientSender ? "bg-background/95 border-border/40 text-foreground" : "bg-sky-700/90 border-sky-500/30 text-white"
                                             }`}
                                           >
-                                            <FileText className="h-3.5 w-3.5" />
-                                          </div>
-                                          <div className="min-w-0">
-                                            <span className="font-bold truncate block text-xs">
-                                              {msg.attachment_name || "Client Document"}
+                                            <span className="truncate font-semibold text-[11px] block min-w-0">
+                                              {msg.attachment_name || "Image Snippet"}
                                             </span>
-                                            <span
-                                              className={`text-[10px] block truncate ${
-                                                isClientSender ? "text-muted-foreground" : "text-sky-200"
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => handlePreviewAttachment(msg)}
+                                              className={`h-6 px-2 text-[10px] font-bold gap-1 shrink-0 ${
+                                                isClientSender ? "text-sky-600 hover:text-sky-700" : "text-white hover:bg-white/20"
                                               }`}
                                             >
-                                              Stored in Company Vault (Client Shared Docs)
-                                            </span>
+                                              <Eye className="h-3 w-3" /> Full View
+                                            </Button>
                                           </div>
                                         </div>
-
-                                        <Button
-                                          type="button"
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => handlePreviewAttachment(msg)}
-                                          className={`h-7 text-[11px] font-bold gap-1 px-2.5 shrink-0 shadow-2xs ${
+                                      ) : (
+                                        <div
+                                          className={`mt-2 p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs shadow-2xs ${
                                             isClientSender
-                                              ? "text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 border-sky-500/30"
-                                              : "text-white bg-white/10 hover:bg-white/20 border-white/30"
+                                              ? "bg-background/90 border-border/60 text-foreground"
+                                              : "bg-sky-700/80 border-sky-500/30 text-white"
                                           }`}
                                         >
-                                          <Eye className="h-3 w-3" />
-                                          Preview
-                                        </Button>
-                                      </div>
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            <div
+                                              className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 border ${
+                                                isClientSender
+                                                  ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20"
+                                                  : "bg-white/10 text-white border-white/20"
+                                              }`}
+                                            >
+                                              <FileText className="h-3.5 w-3.5" />
+                                            </div>
+                                            <div className="min-w-0">
+                                              <span className="font-bold truncate block text-xs">
+                                                {msg.attachment_name || "Client Document"}
+                                              </span>
+                                              <span
+                                                className={`text-[10px] block truncate ${
+                                                  isClientSender ? "text-muted-foreground" : "text-sky-200"
+                                                }`}
+                                              >
+                                                Stored in Company Vault (Client Shared Docs)
+                                              </span>
+                                            </div>
+                                          </div>
+
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handlePreviewAttachment(msg)}
+                                            className={`h-7 text-[11px] font-bold gap-1 px-2.5 shrink-0 shadow-2xs ${
+                                              isClientSender
+                                                ? "text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 border-sky-500/30"
+                                                : "text-white bg-white/10 hover:bg-white/20 border-white/30"
+                                            }`}
+                                          >
+                                            <Eye className="h-3 w-3" />
+                                            Preview
+                                          </Button>
+                                        </div>
+                                      )
                                     )}
                                   </div>
 
@@ -1754,7 +1997,7 @@ export function DualOrderChatDialog({
                           <Reply className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
                           <div className="min-w-0">
                             <span className="font-bold text-sky-700 dark:text-sky-300 block text-[10px] sm:text-[11px]">
-                              Replying to {quotedClientMessage.sender_name || (quotedClientMessage.is_client ? "Client" : "Consultant")}
+                              Replying to {quotedClientMessage.is_client ? (quotedClientMessage.sender_name || "Client") : formatExternalTeamName(quotedClientMessage.sender_name)}
                             </span>
                             <p className="text-muted-foreground text-[11px] truncate max-w-sm italic">
                               "{quotedClientMessage.message || quotedClientMessage.attachment_name || "Attachment"}"
@@ -1774,10 +2017,77 @@ export function DualOrderChatDialog({
                       </div>
                     )}
 
+                    {/* Client Attachment / Snippet Staged Preview Chip */}
+                    {clientAttachment && (
+                      <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-sky-500/30 bg-sky-500/10 dark:bg-sky-950/30 text-xs shadow-xs animate-in fade-in slide-in-from-bottom-2 duration-150">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {clientAttachmentPreview ? (
+                            <img
+                              src={clientAttachmentPreview}
+                              alt="Snippet preview"
+                              className="h-10 w-10 object-cover rounded-lg border border-sky-500/30 shrink-0 bg-background"
+                            />
+                          ) : (
+                            <div className="h-10 w-10 rounded-lg bg-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-500/30">
+                              <FileText className="h-5 w-5" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold truncate text-xs text-foreground block">
+                                {clientAttachment.name}
+                              </span>
+                              <Badge variant="outline" className="text-[10px] py-0 px-1.5 bg-sky-500/15 border-sky-500/30 text-sky-700 dark:text-sky-300 shrink-0">
+                                {clientAttachment.type.startsWith("image/") ? "Snippet / Image" : "Document"}
+                              </Badge>
+                            </div>
+                            <span className="text-[11px] text-muted-foreground block truncate">
+                              {formatFileSize(clientAttachment.size)} • Storing in Client Shared Docs
+                            </span>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleRemoveClientAttachment}
+                          className="h-7 w-7 rounded-full text-muted-foreground hover:text-foreground hover:bg-background/60 shrink-0"
+                          title="Remove attachment"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+
                     <form
                       onSubmit={handleClientSendClick}
                       className="flex items-end gap-2"
                     >
+                      <input
+                        type="file"
+                        ref={clientFileInputRef}
+                        className="hidden"
+                        onChange={e => {
+                          if (e.target.files?.[0]) {
+                            handleClientAttachmentSelect(e.target.files[0]);
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => clientFileInputRef.current?.click()}
+                        title="Attach file or screenshot snippet"
+                        className={`h-[40px] w-[40px] rounded-xl shrink-0 transition-colors ${
+                          clientAttachment
+                            ? "border-sky-500 text-sky-600 bg-sky-500/10 shadow-xs"
+                            : "border-input bg-background text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <Paperclip className="h-4 w-4" />
+                      </Button>
+
                       <ChatEmojiPicker
                         onSelectEmoji={emoji => {
                           setClientInput(prev => {
@@ -1798,8 +2108,13 @@ export function DualOrderChatDialog({
                       <textarea
                         ref={clientInputRef}
                         rows={1}
-                        placeholder="Message the Client (Enter to send, Shift + Enter for new line)..."
+                        placeholder={
+                          clientAttachment
+                            ? "Add a note with this attachment (Enter to send, Shift + Enter for new line)..."
+                            : "Message the Client (Paste screenshot snippet directly here, Enter to send)..."
+                        }
                         value={clientInput}
+                        onPaste={e => handlePasteSnippet(e, handleClientAttachmentSelect, "Client Channel")}
                         onChange={e => {
                           setClientInput(e.target.value);
                           e.target.style.height = "auto";
@@ -1831,11 +2146,15 @@ export function DualOrderChatDialog({
                       <Button
                         type="submit"
                         size="sm"
-                        disabled={!clientInput.trim() || sendingClient}
+                        disabled={(!clientInput.trim() && !clientAttachment) || sendingClient}
                         className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold gap-1.5 px-3.5 h-9 shrink-0 shadow-xs"
                       >
-                        <Send className="h-3.5 w-3.5" />
-                        Send to Client
+                        {sendingClient ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Send className="h-3.5 w-3.5" />
+                        )}
+                        <span>Send to Client</span>
                       </Button>
                     </form>
                   </div>
@@ -1844,7 +2163,18 @@ export function DualOrderChatDialog({
                 {/* ============================================================ */}
                 {/* PANE 2 (RIGHT): INTERNAL TEAM CHAT (PRIVATE)                */}
                 {/* ============================================================ */}
-                <div className="flex flex-col h-full min-h-0 max-h-full bg-background/50 overflow-hidden">
+                <div
+                  className="flex flex-col h-full min-h-0 max-h-full bg-background/50 overflow-hidden outline-none"
+                  onPaste={e => handlePasteSnippet(e, handleInternalAttachmentSelect, "Internal Notes")}
+                  onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (e.dataTransfer.files?.[0]) {
+                      handleInternalAttachmentSelect(e.dataTransfer.files[0]);
+                    }
+                  }}
+                >
                   {/* Internal Pane Subheader */}
                   <div className="px-4 py-2.5 border-b border-border/40 bg-amber-500/5 dark:bg-amber-950/20 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-2.5">
@@ -2061,34 +2391,68 @@ export function DualOrderChatDialog({
 
                                     <div className="break-words [overflow-wrap:anywhere] min-w-0 max-w-full">{renderMessageContent(msg.message, true, taggableUsers)}</div>
 
-                                    {/* Attached Document Card (Preview Only) */}
+                                    {/* Attached Document or Image Snippet Card (Preview Only) */}
                                     {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
-                                      <div className="mt-2 p-2.5 rounded-xl bg-background/90 border border-border/60 flex items-center justify-between gap-3 text-xs shadow-2xs">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          <div className="h-7 w-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
-                                            <FileText className="h-3.5 w-3.5" />
+                                      isImageFile(msg.attachment_name || msg.attachment_url) ? (
+                                        <div className="mt-2 rounded-xl overflow-hidden border border-border/60 shadow-xs max-w-sm">
+                                          <div
+                                            className="relative cursor-pointer group/img overflow-hidden bg-muted/30 flex items-center justify-center max-h-60"
+                                            onClick={() => handlePreviewAttachment(msg)}
+                                          >
+                                            <img
+                                              src={`/api-proxy/api/clients/orders/${orderNumber}/attachments/preview?path=${encodeURIComponent(msg.attachment_url)}`}
+                                              alt={msg.attachment_name || "Snippet"}
+                                              loading="lazy"
+                                              className="w-full h-auto max-h-60 object-contain transition-transform duration-200 group-hover/img:scale-[1.02]"
+                                            />
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-xs font-semibold backdrop-blur-[2px]">
+                                              <Eye className="h-4 w-4" />
+                                              <span>Click to Enlarge</span>
+                                            </div>
                                           </div>
-                                          <div className="min-w-0">
-                                            <span className="font-bold text-foreground truncate block text-xs">
-                                              {msg.attachment_name || "Document"}
+                                          <div className="p-2 border-t bg-background/95 border-border/40 text-foreground flex items-center justify-between gap-2 text-xs">
+                                            <span className="truncate font-semibold text-[11px] block min-w-0">
+                                              {msg.attachment_name || "Internal Snippet Image"}
                                             </span>
-                                            <span className="text-[10px] text-muted-foreground block">
-                                              Stored in Company Vault
-                                            </span>
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => handlePreviewAttachment(msg)}
+                                              className="h-6 px-2 text-[10px] font-bold gap-1 shrink-0 text-amber-600 hover:text-amber-700"
+                                            >
+                                              <Eye className="h-3 w-3" /> Full View
+                                            </Button>
                                           </div>
                                         </div>
+                                      ) : (
+                                        <div className="mt-2 p-2.5 rounded-xl bg-background/90 border border-border/60 flex items-center justify-between gap-3 text-xs shadow-2xs">
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            <div className="h-7 w-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
+                                              <FileText className="h-3.5 w-3.5" />
+                                            </div>
+                                            <div className="min-w-0">
+                                              <span className="font-bold text-foreground truncate block text-xs">
+                                                {msg.attachment_name || "Document"}
+                                              </span>
+                                              <span className="text-[10px] text-muted-foreground block">
+                                                Stored in Company Vault
+                                              </span>
+                                            </div>
+                                          </div>
 
-                                        <Button
-                                          type="button"
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => handlePreviewAttachment(msg)}
-                                          className="h-7 text-[11px] font-bold gap-1 px-2.5 shrink-0 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 border-amber-500/30 shadow-2xs"
-                                        >
-                                          <Eye className="h-3 w-3" />
-                                          Preview
-                                        </Button>
-                                      </div>
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handlePreviewAttachment(msg)}
+                                            className="h-7 text-[11px] font-bold gap-1 px-2.5 shrink-0 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 border-amber-500/30 shadow-2xs"
+                                          >
+                                            <Eye className="h-3 w-3" />
+                                            Preview
+                                          </Button>
+                                        </div>
+                                      )
                                     )}
                                   </div>
 
@@ -2207,7 +2571,74 @@ export function DualOrderChatDialog({
                       </div>
                     )}
 
+                    {/* Internal Attachment / Snippet Staged Preview Chip */}
+                    {internalAttachment && (
+                      <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 dark:bg-amber-950/30 text-xs shadow-xs animate-in fade-in slide-in-from-bottom-2 duration-150">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {internalAttachmentPreview ? (
+                            <img
+                              src={internalAttachmentPreview}
+                              alt="Snippet preview"
+                              className="h-10 w-10 object-cover rounded-lg border border-amber-500/30 shrink-0 bg-background"
+                            />
+                          ) : (
+                            <div className="h-10 w-10 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
+                              <FileText className="h-5 w-5" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold truncate text-xs text-foreground block">
+                                {internalAttachment.name}
+                              </span>
+                              <Badge variant="outline" className="text-[10px] py-0 px-1.5 bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300 shrink-0">
+                                {internalAttachment.type.startsWith("image/") ? "Snippet / Image" : "Document"}
+                              </Badge>
+                            </div>
+                            <span className="text-[11px] text-muted-foreground block truncate">
+                              {formatFileSize(internalAttachment.size)} • Internal chat only (not stored in Vault or Dropbox)
+                            </span>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleRemoveInternalAttachment}
+                          className="h-7 w-7 rounded-full text-muted-foreground hover:text-foreground hover:bg-background/60 shrink-0"
+                          title="Remove attachment"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+
                     <form onSubmit={handleInternalSend} className="flex items-end gap-2">
+                      <input
+                        type="file"
+                        ref={internalFileInputRef}
+                        className="hidden"
+                        onChange={e => {
+                          if (e.target.files?.[0]) {
+                            handleInternalAttachmentSelect(e.target.files[0]);
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => internalFileInputRef.current?.click()}
+                        title="Attach file or screenshot snippet"
+                        className={`h-[40px] w-[40px] rounded-xl shrink-0 transition-colors ${
+                          internalAttachment
+                            ? "border-amber-500 text-amber-600 bg-amber-500/10 shadow-xs"
+                            : "border-input bg-background text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <Paperclip className="h-4 w-4" />
+                      </Button>
+
                       <ChatEmojiPicker
                         onSelectEmoji={emoji => {
                           setInternalInput(prev => {
@@ -2228,8 +2659,13 @@ export function DualOrderChatDialog({
                       <textarea
                         ref={internalInputRef}
                         rows={1}
-                        placeholder="Internal team note (use @ to tag teammates, Shift + Enter for new line)..."
+                        placeholder={
+                          internalAttachment
+                            ? "Add an internal note with this attachment..."
+                            : "Internal team note (use @ to tag teammates, paste snippet directly)..."
+                        }
                         value={internalInput}
+                        onPaste={e => handlePasteSnippet(e, handleInternalAttachmentSelect, "Internal Notes")}
                         onChange={e => {
                           handleInternalTextChange(e.target.value, e.target.selectionStart || 0);
                           e.target.style.height = "auto";
@@ -2264,7 +2700,7 @@ export function DualOrderChatDialog({
                       <Button
                         type="submit"
                         size="sm"
-                        disabled={!internalInput.trim() || sendingInternal}
+                        disabled={(!internalInput.trim() && !internalAttachment) || sendingInternal}
                         className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold gap-1.5 px-3.5 h-9 shrink-0 shadow-xs"
                       >
                         {sendingInternal ? (
@@ -2317,18 +2753,40 @@ export function DualOrderChatDialog({
 
               <div className="space-y-3">
                 <p className="text-xs font-medium text-foreground">
-                  Are you sure you want to send this message to the Client?
+                  Are you sure you want to send this {clientAttachment ? "attachment and note" : "message"} to the Client?
                 </p>
 
-                <div className="p-3.5 rounded-xl border border-sky-500/20 bg-sky-500/5 text-xs text-foreground leading-relaxed">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 block mb-1">
-                    Message Preview:
-                  </span>
-                  <p className="italic font-medium">"{pendingClientMessage}"</p>
-                </div>
+                {clientAttachment && (
+                  <div className="p-3 rounded-xl border border-sky-500/30 bg-sky-500/10 flex items-center gap-3">
+                    {clientAttachmentPreview ? (
+                      <img
+                        src={clientAttachmentPreview}
+                        alt="Snippet preview"
+                        className="h-11 w-11 object-cover rounded-lg border border-sky-500/30 shrink-0 bg-background"
+                      />
+                    ) : (
+                      <div className="h-11 w-11 rounded-lg bg-sky-500/20 text-sky-600 flex items-center justify-center shrink-0">
+                        <FileText className="h-5 w-5" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold block truncate text-foreground">{clientAttachment.name}</span>
+                      <span className="text-[10px] text-muted-foreground block">{formatFileSize(clientAttachment.size)} • Storing in Client Shared Docs</span>
+                    </div>
+                  </div>
+                )}
+
+                {pendingClientMessage ? (
+                  <div className="p-3.5 rounded-xl border border-sky-500/20 bg-sky-500/5 text-xs text-foreground leading-relaxed">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 block mb-1">
+                      Message Note:
+                    </span>
+                    <p className="italic font-medium">"{pendingClientMessage}"</p>
+                  </div>
+                ) : null}
 
                 <p className="text-[11px] text-muted-foreground">
-                  This message will be instantly delivered to the client portal and notify their primary representative.
+                  This will be instantly delivered to the client portal and notify their primary representative.
                 </p>
               </div>
 

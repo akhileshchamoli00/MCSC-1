@@ -124,11 +124,25 @@ export default function NotificationsPage() {
 
     let targetUrl = notif.action_url || "";
 
-    const orderMatch = (targetUrl + " " + (notif.title || "") + " " + (notif.message || "")).match(/(ORD-[A-Za-z0-9\-]+)/i);
-    const orderNum = orderMatch ? orderMatch[1].toUpperCase() : null;
+    // Extract order number from URL query parameters first, or pattern match across URL, title, and message
+    let orderNum: string | null = null;
+    if (targetUrl) {
+      try {
+        const dummyUrl = new URL(targetUrl, "http://localhost");
+        orderNum = dummyUrl.searchParams.get("order");
+      } catch {}
+    }
+    if (!orderNum) {
+      const orderMatch = (targetUrl + " " + (notif.title || "") + " " + (notif.message || "")).match(/((?:ORD|MCSX|MSCX|MCS|SINGLE)-[A-Za-z0-9\-]+)/i);
+      orderNum = orderMatch ? orderMatch[1].toUpperCase() : null;
+    }
 
     if (!targetUrl && orderNum) {
-      targetUrl = `/business/assigned-orders?order=${encodeURIComponent(orderNum)}&chat=true`;
+      if (isAdmin || hasPermission("clients_orders_active", "view")) {
+        targetUrl = `/business/clients/orders?order=${encodeURIComponent(orderNum)}&chat=true`;
+      } else {
+        targetUrl = `/business/assigned-orders?order=${encodeURIComponent(orderNum)}&chat=true`;
+      }
     }
 
     if (targetUrl) {

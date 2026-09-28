@@ -178,15 +178,24 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
 
     let targetUrl = notif.action_url || "";
 
-    // Extract order number from action_url, title, or message if present
-    const orderMatch = (targetUrl + " " + (notif.title || "") + " " + (notif.message || "")).match(/(ORD-[A-Za-z0-9\-]+)/i);
-    const orderNum = orderMatch ? orderMatch[1].toUpperCase() : null;
+    // Extract order number from URL query parameters first, or pattern match across URL, title, and message
+    let orderNum: string | null = null;
+    if (targetUrl) {
+      try {
+        const dummyUrl = new URL(targetUrl, "http://localhost");
+        orderNum = dummyUrl.searchParams.get("order");
+      } catch {}
+    }
+    if (!orderNum) {
+      const orderMatch = (targetUrl + " " + (notif.title || "") + " " + (notif.message || "")).match(/((?:ORD|MCSX|MSCX|MCS|SINGLE)-[A-Za-z0-9\-]+)/i);
+      orderNum = orderMatch ? orderMatch[1].toUpperCase() : null;
+    }
 
     if (!targetUrl && orderNum) {
       if (isClientUser) {
         targetUrl = `/client/chat?order=${encodeURIComponent(orderNum)}`;
       } else if (isAdmin || hasPermission("clients_orders_active", "view")) {
-        targetUrl = `/business/assigned-orders?order=${encodeURIComponent(orderNum)}&chat=true`;
+        targetUrl = `/business/clients/orders?order=${encodeURIComponent(orderNum)}&chat=true`;
       } else {
         targetUrl = `/business/assigned-orders?order=${encodeURIComponent(orderNum)}&chat=true`;
       }

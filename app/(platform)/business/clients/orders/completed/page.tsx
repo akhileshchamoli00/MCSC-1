@@ -424,7 +424,7 @@ export default function ClientOrdersPage() {
   // On Hold Modal State for Edit Form
   const [isOnHoldDialogOpen, setIsOnHoldDialogOpen] = useState(false);
   const [holdReason, setHoldReason] = useState("");
-  const [holdChannel, setHoldChannel] = useState<"CLIENT" | "INTERNAL">("CLIENT");
+  const [holdChannel, setHoldChannel] = useState<"CLIENT" | "INTERNAL">("INTERNAL");
   const [prevStatusBeforeHold, setPrevStatusBeforeHold] = useState<string>("COMPLETED");
 
 
@@ -842,7 +842,7 @@ export default function ClientOrdersPage() {
     if (newStatus === "ON_HOLD") {
       setPrevStatusBeforeHold(editForm.status);
       setHoldReason("");
-      setHoldChannel("CLIENT");
+      setHoldChannel("INTERNAL");
       setIsOnHoldDialogOpen(true);
       return;
     }
@@ -944,9 +944,15 @@ export default function ClientOrdersPage() {
     return "IDR " + new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(val);
   };
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return "-";
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch {
+      return "-";
+    }
   };
 
 
@@ -1016,7 +1022,8 @@ export default function ClientOrdersPage() {
     const compName = (ord.company_name || "").toLowerCase();
     const itemsStr = (ord.items || []).map((i: any) => `${i.job_title} ${i.job_id}`).join(" ").toLowerCase();
     const consultantsStr = (ord.consultants || []).map((c: any) => c.name).join(" ").toLowerCase();
-    return orderNum.includes(term) || clientName.includes(term) || compName.includes(term) || itemsStr.includes(term) || consultantsStr.includes(term);
+    const dateStr = ord.created_at ? formatDate(ord.created_at).toLowerCase() : "";
+    return orderNum.includes(term) || clientName.includes(term) || compName.includes(term) || itemsStr.includes(term) || consultantsStr.includes(term) || dateStr.includes(term);
   });
 
   const totalPages = Math.ceil(filteredOrders.length / 10);
@@ -1056,6 +1063,9 @@ export default function ClientOrdersPage() {
       case "DOCUMENTS_REVIEWED": return "bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 font-bold";
       case "PRE_DOC_SENT_FOR_SIGNATURE": return "bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20 font-bold";
       case "PRE_DOCS_SENT": return "bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20 font-bold";
+      case "AWAITING_SIGNING_NOTARIZATION": return "bg-violet-500/10 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/20 font-bold";
+      case "AWAITING_DOCUMENT_RETURN": return "bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20 font-bold";
+      case "AWAITING_THIRD_PARTY_RESPONSE": return "bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20 font-bold";
       case "FINAL_DOCUMENT_PREPARATION": return "bg-orange-500/10 dark:bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/20 font-bold";
       case "FINAL_DOC_READY": return "bg-lime-500/10 dark:bg-lime-500/15 text-lime-600 dark:text-lime-400 border-lime-500/20 font-bold";
       case "INVOICE_GENERATED": return "bg-pink-500/10 dark:bg-pink-500/15 text-pink-600 dark:text-pink-400 border-pink-500/20 font-bold";
@@ -1892,7 +1902,7 @@ export default function ClientOrdersPage() {
                     <thead>
                       <tr className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
                         <th className="py-2.5 px-2 w-8 text-center">No.</th>
-                        <th className="py-2.5 px-2 whitespace-nowrap w-24">Order ID</th>
+                        <th className="py-2.5 px-2 whitespace-nowrap w-28">Order ID & Date</th>
                         <th className="py-2.5 px-2 min-w-[120px] max-w-[160px]">Company Entity</th>
                         <th className="py-2.5 px-2.5 min-w-[220px] max-w-[320px]">Service Package</th>
                         <th className="py-2.5 px-3 w-36 min-w-[145px] max-w-[170px] whitespace-nowrap text-left">Assigned Consultants</th>
@@ -1934,6 +1944,15 @@ export default function ClientOrdersPage() {
                                 <Badge variant="outline" className="font-mono font-bold text-xs bg-primary/10 border-primary/30 text-primary px-2 py-0.5 rounded">
                                   {ord.order_number}
                                 </Badge>
+                              )}
+                              {ord.created_at && (
+                                <div
+                                  className="text-[10.5px] text-muted-foreground font-medium flex items-center gap-1 mt-1 tracking-tight"
+                                  title={`Order Created: ${new Date(ord.created_at).toLocaleString()}`}
+                                >
+                                  <Calendar className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+                                  <span>{formatDate(ord.created_at)}</span>
+                                </div>
                               )}
                             </td>
                             <td className="py-2 px-2 font-bold text-foreground align-top pt-2.5 min-w-[120px] max-w-[160px]">
@@ -2476,6 +2495,9 @@ export default function ClientOrdersPage() {
                     <option value="REVIEW_DOCS">REVIEW DOCS</option>
                     <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
                     <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
+                    <option value="AWAITING_SIGNING_NOTARIZATION">AWAITING SIGNING / NOTARIZATION</option>
+                    <option value="AWAITING_DOCUMENT_RETURN">AWAITING DOCUMENT RETURN FROM CLIENT</option>
+                    <option value="AWAITING_THIRD_PARTY_RESPONSE">AWAITING THIRD-PARTY RESPONSE (VENDOR)</option>
                     <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
                     <option value="FINAL_DOC_READY">FINAL DOC READY</option>
                     <option value="INVOICE_GENERATED">INVOICE GENERATED</option>
@@ -2628,49 +2650,17 @@ export default function ClientOrdersPage() {
                 />
               </div>
 
-              {/* Chat Target Channel Toggle */}
-              <div className="space-y-2 pt-1 border-t border-border/40">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
-                  Broadcast Reason To Chat
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setHoldChannel("CLIENT")}
-                    className={cn(
-                      "p-3 rounded-xl border text-left transition-all flex flex-col gap-1",
-                      holdChannel === "CLIENT"
-                        ? "border-amber-500/60 bg-amber-500/10 text-foreground ring-1 ring-amber-500/40"
-                        : "border-border/60 bg-muted/20 hover:bg-muted/40 text-muted-foreground"
-                    )}
-                  >
-                    <div className="flex items-center gap-1.5 font-bold text-xs">
-                      <MessageSquare className="h-3.5 w-3.5 text-amber-500" />
-                      <span>Client & Team Chat</span>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground leading-tight">
-                      Client & internal staff both see this reason in chat
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setHoldChannel("INTERNAL")}
-                    className={cn(
-                      "p-3 rounded-xl border text-left transition-all flex flex-col gap-1",
-                      holdChannel === "INTERNAL"
-                        ? "border-amber-500/60 bg-amber-500/10 text-foreground ring-1 ring-amber-500/40"
-                        : "border-border/60 bg-muted/20 hover:bg-muted/40 text-muted-foreground"
-                    )}
-                  >
-                    <div className="flex items-center gap-1.5 font-bold text-xs">
-                      <Lock className="h-3.5 w-3.5 text-amber-500" />
-                      <span>Internal Staff Only</span>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground leading-tight">
-                      Private note logged only for processing consultants
-                    </span>
-                  </button>
+              {/* Internal Privacy Notice */}
+              <div className="p-3 rounded-xl border border-amber-500/25 bg-amber-500/5 flex items-start gap-2.5">
+                <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <span>Visibility: Internal Only</span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono font-bold uppercase">Private</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    This on-hold reason is strictly confidential for internal staff only. No messages or reasons will ever be sent to or visible in the client chat.
+                  </p>
                 </div>
               </div>
             </div>
@@ -2732,6 +2722,12 @@ export default function ClientOrdersPage() {
                   <Badge variant="outline" className="font-mono text-xs font-bold px-3 py-1 bg-zinc-100 text-zinc-800 border border-zinc-300 rounded-lg">
                     {selectedOrderGroup.order_number}
                   </Badge>
+                  {selectedOrderGroup.created_at && (
+                    <Badge variant="outline" className="font-mono text-xs font-medium px-2.5 py-1 bg-zinc-50 text-zinc-600 border border-zinc-200 rounded-lg flex items-center gap-1.5" title={`Order Created: ${new Date(selectedOrderGroup.created_at).toLocaleString()}`}>
+                      <Calendar className="h-3 w-3 text-zinc-400" />
+                      {formatDate(selectedOrderGroup.created_at)}
+                    </Badge>
+                  )}
                   <Button variant="ghost" size="icon" onClick={() => setIsViewOpen(false)} className="rounded-full h-8 w-8 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100">
                     <X className="h-4 w-4" />
                   </Button>

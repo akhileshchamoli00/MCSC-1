@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, BackgroundTasks
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 
 import models, schemas, auth, database
@@ -17,7 +17,11 @@ router = APIRouter(
 def get_employees(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "employees_all", "view", db) or (current_user.role and current_user.role.name.upper() not in ["CLIENT", "MEMBER"])):
         raise HTTPException(status_code=403, detail="Not authorized to view employee directory")
-    employees = db.query(models.Employee).order_by(models.Employee.first_name, models.Employee.last_name).offset(skip).limit(limit).all()
+    employees = db.query(models.Employee).options(
+        joinedload(models.Employee.department),
+        joinedload(models.Employee.user),
+        joinedload(models.Employee.manager)
+    ).order_by(models.Employee.first_name, models.Employee.last_name).offset(skip).limit(limit).all()
     return employees
 
 @router.get("/{employee_id}", response_model=schemas.EmployeeResponse)

@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request, Query, Response, BackgroundTasks
 from sqlalchemy.orm import Session, joinedload, selectinload
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Union
 from pydantic import BaseModel
 import os
 import re
@@ -135,7 +135,7 @@ def update_order_group_status(
     new_status: str, 
     user_id: Optional[int] = None,
     hold_reason: Optional[str] = None,
-    hold_channel: Optional[str] = "CLIENT"
+    hold_channel: Optional[str] = "INTERNAL"
 ):
     if not orders:
         return
@@ -163,7 +163,8 @@ def update_order_group_status(
             else:
                 msg = f"Order execution status has been updated to {status_label}."
             
-            target_channel = hold_channel if (new_status == "ON_HOLD" and hold_channel in ["CLIENT", "INTERNAL"]) else "CLIENT"
+            # Status updates and on-hold reasons are strictly internal notes; never sent to client chat
+            target_channel = "INTERNAL"
             
             # Prevent duplicate status change entries in concurrent requests (within last 5 seconds)
             five_sec_ago = datetime.utcnow() - timedelta(seconds=5)
@@ -760,6 +761,9 @@ def get_my_assigned_orders(db: Session = Depends(database.get_db), current_user:
         "DOCUMENTS_REVIEWED",
         "PRE_DOC_SENT_FOR_SIGNATURE",
         "PRE_DOCS_SENT",
+        "AWAITING_SIGNING_NOTARIZATION",
+        "AWAITING_DOCUMENT_RETURN",
+        "AWAITING_THIRD_PARTY_RESPONSE",
         "FINAL_DOCUMENT_PREPARATION",
         "FINAL_DOC_READY",
         "WAITING_FOR_FINAL_PAYMENT",
@@ -808,7 +812,8 @@ def get_order_workload_matrix(
     all_orders = db.query(models.ClientOrder).options(
         joinedload(models.ClientOrder.company),
         joinedload(models.ClientOrder.client),
-        joinedload(models.ClientOrder.service)
+        joinedload(models.ClientOrder.service),
+        joinedload(models.ClientOrder.notary)
     ).order_by(models.ClientOrder.id.desc()).all()
 
     # Group by order_number
@@ -825,12 +830,43 @@ def get_order_workload_matrix(
 
     emp_map = {e.id: e for e in all_employees}
 
+    # Pre-fetch notary service fee records for fee fallback
+    fee_records = db.query(models.NotaryServiceFee).all()
+    notary_fee_cache = {(fr.notary_id, fr.service_id): (fr.fee or 0.0) for fr in fee_records}
+
     # Pre-calculate assigned sets and order objects
     consultant_orders_map = defaultdict(dict)  # emp_id -> {order_num: order_data}
     reviewer_orders_map = defaultdict(dict)    # emp_id -> {order_num: order_data}
     
     total_active_orders = 0
+    total_active_portfolio_value = 0.0
+    total_active_gross_value = 0.0
+    total_active_vendor_deductions = 0.0
+    total_all_portfolio_value = 0.0
+    total_all_gross_value = 0.0
+    total_all_vendor_deductions = 0.0
     unassigned_orders = 0
+
+    def compute_contribution_shares(num_c: int, num_r: int):
+        """
+        Share matrix evaluation based on executing consultants and designated reviewers:
+        - Reviewer share is set to 5% flat whenever reviewers are present.
+        - Consultants split the remaining 95%:
+          * 1 Consultant, 1 Reviewer: Consultant gets 95%, Reviewer gets 5%
+          * 2 Consultants, 1 Reviewer: Consultants get 47.5% each (95% total), Reviewer gets 5%
+          * Nc Consultants, Nr Reviewers: Consultants split 95% (95% / Nc each), Reviewers split 5% (5% / Nr each)
+          * Consultants only (Nr == 0): Consultants split 100% (100% / Nc each)
+          * Reviewers only (Nc == 0): Reviewers split 100% (100% / Nr each)
+          * Nc == 0 and Nr == 0: 0.0, 0.0
+        Returns: (c_share_pct_each, r_share_pct_each)
+        """
+        if num_c == 0 and num_r == 0:
+            return 0.0, 0.0
+        if num_r == 0:
+            return round(100.0 / num_c, 2), 0.0
+        if num_c == 0:
+            return 0.0, round(100.0 / num_r, 2)
+        return round(95.0 / num_c, 2), round(5.0 / num_r, 2)
 
     for order_num, items in orders_by_num.items():
         first_item = items[0]
@@ -851,7 +887,9 @@ def get_order_workload_matrix(
         # Collect unique consultant and reviewer IDs
         c_ids = set()
         r_ids = set()
-        total_group_amount = 0.0
+        total_gross_amount = 0.0
+        total_vendor_deductions = 0.0
+        vendor_details = []
         services = []
 
         for item in items:
@@ -860,12 +898,47 @@ def get_order_workload_matrix(
             if item.reviewer_id and item.reviewer_id not in r_list:
                 r_list.append(item.reviewer_id)
             r_ids.update(r_list)
-            total_group_amount += float(item.unit_price or item.total_amount or 0.0)
+            
+            # Item contract amount
+            item_gross = float(item.unit_price or item.total_amount or 0.0)
+            total_gross_amount += item_gross
             if item.job_title:
                 services.append(item.job_title)
 
+            # Notary, Government Body, or other vendor cost deduction
+            v_fee = float(item.notary_fee or 0.0)
+            if v_fee <= 0.0 and item.notary_id and item.service_id:
+                v_fee = float(notary_fee_cache.get((item.notary_id, item.service_id), 0.0))
+
+            if v_fee > 0.0:
+                total_vendor_deductions += v_fee
+                vendor_name = item.notary.name if item.notary else "Vendor/Notary"
+                vendor_type = getattr(item.notary, "vendor_type", None) or "VENDOR"
+                vendor_details.append({
+                    "vendor_id": item.notary_id,
+                    "vendor_name": vendor_name,
+                    "vendor_type": vendor_type,
+                    "fee": v_fee,
+                    "job_title": item.job_title
+                })
+
+        # Net order amount after deducting notary, govt body, and external vendor costs
+        net_amount = max(0.0, total_gross_amount - total_vendor_deductions)
+
+        if is_active:
+            total_active_gross_value += total_gross_amount
+            total_active_vendor_deductions += total_vendor_deductions
+            total_active_portfolio_value += net_amount
+        total_all_gross_value += total_gross_amount
+        total_all_vendor_deductions += total_vendor_deductions
+        total_all_portfolio_value += net_amount
+
         if is_active and not c_ids and not r_ids:
             unassigned_orders += 1
+
+        c_share_pct, r_share_pct = compute_contribution_shares(len(c_ids), len(r_ids))
+        c_share_amount = round(net_amount * (c_share_pct / 100.0), 2)
+        r_share_amount = round(net_amount * (r_share_pct / 100.0), 2)
 
         # Build order summary payload for drill-down
         order_summary = {
@@ -877,25 +950,35 @@ def get_order_workload_matrix(
             "client_name": first_item.client.contact_person if first_item.client else None,
             "services": services[:3],
             "services_count": len(services),
-            "total_amount": total_group_amount,
+            "total_amount": total_gross_amount,
+            "gross_amount": round(total_gross_amount, 2),
+            "vendor_deductions": round(total_vendor_deductions, 2),
+            "net_amount": round(net_amount, 2),
+            "vendor_details": vendor_details,
             "created_at": first_item.created_at.isoformat() if first_item.created_at else None,
             "is_active": is_active,
             "consultant_ids": list(c_ids),
-            "reviewer_ids": list(r_ids)
+            "reviewer_ids": list(r_ids),
+            "consultant_share_percent": c_share_pct,
+            "reviewer_share_percent": r_share_pct
         }
 
         # Populate consultant map
         for cid in c_ids:
             consultant_orders_map[cid][order_num] = {
                 **order_summary,
-                "role": "CONSULTANT"
+                "role": "CONSULTANT",
+                "contribution_percent": c_share_pct,
+                "contribution_amount": c_share_amount
             }
 
         # Populate reviewer map
         for rid in r_ids:
             reviewer_orders_map[rid][order_num] = {
                 **order_summary,
-                "role": "REVIEWER"
+                "role": "REVIEWER",
+                "contribution_percent": r_share_pct,
+                "contribution_amount": r_share_amount
             }
 
     # Also include any inactive employees who happen to have assignments
@@ -977,12 +1060,34 @@ def get_order_workload_matrix(
         # Merge orders list for drilldown
         merged_orders = {}
         for o in c_orders_list:
-            merged_orders[o["order_number"]] = {**o, "assigned_as": "CONSULTANT"}
+            merged_orders[o["order_number"]] = {
+                **o,
+                "assigned_as": "CONSULTANT",
+                "contribution_percent": o.get("contribution_percent", 0.0),
+                "contribution_amount": o.get("contribution_amount", 0.0)
+            }
         for o in r_orders_list:
-            if o["order_number"] in merged_orders:
-                merged_orders[o["order_number"]]["assigned_as"] = "BOTH"
+            onum = o["order_number"]
+            if onum in merged_orders:
+                c_item = merged_orders[onum]
+                combined_pct = round(c_item["contribution_percent"] + o.get("contribution_percent", 0.0), 2)
+                combined_amt = round(c_item["contribution_amount"] + o.get("contribution_amount", 0.0), 2)
+                merged_orders[onum]["assigned_as"] = "BOTH"
+                merged_orders[onum]["contribution_percent"] = combined_pct
+                merged_orders[onum]["contribution_amount"] = combined_amt
             else:
-                merged_orders[o["order_number"]] = {**o, "assigned_as": "REVIEWER"}
+                merged_orders[onum] = {
+                    **o,
+                    "assigned_as": "REVIEWER",
+                    "contribution_percent": o.get("contribution_percent", 0.0),
+                    "contribution_amount": o.get("contribution_amount", 0.0)
+                }
+
+        # Employee contribution totals
+        active_contrib_val = sum(o["contribution_amount"] for o in merged_orders.values() if o["is_active"])
+        total_contrib_val = sum(o["contribution_amount"] for o in merged_orders.values())
+        active_portfolio_share = round((active_contrib_val / total_active_portfolio_value * 100.0), 1) if total_active_portfolio_value > 0 else 0.0
+        total_portfolio_share = round((total_contrib_val / total_all_portfolio_value * 100.0), 1) if total_all_portfolio_value > 0 else 0.0
 
         # Enrich orders with names of team members
         final_orders_list = list(merged_orders.values())
@@ -1013,6 +1118,10 @@ def get_order_workload_matrix(
             "reviewer_total_count": len(r_orders_list),
             "total_active_load": total_active_count,
             "total_all_load": len(all_order_nums),
+            "active_contribution_value": round(active_contrib_val, 2),
+            "total_contribution_value": round(total_contrib_val, 2),
+            "active_portfolio_share_pct": active_portfolio_share,
+            "total_portfolio_share_pct": total_portfolio_share,
             "capacity_status": capacity_status,
             "status_breakdown": dict(status_counts),
             "orders": final_orders_list
@@ -1032,7 +1141,13 @@ def get_order_workload_matrix(
             "total_reviewers_engaged": total_reviewers_engaged,
             "unassigned_orders_count": unassigned_orders,
             "avg_consultant_load": avg_c_load,
-            "avg_reviewer_load": avg_r_load
+            "avg_reviewer_load": avg_r_load,
+            "total_active_portfolio_value": round(total_active_portfolio_value, 2),
+            "total_active_gross_value": round(total_active_gross_value, 2),
+            "total_active_vendor_deductions": round(total_active_vendor_deductions, 2),
+            "total_all_portfolio_value": round(total_all_portfolio_value, 2),
+            "total_all_gross_value": round(total_all_gross_value, 2),
+            "total_all_vendor_deductions": round(total_all_vendor_deductions, 2)
         },
         "team_workload": matrix_rows
     }
@@ -1044,6 +1159,7 @@ def get_client_orders(
     offset: Optional[int] = Query(0, ge=0),
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
+    order_number: Optional[str] = Query(None),
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
@@ -1056,6 +1172,9 @@ def get_client_orders(
         joinedload(models.ClientOrder.service),
         joinedload(models.ClientOrder.notary)
     ).order_by(models.ClientOrder.id.desc())
+
+    if isinstance(order_number, str) and order_number.strip():
+        orders_query = orders_query.filter(models.ClientOrder.order_number == order_number.strip())
 
     if isinstance(status, str) and status.strip():
         orders_query = orders_query.filter(models.ClientOrder.status == status.strip())
@@ -2863,10 +2982,21 @@ def get_company_consultants(company_id: int, db: Session = Depends(database.get_
             
     return result
 
-@router.post("/companies/{company_id}/documents", response_model=schemas.ClientDocumentResponse)
+def sync_dropbox_file_task(file_bytes: bytes, destination_path: str):
+    try:
+        from utils.dropbox_client import upload_file
+        res = upload_file(file_bytes, destination_path)
+        if not res.get("success"):
+            print(f"Notice: Background Dropbox upload error for {destination_path}: {res.get('error')}")
+    except Exception as e:
+        print(f"Notice: Background Dropbox upload failed for {destination_path}: {e}")
+
+@router.post("/companies/{company_id}/documents", response_model=Union[schemas.ClientDocumentResponse, List[schemas.ClientDocumentResponse]])
 def upload_client_document(
     company_id: int, 
+    background_tasks: BackgroundTasks,
     file: Optional[UploadFile] = File(None), 
+    files: Optional[List[UploadFile]] = File(None),
     document_type: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     document_path: Optional[str] = Form(None),
@@ -2883,13 +3013,14 @@ def upload_client_document(
     if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_documents", "create", db) or is_admin_or_hr(current_user) or is_assigned_employee_to_company(current_user, company_id, db) or is_client_themselves_for_company(current_user, company_id, db)):
         raise HTTPException(status_code=403, detail="Not authorized to upload documents for this company")
         
-    if not file:
-        raise HTTPException(status_code=400, detail="A file upload is mandatory.")
+    upload_list: List[UploadFile] = []
+    if files:
+        upload_list.extend(files)
+    elif file:
+        upload_list.append(file)
 
-    # Security validation & sanitization
-    raw_bytes = file.file.read()
-    from utils.file_sanitizer import validate_file_security
-    file_bytes, filename = validate_file_security(raw_bytes, file.filename or "document.pdf", max_size_mb=50, allowed_category="all")
+    if not upload_list:
+        raise HTTPException(status_code=400, detail="At least one file upload is mandatory.")
 
     # Determine company directory folder name
     company_code = company.company_code or f"comp_{company.id}"
@@ -2900,23 +3031,6 @@ def upload_client_document(
     # Determine order folder name
     order_folder = (order_number or "No_Order").strip().replace("/", "_").replace("\\", "_")
 
-    # Destination path in Dropbox
-    destination_path = f"/Clients/{company_code}/{order_folder}/{doc_type_folder}/{filename}"
-    if destination_path.startswith("//"):
-        destination_path = destination_path[1:]
-        
-    try:
-        from utils.dropbox_client import upload_file
-        res = upload_file(file_bytes, destination_path)
-        if not res.get("success"):
-            raise HTTPException(status_code=500, detail=f"Failed to upload to Dropbox: {res.get('error')}")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save file to Dropbox: {str(e)}")
-        
-    public_url = destination_path
-        
     parsed_date = None
     if document_date:
         try:
@@ -2931,30 +3045,66 @@ def upload_client_document(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid expiry date format, expected YYYY-MM-DD")
 
-    db_doc = models.ClientDocument(
-        company_id=company_id,
-        file_name=filename,
-        file_url=public_url,
-        document_type=document_type,
-        description=description,
-        document_path=destination_path,
-        order_number=order_number,
-        document_date=parsed_date,
-        expiry_date=parsed_expiry_date,
-        uploaded_at=datetime.now(),
-        uploaded_by=current_user.id
-    )
-    db.add(db_doc)
+    from utils.file_sanitizer import validate_file_security
+
+    created_docs = []
+    for item in upload_list:
+        # Security validation & sanitization
+        raw_bytes = item.file.read()
+        file_bytes, filename = validate_file_security(raw_bytes, item.filename or "document.pdf", max_size_mb=50, allowed_category="all")
+
+        # Destination path in Dropbox
+        destination_path = f"/Clients/{company_code}/{order_folder}/{doc_type_folder}/{filename}"
+        if destination_path.startswith("//"):
+            destination_path = destination_path[1:]
+            
+        # 1. Local disk fallback cache (written immediately for instant streaming)
+        local_rel = destination_path.replace("/Clients/", "", 1)
+        local_full_path = os.path.join("uploads", local_rel)
+        os.makedirs(os.path.dirname(local_full_path), exist_ok=True)
+        try:
+            with open(local_full_path, "wb") as f_out:
+                f_out.write(file_bytes)
+        except Exception as local_err:
+            print(f"Notice: Failed writing local backup: {local_err}")
+
+        # 2. Queue Dropbox upload in background to prevent HTTP proxy timeouts
+        background_tasks.add_task(sync_dropbox_file_task, file_bytes, destination_path)
+            
+        public_url = destination_path
+
+        db_doc = models.ClientDocument(
+            company_id=company_id,
+            file_name=filename,
+            file_url=public_url,
+            document_type=document_type,
+            description=description,
+            document_path=destination_path,
+            order_number=order_number,
+            document_date=parsed_date,
+            expiry_date=parsed_expiry_date,
+            uploaded_at=datetime.now(),
+            uploaded_by=current_user.id
+        )
+        db.add(db_doc)
+        created_docs.append(db_doc)
+
     try:
         db.commit()
-        db.refresh(db_doc)
+        for doc in created_docs:
+            db.refresh(doc)
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-    log_activity(db, "DOCUMENT_UPLOADED", f"Uploaded document {filename} ({document_type or 'General'}) for order {order_number or 'N/A'}", client_id=company.client_id, company_id=company_id, user_id=current_user.id)
-    
-    return db_doc
+    for doc in created_docs:
+        log_activity(db, "DOCUMENT_UPLOADED", f"Uploaded document {doc.file_name} ({document_type or 'General'}) for order {order_number or 'N/A'}", client_id=company.client_id, company_id=company_id, user_id=current_user.id)
+
+    if files is not None:
+        return created_docs
+    elif created_docs:
+        return created_docs[0]
+    return []
 
 @router.get("/companies/{company_id}/documents/{document_id}/preview")
 async def preview_client_document(
@@ -3521,12 +3671,14 @@ def format_order_progress_response(
     u: models.ClientOrderProgress, 
     db: Session,
     seen_by: Optional[List[schemas.MessageSeenUser]] = None,
-    reactions: Optional[List[schemas.MessageReactionGroup]] = None
+    reactions: Optional[List[schemas.MessageReactionGroup]] = None,
+    for_external: bool = False
 ) -> schemas.ClientOrderProgressResponse:
     sender_name = "System"
     sender_role = "Milestone"
     sender_avatar = None
     is_client = False
+    is_external = for_external or (u.channel and u.channel.upper() == "CLIENT")
     
     # 1. Check if automated milestone update FIRST (always System / Milestone)
     is_milestone = not u.user_id or is_automated_milestone_message(u.message)
@@ -3595,22 +3747,40 @@ def format_order_progress_response(
     # 3. Staff user
     if u.user:
         if u.user.employee:
-            first_name = u.user.employee.first_name or ""
-            last_name = u.user.employee.last_name or ""
+            first_name = (u.user.employee.first_name or "").strip()
+            last_name = (u.user.employee.last_name or "").strip()
             full_name = f"{first_name} {last_name}".strip()
-            sender_name = full_name if full_name else (u.user.role.name.title() if u.user.role else "Consultant")
+            
+            if is_external:
+                # External order chat: Represent team members with "MCS" (e.g. "John MCS")
+                base_first = first_name or (full_name.split()[0] if full_name else (u.user.name.split()[0] if u.user.name else "Consultant"))
+                sender_name = f"{base_first} MCS" if not base_first.upper().endswith("MCS") else base_first
+            else:
+                sender_name = full_name if full_name else (u.user.role.name.title() if u.user.role else "Consultant")
+                
             sender_role = u.user.employee.job_title or "Consultant"
             sender_avatar = u.user.employee.profile_photo
         elif u.user.role:
-            sender_name = u.user.role.name.title()
+            if is_external:
+                first_name = (u.user.name or "").strip().split()[0] if u.user.name else u.user.role.name.title()
+                sender_name = f"{first_name} MCS" if not first_name.upper().endswith("MCS") else first_name
+            else:
+                sender_name = u.user.role.name.title()
             sender_role = u.user.role.name.upper()
         else:
-            sender_name = "Staff"
+            sender_name = "Team MCS" if is_external else "Staff"
             sender_role = "Team"
     else:
         sender_name = "System"
         sender_role = "Milestone"
         
+    quoted_sender = getattr(u, "quoted_sender_name", None)
+    if is_external and quoted_sender:
+        q_clean = quoted_sender.strip()
+        if q_clean.lower() not in ["client", "you", "you (client)", "member"] and not q_clean.upper().endswith("MCS"):
+            q_first = q_clean.split()[0]
+            quoted_sender = f"{q_first} MCS"
+
     return schemas.ClientOrderProgressResponse(
         id=u.id,
         order_number=u.order_number,
@@ -3621,7 +3791,7 @@ def format_order_progress_response(
         attachment_name=u.attachment_name,
         quoted_message_id=getattr(u, "quoted_message_id", None),
         quoted_message_text=getattr(u, "quoted_message_text", None),
-        quoted_sender_name=getattr(u, "quoted_sender_name", None),
+        quoted_sender_name=quoted_sender,
         created_at=u.created_at,
         sender_name=sender_name,
         sender_role=sender_role,
@@ -3787,9 +3957,10 @@ def get_order_progress(
     )
     
     is_client_user = bool(current_user.role and current_user.role.name.upper() in ["CLIENT", "CUSTOMER", "MEMBER"])
+    is_external_view = is_client_user or (channel and channel.upper() == "CLIENT")
 
     # 1. CLIENT user or channel == "CLIENT" (Client & Consultant Chat)
-    if is_client_user or (channel and channel.upper() == "CLIENT"):
+    if is_external_view:
         query = query.filter(
             models.ClientOrderProgress.channel != "INTERNAL"
         ).filter(
@@ -3833,17 +4004,24 @@ def get_order_progress(
             r_role = "Client"
             r_avatar = None
         elif r_user.employee:
-            fn = r_user.employee.first_name or ""
-            ln = r_user.employee.last_name or ""
-            r_name = f"{fn} {ln}".strip() or (r_user.role.name.title() if r_user.role else "Consultant")
+            fn = (r_user.employee.first_name or "").strip()
+            ln = (r_user.employee.last_name or "").strip()
+            if is_external_view or (r.channel and r.channel.upper() == "CLIENT"):
+                r_name = f"{fn} MCS" if fn else "Consultant MCS"
+            else:
+                r_name = f"{fn} {ln}".strip() or (r_user.role.name.title() if r_user.role else "Consultant")
             r_role = r_user.employee.job_title or (r_user.role.name.title() if r_user.role else "Consultant")
             r_avatar = r_user.employee.profile_photo
         elif r_user.role:
-            r_name = r_user.role.name.title()
+            if is_external_view or (r.channel and r.channel.upper() == "CLIENT"):
+                r_first = (r_user.name or "").strip().split()[0] if r_user.name else r_user.role.name.title()
+                r_name = f"{r_first} MCS"
+            else:
+                r_name = r_user.role.name.title()
             r_role = r_user.role.name.upper()
             r_avatar = None
         else:
-            r_name = "Staff"
+            r_name = "Team MCS" if (is_external_view or (r.channel and r.channel.upper() == "CLIENT")) else "Staff"
             r_role = "Team"
             r_avatar = None
 
@@ -3891,17 +4069,24 @@ def get_order_progress(
                 r_role = "Client"
                 r_avatar = None
             elif r_user.employee:
-                fn = r_user.employee.first_name or ""
-                ln = r_user.employee.last_name or ""
-                r_name = f"{fn} {ln}".strip() or (r_user.role.name.title() if r_user.role else "Consultant")
+                fn = (r_user.employee.first_name or "").strip()
+                ln = (r_user.employee.last_name or "").strip()
+                if is_external_view:
+                    r_name = f"{fn} MCS" if fn else "Consultant MCS"
+                else:
+                    r_name = f"{fn} {ln}".strip() or (r_user.role.name.title() if r_user.role else "Consultant")
                 r_role = r_user.employee.job_title or (r_user.role.name.title() if r_user.role else "Consultant")
                 r_avatar = r_user.employee.profile_photo
             elif r_user.role:
-                r_name = r_user.role.name.title()
+                if is_external_view:
+                    r_first = (r_user.name or "").strip().split()[0] if r_user.name else r_user.role.name.title()
+                    r_name = f"{r_first} MCS"
+                else:
+                    r_name = r_user.role.name.title()
                 r_role = r_user.role.name.upper()
                 r_avatar = None
             else:
-                r_name = "Staff"
+                r_name = "Team MCS" if is_external_view else "Staff"
                 r_role = "Team"
                 r_avatar = None
 
@@ -3943,7 +4128,24 @@ def get_order_progress(
                 continue
             last_system_msg_key = msg_key
             last_system_msg_time = u.created_at
-            res.append(format_order_progress_response(u, db, seen_by=[], reactions=[]))
+
+            # Client privacy safeguard: never leak on-hold reason in client-facing chat views
+            if (is_client_user or (channel and channel.upper() == "CLIENT")) and u.message:
+                if "order placed on hold" in u.message.lower() and "reason:" in u.message.lower():
+                    u_sanitized = models.ClientOrderProgress(
+                        id=u.id,
+                        order_number=u.order_number,
+                        user_id=u.user_id,
+                        message="⏸️ Order placed ON HOLD.",
+                        channel="CLIENT",
+                        attachment_url=u.attachment_url,
+                        attachment_name=u.attachment_name,
+                        created_at=u.created_at
+                    )
+                    res.append(format_order_progress_response(u_sanitized, db, seen_by=[], reactions=[], for_external=is_external_view))
+                    continue
+
+            res.append(format_order_progress_response(u, db, seen_by=[], reactions=[], for_external=is_external_view))
             continue
             
         # Match readers
@@ -3969,7 +4171,7 @@ def get_order_progress(
                     users=users
                 ))
 
-        res.append(format_order_progress_response(u, db, seen_by=msg_seen_by, reactions=msg_reactions))
+        res.append(format_order_progress_response(u, db, seen_by=msg_seen_by, reactions=msg_reactions, for_external=is_external_view))
     return res
 
 
@@ -4897,6 +5099,8 @@ async def upload_order_attachment(
     order_number: str,
     file: UploadFile = File(...),
     message: Optional[str] = Form(None),
+    channel: Optional[str] = Form(None),
+    is_snippet: Optional[bool] = Form(False),
     quoted_message_id: Optional[int] = Form(None),
     quoted_message_text: Optional[str] = Form(None),
     quoted_sender_name: Optional[str] = Form(None),
@@ -4904,9 +5108,9 @@ async def upload_order_attachment(
     current_user: models.User = Depends(auth.get_current_user)
 ):
     """
-    Allow client (or authorized user) to upload a document via order chat.
+    Allow client (or authorized user) to upload a document/snippet via order chat.
     Stores the document in Dropbox under:
-    /Clients/{company_code}/{order_number}/Client Shared Docs/{filename}
+    /Clients/{company_code}/{order_number}/{folder_type}/{filename}
     Also saves a local fallback copy, records ClientDocument entry,
     and inserts ClientOrderProgress with the attachment info.
     """
@@ -4926,58 +5130,82 @@ async def upload_order_attachment(
         
     company_code = company.company_code if (company and company.company_code) else (f"comp_{company_id}" if company_id else "General")
     order_folder = (order_number or "No_Order").strip().replace("/", "_").replace("\\", "_")
+
+    # Determine target channel (CLIENT or INTERNAL)
+    target_channel = "CLIENT"
+    if current_user.role and current_user.role.name.upper() == "CLIENT":
+        target_channel = "CLIENT"
+    elif channel and channel.upper() in ["CLIENT", "INTERNAL"]:
+        target_channel = channel.upper()
     
     raw_bytes = await file.read()
     from utils.file_sanitizer import validate_file_security
-    file_bytes, sanitized_filename = validate_file_security(raw_bytes, file.filename or "shared_document.pdf", max_size_mb=50, allowed_category="all")
+    file_bytes, sanitized_filename = validate_file_security(raw_bytes, file.filename or "attachment.png", max_size_mb=50, allowed_category="all")
     
-    # Destination path: /Clients/{company_code}/{order_number}/Client Shared Docs/{filename}
-    destination_path = f"/Clients/{company_code}/{order_folder}/Client Shared Docs/{sanitized_filename}"
-    if destination_path.startswith("//"):
-        destination_path = destination_path[1:]
-        
-    # 1. Local disk fallback cache
-    local_rel = destination_path.replace("/Clients/", "", 1)
-    local_full_path = os.path.join("uploads", local_rel)
-    os.makedirs(os.path.dirname(local_full_path), exist_ok=True)
-    try:
-        with open(local_full_path, "wb") as f_out:
-            f_out.write(file_bytes)
-    except Exception as local_err:
-        print(f"Notice: Failed writing local backup: {local_err}")
-        
-    # 2. Upload to Dropbox
-    try:
-        from utils.dropbox_client import upload_file
-        res = upload_file(file_bytes, destination_path)
-        if not res.get("success"):
-            print(f"Notice: Dropbox upload returned: {res.get('error')}")
-    except Exception as dbx_err:
-        print(f"Notice: Dropbox upload failed, using local disk fallback: {dbx_err}")
-        
-    # 3. Create ClientDocument record so it appears under legal documents & company docs
-    if company_id:
-        client_doc = models.ClientDocument(
-            company_id=company_id,
-            file_name=sanitized_filename,
-            file_url=destination_path,
-            document_type="Client Shared Docs",
-            description=(message.strip() if message and message.strip() else None),
-            document_path=destination_path,
-            order_number=order_number,
-            document_date=datetime.now().date(),
-            uploaded_at=datetime.now(),
-            uploaded_by=current_user.id
-        )
-        db.add(client_doc)
+    if target_channel == "INTERNAL":
+        # INTERNAL CHAT: strictly kept in the chat and NOT stored in Dropbox or Company Documents Vault
+        chat_snippet_rel = os.path.join("chat_snippets", order_folder, sanitized_filename).replace("\\", "/")
+        destination_path = f"/{chat_snippet_rel}"
+        local_full_path = os.path.join("uploads", "chat_snippets", order_folder, sanitized_filename)
+        os.makedirs(os.path.dirname(local_full_path), exist_ok=True)
+        try:
+            with open(local_full_path, "wb") as f_out:
+                f_out.write(file_bytes)
+        except Exception as local_err:
+            print(f"Notice: Failed writing local internal chat media: {local_err}")
+        # Note: Dropbox upload skipped entirely
+        # Note: ClientDocument creation skipped entirely (never in Company Vault)
+    else:
+        # CLIENT CHANNEL: documents uploaded by or shared with client MUST be stored in Client Shared Docs
+        folder_type = "Client Shared Docs"
+        destination_path = f"/Clients/{company_code}/{order_folder}/{folder_type}/{sanitized_filename}"
+        if destination_path.startswith("//"):
+            destination_path = destination_path[1:]
+            
+        # 1. Local disk fallback cache
+        local_rel = destination_path.replace("/Clients/", "", 1)
+        local_full_path = os.path.join("uploads", local_rel)
+        os.makedirs(os.path.dirname(local_full_path), exist_ok=True)
+        try:
+            with open(local_full_path, "wb") as f_out:
+                f_out.write(file_bytes)
+        except Exception as local_err:
+            print(f"Notice: Failed writing local backup: {local_err}")
+            
+        # 2. Upload to Dropbox under Client Shared Docs
+        try:
+            from utils.dropbox_client import upload_file
+            res = upload_file(file_bytes, destination_path)
+            if not res.get("success"):
+                print(f"Notice: Dropbox upload returned: {res.get('error')}")
+        except Exception as dbx_err:
+            print(f"Notice: Dropbox upload failed, using local disk fallback: {dbx_err}")
+            
+        # 3. Create ClientDocument record so it appears under Client Shared Docs & Company Docs Vault
+        if company_id:
+            client_doc = models.ClientDocument(
+                company_id=company_id,
+                file_name=sanitized_filename,
+                file_url=destination_path,
+                document_type=folder_type,
+                description=(message.strip() if message and message.strip() else None),
+                document_path=destination_path,
+                order_number=order_number,
+                document_date=datetime.now().date(),
+                uploaded_at=datetime.now(),
+                uploaded_by=current_user.id
+            )
+            db.add(client_doc)
         
     # 4. Create ClientOrderProgress chat message
-    chat_message = message.strip() if message and message.strip() else f"Uploaded document: {sanitized_filename}"
+    is_image = sanitized_filename.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".gif")) or sanitized_filename.lower().startswith("snippet_")
+    default_text = "Shared an image snippet" if is_image else f"Uploaded attachment: {sanitized_filename}"
+    chat_message = message.strip() if message and message.strip() else default_text
     db_progress = models.ClientOrderProgress(
         order_number=order_number,
         user_id=current_user.id,
         message=chat_message,
-        channel="CLIENT",
+        channel=target_channel,
         attachment_url=destination_path,
         attachment_name=sanitized_filename,
         quoted_message_id=quoted_message_id,
@@ -4989,31 +5217,74 @@ async def upload_order_attachment(
     db.refresh(db_progress)
 
     # Immediately record the sender's read watermark for this channel
-    record_sender_read_watermark(order_number, "CLIENT", current_user.id, db_progress.id, db)
+    record_sender_read_watermark(order_number, target_channel, current_user.id, db_progress.id, db)
     
     formatted_resp = format_order_progress_response(db_progress, db)
     
     # 5. Notify assigned consultants and admins
     from notification_manager import manager
-    consultant_user_ids = set()
-    for o in orders_in_group:
-        c_ids = parse_consultant_ids(o.consultant_ids)
-        for cid in c_ids:
-            emp = db.query(models.Employee).filter(models.Employee.id == cid).first()
-            if emp and emp.user_id:
-                consultant_user_ids.add(emp.user_id)
-                
-    for uid in consultant_user_ids:
-        manager.notify_user_sync(
-            db=db,
-            user_id=uid,
-            title=f"New Document Uploaded - #{order_number}",
-            message=f"Client uploaded '{sanitized_filename}' on Order #{order_number}",
-            type="attendance",
-            module="clients",
-            reference_id=first_order.id,
-            action_url=f"/business/assigned-orders?order={order_number}&chat=true"
-        )
+    try:
+        if target_channel == "CLIENT":
+            if current_user.role and current_user.role.name.upper() == "CLIENT":
+                consultant_user_ids = set()
+                for o in orders_in_group:
+                    c_ids = parse_consultant_ids(o.consultant_ids)
+                    for cid in c_ids:
+                        emp = db.query(models.Employee).filter(models.Employee.id == cid).first()
+                        if emp and emp.user_id:
+                            consultant_user_ids.add(emp.user_id)
+                            
+                for uid in consultant_user_ids:
+                    title_text = f"New Snippet Shared - #{order_number}" if is_snippet_upload else f"New Document Uploaded - #{order_number}"
+                    desc_text = f"Client shared an image snippet on Order #{order_number}" if is_snippet_upload else f"Client uploaded '{sanitized_filename}' on Order #{order_number}"
+                    manager.notify_user_sync(
+                        db=db,
+                        user_id=uid,
+                        title=title_text,
+                        message=desc_text,
+                        type="attendance",
+                        module="clients",
+                        reference_id=first_order.id,
+                        action_url=f"/business/assigned-orders?order={order_number}&chat=true"
+                    )
+            else:
+                if company and company.client and company.client.user_id:
+                    title_text = f"New Snippet in Chat - #{order_number}" if is_snippet_upload else f"New Attachment Received - #{order_number}"
+                    desc_text = f"Consultant shared an image snippet on Order #{order_number}" if is_snippet_upload else f"Consultant shared '{sanitized_filename}' on Order #{order_number}"
+                    manager.notify_user_sync(
+                        db=db,
+                        user_id=company.client.user_id,
+                        title=title_text,
+                        message=desc_text,
+                        type="attendance",
+                        module="clients",
+                        reference_id=first_order.id,
+                        action_url=f"/client/chat?order={order_number}"
+                    )
+        else:
+            consultant_user_ids = set()
+            for o in orders_in_group:
+                c_ids = parse_consultant_ids(o.consultant_ids)
+                for cid in c_ids:
+                    emp = db.query(models.Employee).filter(models.Employee.id == cid).first()
+                    if emp and emp.user_id and emp.user_id != current_user.id:
+                        consultant_user_ids.add(emp.user_id)
+                        
+            for uid in consultant_user_ids:
+                title_text = f"New Internal Snippet - #{order_number}" if is_snippet_upload else f"New Internal Attachment - #{order_number}"
+                desc_text = f"New snippet posted in internal order notes #{order_number}" if is_snippet_upload else f"New file '{sanitized_filename}' posted in internal order notes #{order_number}"
+                manager.notify_user_sync(
+                    db=db,
+                    user_id=uid,
+                    title=title_text,
+                    message=desc_text,
+                    type="attendance",
+                    module="clients",
+                    reference_id=first_order.id,
+                    action_url=f"/business/assigned-orders?order={order_number}&chat=true"
+                )
+    except Exception as notify_err:
+        print(f"Notice: Failed to dispatch notification: {notify_err}")
         
     return formatted_resp
 
@@ -5061,7 +5332,16 @@ async def preview_order_attachment(
     import httpx
     
     # 1. Check local storage
-    local_rel = path.replace("/Clients/", "", 1) if path.startswith("/Clients/") else path.replace("/uploads/", "", 1)
+    if path.startswith("/Clients/"):
+        local_rel = path.replace("/Clients/", "", 1)
+    elif path.startswith("/uploads/"):
+        local_rel = path.replace("/uploads/", "", 1)
+    elif path.startswith("/chat_snippets/"):
+        local_rel = path.replace("/chat_snippets/", "chat_snippets/", 1)
+    elif path.startswith("chat_snippets/"):
+        local_rel = path
+    else:
+        local_rel = path.lstrip("/")
     local_path = os.path.join("uploads", local_rel)
     if os.path.exists(local_path):
         mime_type, _ = mimetypes.guess_type(local_path)
@@ -6899,6 +7179,7 @@ async def upload_public_order_attachment(
     order_number: str,
     file: UploadFile = File(...),
     message: Optional[str] = Form(None),
+    is_snippet: Optional[bool] = Form(False),
     quoted_message_id: Optional[int] = Form(None),
     quoted_message_text: Optional[str] = Form(None),
     quoted_sender_name: Optional[str] = Form(None),
@@ -6926,7 +7207,9 @@ async def upload_public_order_attachment(
     from utils.file_sanitizer import validate_file_security
     file_bytes, sanitized_filename = validate_file_security(raw_bytes, file.filename or "shared_document.pdf", max_size_mb=50, allowed_category="all")
     
-    destination_path = f"/Clients/{company_code}/{order_folder}/Client Shared Docs/{sanitized_filename}"
+    # All documents uploaded by the client are stored in Client Shared Docs
+    folder_type = "Client Shared Docs"
+    destination_path = f"/Clients/{company_code}/{order_folder}/{folder_type}/{sanitized_filename}"
     if destination_path.startswith("//"):
         destination_path = destination_path[1:]
         
@@ -6940,7 +7223,7 @@ async def upload_public_order_attachment(
     except Exception as local_err:
         print(f"Notice: Failed writing local backup: {local_err}")
         
-    # 2. Upload to Dropbox
+    # 2. Upload to Dropbox under Client Shared Docs
     dropbox_url = None
     try:
         from utils.dropbox_client import upload_file, get_shared_link
@@ -6952,15 +7235,15 @@ async def upload_public_order_attachment(
     except Exception as dbx_err:
         print(f"Notice: Dropbox upload failed, using local disk fallback: {dbx_err}")
         
-    attachment_url = dropbox_url if dropbox_url else f"/uploads/{local_rel}".replace("\\", "/")
+    attachment_url = dropbox_url if dropbox_url else destination_path
     
-    # 3. Create ClientDocument record
+    # 3. Create ClientDocument record so it appears under Client Shared Docs & Company Docs Vault
     if company_id:
         client_doc = models.ClientDocument(
             company_id=company_id,
             file_name=sanitized_filename,
             file_url=attachment_url,
-            document_type="CHAT_UPLOAD",
+            document_type="Client Shared Docs",
             description=(message.strip() if (message and message.strip()) else None),
             order_number=first_order.order_number,
             uploaded_by=current_user.id
@@ -6969,7 +7252,9 @@ async def upload_public_order_attachment(
         db.commit()
         
     # 4. Insert ClientOrderProgress record
-    chat_text = message.strip() if (message and message.strip()) else f"Uploaded attachment: {sanitized_filename}"
+    is_image = sanitized_filename.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".gif")) or sanitized_filename.lower().startswith("snippet_")
+    default_text = "Shared an image snippet" if is_image else f"Uploaded attachment: {sanitized_filename}"
+    chat_text = message.strip() if (message and message.strip()) else default_text
     db_progress = models.ClientOrderProgress(
         order_number=first_order.order_number,
         user_id=current_user.id,

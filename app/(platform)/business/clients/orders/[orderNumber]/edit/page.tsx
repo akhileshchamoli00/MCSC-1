@@ -58,8 +58,32 @@ export default function EditClientOrderPage() {
   const searchParams = useSearchParams();
   
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [selectedOrderGroup, setSelectedOrderGroup] = useState<any>(null);
+
+  // Helper for resilient fetching with retry on transient network drops
+  const safeFetch = async (url: string, options?: RequestInit, retries = 2, delayMs = 500): Promise<Response | null> => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const res = await fetch(url, options);
+        if (res.ok) return res;
+        if (res.status >= 500 && attempt < retries) {
+          await new Promise((r) => setTimeout(r, delayMs * (attempt + 1)));
+          continue;
+        }
+        return res;
+      } catch (err) {
+        if (attempt < retries) {
+          await new Promise((r) => setTimeout(r, delayMs * (attempt + 1)));
+        } else {
+          console.warn(`[safeFetch] Failed for ${url}:`, err);
+          return null;
+        }
+      }
+    }
+    return null;
+  };
 
   // DB Data Options
   const [clients, setClients] = useState<any[]>([]);
@@ -98,39 +122,57 @@ export default function EditClientOrderPage() {
   // On Hold Modal State
   const [isOnHoldDialogOpen, setIsOnHoldDialogOpen] = useState(false);
   const [holdReason, setHoldReason] = useState("");
-  const [holdChannel, setHoldChannel] = useState<"CLIENT" | "INTERNAL">("CLIENT");
+  const [holdChannel, setHoldChannel] = useState<"CLIENT" | "INTERNAL">("INTERNAL");
   const [prevStatusBeforeHold, setPrevStatusBeforeHold] = useState<string>("CONFIRMED");
 
   const fetchData = async () => {
     try {
       setLoading(true);
+      setLoadError(null);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
       const [cliRes, ordRes, serRes, empRes, teamRes, notariesRes, compRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, { credentials: "include" }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, { credentials: "include" }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/services/catalog`, { credentials: "include" }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, { credentials: "include" }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, { credentials: "include" }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries`, { credentials: "include" }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/companies/all`, { credentials: "include" })
+        safeFetch(`${apiUrl}/api/clients`, { credentials: "include" }),
+        safeFetch(`${apiUrl}/api/clients/orders?order_number=${encodeURIComponent(orderNumber)}`, { credentials: "include" }),
+        safeFetch(`${apiUrl}/api/clients/services/catalog`, { credentials: "include" }),
+        safeFetch(`${apiUrl}/api/employees`, { credentials: "include" }),
+        safeFetch(`${apiUrl}/api/teams`, { credentials: "include" }),
+        safeFetch(`${apiUrl}/api/clients/notaries`, { credentials: "include" }),
+        safeFetch(`${apiUrl}/api/clients/companies/all`, { credentials: "include" })
       ]);
 
       let fetchedClients: any[] = [];
       let fetchedOrders: any[] = [];
       let fetchedServices: any[] = [];
       let fetchedCompanies: any[] = [];
-      if (cliRes.ok) {
+      if (cliRes && cliRes.ok) {
         fetchedClients = await cliRes.json();
         setClients(fetchedClients);
       }
-      if (ordRes.ok) fetchedOrders = await ordRes.json();
-      if (serRes.ok) {
+      if (ordRes && ordRes.ok) {
+        fetchedOrders = await ordRes.json();
+      }
+      // If order not found by exact order_number, fallback to search or general orders endpoint
+      if (!Array.isArray(fetchedOrders) || fetchedOrders.length === 0) {
+        const fallbackRes = await safeFetch(`${apiUrl}/api/clients/orders?search=${encodeURIComponent(orderNumber)}`, { credentials: "include" });
+        if (fallbackRes && fallbackRes.ok) {
+          fetchedOrders = await fallbackRes.json();
+        }
+        if (!Array.isArray(fetchedOrders) || fetchedOrders.length === 0) {
+          const allRes = await safeFetch(`${apiUrl}/api/clients/orders`, { credentials: "include" });
+          if (allRes && allRes.ok) {
+            fetchedOrders = await allRes.json();
+          }
+        }
+      }
+
+      if (serRes && serRes.ok) {
         fetchedServices = await serRes.json();
         setServices(fetchedServices);
       }
-      if (empRes.ok) setEmployees(await empRes.json());
-      if (teamRes.ok) setTeams(await teamRes.json());
-      if (notariesRes.ok) setNotaries(await notariesRes.json());
-      if (compRes.ok) {
+      if (empRes && empRes.ok) setEmployees(await empRes.json());
+      if (teamRes && teamRes.ok) setTeams(await teamRes.json());
+      if (notariesRes && notariesRes.ok) setNotaries(await notariesRes.json());
+      if (compRes && compRes.ok) {
         fetchedCompanies = await compRes.json();
       }
 
@@ -295,8 +337,9 @@ export default function EditClientOrderPage() {
         is_final_invoice_finalized: targetGroup.is_final_invoice_finalized || false
       });
 
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error loading order data:", err);
+      setLoadError(err?.message || "Failed to load dependency catalog or order data");
       toast.error("Failed to load dependency catalog or order data");
     } finally {
       setLoading(false);
@@ -511,7 +554,7 @@ export default function EditClientOrderPage() {
     if (newStatus === "ON_HOLD") {
       setPrevStatusBeforeHold(editForm.status);
       setHoldReason("");
-      setHoldChannel("CLIENT");
+      setHoldChannel("INTERNAL");
       setIsOnHoldDialogOpen(true);
       return;
     }
@@ -695,6 +738,28 @@ export default function EditClientOrderPage() {
       <div className="flex h-64 items-center justify-center gap-3 text-muted-foreground">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="text-sm font-medium">Loading order details...</p>
+      </div>
+    );
+  }
+
+  if (loadError && !selectedOrderGroup) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center border border-border/60 rounded-2xl bg-card my-8 shadow-xs max-w-lg mx-auto">
+        <div className="p-3 bg-amber-500/10 rounded-full mb-3">
+          <AlertTriangle className="h-8 w-8 text-amber-500" />
+        </div>
+        <h2 className="text-base font-bold text-foreground mb-1">Unable to Load Order Data</h2>
+        <p className="text-xs text-muted-foreground mb-5 max-w-sm">
+          {loadError}. This could be due to a temporary network or tunnel interruption.
+        </p>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => router.back()} className="h-8 text-xs rounded-lg">
+            <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Go Back
+          </Button>
+          <Button size="sm" onClick={() => fetchData()} className="h-8 text-xs font-semibold gap-1.5 rounded-lg">
+            <RefreshCw className="h-3.5 w-3.5" /> Try Again
+          </Button>
+        </div>
       </div>
     );
   }
@@ -1332,6 +1397,9 @@ export default function EditClientOrderPage() {
                     <option value="REVIEW_DOCS">REVIEW DOCS</option>
                     <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
                     <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
+                    <option value="AWAITING_SIGNING_NOTARIZATION">AWAITING SIGNING / NOTARIZATION</option>
+                    <option value="AWAITING_DOCUMENT_RETURN">AWAITING DOCUMENT RETURN FROM CLIENT</option>
+                    <option value="AWAITING_THIRD_PARTY_RESPONSE">AWAITING THIRD-PARTY RESPONSE (VENDOR)</option>
                     <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
                     <option value="FINAL_DOC_READY">FINAL DOC READY</option>
                     <option value="INVOICE_GENERATED">INVOICE GENERATED</option>
@@ -1678,25 +1746,16 @@ export default function EditClientOrderPage() {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-foreground">Broadcast Visibility</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setHoldChannel("CLIENT")}
-                  className={`p-2.5 rounded-xl border text-left transition-colors ${holdChannel === "CLIENT" ? "border-primary bg-primary/10 text-primary font-bold" : "border-border/60 hover:bg-muted/40 text-xs"}`}
-                >
-                  <div className="font-semibold text-xs">Client & Team</div>
-                  <div className="text-[10px] text-muted-foreground">Visible to client in order chat</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHoldChannel("INTERNAL")}
-                  className={`p-2.5 rounded-xl border text-left transition-colors ${holdChannel === "INTERNAL" ? "border-primary bg-primary/10 text-primary font-bold" : "border-border/60 hover:bg-muted/40 text-xs"}`}
-                >
-                  <div className="font-semibold text-xs">Internal Only</div>
-                  <div className="text-[10px] text-muted-foreground">Visible only to internal staff</div>
-                </button>
+            <div className="p-3 rounded-xl border border-amber-500/25 bg-amber-500/5 flex items-start gap-2.5">
+              <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <span>Visibility: Internal Only</span>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono font-bold uppercase">Private</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  This on-hold reason is strictly confidential for internal staff only. No messages or reasons will ever be sent to or visible in the client chat.
+                </p>
               </div>
             </div>
           </div>

@@ -53,7 +53,8 @@ import {
   AlertTriangle,
   Lock,
   FolderKanban,
-  Sparkles
+  Sparkles,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
@@ -85,14 +86,14 @@ export default function CompanyDocumentsManagementPage() {
   const [pendingConfirmStatus, setPendingConfirmStatus] = useState<string>("");
   const [isHoldDialogOpen, setIsHoldDialogOpen] = useState(false);
   const [holdReason, setHoldReason] = useState("");
-  const [holdChannel, setHoldChannel] = useState<"CLIENT" | "INTERNAL">("CLIENT");
+  const [holdChannel, setHoldChannel] = useState<"CLIENT" | "INTERNAL">("INTERNAL");
   const [submittingHold, setSubmittingHold] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [filterByActiveOrder, setFilterByActiveOrder] = useState(Boolean(orderNumberParam));
 
   // Documents
   const [documents, setDocuments] = useState<any[]>([]);
-  const [uploadRow, setUploadRow] = useState({ file: null as File | null, type: "", description: "", document_path: "", date: "", expiry_date: "" });
+  const [uploadRow, setUploadRow] = useState({ files: [] as File[], type: "", description: "", document_path: "", date: "", expiry_date: "" });
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [deleteDocId, setDeleteDocId] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -261,6 +262,9 @@ export default function CompanyDocumentsManagementPage() {
     "REVIEW_DOCS",
     "DOCUMENTS_REVIEWED",
     "PRE_DOC_SENT_FOR_SIGNATURE",
+    "AWAITING_SIGNING_NOTARIZATION",
+    "AWAITING_DOCUMENT_RETURN",
+    "AWAITING_THIRD_PARTY_RESPONSE",
     "FINAL_DOCUMENT_PREPARATION",
     "FINAL_DOC_READY",
     "ON_HOLD"
@@ -281,6 +285,9 @@ export default function CompanyDocumentsManagementPage() {
       case "DOCUMENTS_REVIEWED": return "bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 font-bold";
       case "PRE_DOC_SENT_FOR_SIGNATURE": return "bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20 font-bold";
       case "PRE_DOCS_SENT": return "bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20 font-bold";
+      case "AWAITING_SIGNING_NOTARIZATION": return "bg-violet-500/10 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/20 font-bold";
+      case "AWAITING_DOCUMENT_RETURN": return "bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20 font-bold";
+      case "AWAITING_THIRD_PARTY_RESPONSE": return "bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20 font-bold";
       case "FINAL_DOCUMENT_PREPARATION": return "bg-orange-500/10 dark:bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/20 font-bold";
       case "FINAL_DOC_READY": return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold";
       default: return "bg-primary/10 text-primary border-primary/20 font-bold";
@@ -291,7 +298,7 @@ export default function CompanyDocumentsManagementPage() {
     if (!activeOrder || !activeOrderItems || activeOrderItems.length === 0 || !newStatus || newStatus === activeOrder.status) return;
     if (newStatus === "ON_HOLD") {
       setHoldReason("");
-      setHoldChannel("CLIENT");
+      setHoldChannel("INTERNAL");
       setIsHoldDialogOpen(true);
       return;
     }
@@ -450,8 +457,8 @@ export default function CompanyDocumentsManagementPage() {
   };
 
   const handleUploadDocuments = async () => {
-    if (!uploadRow.file) {
-      toast.error("Please attach a file to upload.");
+    if (uploadRow.files.length === 0) {
+      toast.error("Please attach at least one file to upload.");
       return;
     }
     if (!uploadRow.type) {
@@ -462,7 +469,9 @@ export default function CompanyDocumentsManagementPage() {
 
     try {
       const formData = new FormData();
-      formData.append("file", uploadRow.file);
+      uploadRow.files.forEach(f => {
+        formData.append("files", f);
+      });
       formData.append("document_type", uploadRow.type);
       if (uploadRow.description) formData.append("description", uploadRow.description);
       if (selectedOrderNum && selectedOrderNum.trim()) {
@@ -478,23 +487,31 @@ export default function CompanyDocumentsManagementPage() {
       });
 
       if (!res.ok) {
-        let msg = "Save failed";
+        let msg = `Save failed (${res.status} ${res.statusText})`;
         try {
-          const errJson = await res.json();
-          msg = errJson.detail || errJson.message || JSON.stringify(errJson);
-        } catch {
-          const errText = await res.text();
-          if (errText) msg = errText;
+          const rawText = await res.text();
+          if (rawText) {
+            try {
+              const errJson = JSON.parse(rawText);
+              msg = errJson.detail || errJson.message || rawText;
+            } catch {
+              msg = rawText;
+            }
+          }
+        } catch (e: any) {
+          console.warn("Could not read error response text:", e);
         }
         throw new Error(msg);
       }
 
-      const newDoc = await res.json();
-      setDocuments(prev => [...prev, newDoc]);
-      setUploadRow({ file: null, type: "", description: "", document_path: "", date: "", expiry_date: "" });
+      const resData = await res.json();
+      const newDocsList = Array.isArray(resData) ? resData : [resData];
+      setDocuments(prev => [...prev, ...newDocsList]);
+      const count = uploadRow.files.length;
+      setUploadRow({ files: [], type: "", description: "", document_path: "", date: "", expiry_date: "" });
       setSelectedOrderNum("");
       setOrderSearchQuery("");
-      toast.success("Document record saved successfully!");
+      toast.success(`${count} document(s) uploaded successfully!`);
       fetchInitialData();
     } catch (err: any) {
       console.error("Save failed", err);
@@ -917,6 +934,9 @@ export default function CompanyDocumentsManagementPage() {
                   <option value="REVIEW_DOCS">REVIEW DOCS</option>
                   <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
                   <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
+                  <option value="AWAITING_SIGNING_NOTARIZATION">AWAITING SIGNING / NOTARIZATION</option>
+                  <option value="AWAITING_DOCUMENT_RETURN">AWAITING DOCUMENT RETURN FROM CLIENT</option>
+                  <option value="AWAITING_THIRD_PARTY_RESPONSE">AWAITING THIRD-PARTY RESPONSE (VENDOR)</option>
                   <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
                   <option value="FINAL_DOC_READY">FINAL DOC READY</option>
                   <option value="ON_HOLD">ON HOLD</option>
@@ -1308,35 +1328,122 @@ export default function CompanyDocumentsManagementPage() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between pt-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      className="hidden"
-                      onChange={(e) => setUploadRow({ ...uploadRow, file: e.target.files?.[0] || null })}
-                    />
+                <div className="space-y-2.5 pt-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files.length > 0) {
+                            const newFiles = Array.from(e.target.files);
+                            setUploadRow(prev => ({
+                              ...prev,
+                              files: [
+                                ...prev.files,
+                                ...newFiles.filter(nf => !prev.files.some(existing => existing.name === nf.name && existing.size === nf.size))
+                              ]
+                            }));
+                          }
+                          if (fileInputRef.current) fileInputRef.current.value = "";
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={`h-9 gap-1.5 cursor-pointer ${uploadRow.files.length > 0 ? "border-primary/40 text-primary bg-primary/5" : "border-dashed"}`}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Paperclip className="h-4 w-4" />
+                        {uploadRow.files.length === 0
+                          ? "Attach File(s)"
+                          : `+ Add More Files (${uploadRow.files.length} selected)`}
+                      </Button>
+
+                      {uploadRow.files.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs text-muted-foreground hover:text-destructive cursor-pointer"
+                          onClick={() => setUploadRow(prev => ({ ...prev, files: [] }))}
+                        >
+                          Clear All
+                        </Button>
+                      )}
+                    </div>
+
                     <Button
-                      type="button"
-                      variant="outline"
                       size="sm"
-                      className={`h-9 gap-1.5 ${uploadRow.file ? "border-primary/40 text-primary bg-primary/5" : "border-dashed"}`}
-                      onClick={() => fileInputRef.current?.click()}
+                      className="h-9 gap-1.5 font-semibold shadow-sm px-6 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+                      onClick={handleUploadDocuments}
+                      disabled={uploadingDocs || uploadRow.files.length === 0 || !uploadRow.type}
                     >
-                      <Paperclip className="h-4 w-4" />
-                      {uploadRow.file ? uploadRow.file.name : "Attach File"}
+                      {uploadingDocs ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Saving ({uploadRow.files.length})...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4" />
+                          <span>
+                            {uploadRow.files.length === 0
+                              ? "Save"
+                              : uploadRow.files.length === 1
+                              ? "Save 1 Document"
+                              : `Save ${uploadRow.files.length} Documents`}
+                          </span>
+                        </>
+                      )}
                     </Button>
                   </div>
 
-                  <Button
-                    size="sm"
-                    className="h-9 gap-1.5 font-semibold shadow-sm px-6 bg-emerald-600 hover:bg-emerald-700 text-white"
-                    onClick={handleUploadDocuments}
-                    disabled={uploadingDocs || !uploadRow.file || !uploadRow.type}
-                  >
-                    <Save className="h-4 w-4" />
-                    {uploadingDocs ? "Saving..." : "Save"}
-                  </Button>
+                  {/* Staged Files Preview List */}
+                  {uploadRow.files.length > 0 && (
+                    <div className="p-2.5 rounded-lg border border-border/60 bg-muted/20 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground">
+                        <span>
+                          Files attached for <strong className="text-foreground">{uploadRow.type || "selected category"}</strong>:
+                        </span>
+                        <span className="text-[10px]">
+                          {(uploadRow.files.reduce((acc, f) => acc + f.size, 0) / (1024 * 1024)).toFixed(2)} MB total
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+                        {uploadRow.files.map((file, idx) => (
+                          <div
+                            key={`${file.name}-${idx}`}
+                            className="flex items-center gap-1.5 bg-background border border-border/80 px-2.5 py-1 rounded-md text-xs shadow-xs"
+                          >
+                            <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span className="truncate max-w-[200px] font-medium text-[11px] text-foreground" title={file.name}>
+                              {file.name}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground shrink-0">
+                              ({(file.size / 1024).toFixed(0)} KB)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUploadRow(prev => ({
+                                  ...prev,
+                                  files: prev.files.filter((_, i) => i !== idx)
+                                }));
+                              }}
+                              className="text-muted-foreground hover:text-destructive ml-0.5 rounded p-0.5 transition-colors cursor-pointer"
+                              title="Remove file"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -2139,17 +2246,17 @@ export default function CompanyDocumentsManagementPage() {
                 className="text-xs min-h-[90px]"
               />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Channel</label>
-              <Select value={holdChannel} onValueChange={(v: "CLIENT" | "INTERNAL") => setHoldChannel(v)}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CLIENT">Client Communication (Waiting on Client)</SelectItem>
-                  <SelectItem value="INTERNAL">Internal Review / Department Blocker</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="p-3 rounded-xl border border-amber-500/25 bg-amber-500/5 flex items-start gap-2.5">
+              <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <span>Visibility: Internal Only</span>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono font-bold uppercase">Private</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  This blocker note is strictly confidential for internal staff only. No messages or reasons will ever be sent to or visible in the client chat.
+                </p>
+              </div>
             </div>
           </div>
           <DialogFooter>

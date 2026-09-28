@@ -1180,7 +1180,7 @@ class ClientOrderUpdate(BaseModel):
     xendit_invoice_id: Optional[str] = None
     notary_id: Optional[int] = None
     hold_reason: Optional[str] = None
-    hold_channel: Optional[str] = "CLIENT"
+    hold_channel: Optional[str] = "INTERNAL"
 
 class CompanyStakeholderCreate(BaseModel):
     name: str
