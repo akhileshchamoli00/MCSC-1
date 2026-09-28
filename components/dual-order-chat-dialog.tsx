@@ -303,6 +303,10 @@ const renderMessageContent = (
         .sort((a: string, b: string) => b.length - a.length)
         .map((name: string) => name.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"));
 
+      if (!names.some((n: string) => n.toLowerCase() === "team")) {
+        names.unshift("Team");
+      }
+
       if (names.length > 0) {
         const namesPattern = names.join("|");
         regex = new RegExp(
@@ -329,6 +333,19 @@ const renderMessageContent = (
           const isMention = isInternal && part.startsWith("@");
 
           if (isEmail || isMention) {
+            const isOrderTeam = isMention && (part.toLowerCase() === "@team" || part.toLowerCase() === "@[team]");
+            if (isOrderTeam) {
+              return (
+                <span
+                  key={i}
+                  className="font-bold text-amber-700 dark:text-amber-300 bg-amber-500/20 dark:bg-amber-950/60 border border-amber-500/35 px-1.5 py-0.5 rounded-md text-[11px] sm:text-xs inline-flex items-center gap-1 align-baseline mr-0.5 select-text shadow-2xs"
+                  title="Assigned Order Members (Consultants & Reviewers)"
+                >
+                  <Users className="h-3 w-3 inline shrink-0 text-amber-600 dark:text-amber-400" />
+                  {part}
+                </span>
+              );
+            }
             return (
               <span
                 key={i}
@@ -894,7 +911,15 @@ export function DualOrderChatDialog({
         displayName: t.name
       }));
 
-      setTaggableUsers([...formattedEmployees, ...formattedTeams]);
+      // Order Team tag specifically for members assigned to this order
+      const orderTeamItem = {
+        id: "order_team_mention",
+        type: "order_team",
+        displayName: "Team",
+        subtitle: "Assigned Consultants & Reviewers"
+      };
+
+      setTaggableUsers([orderTeamItem, ...formattedEmployees, ...formattedTeams]);
     } catch (err) {
       console.error("Error fetching taggable users:", err);
     }
@@ -1165,9 +1190,10 @@ export function DualOrderChatDialog({
     if (match) {
       const query = match[1].toLowerCase();
       const filtered = taggableUsers.filter(u =>
-        u.displayName.toLowerCase().includes(query)
+        u.displayName.toLowerCase().includes(query) ||
+        (u.subtitle && u.subtitle.toLowerCase().includes(query))
       );
-      setFilteredSuggestions(filtered.slice(0, 5));
+      setFilteredSuggestions(filtered.slice(0, 6));
       setShowSuggestions(filtered.length > 0);
     } else {
       setShowSuggestions(false);
@@ -2549,22 +2575,40 @@ export function DualOrderChatDialog({
 
                     {/* Suggestions Popover for @mentions */}
                     {showSuggestions && (
-                      <div className="absolute bottom-full left-3 right-3 mb-2 bg-popover border border-border rounded-xl shadow-xl p-1 z-50 max-h-48 overflow-y-auto">
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-1">
-                          Suggested Mentions
+                      <div className="absolute bottom-full left-3 right-3 mb-2 bg-popover border border-border rounded-xl shadow-xl p-1 z-50 max-h-52 overflow-y-auto">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-1 flex items-center justify-between">
+                          <span>Suggested Mentions</span>
+                          <span className="text-[9px] font-normal text-muted-foreground lowercase">type or click</span>
                         </div>
                         {filteredSuggestions.map((item, i) => (
                           <button
                             key={i}
                             type="button"
                             onClick={() => selectSuggestion(item)}
-                            className="w-full text-left px-2.5 py-1.5 text-xs hover:bg-muted/80 rounded-lg flex items-center justify-between"
+                            className={`w-full text-left px-2.5 py-1.5 text-xs hover:bg-muted/80 rounded-lg flex items-center justify-between transition-colors ${
+                              item.type === "order_team" ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-950 dark:text-amber-100" : ""
+                            }`}
                           >
-                            <span className="font-semibold text-foreground">
-                              {item.type === "team" ? `👥 ${item.displayName}` : `👤 ${item.displayName}`}
+                            <span className="font-semibold text-foreground flex items-center gap-1.5 min-w-0">
+                              {item.type === "order_team" ? (
+                                <>
+                                  <Users className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                                  <span className="text-amber-700 dark:text-amber-300 font-bold truncate">@{item.displayName}</span>
+                                </>
+                              ) : item.type === "team" ? (
+                                <>
+                                  <Users className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                  <span className="truncate">{item.displayName}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                  <span className="truncate">{item.displayName}</span>
+                                </>
+                              )}
                             </span>
-                            <span className="text-[10px] text-muted-foreground">
-                              {item.type === "team" ? "Team" : item.department?.name || "Staff"}
+                            <span className={`text-[10px] shrink-0 ml-2 ${item.type === "order_team" ? "text-amber-700 dark:text-amber-300 font-bold" : "text-muted-foreground"}`}>
+                              {item.type === "order_team" ? (item.subtitle || "Assigned Order Team") : (item.type === "team" ? "Team" : item.department?.name || item.job_title || "Staff")}
                             </span>
                           </button>
                         ))}

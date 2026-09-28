@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request, Query, Response, BackgroundTasks
 from sqlalchemy.orm import Session, joinedload, selectinload
-from typing import List, Optional, Any, Union
+from typing import List, Optional, Any, Union, Set
 from pydantic import BaseModel
 import os
 import re
@@ -4808,6 +4808,35 @@ def get_taggable_users_for_order(order_number: str, db: Session) -> List[models.
     return allowed_users
 
 
+def get_assigned_order_team_user_ids(order_number: str, db: Session) -> Set[int]:
+    """
+    Returns user_ids of all consultants and reviewers assigned to this order (across all line items).
+    """
+    clean_no = (order_number or "").strip().upper()
+    orders_in_group = db.query(models.ClientOrder).filter(func.upper(models.ClientOrder.order_number) == clean_no).all()
+    if not orders_in_group:
+        return set()
+
+    assigned_emp_ids = set()
+    for o in orders_in_group:
+        c_ids = parse_consultant_ids(o.consultant_ids)
+        assigned_emp_ids.update(c_ids)
+        r_ids = parse_consultant_ids(getattr(o, "reviewer_ids", None))
+        assigned_emp_ids.update(r_ids)
+        if getattr(o, "reviewer_id", None):
+            assigned_emp_ids.add(o.reviewer_id)
+
+    if not assigned_emp_ids:
+        return set()
+
+    assigned_emps = db.query(models.Employee).filter(
+        models.Employee.id.in_(list(assigned_emp_ids)),
+        models.Employee.status == models.EmploymentStatus.ACTIVE
+    ).all()
+
+    return {emp.user_id for emp in assigned_emps if emp.user_id}
+
+
 @router.get("/orders/{order_number}/taggable-users")
 def get_order_taggable_users(
     order_number: str,
@@ -4882,11 +4911,21 @@ def add_order_progress(
     
     if target_channel == "INTERNAL":
         tagged_user_ids = set()
+        order_team_user_ids = set()
         taggable_users = get_taggable_users_for_order(order_number, db)
         taggable_user_map = {u.id: u for u in taggable_users}
 
-        # 1. Match @email patterns
         import re
+        # Check for @Team tag (specifically tags assigned consultants & reviewers for this order)
+        is_order_team_tagged = bool(re.search(r'(^|\s|["\'(])@team\b', message_text, re.IGNORECASE))
+        if is_order_team_tagged:
+            assigned_uids = get_assigned_order_team_user_ids(order_number, db)
+            for uid in assigned_uids:
+                if uid != current_user.id:
+                    order_team_user_ids.add(uid)
+                    tagged_user_ids.add(uid)
+
+        # 1. Match @email patterns
         emails = re.findall(r'@([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', message_text)
         for email in emails:
             user = db.query(models.User).filter(models.User.email == email).first()
@@ -4905,10 +4944,10 @@ def add_order_progress(
                 if emp.user_id != current_user.id:
                     tagged_user_ids.add(emp.user_id)
 
-        # 3. Match @Team Name for active teams
+        # 3. Match @Team Name for active company teams (excluding generic @team)
         active_teams = db.query(models.Team).filter(models.Team.is_active == True).all()
         for team in active_teams:
-            if f"@{team.name}".lower() in message_text.lower():
+            if team.name and team.name.strip().lower() != "team" and f"@{team.name}".lower() in message_text.lower():
                 for member in team.members:
                     if member.status == models.EmploymentStatus.ACTIVE and member.user_id and member.user_id != current_user.id:
                         if member.user_id in taggable_user_map:
@@ -4951,13 +4990,22 @@ def add_order_progress(
                     action_url = f"{base_route}?order={order_number}&chat=true"
                 elif auth.has_permission(tagged_user, "clients_my", "view", db):
                     action_url = f"/business/assigned-orders?order={order_number}&chat=true"
+                else:
+                    action_url = f"/business/assigned-orders?order={order_number}&chat=true"
                 
                 if action_url:
+                    is_team_notif = uid in order_team_user_ids
+                    notif_title = f"Tagged @Team in Order #{order_number}" if is_team_notif else "Tagged in Order Chat"
+                    notif_msg = (
+                        f"{formatted_resp.sender_name} tagged @Team in Order #{order_number}: \"{message_text[:60]}...\""
+                        if is_team_notif else
+                        f"{formatted_resp.sender_name} tagged you in Order #{order_number}: \"{message_text[:60]}...\""
+                    )
                     manager.notify_user_sync(
                         db=db,
                         user_id=uid,
-                        title="Tagged in Order Chat",
-                        message=f"{formatted_resp.sender_name} tagged you in Order #{order_number}: \"{message_text[:60]}...\"",
+                        title=notif_title,
+                        message=notif_msg,
                         type="attendance",
                         module="clients",
                         reference_id=first_order.id,
