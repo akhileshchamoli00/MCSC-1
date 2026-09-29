@@ -263,7 +263,7 @@ const navModules: NavModule[] = [
       { name: "Active Orders", href: "/business/clients/orders", adminOnly: true, moduleCode: "clients_orders_active" },
       { name: "Completed Orders", href: "/business/clients/orders/completed", adminOnly: true, moduleCode: "clients_orders_completed" },
       { name: "Cancelled Orders", href: "/business/clients/orders/cancelled", adminOnly: true, moduleCode: "clients_orders_cancelled" },
-      { name: "Team Workload", href: "/business/clients/orders/workload", adminOnly: true, moduleCode: "clients_orders_active" }
+      { name: "Team Workload", href: "/business/clients/orders/workload", adminOnly: true, moduleCode: "clients_orders_workload" }
     ]
   },
   {

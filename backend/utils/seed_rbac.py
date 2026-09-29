@@ -71,12 +71,16 @@ def seed_rbac_data(db: Session):
         {"name": "Companies", "code": "clients_company", "system_area": "business", "submodules": []},
         {"name": "Assigned Orders", "code": "clients_my", "system_area": "business", "submodules": []},
         {"name": "Services", "code": "clients_services", "system_area": "business", "submodules": []},
+        {"name": "Vendors", "code": "clients_vendors", "system_area": "business", "submodules": [
+            {"name": "Vendor Directory", "code": "clients_notaries"},
+            {"name": "Vendor Settlements", "code": "clients_orders_notary_payments"},
+        ]},
         {"name": "Order Management", "code": "clients_orders", "system_area": "business", "submodules": [
             {"name": "Pipeline Orders", "code": "clients_orders_pipeline"},
             {"name": "Active Orders", "code": "clients_orders_active"},
+            {"name": "Team Workload", "code": "clients_orders_workload"},
             {"name": "Completed Orders", "code": "clients_orders_completed"},
             {"name": "Cancelled Orders", "code": "clients_orders_cancelled"},
-            {"name": "Settlements", "code": "clients_orders_notary_payments"},
         ]},
         {"name": "Documents", "code": "clients_documents", "system_area": "business", "submodules": [
             {"name": "Invoice Folders & Files", "code": "clients_documents_invoices"},
@@ -84,7 +88,6 @@ def seed_rbac_data(db: Session):
         {"name": "Client Announcements", "code": "clients_announcements", "system_area": "business", "submodules": []},
         {"name": "Accurate Online", "code": "clients_accurate", "system_area": "business", "submodules": []},
         {"name": "Teams", "code": "clients_teams", "system_area": "business", "submodules": []},
-        {"name": "Notaries", "code": "clients_notaries", "system_area": "business", "submodules": []},
         {"name": "Chat", "code": "chat", "system_area": "business", "submodules": [
             {"name": "Chat Center", "code": "chat_center"},
             {"name": "Client Chat", "code": "chat_client"},
@@ -204,18 +207,22 @@ def seed_rbac_data(db: Session):
 
     # Force grant all permissions for any new/updated modules to ADMIN and Super Admin roles
     admin_roles = db.query(models.Role).filter(models.Role.name.in_(["Admin", "ADMIN", "Super Admin"])).all()
-    for admin_role in admin_roles:
-        for mod in modules_by_code.values():
-            for perm in perm_map.values():
-                exists = db.query(models.RolePermission).filter(
-                    models.RolePermission.role_id == admin_role.id,
-                    models.RolePermission.module_id == mod.id,
-                    models.RolePermission.permission_id == perm.id
-                ).first()
-                if not exists:
-                    rp = models.RolePermission(role_id=admin_role.id, module_id=mod.id, permission_id=perm.id)
-                    db.add(rp)
-    db.commit()
+    if admin_roles:
+        admin_role_ids = [r.id for r in admin_roles]
+        existing_rp_tuples = set(
+            db.query(models.RolePermission.role_id, models.RolePermission.module_id, models.RolePermission.permission_id)
+            .filter(models.RolePermission.role_id.in_(admin_role_ids))
+            .all()
+        )
+        new_rps = []
+        for admin_role in admin_roles:
+            for mod in modules_by_code.values():
+                for perm in perm_map.values():
+                    if (admin_role.id, mod.id, perm.id) not in existing_rp_tuples:
+                        new_rps.append(models.RolePermission(role_id=admin_role.id, module_id=mod.id, permission_id=perm.id))
+        if new_rps:
+            db.bulk_save_objects(new_rps)
+            db.commit()
 
     print("RBAC Database seeding completed successfully.")
 

@@ -29,9 +29,20 @@ import {
 import { toast } from "sonner";
 import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
+import { useUser } from "@/contexts/user-context";
 
 export default function NewNotaryPage() {
   const router = useRouter();
+  const { isAdmin, hasPermission, loading: userLoading } = useUser();
+  const canCreate = isAdmin || hasPermission("clients_notaries", "create") || hasPermission("clients_vendors", "create");
+
+  useEffect(() => {
+    if (!userLoading && !canCreate) {
+      toast.error("Access Denied: You do not have permission to add vendors.");
+      router.replace("/business/clients/notaries");
+    }
+  }, [userLoading, canCreate, router]);
+
   const [saving, setSaving] = useState(false);
   const [services, setServices] = useState<any[]>([]);
   const [serviceFees, setServiceFees] = useState<Record<number, string>>({});

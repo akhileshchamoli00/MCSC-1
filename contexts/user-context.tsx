@@ -236,7 +236,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const hasPermission = React.useCallback((moduleCode: string, actionCode: string) => {
     if (isAdmin) return true;
-    return permissions.includes(`${moduleCode}:${actionCode}`) || permissions.includes("*:*");
+    if (permissions.includes(`${moduleCode}:${actionCode}`) || permissions.includes("*:*")) return true;
+    if ((moduleCode === "clients_notaries" || moduleCode === "clients_orders_notary_payments") && permissions.includes(`clients_vendors:${actionCode}`)) {
+      return true;
+    }
+    return false;
   }, [isAdmin, permissions]);
 
   // Determine allowed modes based on role and permissions

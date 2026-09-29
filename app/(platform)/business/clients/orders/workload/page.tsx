@@ -117,7 +117,7 @@ interface WorkloadSummary {
 export default function TeamWorkloadPage() {
   const router = useRouter();
   const { isAdmin, hasPermission, loading: userLoading } = useUser();
-  const canView = isAdmin || hasPermission("clients_orders_active", "view") || hasPermission("clients_orders", "view");
+  const canView = isAdmin || hasPermission("clients_orders_workload", "view") || hasPermission("clients_orders_active", "view") || hasPermission("clients_orders", "view");
 
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<WorkloadSummary | null>(null);

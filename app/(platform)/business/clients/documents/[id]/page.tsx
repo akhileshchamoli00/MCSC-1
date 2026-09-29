@@ -105,11 +105,70 @@ export default function CompanyDocumentsManagementPage() {
   const [loadingPreviewLink, setLoadingPreviewLink] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // DOCX inline preview states
+  const [docxLoading, setDocxLoading] = useState(false);
+  const [docxError, setDocxError] = useState<string | null>(null);
+  const docxContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!previewDoc || !previewDoc.file_name?.match(/\.docx$/i) || !resolvedPreviewUrl || resolvedPreviewUrl === "#") {
+      setDocxLoading(false);
+      setDocxError(null);
+      return;
+    }
+
+    let isMounted = true;
+    setDocxLoading(true);
+    setDocxError(null);
+
+    fetch(resolvedPreviewUrl, { credentials: "include" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Could not load document (${res.status})`);
+        return res.blob();
+      })
+      .then(async (blob) => {
+        if (!isMounted) return;
+        setTimeout(async () => {
+          if (!isMounted || !docxContainerRef.current) return;
+          try {
+            docxContainerRef.current.innerHTML = "";
+            const { renderAsync } = await import("docx-preview");
+            await renderAsync(blob, docxContainerRef.current, undefined, {
+              className: "docx-preview-content",
+              inWrapper: true,
+              ignoreWidth: false,
+              ignoreHeight: false
+            });
+            if (isMounted) setDocxLoading(false);
+          } catch (renderErr: any) {
+            console.error("docx render error", renderErr);
+            if (isMounted) {
+              setDocxError(renderErr.message || "Failed to render Word document preview.");
+              setDocxLoading(false);
+            }
+          }
+        }, 60);
+      })
+      .catch((err: any) => {
+        console.error("docx fetch error", err);
+        if (isMounted) {
+          setDocxError(err.message || "Failed to retrieve Word document data.");
+          setDocxLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [previewDoc, resolvedPreviewUrl]);
+
   const handleClosePreview = () => {
     setIsClosingPreview(true);
     setTimeout(() => {
       setPreviewDoc(null);
       setResolvedPreviewUrl(null);
+      setDocxLoading(false);
+      setDocxError(null);
       setIsClosingPreview(false);
     }, 280);
   };
@@ -606,44 +665,73 @@ export default function CompanyDocumentsManagementPage() {
   };
 
   const handleDownloadDocFile = async (doc: any) => {
-    if (!doc.file_url || doc.file_url === "#") {
-      toast.error("No valid URL found for this document.");
+    if (!doc) {
+      toast.error("Invalid document reference.");
       return;
     }
 
-    if (doc.file_url.startsWith("/Clients/")) {
-      const toastId = toast.loading("Generating secure Dropbox download link...");
-      try {
+    const toastId = toast.loading(`Preparing download for ${doc.file_name || 'document'}...`);
+    try {
+      // 1. Primary method: stream through the authenticated backend download endpoint
+      // This works whether the document is on Dropbox or local disk cache
+      if (doc.id) {
+        const downloadEndpoint = `/api-proxy/api/clients/companies/${companyId}/documents/${doc.id}/download`;
+        const res = await fetch(downloadEndpoint, { credentials: "include" });
+        if (res.ok) {
+          const blob = await res.blob();
+          const objectUrl = window.URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = objectUrl;
+          link.download = doc.file_name || "document";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(objectUrl);
+          toast.success("Download started!", { id: toastId });
+          fetchActivities();
+          return;
+        }
+      }
+
+      // 2. Fallback to Dropbox temporary link if direct stream fails
+      if (doc.file_url && doc.file_url.startsWith("/Clients/")) {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dropbox/download?path=${encodeURIComponent(doc.file_url)}&action=DOWNLOAD`, {
           credentials: "include",
         });
         const data = await res.json();
-        toast.dismiss(toastId);
         if (res.ok && data.success && data.link) {
-          window.open(data.link, "_blank");
-          toast.success("Download started!");
+          const link = document.createElement("a");
+          link.href = data.link;
+          link.download = doc.file_name || "document";
+          link.target = "_blank";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          toast.success("Download started!", { id: toastId });
           fetchActivities();
-        } else {
-          throw new Error(data.error || "Failed to generate link");
+          return;
         }
-      } catch (err: any) {
-        toast.dismiss(toastId);
-        toast.error(err.message || "Failed to download Dropbox file");
       }
-    } else {
-      const url = doc.file_url.startsWith("/uploads/") ? `${process.env.NEXT_PUBLIC_API_URL}${doc.file_url}` : doc.file_url;
-      window.open(url, "_blank");
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/dropbox/log-action`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          path: doc.file_url,
-          action_type: "DOCUMENT_DOWNLOADED",
-          description: `Downloaded document '${doc.file_name}' (${doc.document_type || 'General'})${doc.order_number ? ` for order ${doc.order_number}` : ''}`,
-          company_id: parseInt(companyId)
-        })
-      }).then(() => fetchActivities()).catch(() => {});
+
+      // 3. Fallback to direct uploads URL if stored locally
+      if (doc.file_url && doc.file_url.startsWith("/uploads/")) {
+        const url = `${process.env.NEXT_PUBLIC_API_URL}${doc.file_url}`;
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = doc.file_name || "document";
+        link.target = "_blank";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Download started!", { id: toastId });
+        fetchActivities();
+        return;
+      }
+
+      throw new Error("Unable to resolve download URL.");
+    } catch (err: any) {
+      console.error("Download failed:", err);
+      toast.error(err.message || "Failed to download document.", { id: toastId });
     }
   };
   // Stakeholder Creation
@@ -2007,6 +2095,18 @@ export default function CompanyDocumentsManagementPage() {
               </div>
 
               <div className="flex items-center gap-2">
+                {previewDoc && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDownloadDocFile(previewDoc)}
+                    className="h-8 gap-1.5 text-slate-300 hover:text-white hover:bg-slate-800 font-semibold text-xs cursor-pointer px-3 rounded-lg border border-slate-700/60 transition-colors"
+                    title="Download File"
+                  >
+                    <Download className="h-3.5 w-3.5 text-emerald-400" />
+                    <span className="hidden sm:inline">Download</span>
+                  </Button>
+                )}
                 {resolvedPreviewUrl && resolvedPreviewUrl !== "#" && (
                   <Button
                     variant="ghost"
@@ -2039,6 +2139,51 @@ export default function CompanyDocumentsManagementPage() {
                     alt="Document Preview"
                     className="max-h-[calc(100vh-16rem)] w-auto max-w-full object-contain rounded-lg shadow-md"
                   />
+                ) : previewDoc.file_name?.match(/\.docx$/i) ? (
+                  <div className="w-full h-[calc(100vh-16rem)] overflow-y-auto bg-slate-200/70 dark:bg-slate-900/90 rounded-xl p-2 sm:p-6 flex flex-col items-center">
+                    {docxLoading && (
+                      <div className="flex flex-col items-center justify-center p-12 space-y-3 m-auto">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        <p className="text-xs font-semibold text-muted-foreground">Rendering Word Document (.docx)...</p>
+                      </div>
+                    )}
+                    {docxError && (
+                      <div className="text-center p-8 bg-background rounded-2xl border border-border space-y-3 max-w-md m-auto shadow-sm">
+                        <AlertCircle className="h-10 w-10 text-amber-500 mx-auto" />
+                        <p className="text-sm font-bold text-foreground">Could not preview Word document</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{docxError}</p>
+                        <Button
+                          size="sm"
+                          onClick={() => handleDownloadDocFile(previewDoc)}
+                          className="font-bold gap-2 text-xs"
+                        >
+                          <Download className="h-4 w-4" /> Download Word File (.docx)
+                        </Button>
+                      </div>
+                    )}
+                    <div 
+                      ref={docxContainerRef} 
+                      className={`w-full max-w-4xl bg-white text-black dark:bg-slate-100 rounded-lg shadow-md p-4 sm:p-8 font-sans ${docxLoading || docxError ? "hidden" : "block"}`} 
+                    />
+                  </div>
+                ) : previewDoc.file_name?.match(/\.doc$/i) ? (
+                  <div className="text-center space-y-4 p-8 bg-background rounded-2xl border border-border max-w-md m-auto shadow-sm">
+                    <div className="h-12 w-12 rounded-2xl bg-blue-500/10 text-blue-600 flex items-center justify-center mx-auto border border-blue-500/20">
+                      <FileText className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-foreground">Legacy Microsoft Word Document (.doc)</h4>
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                        Legacy binary Word files (.doc) cannot be rendered inline in browsers. Please download the document to view or edit it in Microsoft Word.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => handleDownloadDocFile(previewDoc)}
+                      className="font-bold gap-2 text-xs w-full"
+                    >
+                      <Download className="h-4 w-4" /> Download Document (.doc)
+                    </Button>
+                  </div>
                 ) : (
                   <iframe
                     src={previewDoc.file_name?.match(/\.pdf$/i) ? resolvedPreviewUrl : `https://docs.google.com/gview?url=${encodeURIComponent(resolvedPreviewUrl)}&embedded=true`}

@@ -327,12 +327,17 @@ def has_permission(current_user: models.User, module_code: str, permission_code:
         return True
     if not current_user.role_id:
         return False
+
+    codes_to_check = [module_code]
+    if module_code in ["clients_notaries", "clients_orders_notary_payments"]:
+        codes_to_check.append("clients_vendors")
+
     has_perm = db.query(models.RolePermission)\
         .join(models.Module, models.RolePermission.module_id == models.Module.id)\
         .join(models.Permission, models.RolePermission.permission_id == models.Permission.id)\
         .filter(
             models.RolePermission.role_id == current_user.role_id,
-            models.Module.code == module_code,
+            models.Module.code.in_(codes_to_check),
             models.Permission.code == permission_code
         ).first()
     return has_perm is not None

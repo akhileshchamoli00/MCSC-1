@@ -50,7 +50,9 @@ import { useUser } from "@/contexts/user-context";
 function NotaryPaymentsContent() {
   const router = useRouter();
   const { isAdmin, hasPermission, loading: userLoading } = useUser();
-  const canView = isAdmin || hasPermission("clients_orders_notary_payments", "view");
+  const canView = isAdmin || hasPermission("clients_orders_notary_payments", "view") || hasPermission("clients_vendors", "view");
+  const canEdit = isAdmin || hasPermission("clients_orders_notary_payments", "edit") || hasPermission("clients_vendors", "edit");
+  const canApprove = isAdmin || hasPermission("clients_orders_notary_payments", "approve") || hasPermission("clients_vendors", "approve");
 
   const searchParams = useSearchParams();
   const notaryIdParam = searchParams.get("notaryId");
@@ -910,26 +912,30 @@ function NotaryPaymentsContent() {
                                 </Button>
                               </div>
                             ) : (
-                              <div className="flex items-center justify-center gap-1.5">
-                                <Button 
-                                  type="button"
-                                  size="sm" 
-                                  className="font-bold text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
-                                  onClick={() => handleInitiateDisburse(j)}
-                                >
-                                  <Zap className="h-3.5 w-3.5 mr-1 fill-current" /> Pay via Xendit
-                                </Button>
-                                <Button 
-                                  type="button"
-                                  variant="outline" 
-                                  size="sm" 
-                                  title="Record Manual Offline Transfer"
-                                  className="font-semibold text-xs h-8 px-2"
-                                  onClick={() => setPayingJob(j)}
-                                >
-                                  <CreditCard className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
+                              (canEdit || canApprove) ? (
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <Button 
+                                    type="button"
+                                    size="sm" 
+                                    className="font-bold text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                                    onClick={() => handleInitiateDisburse(j)}
+                                  >
+                                    <Zap className="h-3.5 w-3.5 mr-1 fill-current" /> Pay via Xendit
+                                  </Button>
+                                  <Button 
+                                    type="button"
+                                    variant="outline" 
+                                    size="sm" 
+                                    title="Record Manual Offline Transfer"
+                                    className="font-semibold text-xs h-8 px-2"
+                                    onClick={() => setPayingJob(j)}
+                                  >
+                                    <CreditCard className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground font-medium italic">Pending</span>
+                              )
                             )}
                           </td>
                         </tr>

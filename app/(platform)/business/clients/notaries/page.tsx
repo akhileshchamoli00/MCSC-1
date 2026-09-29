@@ -70,7 +70,10 @@ const formatUserName = (userObj: any, fallback = "Staff") => {
 export default function NotariesPage() {
   const router = useRouter();
   const { isAdmin, hasPermission, loading: userLoading } = useUser();
-  const canView = isAdmin || hasPermission("clients_notaries", "view");
+  const canView = isAdmin || hasPermission("clients_notaries", "view") || hasPermission("clients_vendors", "view");
+  const canCreate = isAdmin || hasPermission("clients_notaries", "create") || hasPermission("clients_vendors", "create");
+  const canEdit = isAdmin || hasPermission("clients_notaries", "edit") || hasPermission("clients_vendors", "edit");
+  const canDelete = isAdmin || hasPermission("clients_notaries", "delete") || hasPermission("clients_vendors", "delete");
 
   const [notaries, setNotaries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -290,11 +293,13 @@ export default function NotariesPage() {
         </div>
 
         {/* Add New Vendor Button */}
-        <Link href="/business/clients/notaries/new" className="shrink-0 flex items-stretch">
-          <Button className="gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm">
-            <Plus className="h-4 w-4" /> Add New Vendor
-          </Button>
-        </Link>
+        {canCreate && (
+          <Link href="/business/clients/notaries/new" className="shrink-0 flex items-stretch">
+            <Button className="gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm">
+              <Plus className="h-4 w-4" /> Add New Vendor
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Main Notary Table Card */}
@@ -521,7 +526,7 @@ export default function NotariesPage() {
 
                       <td className="py-3.5 px-4 align-top text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {notary.validation_status !== "VALIDATED" && (
+                          {canEdit && notary.validation_status !== "VALIDATED" && (
                             <Link href={`/business/clients/notaries/${notary.id}/edit`}>
                               <Button 
                                 size="sm" 
@@ -533,28 +538,32 @@ export default function NotariesPage() {
                               </Button>
                             </Link>
                           )}
-                          <Link href={`/business/clients/notaries/${notary.id}/edit`}>
+                          {canEdit && (
+                            <Link href={`/business/clients/notaries/${notary.id}/edit`}>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                title="Edit Vendor Profile" 
+                                className="h-7 w-7 border border-transparent hover:border-border rounded-lg"
+                              >
+                                <Edit2 className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                              </Button>
+                            </Link>
+                          )}
+                          {canDelete && (
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              title="Edit Vendor Profile" 
-                              className="h-7 w-7 border border-transparent hover:border-border rounded-lg"
+                              title="Delete Vendor" 
+                              className="h-7 w-7 hover:bg-destructive/10 border border-transparent hover:border-destructive/10 rounded-lg"
+                              onClick={() => {
+                                setSelectedNotary(notary);
+                                setIsDeleteOpen(true);
+                              }}
                             >
-                              <Edit2 className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                              <Trash2 className="h-3.5 w-3.5 text-destructive/70 hover:text-destructive" />
                             </Button>
-                          </Link>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            title="Delete Vendor" 
-                            className="h-7 w-7 hover:bg-destructive/10 border border-transparent hover:border-destructive/10 rounded-lg"
-                            onClick={() => {
-                              setSelectedNotary(notary);
-                              setIsDeleteOpen(true);
-                            }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5 text-destructive/70 hover:text-destructive" />
-                          </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

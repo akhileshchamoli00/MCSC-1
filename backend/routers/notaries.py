@@ -16,7 +16,22 @@ def is_authorized_admin(user: models.User, db: Session, perm: str = "view") -> b
         return False
     if auth.is_super_admin(user):
         return True
-    if auth.has_permission(user, "clients_notaries", perm, db):
+    if auth.has_permission(user, "clients_notaries", perm, db) or auth.has_permission(user, "clients_vendors", perm, db):
+        return True
+    if not user.role_id:
+        return False
+    db_role = db.query(models.Role).filter(models.Role.id == user.role_id).first()
+    if not db_role:
+        return False
+    r_name = db_role.name.upper()
+    return "ADMIN" in r_name or "HR" in r_name or r_name in ["ADMIN", "HR ADMIN", "MANAGEMENT", "HR", "SUPER ADMIN", "SUPERADMIN", "SYSTEM ADMIN"]
+
+def is_authorized_payments(user: models.User, db: Session, perm: str = "view") -> bool:
+    if not user:
+        return False
+    if auth.is_super_admin(user):
+        return True
+    if auth.has_permission(user, "clients_orders_notary_payments", perm, db) or auth.has_permission(user, "clients_vendors", perm, db) or auth.has_permission(user, "clients_notaries", perm, db):
         return True
     if not user.role_id:
         return False
@@ -126,6 +141,12 @@ def create_notary(
     """
     Register a new vendor / notary public.
     """
+    if not is_authorized_admin(current_user, db, "create"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators or authorized staff can register new vendors."
+        )
+
     v_type = notary_in.vendor_type or ("GOVERNMENT_OFFICER" if notary_in.is_gov_officer else ("OTHER_VENDORS" if notary_in.is_other_vendor else "NOTARY"))
     is_notary = (v_type == "NOTARY")
     is_gov = (v_type == "GOVERNMENT_OFFICER")
@@ -199,7 +220,7 @@ def update_notary(
     """
     Update a vendor / notary record. (Admin only)
     """
-    if not is_authorized_admin(current_user, db):
+    if not is_authorized_admin(current_user, db, "edit"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only administrators or management can update vendor records."
@@ -272,7 +293,7 @@ def validate_notary(
     """
     Validate or request revision on a vendor / notary profile. (Admin only)
     """
-    if not is_authorized_admin(current_user, db):
+    if not is_authorized_admin(current_user, db, "edit"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only administrators or management can validate vendor profiles."
@@ -310,7 +331,7 @@ def delete_notary(
     """
     Delete a notary public record. (Admin only)
     """
-    if not is_authorized_admin(current_user, db):
+    if not is_authorized_admin(current_user, db, "delete"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only administrators or management can delete notary records."
@@ -332,6 +353,11 @@ def get_notary_payments_summary(db: Session = Depends(database.get_db), current_
     """
     Get a summary of payments for all notaries.
     """
+    if not is_authorized_payments(current_user, db, "view"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. You do not have permission to view vendor settlements."
+        )
     notaries = db.query(models.Notary).all()
     results = []
     
@@ -376,6 +402,11 @@ def get_notary_payment_history(notary_id: int, db: Session = Depends(database.ge
     """
     Get detailed job history and payment records for a specific notary.
     """
+    if not is_authorized_payments(current_user, db, "view"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied. You do not have permission to view vendor settlements."
+        )
     notary = db.query(models.Notary).filter(models.Notary.id == notary_id).first()
     if not notary:
         raise HTTPException(status_code=404, detail="Notary not found")
@@ -442,7 +473,7 @@ def disburse_notary_payment(
     """
     Directly execute an automated Xendit Payout / Disbursement to the assigned notary's bank account. (Admin only)
     """
-    if not is_authorized_admin(current_user, db):
+    if not is_authorized_payments(current_user, db, "edit"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only administrators or management can execute disbursements."
@@ -533,7 +564,7 @@ def pay_notary_job(
     """
     Mark a specific notary job item as paid manually (offline transfer/cash). (Admin only)
     """
-    if not is_authorized_admin(current_user, db):
+    if not is_authorized_payments(current_user, db, "edit"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only administrators or management can update payment records."
@@ -570,7 +601,7 @@ def unpay_notary_job(
     """
     Revert a specific notary job item to unpaid. (Admin only)
     """
-    if not is_authorized_admin(current_user, db):
+    if not is_authorized_payments(current_user, db, "edit"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only administrators or management can update payment records."
@@ -606,7 +637,7 @@ def send_notary_voucher_email(
     """
     Send an official Payment Voucher (Remittance Advice) email to the notary for a settled order item.
     """
-    if not is_authorized_admin(current_user, db):
+    if not is_authorized_payments(current_user, db, "view"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only administrators or management can dispatch payment vouchers."

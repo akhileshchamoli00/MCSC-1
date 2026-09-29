@@ -43,6 +43,7 @@ import {
 import { toast } from "sonner";
 import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
+import { useUser } from "@/contexts/user-context";
 
 const formatUserName = (userObj: any, fallback = "Staff") => {
   if (!userObj) return fallback;
@@ -67,6 +68,16 @@ export default function EditNotaryPage() {
   const router = useRouter();
   const params = useParams();
   const notaryId = params?.notaryId as string;
+  const { isAdmin, hasPermission, loading: userLoading } = useUser();
+  const canEdit = isAdmin || hasPermission("clients_notaries", "edit") || hasPermission("clients_vendors", "edit");
+  const canDelete = isAdmin || hasPermission("clients_notaries", "delete") || hasPermission("clients_vendors", "delete");
+
+  useEffect(() => {
+    if (!userLoading && !canEdit) {
+      toast.error("Access Denied: You do not have permission to edit vendors.");
+      router.replace("/business/clients/notaries");
+    }
+  }, [userLoading, canEdit, router]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

@@ -138,7 +138,21 @@ def send_whatsapp_template(
             if resp.status_code in [200, 201]:
                 return {"success": True, "data": data}
             else:
-                error_msg = data.get("error", {}).get("message", resp.text)
+                error_data = data.get("error", {})
+                error_msg = error_data.get("message", resp.text)
+                err_subcode = error_data.get("error_subcode")
+                # If language mismatch, automatically retry with en_US <-> en
+                if (err_subcode in [132001, 2388046] or "translated language" in str(error_msg).lower()) and language_code in ["en", "en_US"]:
+                    alt_lang = "en_US" if language_code == "en" else "en"
+                    print(f"Notice: Retrying WhatsApp template '{template_name}' with '{alt_lang}'...")
+                    payload["template"]["language"]["code"] = alt_lang
+                    retry_resp = client.post(url, headers=headers, json=payload)
+                    retry_data = retry_resp.json()
+                    if retry_resp.status_code in [200, 201]:
+                        print(f"Successfully sent WhatsApp template with '{alt_lang}' to {target}: {retry_data}")
+                        return {"success": True, "data": retry_data}
+                    error_msg = retry_data.get("error", {}).get("message", retry_resp.text)
+                    data = retry_data
                 return {"success": False, "error": error_msg, "status_code": resp.status_code, "raw": data}
     except Exception as e:
         return {"success": False, "error": str(e)}

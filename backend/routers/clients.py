@@ -820,7 +820,7 @@ def get_my_assigned_orders(db: Session = Depends(database.get_db), current_user:
             
     consultants_cache = build_consultants_cache(db, filtered_orders)
     doc_counts_cache = build_doc_counts_cache(db, filtered_orders)
-    can_view_notary_payments = is_admin or auth.has_permission(current_user, "clients_orders_notary_payments", "view", db)
+    can_view_notary_payments = is_admin or auth.has_permission(current_user, "clients_orders_notary_payments", "view", db) or auth.has_permission(current_user, "clients_vendors", "view", db)
     
     formatted_orders = []
     for ord_obj in filtered_orders:
@@ -850,6 +850,7 @@ def get_order_workload_matrix(
     if not (
         auth.is_super_admin(current_user) 
         or is_admin_or_hr(current_user) 
+        or auth.has_permission(current_user, "clients_orders_workload", "view", db)
         or auth.has_permission(current_user, "clients_orders_active", "view", db)
         or auth.has_permission(current_user, "clients_orders", "view", db)
         or auth.has_permission(current_user, "clients_my", "view", db)
@@ -1283,7 +1284,7 @@ def get_client_orders(
         can_view_completed = auth.has_permission(current_user, "clients_orders_completed", "view", db)
         can_view_cancelled = auth.has_permission(current_user, "clients_orders_cancelled", "view", db)
         can_view_pipeline = auth.has_permission(current_user, "clients_orders_pipeline", "view", db)
-        can_view_notary_payments = auth.has_permission(current_user, "clients_orders_notary_payments", "view", db)
+        can_view_notary_payments = auth.has_permission(current_user, "clients_orders_notary_payments", "view", db) or auth.has_permission(current_user, "clients_vendors", "view", db)
         can_view_assigned = auth.has_permission(current_user, "clients_my", "view", db)
         
         if not (can_view_active or can_view_completed or can_view_cancelled or can_view_pipeline or can_view_notary_payments or can_view_assigned):
@@ -3155,14 +3156,16 @@ def upload_client_document(
     return []
 
 @router.get("/companies/{company_id}/documents/{document_id}/preview")
+@router.get("/companies/{company_id}/documents/{document_id}/download")
 async def preview_client_document(
     company_id: int,
     document_id: int,
+    download: bool = False,
     token: Optional[str] = None,
     db: Session = Depends(database.get_db),
     request: Request = None
 ):
-    """Securely stream client document from Dropbox or local disk for inline preview."""
+    """Securely stream client document from Dropbox or local disk for inline preview or download."""
     # Retrieve actual token from cookie, header, or query param
     cookie_token = request.cookies.get("hrms_token") if request else None
     header_token = None
@@ -3210,19 +3213,40 @@ async def preview_client_document(
     from fastapi.responses import StreamingResponse
     import httpx
     
+    safe_filename = db_doc.file_name or "document"
+    ext = (safe_filename.rsplit(".", 1)[-1] if "." in safe_filename else "").lower()
+    
+    # Accurate MIME type detection for Word and Office documents
+    mime_type, _ = mimetypes.guess_type(safe_filename)
+    if ext == "docx":
+        mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    elif ext == "doc":
+        mime_type = "application/msword"
+    elif ext == "xlsx":
+        mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    elif ext == "xls":
+        mime_type = "application/vnd.ms-excel"
+    elif ext == "pdf":
+        mime_type = "application/pdf"
+    elif not mime_type:
+        mime_type = "application/octet-stream"
+
+    is_download = download or (request is not None and request.url.path.endswith("/download"))
+    disposition = "attachment" if is_download else "inline"
+    headers = {
+        "Content-Disposition": f'{disposition}; filename="{safe_filename}"',
+        "Access-Control-Expose-Headers": "Content-Disposition"
+    }
+
     # 1. Local storage case
     if db_doc.file_url.startswith("/uploads/"):
         import os
         local_path = os.path.join("uploads", db_doc.file_url.replace("/uploads/", "", 1))
         if os.path.exists(local_path):
-            mime_type, _ = mimetypes.guess_type(local_path)
-            if not mime_type:
-                mime_type = "application/octet-stream"
-            
             def iterfile():
                 with open(local_path, mode="rb") as f:
                     yield from f
-            return StreamingResponse(iterfile(), media_type=mime_type)
+            return StreamingResponse(iterfile(), media_type=mime_type, headers=headers)
         raise HTTPException(status_code=404, detail="Local file could not be resolved on disk")
         
     # 2. Dropbox path case
@@ -3232,13 +3256,10 @@ async def preview_client_document(
         import os
         local_path = os.path.join("uploads", local_rel)
         if os.path.exists(local_path):
-            mime_type, _ = mimetypes.guess_type(local_path)
-            if not mime_type:
-                mime_type = "application/octet-stream"
             def iterfile():
                 with open(local_path, mode="rb") as f:
                     yield from f
-            return StreamingResponse(iterfile(), media_type=mime_type)
+            return StreamingResponse(iterfile(), media_type=mime_type, headers=headers)
             
         # Check old local path fallback
         parts = local_rel.split("/")
@@ -3246,13 +3267,10 @@ async def preview_client_document(
             old_rel = f"{parts[0]}/{parts[2]}/{parts[3]}"
             old_path = os.path.join("uploads", old_rel)
             if os.path.exists(old_path):
-                mime_type, _ = mimetypes.guess_type(old_path)
-                if not mime_type:
-                    mime_type = "application/octet-stream"
                 def iterfile():
                     with open(old_path, mode="rb") as f:
                         yield from f
-                return StreamingResponse(iterfile(), media_type=mime_type)
+                return StreamingResponse(iterfile(), media_type=mime_type, headers=headers)
                 
         # Resolve Dropbox temporary link
         from utils.dropbox_client import get_temporary_link
@@ -3270,21 +3288,19 @@ async def preview_client_document(
                     async for chunk in response.aiter_bytes():
                         yield chunk
                         
-        mime_type, _ = mimetypes.guess_type(db_doc.file_name or "")
-        if not mime_type:
-            mime_type = "application/octet-stream"
-            
         order_suffix = f" for order {db_doc.order_number}" if db_doc.order_number else ""
+        act_type = "DOCUMENT_DOWNLOADED" if is_download else "DOCUMENT_VIEWED"
+        act_desc = f"{'Downloaded' if is_download else 'Viewed'} document '{db_doc.file_name}' ({db_doc.document_type or 'General'}){order_suffix}"
         log_activity(
             db, 
-            "DOCUMENT_VIEWED", 
-            f"Viewed document '{db_doc.file_name}' ({db_doc.document_type or 'General'}){order_suffix}", 
+            act_type, 
+            act_desc, 
             client_id=company.client_id, 
             company_id=company_id, 
             user_id=current_user.id
         )
 
-        return StreamingResponse(stream_file(), media_type=mime_type)
+        return StreamingResponse(stream_file(), media_type=mime_type, headers=headers)
         
     raise HTTPException(status_code=400, detail="Document URL format is invalid")
 
@@ -3890,7 +3906,7 @@ def get_order_summary(
     reviewers = get_consultants_data(db, unique_rids)
     reviewer_data = reviewers[0] if reviewers else None
 
-    can_view_notary_payments = is_admin_or_hr(current_user) or auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders_notary_payments", "view", db)
+    can_view_notary_payments = is_admin_or_hr(current_user) or auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders_notary_payments", "view", db) or auth.has_permission(current_user, "clients_vendors", "view", db)
 
     items = []
     total_amount = 0.0
@@ -5524,7 +5540,7 @@ def finalize_order_invoice(
         raise HTTPException(status_code=404, detail="Company not found for these orders")
         
     # Check permissions
-    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders_pipeline", "edit", db) or auth.has_permission(current_user, "clients_orders_active", "edit", db) or auth.has_permission(current_user, "clients_orders_notary_payments", "edit", db) or is_admin_or_hr(current_user)):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders_pipeline", "edit", db) or auth.has_permission(current_user, "clients_orders_active", "edit", db) or auth.has_permission(current_user, "clients_orders_notary_payments", "edit", db) or auth.has_permission(current_user, "clients_vendors", "edit", db) or is_admin_or_hr(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized to finalize invoices for this order")
         
     company_code = company.company_code or f"comp_{company.id}"
@@ -5620,7 +5636,7 @@ def finalize_order_final_invoice(
         raise HTTPException(status_code=404, detail="Company not found for these orders")
         
     # Check permissions
-    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders_active", "edit", db) or auth.has_permission(current_user, "clients_orders_completed", "edit", db) or auth.has_permission(current_user, "clients_orders_notary_payments", "edit", db) or is_admin_or_hr(current_user)):
+    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders_active", "edit", db) or auth.has_permission(current_user, "clients_orders_completed", "edit", db) or auth.has_permission(current_user, "clients_orders_notary_payments", "edit", db) or auth.has_permission(current_user, "clients_vendors", "edit", db) or is_admin_or_hr(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized to finalize invoices for this order")
         
     company_code = company.company_code or f"comp_{company.id}"
