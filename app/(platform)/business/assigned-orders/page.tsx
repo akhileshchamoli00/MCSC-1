@@ -25,7 +25,8 @@ import {
   ChevronRight,
   PauseCircle,
   AlertTriangle,
-  ShieldCheck
+  ShieldCheck,
+  Scale
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -112,6 +113,7 @@ export default function AssignedOrdersPage() {
   // Real-time Chat & Tagging States
   const [employees, setEmployees] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
+  const [notaries, setNotaries] = useState<any[]>([]);
   const [viewingTeam, setViewingTeam] = useState<any | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredEmployees, setFilteredEmployees] = useState<any[]>([]);
@@ -339,16 +341,20 @@ export default function AssignedOrdersPage() {
   const fetchMetaData = async () => {
     if (userLoading || !canView) return;
     try {
-      const [empRes, teamRes] = await Promise.all([
+      const [empRes, teamRes, notariesRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/employees`, {
           credentials: "include",
         }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/teams`, {
           credentials: "include",
-        })
+        }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/notaries`, {
+          credentials: "include",
+        }).catch(() => null)
       ]);
       if (empRes.ok) setEmployees(await empRes.json());
       if (teamRes.ok) setTeams(await teamRes.json());
+      if (notariesRes && notariesRes.ok) setNotaries(await notariesRes.json());
     } catch (err) {
       console.error("Error fetching chat metadata:", err);
     }
@@ -382,12 +388,23 @@ export default function AssignedOrdersPage() {
           reviewer: ord.reviewer || null,
           reviewer_ids: ord.reviewer_ids || (ord.reviewer_id ? [ord.reviewer_id] : []),
           reviewers: ord.reviewers || (ord.reviewer ? [ord.reviewer] : []),
+          notaries: [],
           notes: ord.notes || "",
           document_count: ord.document_count || 0,
           items: []
         });
       }
       const group = groupedOrdersMap.get(key);
+
+      const itemNotary = ord.notary || (ord.notary_id && notaries.find((n: any) => n.id === ord.notary_id));
+      if (itemNotary && itemNotary.name) {
+        ord.notary = itemNotary;
+        const existingNotaryIds = new Set((group.notaries || []).map((n: any) => n.id));
+        if (!existingNotaryIds.has(itemNotary.id)) {
+          group.notaries.push(itemNotary);
+        }
+      }
+
       group.items.push(ord);
       if (typeof ord.document_count === "number" && ord.document_count > (group.document_count || 0)) {
         group.document_count = ord.document_count;
@@ -458,9 +475,24 @@ export default function AssignedOrdersPage() {
           } : null;
         }).filter(Boolean);
       }
+      // Enrich notaries from notaries list if missing on any items
+      if (group.items && notaries.length > 0) {
+        group.items.forEach((item: any) => {
+          if (!item.notary && item.notary_id) {
+            const found = notaries.find((n: any) => n.id === item.notary_id);
+            if (found) item.notary = found;
+          }
+          if (item.notary && item.notary.name) {
+            const existingNotaryIds = new Set((group.notaries || []).map((n: any) => n.id));
+            if (!existingNotaryIds.has(item.notary.id)) {
+              group.notaries.push(item.notary);
+            }
+          }
+        });
+      }
       return group;
     });
-  }, [orders, employees]);
+  }, [orders, employees, notaries]);
 
   const handleUpdateStatus = async (group: any, newStatus: string) => {
     if (!group || !newStatus || newStatus === group.status) return;
@@ -764,7 +796,8 @@ export default function AssignedOrdersPage() {
         const clientName = (ord.client_name || "").toLowerCase();
         const compName = (ord.company_name || "").toLowerCase();
         const itemsStr = (ord.items || []).map((i: any) => `${i.job_title} ${i.job_id}`).join(" ").toLowerCase();
-        return orderNum.includes(term) || clientName.includes(term) || compName.includes(term) || itemsStr.includes(term);
+        const notariesStr = (ord.notaries || []).map((n: any) => n.name).join(" ").toLowerCase();
+        return orderNum.includes(term) || clientName.includes(term) || compName.includes(term) || itemsStr.includes(term) || notariesStr.includes(term);
       })
       .sort((a, b) => {
         const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -847,7 +880,7 @@ export default function AssignedOrdersPage() {
       sessionStorage.setItem("assigned_orders_highlighted_order", matched.order_number);
     }
     setTimeout(() => {
-      const el = document.getElementById(`order-row-${matched.order_number}`);
+      const el = document.getElementById(`order-row-${matched.order_number}`) || document.getElementById(`mobile-order-card-${matched.order_number}`);
       const scrollParent = el?.closest('main') || document.querySelector('main');
       if (el && scrollParent) {
         const parentRect = scrollParent.getBoundingClientRect();
@@ -936,6 +969,32 @@ export default function AssignedOrdersPage() {
     }
   };
 
+  const renderVendorBadge = (item: any) => {
+    const notary = item?.notary;
+    if (!notary || !notary.name) return null;
+
+    const isGov = notary.vendor_type === "GOVERNMENT_OFFICER" || notary.is_gov_officer;
+    const isOther = notary.vendor_type === "OTHER_VENDORS" || notary.is_other_vendor;
+
+    const prefix = isGov ? "Govt Body" : isOther ? "Vendor" : "Notary";
+    const baseColor = isGov
+      ? "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/25"
+      : isOther
+        ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25"
+        : "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/25";
+
+    return (
+      <Badge
+        variant="outline"
+        className={`text-[9.5px] font-bold py-0.5 px-2 ${baseColor} shrink-0 inline-flex items-center gap-1 shadow-2xs`}
+        title={`Assigned ${prefix}: ${notary.name}`}
+      >
+        <Scale className="h-2.5 w-2.5 shrink-0" />
+        <span>{prefix}: {notary.name}</span>
+      </Badge>
+    );
+  };
+
   // Mutually Exclusive Counts Across All Folders
   const assignedOrdersCount = groupedOrders.filter(o => {
     const st = (o.status || "").toUpperCase();
@@ -1018,13 +1077,13 @@ export default function AssignedOrdersPage() {
           </div>
 
           {/* 5 Interactive Workflow Folders */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3.5">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2.5 sm:gap-3.5">
 
             {/* FOLDER 1: NEWLY ASSIGNED */}
             <div
               onClick={() => setActiveTab("ASSIGNED")}
               className={cn(
-                "group relative rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
+                "group relative rounded-2xl border p-3.5 sm:p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
                 "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
                 activeTab === "ASSIGNED"
                   ? "border-purple-500/60 ring-2 ring-purple-500/20 bg-gradient-to-br from-purple-500/10 via-purple-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-purple-500/5 -translate-y-0.5"
@@ -1080,7 +1139,7 @@ export default function AssignedOrdersPage() {
             <div
               onClick={() => setActiveTab("IN_PROGRESS")}
               className={cn(
-                "group relative rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
+                "group relative rounded-2xl border p-3.5 sm:p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
                 "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
                 activeTab === "IN_PROGRESS"
                   ? "border-sky-500/60 ring-2 ring-sky-500/20 bg-gradient-to-br from-sky-500/10 via-sky-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-sky-500/5 -translate-y-0.5"
@@ -1134,7 +1193,7 @@ export default function AssignedOrdersPage() {
             <div
               onClick={() => setActiveTab("REVIEW_ORDER")}
               className={cn(
-                "group relative rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
+                "group relative rounded-2xl border p-3.5 sm:p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
                 "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
                 activeTab === "REVIEW_ORDER"
                   ? "border-indigo-500/60 ring-2 ring-indigo-500/20 bg-gradient-to-br from-indigo-500/10 via-indigo-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-indigo-500/5 -translate-y-0.5"
@@ -1188,7 +1247,7 @@ export default function AssignedOrdersPage() {
             <div
               onClick={() => setActiveTab("ON_HOLD")}
               className={cn(
-                "group relative rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
+                "group relative rounded-2xl border p-3.5 sm:p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
                 "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
                 activeTab === "ON_HOLD"
                   ? "border-amber-500/60 ring-2 ring-amber-500/20 bg-gradient-to-br from-amber-500/10 via-amber-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-amber-500/5 -translate-y-0.5"
@@ -1242,7 +1301,7 @@ export default function AssignedOrdersPage() {
             <div
               onClick={() => setActiveTab("COMPLETED")}
               className={cn(
-                "group relative rounded-2xl border p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
+                "col-span-2 sm:col-span-1 group relative rounded-2xl border p-3.5 sm:p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
                 "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
                 activeTab === "COMPLETED"
                   ? "border-emerald-500/60 ring-2 ring-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-emerald-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-emerald-500/5 -translate-y-0.5"
@@ -1385,7 +1444,7 @@ export default function AssignedOrdersPage() {
               </div>
             ) : (
               <>
-                <div className="overflow-x-auto">
+                <div className="hidden md:block overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
@@ -1393,7 +1452,7 @@ export default function AssignedOrdersPage() {
                         <th className="p-4 w-28 whitespace-nowrap">Order ID</th>
                         <th className="p-4 min-w-[170px]">Client & Company</th>
                         <th className="p-4 min-w-[260px] lg:min-w-[320px]">Service Scope</th>
-                        <th className="p-4 w-44 min-w-[150px]">Consultant & Reviewer</th>
+                        <th className="p-4 w-48 min-w-[160px]">Team & Notary</th>
                         <th className="p-4 w-32 whitespace-nowrap">Created Date</th>
                         <th className="p-4 w-40 text-center whitespace-nowrap">Execution Stage</th>
                         <th className="p-4 w-28 text-right whitespace-nowrap">Actions</th>
@@ -1497,6 +1556,7 @@ export default function AssignedOrdersPage() {
                                               {item.pricing_tier.toLowerCase().replace('_', ' ')}
                                             </Badge>
                                           )}
+                                          {renderVendorBadge(item)}
                                         </div>
                                         {item.description && (
                                           <div className="space-y-1">
@@ -1534,7 +1594,7 @@ export default function AssignedOrdersPage() {
                                 <span className="text-muted-foreground italic text-xs">-</span>
                               )}
                             </td>
-                            <td className="p-4 align-top pt-5 w-44 min-w-[150px]">
+                            <td className="p-4 align-top pt-5 w-48 min-w-[160px]">
                               <div className="flex flex-col items-start gap-1.5 w-full">
                                 {ord.consultants && ord.consultants.length > 0 ? (
                                   ord.consultants.map((c: any) => (
@@ -1565,6 +1625,19 @@ export default function AssignedOrdersPage() {
                                     </Badge>
                                   ));
                                 })()}
+                                {ord.notaries && ord.notaries.length > 0 && (
+                                  ord.notaries.map((notary: any) => (
+                                    <Badge
+                                      key={notary.id}
+                                      variant="outline"
+                                      className="text-[10px] bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/25 font-semibold flex items-center gap-1.5 py-0.5 px-2 max-w-full truncate shadow-none"
+                                      title={`Assigned Notary: ${notary.name}`}
+                                    >
+                                      <Scale className="h-3 w-3 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                      <span className="truncate">Notary: {notary.name}</span>
+                                    </Badge>
+                                  ))
+                                )}
                               </div>
                             </td>
                             <td className="p-4 font-mono font-medium text-muted-foreground align-top pt-5">
@@ -1620,6 +1693,256 @@ export default function AssignedOrdersPage() {
                       })}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Mobile Card View (< md) */}
+                <div className="block md:hidden divide-y divide-border/60">
+                  {paginatedOrders.map((ord, idx) => {
+                    const isHighlighted = highlightedOrderNum === ord.order_number;
+                    const isCompleted = ord.status === "COMPLETED";
+                    const canSelectStatus = CONSULTANT_EDITABLE_STATUSES.includes((ord.status || "").toUpperCase());
+
+                    return (
+                      <div
+                        key={ord.order_number}
+                        id={`mobile-order-card-${ord.order_number}`}
+                        onClick={() => {
+                          setHighlightedOrderNum(ord.order_number);
+                          if (typeof window !== "undefined") {
+                            sessionStorage.setItem("assigned_orders_highlighted_order", ord.order_number);
+                          }
+                        }}
+                        className={cn(
+                          "p-4 transition-all duration-200 space-y-3 cursor-pointer",
+                          isHighlighted
+                            ? "bg-blue-500/10 dark:bg-blue-500/15 border-l-4 border-l-blue-500"
+                            : "hover:bg-muted/30"
+                        )}
+                      >
+                        {/* Top Header: Index, Order ID, Date */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-semibold text-muted-foreground">
+                              #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + idx))}
+                            </span>
+                            {ord.company_id ? (
+                              <Link
+                                href={`/business/clients/documents/${ord.company_id}?order=${ord.order_number}&from=assigned-orders&tab=${activeTab}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setHighlightedOrderNum(ord.order_number);
+                                  if (typeof window !== "undefined") {
+                                    sessionStorage.setItem("assigned_orders_highlighted_order", ord.order_number);
+                                  }
+                                }}
+                              >
+                                <Badge
+                                  variant="outline"
+                                  className="font-mono font-bold text-xs bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary cursor-pointer transition-colors"
+                                >
+                                  {ord.order_number}
+                                </Badge>
+                              </Link>
+                            ) : (
+                              <Badge variant="outline" className="font-mono font-bold text-xs bg-primary/10 border-primary/30 text-primary">
+                                {ord.order_number}
+                              </Badge>
+                            )}
+                          </div>
+                          <span className="text-[11px] font-mono text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatDate(ord.created_at)}
+                          </span>
+                        </div>
+
+                        {/* Client & Company */}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-foreground font-bold text-sm">{ord.company_name || "Personal Client"}</span>
+                            {(() => {
+                              const vStatus = ord.company?.validation_status;
+                              if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
+                                return (
+                                  <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 flex items-center gap-0.5">
+                                    <Clock className="h-2.5 w-2.5" /> Pending Company
+                                  </Badge>
+                                );
+                              }
+                              if (vStatus === "NEEDS_REVISION") {
+                                return (
+                                  <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 flex items-center gap-0.5">
+                                    <AlertCircle className="h-2.5 w-2.5" /> Revision Required
+                                  </Badge>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                            <Building className="h-3.5 w-3.5 shrink-0" />
+                            <span>{ord.client_name || "Representative"}</span>
+                          </div>
+                        </div>
+
+                        {/* Deliverables / Scope */}
+                        {ord.items && ord.items.length > 0 && (
+                          <div className="space-y-2 bg-muted/20 rounded-xl p-2.5 border border-border/50">
+                            <div className="text-[11px] font-semibold text-muted-foreground flex items-center justify-between">
+                              <span>Deliverables ({ord.items.length})</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedGroup(ord);
+                                  setIsViewOpen(true);
+                                }}
+                                className="text-primary hover:underline text-[11px] font-bold"
+                              >
+                                View Scope
+                              </button>
+                            </div>
+                            {ord.items.map((item: any, iIdx: number) => {
+                              const itemKey = `${ord.order_number}-${iIdx}`;
+                              const isExpanded = !!expandedItems[itemKey];
+                              return (
+                                <div key={iIdx} className="text-xs space-y-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-medium text-foreground">{item.job_title}</span>
+                                    {item.job_id && (
+                                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 bg-primary/5 text-primary border-primary/20">
+                                        {item.job_id}
+                                      </Badge>
+                                    )}
+                                    {renderVendorBadge(item)}
+                                  </div>
+                                  {item.description && (
+                                    <div>
+                                      {isExpanded && (
+                                        <p className="text-[11px] text-muted-foreground leading-relaxed whitespace-pre-wrap pl-2 border-l-2 border-border my-1">
+                                          {item.description}
+                                        </p>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toggleItemExpansion(itemKey);
+                                        }}
+                                        className="text-[10px] text-primary font-semibold hover:underline"
+                                      >
+                                        {isExpanded ? "Hide details" : "Show details"}
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Team Assignments */}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          {ord.consultants && ord.consultants.length > 0 ? (
+                            ord.consultants.map((c: any) => (
+                              <Badge
+                                key={c.id}
+                                variant="outline"
+                                className="text-[10px] bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/25 font-semibold flex items-center gap-1 py-0.5 px-2"
+                              >
+                                <UserCheck className="h-3 w-3 text-blue-600 shrink-0" />
+                                <span className="truncate">{c.first_name} {c.last_name}</span>
+                              </Badge>
+                            ))
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/25 font-semibold py-0.5 px-2">
+                              Unassigned
+                            </Badge>
+                          )}
+
+                          {(() => {
+                            const revList = ord.reviewers && ord.reviewers.length > 0
+                              ? ord.reviewers
+                              : ord.reviewer
+                                ? [ord.reviewer]
+                                : [];
+                            return revList.map((r: any) => (
+                              <Badge
+                                key={r.id || r.name}
+                                variant="outline"
+                                className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/25 font-semibold flex items-center gap-1 py-0.5 px-2"
+                              >
+                                <ShieldCheck className="h-3 w-3 text-purple-600 shrink-0" />
+                                <span className="truncate">Rev: {r.name}</span>
+                              </Badge>
+                            ));
+                          })()}
+
+                          {ord.notaries && ord.notaries.length > 0 && (
+                            ord.notaries.map((notary: any) => (
+                              <Badge
+                                key={notary.id}
+                                variant="outline"
+                                className="text-[10px] bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/25 font-semibold flex items-center gap-1 py-0.5 px-2"
+                                title={`Assigned Notary: ${notary.name}`}
+                              >
+                                <Scale className="h-3 w-3 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                <span className="truncate">Notary: {notary.name}</span>
+                              </Badge>
+                            ))
+                          )}
+                        </div>
+
+                        {/* Bottom Actions Row: Status Selector & Chat Button */}
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/50">
+                          <div className="flex-1 max-w-[200px]" onClick={(e) => e.stopPropagation()}>
+                            {canSelectStatus ? (
+                              <select
+                                value={ord.status}
+                                disabled={savingStatus}
+                                onChange={(e) => handleUpdateStatus(ord, e.target.value)}
+                                className={`w-full h-9 px-2 text-xs font-bold rounded-lg border shadow-xs bg-background transition-colors cursor-pointer ${getOrderStatusColor(ord.status)}`}
+                              >
+                                <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
+                                <option value="IN_PROGRESS">IN PROGRESS</option>
+                                <option value="REVIEW_DOCS">REVIEW DOCS</option>
+                                <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
+                                <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
+                                <option value="AWAITING_SIGNING_NOTARIZATION">AWAITING SIGNING / NOTARIZATION</option>
+                                <option value="AWAITING_DOCUMENT_RETURN">AWAITING DOCUMENT RETURN FROM CLIENT</option>
+                                <option value="AWAITING_THIRD_PARTY_RESPONSE">AWAITING THIRD-PARTY RESPONSE (VENDOR)</option>
+                                <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
+                                <option value="FINAL_DOC_READY">FINAL DOC READY</option>
+                                <option value="ON_HOLD">ON HOLD</option>
+                              </select>
+                            ) : isCompleted ? (
+                              <Badge variant="outline" className="text-xs font-bold py-1 px-2.5 uppercase shadow-xs whitespace-nowrap bg-emerald-500/15 text-emerald-600 border-emerald-500/30 flex items-center gap-1">
+                                <Lock className="h-3 w-3 text-emerald-600 shrink-0" />
+                                COMPLETED
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className={`text-xs font-bold py-1 px-2.5 uppercase shadow-xs whitespace-nowrap ${getOrderStatusColor(ord.status)}`}>
+                                {(ord.status || "").replace(/_/g, " ")}
+                              </Badge>
+                            )}
+                          </div>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 font-bold h-9 px-3.5 border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30 shadow-xs shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedGroup(ord);
+                              setIsChatOpen(true);
+                              fetchProgressUpdates(ord.order_number);
+                            }}
+                          >
+                            <MessageSquare className="h-4 w-4" /> Chat
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Pagination Controls */}
@@ -1711,13 +2034,14 @@ export default function AssignedOrdersPage() {
                               <span className="h-2 w-2 rounded-full bg-primary" />
                               {item.job_title}
                             </span>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
                               <Badge variant="outline" className="font-mono font-bold text-xs bg-primary/5 border-primary/20 text-primary">
                                 {item.job_id || "-"}
                               </Badge>
                               <Badge variant="secondary" className="text-[10px] font-mono font-bold uppercase px-2 py-0.5">
                                 Tier: {item.pricing_tier}
                               </Badge>
+                              {renderVendorBadge(item)}
                             </div>
                           </div>
                           {item.description ? (
@@ -1835,6 +2159,33 @@ export default function AssignedOrdersPage() {
                         </div>
                       );
                     })()}
+
+                    {selectedGroup.notaries && selectedGroup.notaries.length > 0 && (
+                      <div className="pt-2.5 mt-2 border-t border-border/40 space-y-2">
+                        <span className="text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
+                          <Scale className="h-3 w-3" /> Assigned Notary / Legal Partner{selectedGroup.notaries.length > 1 ? "s" : ""}
+                        </span>
+                        <div className="flex flex-col gap-2">
+                          {selectedGroup.notaries.map((notary: any) => (
+                            <div key={notary.id} className="flex items-center gap-2.5 p-2 rounded-lg bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-800/40">
+                              <div className="h-7 w-7 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center text-xs shrink-0">
+                                <Scale className="h-3.5 w-3.5" />
+                              </div>
+                              <div className="min-w-0">
+                                <span className="font-bold text-foreground block truncate text-[11px]">{notary.name}</span>
+                                <span className="text-[9px] text-muted-foreground block truncate">
+                                  {notary.vendor_type === "GOVERNMENT_OFFICER" || notary.is_gov_officer
+                                    ? "Government Official"
+                                    : notary.vendor_type === "OTHER_VENDORS" || notary.is_other_vendor
+                                      ? "External Vendor"
+                                      : "Appointed Notary"}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Logs Stream */}

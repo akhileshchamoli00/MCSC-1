@@ -76,6 +76,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { DualOrderChatDialog } from "@/components/dual-order-chat-dialog";
 import { StakeholderRecipientsSelector } from "@/components/stakeholder-recipients-selector";
 import { useUser } from "@/contexts/user-context";
+import { cn } from "@/lib/utils";
 
 const FILTERS_STORAGE_KEY = "mcsc_active_orders_filters";
 
@@ -2142,7 +2143,7 @@ export default function ClientOrdersPage() {
           </div>
 
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
@@ -2733,6 +2734,197 @@ export default function ClientOrdersPage() {
                     )}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Mobile Card View (< md) */}
+                <div className="block md:hidden divide-y divide-border/60">
+                  {paginatedOrders.length === 0 ? (
+                    <div className="py-12 text-center text-muted-foreground p-4">
+                      <ShoppingCart className="h-10 w-10 text-muted-foreground/30 stroke-[1.5] mx-auto mb-2" />
+                      <span className="text-sm font-semibold text-foreground/80 block">No Client Orders Found</span>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {activeColFilterCount > 0 || searchTerm
+                          ? "No orders match the specified filter criteria."
+                          : 'Click "Create New Order" above to issue your first service order.'}
+                      </p>
+                    </div>
+                  ) : (
+                    paginatedOrders.map((ord, index) => {
+                      const isHighlighted = highlightedOrderNum === ord.order_number;
+                      return (
+                        <div
+                          key={ord.order_number || index}
+                          id={`mobile-order-row-${ord.order_number}`}
+                          onClick={() => {
+                            setHighlightedOrderNum(ord.order_number);
+                          }}
+                          className={cn(
+                            "p-4 space-y-3 transition-all duration-200 cursor-pointer",
+                            isHighlighted
+                              ? "bg-emerald-500/10 dark:bg-emerald-500/15 border-l-4 border-l-emerald-500"
+                              : "hover:bg-muted/30"
+                          )}
+                        >
+                          {/* Top Row: Index, Order ID, Date */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs font-semibold text-muted-foreground">
+                                #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + index))}
+                              </span>
+                              {ord.company_id ? (
+                                <Link
+                                  href={`/business/clients/documents/${ord.company_id}?from=orders`}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Badge
+                                    variant="outline"
+                                    className="font-mono font-bold text-xs bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-200 hover:border-emerald-500/40 hover:text-emerald-600 transition-colors"
+                                  >
+                                    {ord.order_number}
+                                  </Badge>
+                                </Link>
+                              ) : (
+                                <Badge variant="outline" className="font-mono font-bold text-xs bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-200">
+                                  {ord.order_number}
+                                </Badge>
+                              )}
+                            </div>
+                            <span className="text-[11px] font-mono text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {formatDate(ord.created_at)}
+                            </span>
+                          </div>
+
+                          {/* Company & Client */}
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-foreground font-bold text-sm">{ord.company_name || "Personal Client"}</span>
+                              {(() => {
+                                const vStatus = ord.company?.validation_status;
+                                if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
+                                  return (
+                                    <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 flex items-center gap-0.5">
+                                      <Clock className="h-2.5 w-2.5" /> Pending
+                                    </Badge>
+                                  );
+                                }
+                                if (vStatus === "NEEDS_REVISION") {
+                                  return (
+                                    <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 flex items-center gap-0.5">
+                                      <AlertCircle className="h-2.5 w-2.5" /> Revision
+                                    </Badge>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                              <Building className="h-3.5 w-3.5 shrink-0" />
+                              <span>{ord.client_name || "Representative"}</span>
+                            </div>
+                          </div>
+
+                          {/* Service items */}
+                          {ord.items && ord.items.length > 0 && (
+                            <div className="bg-muted/20 rounded-xl p-2.5 border border-border/50 text-xs space-y-1">
+                              <div className="text-[11px] font-semibold text-muted-foreground mb-1">
+                                Services ({ord.items.length})
+                              </div>
+                              {ord.items.map((it: any, iIdx: number) => (
+                                <div key={iIdx} className="flex items-center justify-between gap-2">
+                                  <span className="font-medium text-foreground truncate">{it.service_name || it.job_title}</span>
+                                  {it.pricing_tier && (
+                                    <Badge variant="secondary" className="text-[9px] py-0 px-1 capitalize shrink-0">
+                                      {it.pricing_tier.toLowerCase().replace('_', ' ')}
+                                    </Badge>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Amount, Payment & Status badges */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-xs text-foreground">
+                                {formatCurrency(ord.total_amount || 0)}
+                              </span>
+                              <Badge variant="outline" className={`text-[10px] font-bold py-0 px-1.5 ${getPaymentStatusColor(ord.payment_status)}`}>
+                                {ord.payment_status || "UNPAID"}
+                              </Badge>
+                            </div>
+                            <Badge className={`${getOrderStatusColor(ord.status)} font-bold border text-[10px] px-2 py-0.5`}>
+                              {ord.status || "CONFIRMED"}
+                            </Badge>
+                          </div>
+
+                          {/* Action Row */}
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/50" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1.5 font-bold h-9 px-3 border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30 shadow-xs"
+                              onClick={() => {
+                                setSelectedOrderGroup(ord);
+                                setIsChatOpen(true);
+                                fetchProgressUpdates(ord.order_number);
+                              }}
+                            >
+                              <MessageSquare className="h-4 w-4" /> Chat
+                            </Button>
+
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-9 px-2.5 text-xs font-semibold gap-1"
+                                onClick={() => {
+                                  setSelectedOrderGroup(ord);
+                                  const pct = ord.proforma_stage_percent || 70;
+                                  setProformaPercent(pct);
+                                  setTempPercent(String(pct));
+                                  if (ord.proforma_paid_amount != null && ord.proforma_paid_amount > 0) {
+                                    setTempAmount(String(Math.round(ord.proforma_paid_amount)));
+                                  } else {
+                                    setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
+                                  }
+                                  setIsPph21(false);
+                                  setIsViewOpen(true);
+                                  fetchProgressUpdates(ord.order_number);
+                                }}
+                              >
+                                <Eye className="h-3.5 w-3.5" /> Details
+                              </Button>
+
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-9 px-2.5 text-xs font-semibold gap-1"
+                                onClick={() => {
+                                  saveCurrentFilters();
+                                  router.push(`/business/clients/orders/${ord.order_number}/edit`);
+                                }}
+                              >
+                                <Edit className="h-3.5 w-3.5" /> Edit
+                              </Button>
+
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-9 w-9 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => {
+                                  setSelectedOrderGroup(ord);
+                                  setIsDeleteOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
 
                 {/* Pagination Controls */}

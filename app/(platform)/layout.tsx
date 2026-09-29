@@ -44,6 +44,7 @@ import { HRMSSidebar } from "@/components/hrms-sidebar";
 import { AskLogo } from "@/components/ask-logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { NotificationBell } from "@/components/notification-bell";
+import { MobileBottomBar } from "@/components/mobile-bottom-bar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -481,8 +482,8 @@ function HRMSLayoutContent({ children }: { children: React.ReactNode }) {
       {/* Main Content Area */}
       <div className="flex flex-col flex-1 h-full min-w-0 overflow-hidden">
         {/* Top Header */}
-        <header className="relative w-full bg-[#0b0c10] dark:bg-[#07090e]/95 dark:backdrop-blur-xl border-b border-zinc-800/80 dark:border-zinc-800/60 shadow-[0_4px_24px_rgba(0,0,0,0.25)] flex items-center justify-between px-4 md:px-6 min-h-[64px] py-2 shrink-0 z-30 transition-colors">
-          <div className="flex items-center gap-3 min-w-0">
+        <header className="relative w-full bg-[#0b0c10] dark:bg-[#07090e]/95 dark:backdrop-blur-xl border-b border-zinc-800/80 dark:border-zinc-800/60 shadow-[0_4px_24px_rgba(0,0,0,0.25)] flex items-center justify-between px-3 sm:px-4 md:px-6 min-h-[52px] md:min-h-[64px] py-1.5 md:py-2 shrink-0 z-30 transition-colors pt-safe">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               onClick={() => setIsSidebarOpen(true)}
               className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/10 border border-white/10 rounded-lg transition-colors md:hidden shrink-0"
@@ -492,20 +493,20 @@ function HRMSLayoutContent({ children }: { children: React.ReactNode }) {
             </button>
 
             {/* Left-Aligned Dynamic Section Title & Subtitle */}
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/10 border border-white/15 text-zinc-200 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+              <div className="flex items-center gap-1.5 px-1.5 sm:px-2 py-0.5 rounded-md bg-white/10 border border-white/15 text-zinc-200 shrink-0">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
                 <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-zinc-200">
                   {currentMode === "business" ? "ERP" : "HRMS"}
                 </span>
               </div>
-              <span className="text-zinc-600 font-medium text-xs shrink-0">/</span>
+              <span className="text-zinc-600 font-medium text-xs shrink-0 hidden xs:inline">/</span>
               {headerInfo.icon && (
-                <div className={`p-1 rounded-md border flex items-center justify-center shrink-0 ${headerInfo.iconColor || "text-sky-400 bg-sky-500/15 border-sky-500/30"}`}>
-                  <headerInfo.icon className="h-4 w-4" />
+                <div className={`p-1 rounded-md border flex items-center justify-center shrink-0 hidden xs:flex ${headerInfo.iconColor || "text-sky-400 bg-sky-500/15 border-sky-500/30"}`}>
+                  <headerInfo.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </div>
               )}
-              <span className="text-base sm:text-lg font-bold text-white tracking-tight shrink-0">
+              <span className="text-xs sm:text-base md:text-lg font-bold text-white tracking-tight truncate max-w-[130px] xs:max-w-[200px] sm:max-w-none">
                 {headerInfo.title}
               </span>
               {headerInfo.subtitle && (
@@ -519,18 +520,18 @@ function HRMSLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 ml-auto">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 ml-auto">
             <NotificationBell />
             <ThemeToggle />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2.5 p-1 md:pr-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400/30">
-                  <div className="h-8 w-8 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold text-xs border border-emerald-500/30 overflow-hidden shrink-0">
+                <button className="flex items-center gap-2 p-1 md:pr-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400/30">
+                  <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold text-xs border border-emerald-500/30 overflow-hidden shrink-0">
                     {userProfile?.profile_photo ? (
                       <img src={resolveImageUrl(userProfile.profile_photo)} alt="Profile" className="h-full w-full object-cover" />
                     ) : (
-                      userProfile ? `${userProfile.first_name?.[0] || ""}${userProfile.last_name?.[0] || ""}` : <User className="w-4 h-4" />
+                      userProfile ? `${userProfile.first_name?.[0] || ""}${userProfile.last_name?.[0] || ""}` : <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     )}
                   </div>
                   <div className="hidden md:flex flex-col text-left leading-none">
@@ -579,9 +580,15 @@ function HRMSLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main ref={mainScrollRef} className="flex-1 overflow-y-auto p-3.5 sm:p-4 md:p-5 xl:p-6 2xl:p-8 w-full min-w-0">
+        <main ref={mainScrollRef} className="flex-1 overflow-y-auto p-3.5 sm:p-4 md:p-5 xl:p-6 2xl:p-8 w-full min-w-0 pb-20 md:pb-6 touch-momentum">
           {children}
         </main>
+
+        {/* Mobile Bottom Navigation Bar */}
+        <MobileBottomBar
+          mode={currentMode === "business" ? "business" : "hrms"}
+          onOpenMenu={() => setIsSidebarOpen(true)}
+        />
       </div>
     </div>
   );

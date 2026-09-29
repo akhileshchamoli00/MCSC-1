@@ -348,6 +348,13 @@ export function HRMSSidebar({ isAdmin, userProfile, isMobileOpen, setIsMobileOpe
     }
   }, []);
 
+  // Automatically close mobile sidebar on navigation
+  useEffect(() => {
+    if (setIsMobileOpen) {
+      setIsMobileOpen(false);
+    }
+  }, [pathname, setIsMobileOpen]);
+
   const toggleSidebar = () => {
     const newStat = !isCollapsed;
     setIsCollapsed(newStat);

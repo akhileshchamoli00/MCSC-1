@@ -594,6 +594,39 @@ def format_order_response(ord_obj: models.ClientOrder, consultants_cache: dict, 
         res.document_count = doc_counts_cache.get(ord_obj.order_number.strip().upper(), 0)
     else:
         res.document_count = getattr(res, "document_count", 0) or 0
+
+    if getattr(ord_obj, "notary", None):
+        try:
+            n = ord_obj.notary
+            res.notary = schemas.NotaryResponse(
+                id=n.id,
+                name=n.name,
+                email=n.email,
+                phone=n.phone,
+                address=n.address,
+                city=n.city,
+                status=n.status or "ACTIVE",
+                notes=n.notes,
+                vendor_type=n.vendor_type or "NOTARY",
+                is_notary=bool(n.is_notary),
+                is_gov_officer=bool(n.is_gov_officer),
+                is_other_vendor=bool(n.is_other_vendor),
+                validation_status=n.validation_status or "PENDING_VALIDATION",
+                validation_notes=n.validation_notes,
+                created_by_user_id=n.created_by_user_id,
+                validated_by_user_id=n.validated_by_user_id,
+                validated_at=n.validated_at,
+                created_at=n.created_at or datetime.now(timezone.utc),
+                updated_at=n.updated_at or datetime.now(timezone.utc),
+                service_fees=[],
+                is_bank_configured=bool(n.bank_account_number)
+            )
+        except Exception:
+            try:
+                res.notary = schemas.NotaryResponse.model_validate(ord_obj.notary)
+            except Exception:
+                pass
+
     return res
 
 def get_consultants_data(db: Session, c_ids: Any) -> List[dict]:
@@ -787,7 +820,22 @@ def get_my_assigned_orders(db: Session = Depends(database.get_db), current_user:
             
     consultants_cache = build_consultants_cache(db, filtered_orders)
     doc_counts_cache = build_doc_counts_cache(db, filtered_orders)
-    return [format_order_response(ord_obj, consultants_cache, doc_counts_cache) for ord_obj in filtered_orders]
+    can_view_notary_payments = is_admin or auth.has_permission(current_user, "clients_orders_notary_payments", "view", db)
+    
+    formatted_orders = []
+    for ord_obj in filtered_orders:
+        res = format_order_response(ord_obj, consultants_cache, doc_counts_cache)
+        if not can_view_notary_payments:
+            res.notary_fee = 0.0
+            if res.notary:
+                res.notary.service_fees = []
+                res.notary.bank_name = None
+                res.notary.bank_account_number = None
+                res.notary.bank_account_holder_name = None
+                res.notary.bank_branch = None
+                res.notary.bank_swift_code = None
+        formatted_orders.append(res)
+    return formatted_orders
 
 @router.get("/orders/workload-matrix")
 def get_order_workload_matrix(
@@ -3842,11 +3890,26 @@ def get_order_summary(
     reviewers = get_consultants_data(db, unique_rids)
     reviewer_data = reviewers[0] if reviewers else None
 
+    can_view_notary_payments = is_admin_or_hr(current_user) or auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders_notary_payments", "view", db)
+
     items = []
     total_amount = 0.0
+    notaries_list = []
+    seen_notary_ids = set()
+
     for o in orders:
         total_amount += float(o.unit_price or 0.0)
         desc = o.description or (o.service.description if o.service and o.service.description else None)
+        if o.notary and o.notary.id not in seen_notary_ids:
+            seen_notary_ids.add(o.notary.id)
+            notaries_list.append({
+                "id": o.notary.id,
+                "name": o.notary.name,
+                "vendor_type": o.notary.vendor_type or "NOTARY",
+                "is_gov_officer": bool(o.notary.is_gov_officer),
+                "is_other_vendor": bool(o.notary.is_other_vendor)
+            })
+
         items.append({
             "id": o.id,
             "service_id": o.service_id,
@@ -3861,7 +3924,7 @@ def get_order_summary(
             "needs_gov_officer": o.service.needs_gov_officer if o.service else False,
             "needs_other_vendors": o.service.needs_other_vendors if o.service else False,
             "notary_name": o.notary.name if o.notary else None,
-            "notary_fee": o.notary_fee
+            "notary_fee": o.notary_fee if can_view_notary_payments else None
         })
 
     company_data = None
@@ -3914,6 +3977,7 @@ def get_order_summary(
         "reviewer": reviewer_data,
         "reviewer_ids": unique_rids,
         "reviewers": reviewers,
+        "notaries": notaries_list,
         "items": items
     }
 

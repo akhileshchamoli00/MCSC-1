@@ -1,5 +1,5 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono, Playfair_Display, Antonio } from "next/font/google"
 import { LanguageProvider } from "@/contexts/language-context"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -14,12 +14,32 @@ const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" })
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-serif" })
 const antonio = Antonio({ subsets: ["latin"], variable: "--font-antonio" })
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#07090e" },
+  ],
+}
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.mcsc.co.id"),
   title: "MCS Consulting - Company Registration, Business Licensing, Tax & Compliance Services in Indonesia",
   description:
     "Your trusted partner in managing all aspects of business licensing with over 10 years of professional experience.",
   generator: "https://www.mcsc.co.id",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "MCS Consulting",
+  },
+  formatDetection: {
+    telephone: true,
+  },
   icons: {
     icon: "/icon.png",
     shortcut: "/icon.png",

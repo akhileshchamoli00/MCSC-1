@@ -41,6 +41,7 @@ import { TablePagination } from "@/components/ui/pagination";
 import { DualOrderChatDialog } from "@/components/dual-order-chat-dialog";
 import { useUser } from "@/contexts/user-context";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface OrderSummaryItem {
   order_number: string;
@@ -531,7 +532,7 @@ export default function TeamWorkloadPage() {
         </div>
 
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
@@ -1005,6 +1006,147 @@ export default function TeamWorkloadPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Card View (< md) */}
+        <div className="block md:hidden divide-y divide-border/60">
+          {loading ? (
+            <div className="py-12 text-center text-muted-foreground">
+              <RefreshCw className="h-6 w-6 animate-spin text-purple-600 mx-auto mb-2" />
+              <span className="text-xs font-medium">Aggregating team workload matrix...</span>
+            </div>
+          ) : paginatedTeam.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground p-4">
+              <Users className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+              <span className="text-sm font-semibold text-foreground block">No legal team members match criteria</span>
+              <p className="text-xs text-muted-foreground mt-1">Try adjusting your search query.</p>
+            </div>
+          ) : (
+            paginatedTeam.map((member) => {
+              const isExpanded = !!expandedRows[member.employee_id];
+              const currentInnerFilter = innerOrderFilter[member.employee_id] || "ALL";
+              const displayOrders = member.orders.filter(ord => {
+                if (scopeMode === "ACTIVE" && !ord.is_active) return false;
+                if (currentInnerFilter === "CONSULTANT") {
+                  return ord.assigned_as === "CONSULTANT" || ord.assigned_as === "BOTH";
+                }
+                if (currentInnerFilter === "REVIEWER") {
+                  return ord.assigned_as === "REVIEWER" || ord.assigned_as === "BOTH";
+                }
+                return true;
+              });
+
+              return (
+                <div key={member.employee_id} className="p-4 space-y-3">
+                  {/* Member info & capacity header */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/10 border border-purple-500/20 flex items-center justify-center font-bold text-xs text-purple-700 dark:text-purple-300">
+                        {member.name.split(" ").map((n: string) => n[0]).slice(0, 2).join("")}
+                      </div>
+                      <div>
+                        <span className="font-bold text-sm text-foreground block leading-tight">{member.name}</span>
+                        <span className="text-[11px] text-muted-foreground">{member.job_title || "Legal Specialist"}</span>
+                      </div>
+                    </div>
+                    {getCapacityStatusPill(member.capacity_status)}
+                  </div>
+
+                  {/* Workload Metric Chips */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-muted/20 p-2.5 rounded-xl border border-border/50 text-xs">
+                    <div>
+                      <span className="text-[10px] text-muted-foreground block">Executing Orders</span>
+                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        {scopeMode === "ACTIVE" ? member.consultant_active_count : member.consultant_total_count}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground block">Reviewer Orders</span>
+                      <span className="font-mono font-bold text-purple-600 dark:text-purple-400">
+                        {scopeMode === "ACTIVE" ? member.reviewer_active_count : member.reviewer_total_count}
+                      </span>
+                    </div>
+                    <div className="col-span-2 sm:col-span-1">
+                      <span className="text-[10px] text-muted-foreground block">Contributed Value</span>
+                      <span className="font-mono font-bold text-blue-600 dark:text-blue-400 text-xs">
+                        {formatCurrency(scopeMode === "ACTIVE" ? (member.active_contribution_value || 0) : (member.total_contribution_value || 0))}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Drilldown Trigger */}
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {(scopeMode === "ACTIVE" ? member.total_active_load : member.total_all_load)} orders assigned
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => toggleRow(member.employee_id)}
+                      className="h-8 px-3 text-xs font-semibold gap-1.5 text-purple-700 dark:text-purple-400 border-purple-500/30 hover:bg-purple-500/10"
+                    >
+                      <span>{isExpanded ? "Hide Orders" : "View Orders"}</span>
+                      {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
+
+                  {/* Expanded Drilldown Orders List on Mobile */}
+                  {isExpanded && (
+                    <div className="mt-3 pt-3 border-t border-purple-500/20 space-y-2">
+                      <div className="text-[11px] font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wider">
+                        Assigned Orders ({displayOrders.length})
+                      </div>
+                      {displayOrders.length === 0 ? (
+                        <p className="text-xs text-muted-foreground italic">No orders found in current scope.</p>
+                      ) : (
+                        displayOrders.map((ord: OrderSummaryItem) => (
+                          <div key={ord.order_number} className="bg-background rounded-lg p-2.5 border border-border/60 text-xs space-y-2 shadow-2xs">
+                            <div className="flex items-center justify-between gap-2">
+                              <Badge variant="outline" className="font-mono font-bold text-xs bg-primary/10 border-primary/20 text-primary">
+                                {ord.order_number}
+                              </Badge>
+                              <Badge variant="outline" className={`text-[9.5px] font-bold px-1.5 py-0.5 border ${getOrderStatusBadgeClass(ord.status)}`}>
+                                {ord.status.replace(/_/g, " ")}
+                              </Badge>
+                            </div>
+                            <div className="font-medium text-foreground">{ord.company_name}</div>
+                            <div className="flex items-center justify-between gap-2 text-[11px]">
+                              <span className="text-muted-foreground">Net Value:</span>
+                              <span className="font-mono font-bold text-foreground">
+                                {formatCurrency(ord.net_amount !== undefined ? ord.net_amount : ord.total_amount)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-end gap-2 pt-1 border-t border-border/40">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2.5 text-xs font-semibold gap-1 border-purple-500/30 text-purple-700 dark:text-purple-300 hover:bg-purple-500/10"
+                                onClick={() => setChatOrder({
+                                  orderNumber: ord.order_number,
+                                  companyName: ord.company_name
+                                })}
+                              >
+                                <MessageSquare className="h-3.5 w-3.5" /> Chat
+                              </Button>
+                              <Link href={`/business/assigned-orders?order=${ord.order_number}&chat=false`}>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-xs font-semibold gap-1 text-muted-foreground hover:text-foreground"
+                                >
+                                  View <ExternalLink className="h-3 w-3" />
+                                </Button>
+                              </Link>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       </CardContent>
 

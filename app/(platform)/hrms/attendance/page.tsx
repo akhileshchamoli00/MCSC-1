@@ -289,38 +289,73 @@ export default function AttendancePage() {
           <CardTitle>Attendance History</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-y border-border/50">
-              <tr>
-                <th className="px-4 py-3 font-medium">Date</th>
-                <th className="px-4 py-3 font-medium">Clock In</th>
-                <th className="px-4 py-3 font-medium">Clock Out</th>
-                <th className="px-4 py-3 font-medium">Hours</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/50">
-              {paginatedHistory.map((rec) => (
-                <tr key={rec.id} className="hover:bg-muted/30">
-                  <td className="px-4 py-3 font-medium">{rec.attendance_date}</td>
-                  <td className="px-4 py-3">{rec.clock_in_time ? new Date(rec.clock_in_time).toLocaleTimeString() : "-"}</td>
-                  <td className="px-4 py-3">{rec.clock_out_time ? new Date(rec.clock_out_time).toLocaleTimeString() : "-"}</td>
-                  <td className="px-4 py-3">{rec.working_hours}</td>
-                  <td className="px-4 py-3">
-                    <Badge variant="outline">{rec.status}</Badge>
-                  </td>
-                </tr>
-              ))}
-              {myHistory.length === 0 && (
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-y border-border/50">
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No history found.</td>
+                  <th className="px-4 py-3 font-medium">Date</th>
+                  <th className="px-4 py-3 font-medium">Clock In</th>
+                  <th className="px-4 py-3 font-medium">Clock Out</th>
+                  <th className="px-4 py-3 font-medium">Hours</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {paginatedHistory.map((rec) => (
+                  <tr key={rec.id} className="hover:bg-muted/30">
+                    <td className="px-4 py-3 font-medium">{rec.attendance_date}</td>
+                    <td className="px-4 py-3">{rec.clock_in_time ? new Date(rec.clock_in_time).toLocaleTimeString() : "-"}</td>
+                    <td className="px-4 py-3">{rec.clock_out_time ? new Date(rec.clock_out_time).toLocaleTimeString() : "-"}</td>
+                    <td className="px-4 py-3">{rec.working_hours}</td>
+                    <td className="px-4 py-3">
+                      <Badge variant="outline">{rec.status}</Badge>
+                    </td>
+                  </tr>
+                ))}
+                {myHistory.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No history found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Attendance Cards */}
+          <div className="block md:hidden divide-y divide-border/50">
+            {paginatedHistory.map((rec) => (
+              <div key={rec.id} className="p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-xs text-foreground">{rec.attendance_date}</span>
+                  <Badge variant="outline" className="text-[10px] font-semibold">{rec.status}</Badge>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                  <div>
+                    <span className="text-[10px] block">Clock In</span>
+                    <span className="font-medium text-foreground">
+                      {rec.clock_in_time ? new Date(rec.clock_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "-"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] block">Clock Out</span>
+                    <span className="font-medium text-foreground">
+                      {rec.clock_out_time ? new Date(rec.clock_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "-"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] block">Hours</span>
+                    <span className="font-medium text-foreground">{rec.working_hours || 0} hrs</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {myHistory.length === 0 && (
+              <div className="p-6 text-center text-xs text-muted-foreground">No history found.</div>
+            )}
+          </div>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-border/50 bg-transparent mt-0">
+            <div className="flex flex-col sm:flex-row items-center justify-between px-4 sm:px-6 py-4 border-t border-border/50 bg-transparent gap-3">
               <div className="text-xs text-muted-foreground">
                 Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
                 <span className="font-medium text-foreground">{Math.min(myHistory.length, endIndex)}</span> of{" "}

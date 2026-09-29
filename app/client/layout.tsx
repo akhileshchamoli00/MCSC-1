@@ -6,6 +6,7 @@ import { HRMSSidebar } from "@/components/hrms-sidebar";
 import { AskLogo } from "@/components/ask-logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { NotificationBell } from "@/components/notification-bell";
+import { MobileBottomBar } from "@/components/mobile-bottom-bar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -399,9 +400,15 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               </div>
             </header>
 
-            <main className="flex-1 p-6 md:p-8">
+            <main className="flex-1 p-4 md:p-8 pb-20 md:pb-8 touch-momentum">
               {children}
             </main>
+
+            {/* Mobile Bottom Navigation Bar */}
+            <MobileBottomBar
+              mode="client"
+              onOpenMenu={() => setIsSidebarOpen(true)}
+            />
           </div>
         </div>
       </ClientContext.Provider>

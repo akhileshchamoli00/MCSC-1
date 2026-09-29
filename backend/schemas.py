@@ -951,6 +951,7 @@ class ClientOrderItemResponse(BaseModel):
     notary_payment_status: Optional[str] = "UNPAID"
     notary_payment_date: Optional[date] = None
     notary_payment_ref: Optional[str] = None
+    notary: Optional['NotaryResponse'] = None
 
     class Config:
         from_attributes = True
@@ -1496,6 +1497,10 @@ class NotaryResponse(NotaryBase):
 
     class Config:
         from_attributes = True
+
+
+ClientOrderItemResponse.model_rebuild()
+ClientOrderResponse.model_rebuild()
 
 
 class NotaryDisbursementRequest(BaseModel):

@@ -42,7 +42,8 @@ import {
   Cloud,
   FileDown,
   Paperclip,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Scale
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -581,6 +582,7 @@ export function DualOrderChatDialog({
   // Client Confirmation Dialog State
   const [isConfirmClientOpen, setIsConfirmClientOpen] = useState(false);
   const [pendingClientMessage, setPendingClientMessage] = useState("");
+  const [activeMobileTab, setActiveMobileTab] = useState<"CLIENT" | "INTERNAL">("INTERNAL");
 
   // Tagging in Internal Chat
   const [taggableUsers, setTaggableUsers] = useState<any[]>([]);
@@ -1282,28 +1284,30 @@ export function DualOrderChatDialog({
               className="fixed inset-0 z-[75] h-screen h-[100dvh] max-h-screen max-h-[100dvh] w-screen w-[100vw] max-w-[100vw] bg-background text-foreground shadow-2xl flex flex-col overflow-hidden"
             >
               {/* Top Header Bar - Fixed & Pinned */}
-              <div className="p-3.5 sm:p-4 border-b border-border/80 bg-background/95 backdrop-blur-md flex flex-row items-center justify-between shrink-0 gap-4 sticky top-0 z-30 shadow-xs">
-                <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2.5 sm:p-4 border-b border-border/80 bg-background/95 backdrop-blur-md flex flex-row items-center justify-between shrink-0 gap-2 sm:gap-4 sticky top-0 z-30 shadow-xs pt-safe">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={onClose}
-                    className="gap-2 font-bold shadow-xs bg-muted/60 hover:bg-muted text-foreground border-border transition-colors h-8.5 shrink-0"
+                    className="gap-1.5 sm:gap-2 font-bold shadow-xs bg-muted/60 hover:bg-muted text-foreground border-border transition-colors h-8.5 shrink-0 px-2.5 sm:px-3"
                   >
-                    <ArrowLeft className="h-4 w-4" /> Back to Orders
+                    <ArrowLeft className="h-4 w-4" />
+                    <span className="hidden sm:inline">Back to Orders</span>
+                    <span className="sm:hidden text-xs">Back</span>
                   </Button>
 
-                  <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shrink-0">
-                    <Package className="h-4.5 w-4.5" />
+                  <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shrink-0">
+                    <Package className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
                   </div>
 
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-base sm:text-lg font-extrabold font-mono text-foreground">
-                        Order #{orderNumber}
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                      <h3 className="text-sm sm:text-base md:text-lg font-extrabold font-mono text-foreground truncate max-w-[120px] xs:max-w-none">
+                        #{orderNumber}
                       </h3>
                       {(orderSummary?.status || orderStatus) && (
-                        <Badge variant="outline" className="text-xs font-semibold px-2 py-0.5">
+                        <Badge variant="outline" className="text-[10px] sm:text-xs font-semibold px-1.5 sm:px-2 py-0.5">
                           {orderSummary?.status || orderStatus}
                         </Badge>
                       )}
@@ -1471,13 +1475,18 @@ export function DualOrderChatDialog({
                                       </div>
                                     )}
 
-                                    {(item.needs_notary || item.needs_gov_officer || item.needs_other_vendors) && (
+                                    {(item.needs_notary || item.needs_gov_officer || item.needs_other_vendors || item.notary_name) && (
                                       <div className="flex items-center gap-1 flex-wrap pt-0.5">
-                                        {item.needs_notary && (
+                                        {item.notary_name ? (
+                                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/25 font-bold inline-flex items-center gap-1">
+                                            <Scale className="h-2.5 w-2.5 shrink-0" />
+                                            Notary: {item.notary_name}
+                                          </span>
+                                        ) : item.needs_notary ? (
                                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 font-medium">
                                             Notary
                                           </span>
-                                        )}
+                                        ) : null}
                                         {item.needs_gov_officer && (
                                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-medium">
                                             Gov Approval
@@ -1552,11 +1561,88 @@ export function DualOrderChatDialog({
                               </div>
                             )}
                           </div>
+
+                          {/* Card 4: Assigned Notary */}
+                          {orderSummary?.notaries && orderSummary.notaries.length > 0 && (
+                            <div className="p-3.5 rounded-xl bg-background/90 border border-border/80 shadow-2xs space-y-2.5">
+                              <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
+                                <div className="flex items-center gap-1.5">
+                                  <Scale className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                  <span className="text-xs font-bold text-foreground">Assigned Notary</span>
+                                </div>
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-mono">
+                                  {orderSummary.notaries.length}
+                                </Badge>
+                              </div>
+                              <div className="space-y-2">
+                                {orderSummary.notaries.map((n: any, idx: number) => (
+                                  <div key={n.id || idx} className="flex items-center gap-2.5 p-2 rounded-lg bg-muted/40 border border-border/60">
+                                    <div className="h-7 w-7 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs border border-indigo-500/20 shrink-0">
+                                      <Scale className="h-3.5 w-3.5" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <span className="text-xs font-bold text-foreground truncate block">
+                                        {n.name}
+                                      </span>
+                                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground truncate">
+                                        <span>
+                                          {n.vendor_type === "GOVERNMENT_OFFICER" || n.is_gov_officer
+                                            ? "Government Official"
+                                            : n.vendor_type === "OTHER_VENDORS" || n.is_other_vendor
+                                              ? "External Vendor"
+                                              : "Appointed Notary"}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
                   </div>
                 )}
+
+                {/* Mobile Channel Segmented Tabs (< lg screens) */}
+                <div className="flex lg:hidden items-center justify-between p-2 border-b border-border/80 bg-muted/30 shrink-0 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveMobileTab("CLIENT")}
+                    className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                      activeMobileTab === "CLIENT"
+                        ? "bg-sky-600 text-white border-sky-600 shadow-xs"
+                        : "bg-background/80 text-muted-foreground border-border/60 hover:text-foreground"
+                    }`}
+                  >
+                    <Globe className="h-3.5 w-3.5 shrink-0" />
+                    <span>Client Chat</span>
+                    {clientMessages.length > 0 && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-white/20">
+                        {clientMessages.length}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveMobileTab("INTERNAL")}
+                    className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                      activeMobileTab === "INTERNAL"
+                        ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                        : "bg-background/80 text-muted-foreground border-border/60 hover:text-foreground"
+                    }`}
+                  >
+                    <Lock className="h-3.5 w-3.5 shrink-0" />
+                    <span>Internal Notes</span>
+                    {internalMessages.length > 0 && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-white/20">
+                        {internalMessages.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
 
                 {/* ============================================================ */}
                 {/* DUAL CHAT SPLIT PANE (EXTERNAL CLIENT & INTERNAL NOTES)      */}
@@ -1566,7 +1652,9 @@ export function DualOrderChatDialog({
                 {/* PANE 1 (LEFT): CLIENT & CONSULTANT CHAT (EXTERNAL)           */}
                 {/* ============================================================ */}
                 <div
-                  className="flex flex-col h-full min-h-0 max-h-full bg-background/50 overflow-hidden outline-none"
+                  className={`flex-col h-full min-h-0 max-h-full bg-background/50 overflow-hidden outline-none ${
+                    activeMobileTab === "CLIENT" ? "flex" : "hidden lg:flex"
+                  }`}
                   onPaste={e => handlePasteSnippet(e, handleClientAttachmentSelect, "Client Channel")}
                   onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
                   onDrop={e => {
@@ -2190,7 +2278,9 @@ export function DualOrderChatDialog({
                 {/* PANE 2 (RIGHT): INTERNAL TEAM CHAT (PRIVATE)                */}
                 {/* ============================================================ */}
                 <div
-                  className="flex flex-col h-full min-h-0 max-h-full bg-background/50 overflow-hidden outline-none"
+                  className={`flex-col h-full min-h-0 max-h-full bg-background/50 overflow-hidden outline-none ${
+                    activeMobileTab === "INTERNAL" ? "flex" : "hidden lg:flex"
+                  }`}
                   onPaste={e => handlePasteSnippet(e, handleInternalAttachmentSelect, "Internal Notes")}
                   onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
                   onDrop={e => {

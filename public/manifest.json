@@ -1,0 +1,24 @@
+{
+  "name": "MCS Consulting Platform",
+  "short_name": "MCSC",
+  "description": "MCS Consulting Enterprise ERP, HRMS & Client Workspace",
+  "start_url": "/login",
+  "display": "standalone",
+  "background_color": "#07090e",
+  "theme_color": "#07090e",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
