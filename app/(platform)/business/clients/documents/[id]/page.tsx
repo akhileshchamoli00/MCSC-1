@@ -65,6 +65,26 @@ import { DropboxFileManager } from "@/components/dropbox-file-manager";
 import { DualOrderChatDialog } from "@/components/dual-order-chat-dialog";
 import { cn } from "@/lib/utils";
 
+export const DOCUMENT_CATEGORIES = [
+  "Client ID",
+  "Photo",
+  "Invoice",
+  "Deeds and Approval",
+  "Business Licenses & Tax Registrations",
+  "Local Government Documents (Pemda)",
+  "Immigration & Work Permit Documents",
+  "Agreements & Contracts",
+  "Submission Receipts & Acknowledgements",
+  "BPJS & Employment Reporting Documents",
+  "Investment Activity Reports (LKPM)",
+  "Brand Certificate",
+  "Pre-Signature Documents",
+  "Signed Documents",
+  "Final Documents",
+  "Working Files & Other Supporting Documents",
+  "Miscellaneous Documents"
+];
+
 export default function CompanyDocumentsManagementPage() {
   const params = useParams();
   const companyId = params.id as string;
@@ -292,8 +312,9 @@ export default function CompanyDocumentsManagementPage() {
     };
   };
 
-  // Search filter for docs
+  // Search & Category filters for docs
   const [documentSearchQuery, setDocumentSearchQuery] = useState("");
+  const [docCategoryFilter, setDocCategoryFilter] = useState("ALL");
 
   const activeOrderDocsCount = documents.filter((doc: any) => 
     activeOrder && doc.order_number && doc.order_number.trim().toUpperCase() === activeOrder.order_number.trim().toUpperCase()
@@ -302,6 +323,11 @@ export default function CompanyDocumentsManagementPage() {
   const filteredDocuments = documents.filter((doc: any) => {
     if (activeOrder && filterByActiveOrder) {
       if (!doc.order_number || doc.order_number.trim().toUpperCase() !== activeOrder.order_number.trim().toUpperCase()) {
+        return false;
+      }
+    }
+    if (docCategoryFilter !== "ALL") {
+      if ((doc.document_type || "").trim().toUpperCase() !== docCategoryFilter.trim().toUpperCase()) {
         return false;
       }
     }
@@ -1145,6 +1171,19 @@ export default function CompanyDocumentsManagementPage() {
                     </button>
                   </div>
                 )}
+                <div className="w-full sm:w-56 shrink-0">
+                  <Select value={docCategoryFilter} onValueChange={setDocCategoryFilter}>
+                    <SelectTrigger className="h-9 text-xs bg-muted/10 border-border/80">
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" side="bottom" align="end" className="max-h-60 overflow-y-auto">
+                      <SelectItem value="ALL">All Categories ({documents.length})</SelectItem>
+                      {DOCUMENT_CATEGORIES.map((cat) => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="w-full sm:w-60 relative shrink-0">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -1364,16 +1403,10 @@ export default function CompanyDocumentsManagementPage() {
                       <SelectTrigger className="h-9 text-xs bg-muted/20 w-full">
                         <SelectValue placeholder="Choose type..." />
                       </SelectTrigger>
-                      <SelectContent position="popper" side="bottom" align="start" sideOffset={4}>
-                        <SelectItem value="Client ID">Client ID</SelectItem>
-                        <SelectItem value="Photo">Photo</SelectItem>
-                        <SelectItem value="Invoice">Invoice</SelectItem>
-                        <SelectItem value="Deeds and Approval">Deeds and Approval</SelectItem>
-                        <SelectItem value="Brand Certificate">Brand Certificate</SelectItem>
-                        <SelectItem value="Miscellaneous Documents">Miscellaneous Documents</SelectItem>
-                        <SelectItem value="Pre-Signature Documents">Pre-Signature Documents</SelectItem>
-                        <SelectItem value="Signed Documents">Signed Documents</SelectItem>
-                        <SelectItem value="Final Documents">Final Documents</SelectItem>
+                      <SelectContent position="popper" side="bottom" align="start" sideOffset={4} className="max-h-60 overflow-y-auto">
+                        {DOCUMENT_CATEGORIES.map((cat) => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1944,12 +1977,23 @@ export default function CompanyDocumentsManagementPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="font-semibold text-foreground">Document Type</label>
-                <Input
+                <label className="font-semibold text-foreground">Document Category</label>
+                <Select
                   value={editDoc.document_type || ""}
-                  onChange={(e) => setEditDoc({ ...editDoc, document_type: e.target.value })}
-                  className="h-9 text-xs"
-                />
+                  onValueChange={(val) => setEditDoc({ ...editDoc, document_type: val })}
+                >
+                  <SelectTrigger className="h-9 text-xs bg-background w-full">
+                    <SelectValue placeholder="Select category..." />
+                  </SelectTrigger>
+                  <SelectContent position="popper" side="bottom" align="start" sideOffset={4} className="max-h-60 overflow-y-auto">
+                    {editDoc.document_type && !DOCUMENT_CATEGORIES.includes(editDoc.document_type) && (
+                      <SelectItem value={editDoc.document_type}>{editDoc.document_type} (Current)</SelectItem>
+                    )}
+                    {DOCUMENT_CATEGORIES.map((cat) => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1">
                 <label className="font-semibold text-foreground">Description</label>
