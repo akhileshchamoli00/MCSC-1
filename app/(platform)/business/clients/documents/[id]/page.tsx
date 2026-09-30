@@ -1143,9 +1143,9 @@ export default function CompanyDocumentsManagementPage() {
                   Upload and track license validity, KITAS permits, and expiration dates.
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap w-full sm:w-auto">
+              <div className="flex items-center gap-2.5 flex-wrap xl:flex-nowrap w-full sm:w-auto">
                 {activeOrder && (
-                  <div className="flex items-center bg-muted/60 p-0.5 rounded-lg border border-border/60 text-xs">
+                  <div className="flex items-center bg-muted/60 p-0.5 rounded-lg border border-border/60 text-xs shrink-0">
                     <button
                       type="button"
                       onClick={() => setFilterByActiveOrder(true)}
@@ -1171,27 +1171,27 @@ export default function CompanyDocumentsManagementPage() {
                     </button>
                   </div>
                 )}
-                <div className="w-full sm:w-56 shrink-0">
+                <div className="w-full sm:w-80 min-w-[280px] shrink-0">
                   <Select value={docCategoryFilter} onValueChange={setDocCategoryFilter}>
-                    <SelectTrigger className="h-9 text-xs bg-muted/10 border-border/80">
+                    <SelectTrigger className="h-9 text-xs bg-muted/10 border-border/80 w-full">
                       <SelectValue placeholder="All Categories" />
                     </SelectTrigger>
-                    <SelectContent position="popper" side="bottom" align="end" className="max-h-60 overflow-y-auto">
-                      <SelectItem value="ALL">All Categories ({documents.length})</SelectItem>
+                    <SelectContent position="popper" side="bottom" align="end" className="w-[var(--radix-select-trigger-width)] max-h-60 overflow-y-auto">
+                      <SelectItem value="ALL">All Categories</SelectItem>
                       {DOCUMENT_CATEGORIES.map((cat) => (
                         <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="w-full sm:w-60 relative shrink-0">
+                <div className="w-full sm:w-56 md:w-60 relative shrink-0">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="search"
                     placeholder="Search documents..."
                     value={documentSearchQuery}
                     onChange={(e) => setDocumentSearchQuery(e.target.value)}
-                    className="pl-9 h-9 text-xs bg-muted/10 border-border/80 focus:bg-background transition-all"
+                    className="pl-9 h-9 text-xs bg-muted/10 border-border/80 focus:bg-background transition-all w-full"
                   />
                 </div>
                 <Button
