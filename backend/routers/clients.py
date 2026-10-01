@@ -3377,7 +3377,7 @@ async def preview_client_document(
     safe_filename = db_doc.file_name or "document"
     ext = (safe_filename.rsplit(".", 1)[-1] if "." in safe_filename else "").lower()
     
-    # Accurate MIME type detection for Word and Office documents
+    # Accurate MIME type detection for Office and text documents
     mime_type, _ = mimetypes.guess_type(safe_filename)
     if ext == "docx":
         mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -3387,6 +3387,12 @@ async def preview_client_document(
         mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     elif ext == "xls":
         mime_type = "application/vnd.ms-excel"
+    elif ext == "csv":
+        mime_type = "text/csv; charset=utf-8"
+    elif ext in ("txt", "log", "text", "ini"):
+        mime_type = "text/plain; charset=utf-8"
+    elif ext == "json":
+        mime_type = "application/json; charset=utf-8"
     elif ext == "pdf":
         mime_type = "application/pdf"
     elif not mime_type:
