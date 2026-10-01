@@ -165,8 +165,15 @@ export default function NotificationsPage() {
     }
 
     if (targetUrl) {
-      if (orderNum && !targetUrl.includes("chat=")) {
-        targetUrl += targetUrl.includes("?") ? "&chat=true" : "?chat=true";
+      if (orderNum) {
+        if (targetUrl.includes("chat=false")) {
+          targetUrl = targetUrl.replace("chat=false", "chat=true");
+        } else if (!targetUrl.includes("chat=")) {
+          targetUrl += targetUrl.includes("?") ? "&chat=true" : "?chat=true";
+        }
+        try {
+          sessionStorage.setItem("auto_open_order_chat", orderNum);
+        } catch {}
       }
 
       if (!isAdmin) {

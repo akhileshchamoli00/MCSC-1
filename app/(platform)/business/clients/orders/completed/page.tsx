@@ -64,7 +64,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
@@ -522,7 +522,7 @@ export default function ClientOrdersPage() {
   const [highlightedOrderNum, setHighlightedOrderNum] = useState<string | null>(null);
 
   const openOrderDirectly = (orderNum: string, openChat: boolean = true) => {
-    if (!orderNum || orders.length === 0) return;
+    if (!orderNum) return;
 
     const matched = groupedOrdersMap.get(orderNum) || Array.from(groupedOrdersMap.values()).find(g => g.order_number?.toUpperCase() === orderNum.toUpperCase());
     if (matched) {
@@ -562,32 +562,63 @@ export default function ClientOrdersPage() {
       setTimeout(() => {
         setHighlightedOrderNum(null);
       }, 4000);
+    } else {
+      // Fallback: If not in current completed orders list, fetch directly from backend API
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/clients/orders/group/${encodeURIComponent(orderNum)}`, {
+        credentials: "include",
+      })
+        .then(async res => {
+          if (res.ok) {
+            const data = await res.json();
+            const groupData = Array.isArray(data) && data.length > 0 ? data[0] : data;
+            if (groupData && groupData.order_number) {
+              setSelectedOrderGroup(groupData);
+              if (openChat) {
+                setIsChatOpen(true);
+                fetchProgressUpdates(groupData.order_number);
+              } else {
+                setIsViewOpen(true);
+              }
+            }
+          }
+        })
+        .catch(err => console.error("Error fetching direct completed order:", err));
     }
   };
 
-  // Auto-open chat from URL query parameter (for notifications) & custom event
-  useEffect(() => {
-    if (orders.length === 0) return;
+  const openOrderDirectlyRef = useRef(openOrderDirectly);
+  openOrderDirectlyRef.current = openOrderDirectly;
 
-    const checkParams = () => {
-      if (typeof window === "undefined") return;
-      const params = new URLSearchParams(window.location.search);
-      const orderNum = params.get("order");
-      const openChat = params.get("chat");
-      if (orderNum) {
-        openOrderDirectly(orderNum, openChat === "true" || openChat === null);
-        const url = new URL(window.location.href);
+  // Auto-open chat from URL query parameter (for notifications) & custom event
+  const hasProcessedCompletedUrlRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const orderNum = params.get("order") || sessionStorage.getItem("auto_open_order_chat");
+    const openChat = params.get("chat");
+
+    if (!orderNum) return;
+
+    if (orders.length > 0) {
+      hasProcessedCompletedUrlRef.current = true;
+      openOrderDirectly(orderNum, openChat !== "false");
+      sessionStorage.removeItem("auto_open_order_chat");
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("order") || url.searchParams.has("chat")) {
         url.searchParams.delete("order");
         url.searchParams.delete("chat");
         window.history.replaceState({}, "", url.pathname + url.search);
       }
-    };
+    } else if (!hasProcessedCompletedUrlRef.current) {
+      hasProcessedCompletedUrlRef.current = true;
+      openOrderDirectly(orderNum, openChat !== "false");
+    }
+  }, [orders]);
 
-    checkParams();
-
+  useEffect(() => {
     const handleCustomOpen = (e: any) => {
       if (e.detail?.orderNumber) {
-        openOrderDirectly(e.detail.orderNumber, e.detail.chat ?? true);
+        openOrderDirectlyRef.current(e.detail.orderNumber, e.detail.chat ?? true);
       }
     };
     window.addEventListener("open-order-chat", handleCustomOpen);
@@ -595,7 +626,7 @@ export default function ClientOrdersPage() {
     return () => {
       window.removeEventListener("open-order-chat", handleCustomOpen);
     };
-  }, [orders]);
+  }, []);
 
   // Group raw rows by order_number
   const groupedOrdersMap = new Map<string, any>();

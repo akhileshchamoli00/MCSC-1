@@ -815,11 +815,11 @@ export default function AssignedOrdersPage() {
   const [highlightedOrderNum, setHighlightedOrderNum] = useState<string | null>(null);
 
   const openOrderDirectly = (orderNum: string, openChat: boolean = true) => {
-    if (!orderNum || orders.length === 0) return;
+    if (!orderNum) return;
 
     // Find in grouped orders
     const matched = groupedOrders.find(g => g.order_number?.toUpperCase() === orderNum.toUpperCase());
-    if (!matched) return;
+    if (matched) {
 
     const st = (matched.status || "").toUpperCase();
     const isRevOnly = checkIsReviewOnly(matched);
@@ -896,28 +896,52 @@ export default function AssignedOrdersPage() {
         document.body.scrollTop = 0;
       }
     }, 300);
+    } else {
+      // Fallback: If not in current assigned orders list, fetch directly from backend API
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/clients/orders/group/${encodeURIComponent(orderNum)}`, {
+        credentials: "include",
+      })
+        .then(async res => {
+          if (res.ok) {
+            const data = await res.json();
+            const groupData = Array.isArray(data) && data.length > 0 ? data[0] : data;
+            if (groupData && groupData.order_number) {
+              setSelectedGroup(groupData);
+              if (openChat) {
+                setIsChatOpen(true);
+                fetchProgressUpdates(groupData.order_number);
+              }
+            }
+          }
+        })
+        .catch(err => console.error("Error fetching direct assigned order:", err));
+    }
   };
 
   const hasProcessedUrlOrder = useRef(false);
 
-  // URL Query Params initial handler
+  // URL Query Params & sessionStorage initial handler
   useEffect(() => {
-    if (orders.length === 0 || hasProcessedUrlOrder.current) return;
-
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    const orderNum = params.get("order") || sessionStorage.getItem("assigned_orders_highlighted_order");
+    const orderNum = params.get("order") || sessionStorage.getItem("auto_open_order_chat");
     const openChat = params.get("chat");
 
-    if (orderNum) {
+    if (!orderNum) return;
+
+    if (orders.length > 0) {
       hasProcessedUrlOrder.current = true;
-      openOrderDirectly(orderNum, openChat === "true");
+      openOrderDirectly(orderNum, openChat !== "false");
+      sessionStorage.removeItem("auto_open_order_chat");
       const url = new URL(window.location.href);
       if (url.searchParams.has("order") || url.searchParams.has("chat")) {
         url.searchParams.delete("order");
         url.searchParams.delete("chat");
         window.history.replaceState({}, "", url.pathname + url.search);
       }
+    } else if (!hasProcessedUrlOrder.current) {
+      hasProcessedUrlOrder.current = true;
+      openOrderDirectly(orderNum, openChat !== "false");
     }
   }, [orders, groupedOrders]);
 

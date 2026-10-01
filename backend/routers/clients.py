@@ -1555,6 +1555,108 @@ def create_standalone_client_order(order_req: schemas.ClientOrderCreateRequest, 
 
     return created_rows
 
+@router.get("/orders/group/{order_number}")
+def get_order_group_by_number(
+    order_number: str,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Fetch all items for a specific order group by order_number, aggregated into a single group object
+    compatible with frontend groupedOrders and selectedOrderGroup.
+    """
+    clean_num = order_number.strip().upper()
+    items = db.query(models.ClientOrder).options(
+        joinedload(models.ClientOrder.company),
+        joinedload(models.ClientOrder.client),
+        joinedload(models.ClientOrder.service),
+        joinedload(models.ClientOrder.notary)
+    ).filter(func.upper(models.ClientOrder.order_number) == clean_num).all()
+
+    if not items:
+        # Also try matching by SINGLE-id or id if order_number is numeric
+        if clean_num.startswith("SINGLE-"):
+            raw_id = clean_num.replace("SINGLE-", "")
+            if raw_id.isdigit():
+                items = db.query(models.ClientOrder).options(
+                    joinedload(models.ClientOrder.company),
+                    joinedload(models.ClientOrder.client),
+                    joinedload(models.ClientOrder.service),
+                    joinedload(models.ClientOrder.notary)
+                ).filter(models.ClientOrder.id == int(raw_id)).all()
+        elif clean_num.isdigit():
+            items = db.query(models.ClientOrder).options(
+                joinedload(models.ClientOrder.company),
+                joinedload(models.ClientOrder.client),
+                joinedload(models.ClientOrder.service),
+                joinedload(models.ClientOrder.notary)
+            ).filter(models.ClientOrder.id == int(clean_num)).all()
+
+    if not items:
+        raise HTTPException(status_code=404, detail=f"Order {order_number} not found")
+
+    consultants_cache = build_consultants_cache(db, items)
+    doc_counts_cache = build_doc_counts_cache(db, items)
+    is_admin = is_admin_or_hr(current_user) or auth.is_super_admin(current_user)
+    can_view_notary_payments = is_admin or auth.has_permission(current_user, "clients_orders_notary_payments", "view", db) or auth.has_permission(current_user, "clients_vendors", "view", db)
+
+    formatted_items = []
+    for ord_obj in items:
+        res = format_order_response(ord_obj, consultants_cache, doc_counts_cache)
+        if not can_view_notary_payments:
+            res.notary_fee = 0.0
+            if res.notary:
+                res.notary.bank_account_name = None
+                res.notary.bank_account_number = None
+                res.notary.bank_name = None
+                res.notary.bank_branch = None
+                res.notary.bank_swift_code = None
+        formatted_items.append(res.model_dump() if hasattr(res, "model_dump") else res.dict())
+
+    first = formatted_items[0]
+    total_amt = sum((it.get("unit_price") or it.get("total_amount") or 0) for it in formatted_items)
+
+    all_consultants = []
+    seen_c_ids = set()
+    all_consultant_ids = []
+    for it in formatted_items:
+        for c in it.get("consultants") or []:
+            cid = c.get("id") if isinstance(c, dict) else getattr(c, "id", None)
+            if cid and cid not in seen_c_ids:
+                seen_c_ids.add(cid)
+                all_consultants.append(c)
+        for cid in it.get("consultant_ids") or []:
+            if cid not in all_consultant_ids:
+                all_consultant_ids.append(cid)
+
+    group = {
+        "id": first.get("id"),
+        "order_number": first.get("order_number") or order_number,
+        "client_name": first.get("client_name"),
+        "client_email": first.get("client_email"),
+        "client_phone": first.get("client_phone"),
+        "company_name": first.get("company_name"),
+        "company_id": first.get("company_id"),
+        "company_code": first.get("company_code"),
+        "status": first.get("status"),
+        "created_at": first.get("created_at"),
+        "total_amount": total_amt,
+        "items": formatted_items,
+        "consultants": all_consultants,
+        "consultant_ids": all_consultant_ids,
+        "reviewer_id": first.get("reviewer_id"),
+        "reviewer": first.get("reviewer"),
+        "reviewer_ids": first.get("reviewer_ids") or [],
+        "reviewers": first.get("reviewers") or [],
+        "payment_link": first.get("payment_link"),
+        "is_proforma_finalized": any(it.get("is_proforma_finalized") for it in formatted_items),
+        "is_final_invoice_finalized": any(it.get("is_final_invoice_finalized") for it in formatted_items),
+        "accurate_sync_status": first.get("accurate_sync_status"),
+        "accurate_so_no": first.get("accurate_so_no"),
+        "accurate_inv_no": first.get("accurate_inv_no"),
+    }
+    return group
+
 @router.post("/orders/group/{order_number}/move-to-active")
 @router.post("/orders/{order_number}/move-to-active")
 def move_pipeline_order_to_active(order_number: str, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
@@ -4998,6 +5100,66 @@ def get_taggable_users_for_order(order_number: str, db: Session) -> List[models.
     return allowed_users
 
 
+def get_order_action_url_for_user(user: models.User, order_status: str, order_number: str, db: Session) -> str:
+    """
+    Determines the appropriate routing URL with ?order={order_number}&chat=true based on user's permissions.
+    """
+    clean_no = (order_number or "").strip()
+    is_completed = order_status == "COMPLETED"
+    is_pipeline = order_status in ["PROSPECT", "PIPELINE"]
+    is_cancelled = order_status == "CANCELLED"
+
+    can_view_full_orders = auth.is_super_admin(user) or is_admin_or_hr(user)
+    if not can_view_full_orders:
+        if is_completed:
+            can_view_full_orders = auth.has_permission(user, "clients_orders_completed", "view", db)
+        elif is_cancelled:
+            can_view_full_orders = auth.has_permission(user, "clients_orders_cancelled", "view", db)
+        elif is_pipeline:
+            can_view_full_orders = auth.has_permission(user, "clients_orders_pipeline", "view", db)
+        else:
+            can_view_full_orders = auth.has_permission(user, "clients_orders_active", "view", db)
+
+    if can_view_full_orders:
+        if is_completed:
+            base_route = "/business/clients/orders/completed"
+        elif is_cancelled:
+            base_route = "/business/clients/orders/cancelled"
+        elif is_pipeline:
+            base_route = "/business/clients/orders/pipeline"
+        else:
+            base_route = "/business/clients/orders"
+        return f"{base_route}?order={clean_no}&chat=true"
+    else:
+        return f"/business/assigned-orders?order={clean_no}&chat=true"
+
+
+def get_assigned_consultant_user_ids(order_number: str, db: Session) -> Set[int]:
+    """
+    Returns user_ids of all active consultants (Person In Charge / PIC) assigned to this order (across all line items).
+    Reviewers are explicitly excluded per business requirements.
+    """
+    clean_no = (order_number or "").strip().upper()
+    orders_in_group = db.query(models.ClientOrder).filter(func.upper(models.ClientOrder.order_number) == clean_no).all()
+    if not orders_in_group:
+        return set()
+
+    consultant_emp_ids = set()
+    for o in orders_in_group:
+        c_ids = parse_consultant_ids(o.consultant_ids)
+        consultant_emp_ids.update(c_ids)
+
+    if not consultant_emp_ids:
+        return set()
+
+    assigned_emps = db.query(models.Employee).filter(
+        models.Employee.id.in_(list(consultant_emp_ids)),
+        models.Employee.status == models.EmploymentStatus.ACTIVE
+    ).all()
+
+    return {emp.user_id for emp in assigned_emps if emp.user_id}
+
+
 def get_assigned_order_team_user_ids(order_number: str, db: Session) -> Set[int]:
     """
     Returns user_ids of all consultants and reviewers assigned to this order (across all line items).
@@ -5144,87 +5306,72 @@ def add_order_progress(
                             tagged_user_ids.add(member.user_id)
 
         # Send notifications
-        if tagged_user_ids:
-            from notification_manager import manager
-            
-            is_completed = first_order.status == "COMPLETED"
-            is_pipeline = first_order.status in ["PROSPECT", "PIPELINE"]
-            is_cancelled = first_order.status == "CANCELLED"
+        from notification_manager import manager
+        
+        # 1. Send notifications to tagged users
+        for uid in tagged_user_ids:
+            tagged_user = db.query(models.User).filter(models.User.id == uid).first()
+            if not tagged_user:
+                continue
+                
+            action_url = get_order_action_url_for_user(tagged_user, first_order.status, order_number, db)
+            if action_url:
+                is_team_notif = uid in order_team_user_ids
+                notif_title = f"Tagged @Team in Order #{order_number}" if is_team_notif else "Tagged in Order Chat"
+                notif_msg = (
+                    f"{formatted_resp.sender_name} tagged @Team in Order #{order_number}: \"{message_text[:60]}...\""
+                    if is_team_notif else
+                    f"{formatted_resp.sender_name} tagged you in Order #{order_number}: \"{message_text[:60]}...\""
+                )
+                manager.notify_user_sync(
+                    db=db,
+                    user_id=uid,
+                    title=notif_title,
+                    message=notif_msg,
+                    type="attendance",
+                    module="clients",
+                    reference_id=first_order.id,
+                    action_url=action_url
+                )
 
-            for uid in tagged_user_ids:
-                tagged_user = db.query(models.User).filter(models.User.id == uid).first()
-                if not tagged_user:
-                    continue
-                    
-                can_view_full_orders = auth.is_super_admin(tagged_user) or is_admin_or_hr(tagged_user)
-                if not can_view_full_orders:
-                    if is_completed:
-                        can_view_full_orders = auth.has_permission(tagged_user, "clients_orders_completed", "view", db)
-                    elif is_cancelled:
-                        can_view_full_orders = auth.has_permission(tagged_user, "clients_orders_cancelled", "view", db)
-                    elif is_pipeline:
-                        can_view_full_orders = auth.has_permission(tagged_user, "clients_orders_pipeline", "view", db)
-                    else:
-                        can_view_full_orders = auth.has_permission(tagged_user, "clients_orders_active", "view", db)
-                
-                action_url = None
-                if can_view_full_orders:
-                    if is_completed:
-                        base_route = "/business/clients/orders/completed"
-                    elif is_cancelled:
-                        base_route = "/business/clients/orders/cancelled"
-                    elif is_pipeline:
-                        base_route = "/business/clients/orders/pipeline"
-                    else:
-                        base_route = "/business/clients/orders"
-                    action_url = f"{base_route}?order={order_number}&chat=true"
-                elif auth.has_permission(tagged_user, "clients_my", "view", db):
-                    action_url = f"/business/assigned-orders?order={order_number}&chat=true"
-                else:
-                    action_url = f"/business/assigned-orders?order={order_number}&chat=true"
-                
-                if action_url:
-                    is_team_notif = uid in order_team_user_ids
-                    notif_title = f"Tagged @Team in Order #{order_number}" if is_team_notif else "Tagged in Order Chat"
-                    notif_msg = (
-                        f"{formatted_resp.sender_name} tagged @Team in Order #{order_number}: \"{message_text[:60]}...\""
-                        if is_team_notif else
-                        f"{formatted_resp.sender_name} tagged you in Order #{order_number}: \"{message_text[:60]}...\""
-                    )
+        # 2. Always notify assigned consultants (Person in Charge / PIC) for any internal chat activity
+        assigned_consultant_uids = get_assigned_consultant_user_ids(order_number, db)
+        for uid in assigned_consultant_uids:
+            if uid == current_user.id or uid in tagged_user_ids:
+                continue
+            consultant_user = db.query(models.User).filter(models.User.id == uid).first()
+            if not consultant_user:
+                continue
+            action_url = get_order_action_url_for_user(consultant_user, first_order.status, order_number, db)
+            manager.notify_user_sync(
+                db=db,
+                user_id=uid,
+                title=f"New Message on Order #{order_number}",
+                message=f"{formatted_resp.sender_name} posted in Order #{order_number}: \"{message_text[:60]}...\"",
+                type="attendance",
+                module="clients",
+                reference_id=first_order.id,
+                action_url=action_url
+            )
+    elif target_channel == "CLIENT":
+        from notification_manager import manager
+        if formatted_resp.is_client:
+            # Client sent message -> Notify assigned consultant(s) (PIC)
+            consultant_user_ids = get_assigned_consultant_user_ids(order_number, db)
+            for uid in consultant_user_ids:
+                if uid != current_user.id:
+                    consultant_user = db.query(models.User).filter(models.User.id == uid).first()
+                    action_url = get_order_action_url_for_user(consultant_user, first_order.status, order_number, db) if consultant_user else f"/business/assigned-orders?order={order_number}&chat=true"
                     manager.notify_user_sync(
                         db=db,
                         user_id=uid,
-                        title=notif_title,
-                        message=notif_msg,
+                        title=f"New Client Message - #{order_number}",
+                        message=f"Client message on Order #{order_number}: \"{message_text[:60]}...\"",
                         type="attendance",
                         module="clients",
                         reference_id=first_order.id,
                         action_url=action_url
                     )
-    elif target_channel == "CLIENT":
-        from notification_manager import manager
-        if formatted_resp.is_client:
-            # Client sent message -> Notify assigned consultant(s) & Admin
-            orders_in_group = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
-            consultant_user_ids = set()
-            for o in orders_in_group:
-                c_ids = parse_consultant_ids(o.consultant_ids)
-                for cid in c_ids:
-                    emp = db.query(models.Employee).filter(models.Employee.id == cid).first()
-                    if emp and emp.user_id:
-                        consultant_user_ids.add(emp.user_id)
-            
-            for uid in consultant_user_ids:
-                manager.notify_user_sync(
-                    db=db,
-                    user_id=uid,
-                    title=f"New Client Message - #{order_number}",
-                    message=f"Client message on Order #{order_number}: \"{message_text[:60]}...\"",
-                    type="attendance",
-                    module="clients",
-                    reference_id=first_order.id,
-                    action_url=f"/business/assigned-orders?order={order_number}&chat=true"
-                )
         else:
             # Staff sent message to Client -> Notify Client representative
             client_user_id = None
@@ -5241,6 +5388,24 @@ def add_order_progress(
                     reference_id=first_order.id,
                     action_url=f"/client/chat?order={order_number}"
                 )
+
+            # Also notify assigned consultants (PIC) if someone else (e.g. admin or teammate) sent message to client
+            consultant_user_ids = get_assigned_consultant_user_ids(order_number, db)
+            for uid in consultant_user_ids:
+                if uid != current_user.id:
+                    consultant_user = db.query(models.User).filter(models.User.id == uid).first()
+                    if consultant_user:
+                        action_url = get_order_action_url_for_user(consultant_user, first_order.status, order_number, db)
+                        manager.notify_user_sync(
+                            db=db,
+                            user_id=uid,
+                            title=f"Client Chat Update - #{order_number}",
+                            message=f"{formatted_resp.sender_name} posted to client on Order #{order_number}: \"{message_text[:60]}...\"",
+                            type="attendance",
+                            module="clients",
+                            reference_id=first_order.id,
+                            action_url=action_url
+                        )
 
     return formatted_resp
 
@@ -5464,15 +5629,10 @@ async def upload_order_attachment(
     try:
         if target_channel == "CLIENT":
             if current_user.role and current_user.role.name.upper() == "CLIENT":
-                consultant_user_ids = set()
-                for o in orders_in_group:
-                    c_ids = parse_consultant_ids(o.consultant_ids)
-                    for cid in c_ids:
-                        emp = db.query(models.Employee).filter(models.Employee.id == cid).first()
-                        if emp and emp.user_id:
-                            consultant_user_ids.add(emp.user_id)
-                            
+                consultant_user_ids = get_assigned_consultant_user_ids(order_number, db)
                 for uid in consultant_user_ids:
+                    consultant_user = db.query(models.User).filter(models.User.id == uid).first()
+                    action_url = get_order_action_url_for_user(consultant_user, first_order.status, order_number, db) if consultant_user else f"/business/assigned-orders?order={order_number}&chat=true"
                     title_text = f"New Snippet Shared - #{order_number}" if is_snippet_upload else f"New Document Uploaded - #{order_number}"
                     desc_text = f"Client shared an image snippet on Order #{order_number}" if is_snippet_upload else f"Client uploaded '{sanitized_filename}' on Order #{order_number}"
                     manager.notify_user_sync(
@@ -5483,7 +5643,7 @@ async def upload_order_attachment(
                         type="attendance",
                         module="clients",
                         reference_id=first_order.id,
-                        action_url=f"/business/assigned-orders?order={order_number}&chat=true"
+                        action_url=action_url
                     )
             else:
                 if company and company.client and company.client.user_id:
@@ -5500,27 +5660,23 @@ async def upload_order_attachment(
                         action_url=f"/client/chat?order={order_number}"
                     )
         else:
-            consultant_user_ids = set()
-            for o in orders_in_group:
-                c_ids = parse_consultant_ids(o.consultant_ids)
-                for cid in c_ids:
-                    emp = db.query(models.Employee).filter(models.Employee.id == cid).first()
-                    if emp and emp.user_id and emp.user_id != current_user.id:
-                        consultant_user_ids.add(emp.user_id)
-                        
+            consultant_user_ids = get_assigned_consultant_user_ids(order_number, db)
             for uid in consultant_user_ids:
-                title_text = f"New Internal Snippet - #{order_number}" if is_snippet_upload else f"New Internal Attachment - #{order_number}"
-                desc_text = f"New snippet posted in internal order notes #{order_number}" if is_snippet_upload else f"New file '{sanitized_filename}' posted in internal order notes #{order_number}"
-                manager.notify_user_sync(
-                    db=db,
-                    user_id=uid,
-                    title=title_text,
-                    message=desc_text,
-                    type="attendance",
-                    module="clients",
-                    reference_id=first_order.id,
-                    action_url=f"/business/assigned-orders?order={order_number}&chat=true"
-                )
+                if uid != current_user.id:
+                    consultant_user = db.query(models.User).filter(models.User.id == uid).first()
+                    action_url = get_order_action_url_for_user(consultant_user, first_order.status, order_number, db) if consultant_user else f"/business/assigned-orders?order={order_number}&chat=true"
+                    title_text = f"New Internal Snippet - #{order_number}" if is_snippet_upload else f"New Internal Attachment - #{order_number}"
+                    desc_text = f"New snippet posted in internal order notes #{order_number}" if is_snippet_upload else f"New file '{sanitized_filename}' posted in internal order notes #{order_number}"
+                    manager.notify_user_sync(
+                        db=db,
+                        user_id=uid,
+                        title=title_text,
+                        message=desc_text,
+                        type="attendance",
+                        module="clients",
+                        reference_id=first_order.id,
+                        action_url=action_url
+                    )
     except Exception as notify_err:
         print(f"Notice: Failed to dispatch notification: {notify_err}")
         

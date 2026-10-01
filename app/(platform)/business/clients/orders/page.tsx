@@ -827,7 +827,7 @@ export default function ClientOrdersPage() {
       }, 4000);
     } else {
       // Fallback: If not in current active orders list, fetch directly from backend API
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/group/${encodeURIComponent(orderNum)}`, {
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/clients/orders/group/${encodeURIComponent(orderNum)}`, {
         credentials: "include",
       })
         .then(async res => {
@@ -865,18 +865,30 @@ export default function ClientOrdersPage() {
     };
   }, []);
 
-  // Auto-open chat from URL query parameter (for notifications & deep linking)
+  const hasProcessedUrlOrderRef = useRef(false);
+
+  // Auto-open chat from URL query parameter or sessionStorage (for notifications & deep linking)
   useEffect(() => {
-    const orderNum = searchParams?.get("order");
+    const orderNum = searchParams?.get("order") || (typeof window !== "undefined" ? sessionStorage.getItem("auto_open_order_chat") : null);
     const openChat = searchParams?.get("chat");
-    if (orderNum) {
-      openOrderDirectly(orderNum, openChat === "true" || openChat === null);
+
+    if (!orderNum) return;
+
+    if (orders.length > 0) {
+      hasProcessedUrlOrderRef.current = true;
+      openOrderDirectly(orderNum, openChat !== "false");
       if (typeof window !== "undefined") {
+        sessionStorage.removeItem("auto_open_order_chat");
         const url = new URL(window.location.href);
-        url.searchParams.delete("order");
-        url.searchParams.delete("chat");
-        window.history.replaceState({}, "", url.pathname + url.search);
+        if (url.searchParams.has("order") || url.searchParams.has("chat")) {
+          url.searchParams.delete("order");
+          url.searchParams.delete("chat");
+          window.history.replaceState({}, "", url.pathname + url.search);
+        }
       }
+    } else if (!hasProcessedUrlOrderRef.current) {
+      hasProcessedUrlOrderRef.current = true;
+      openOrderDirectly(orderNum, openChat !== "false");
     }
   }, [searchParams, orders]);
 

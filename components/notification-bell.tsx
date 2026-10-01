@@ -233,9 +233,16 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
     }
 
     if (targetUrl) {
-      // Ensure chat=true is included for order navigation
-      if (orderNum && !targetUrl.includes("chat=")) {
-        targetUrl += targetUrl.includes("?") ? "&chat=true" : "?chat=true";
+      // Ensure chat=true is ALWAYS set for order navigation when clicking notifications
+      if (orderNum) {
+        if (targetUrl.includes("chat=false")) {
+          targetUrl = targetUrl.replace("chat=false", "chat=true");
+        } else if (!targetUrl.includes("chat=")) {
+          targetUrl += targetUrl.includes("?") ? "&chat=true" : "?chat=true";
+        }
+        try {
+          sessionStorage.setItem("auto_open_order_chat", orderNum);
+        } catch {}
       }
 
       if (isClientUser && (targetUrl.startsWith("/business/") || targetUrl.startsWith("/hrms/"))) {
@@ -292,9 +299,8 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
 
       // Dispatch custom event in case user is already viewing the target orders page
       if (orderNum) {
-        const shouldOpenChat = !targetUrl.includes("chat=false");
         window.dispatchEvent(new CustomEvent("open-order-chat", {
-          detail: { orderNumber: orderNum, chat: shouldOpenChat }
+          detail: { orderNumber: orderNum, chat: true }
         }));
       }
 
