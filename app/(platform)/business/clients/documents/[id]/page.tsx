@@ -63,6 +63,7 @@ import Link from "next/link";
 import { format, isBefore, differenceInDays } from "date-fns";
 import { DropboxFileManager } from "@/components/dropbox-file-manager";
 import { DualOrderChatDialog } from "@/components/dual-order-chat-dialog";
+import { ExcelPreview } from "@/components/excel-preview";
 import { cn } from "@/lib/utils";
 
 export const DOCUMENT_CATEGORIES = [
@@ -2227,7 +2228,7 @@ export default function CompanyDocumentsManagementPage() {
       {/* Right-to-Left Slide Preview Panel */}
       {previewDoc && (
         <div className={`fixed top-16 bottom-0 right-0 left-0 md:left-[260px] z-30 bg-background/98 backdrop-blur-md p-4 sm:p-6 flex flex-col justify-between overflow-hidden duration-300 border-l border-t border-border shadow-2xl ${isClosingPreview ? "animate-out slide-out-to-right" : "animate-in slide-in-from-right"}`}>
-          <div className="max-w-7xl w-full h-full mx-auto flex flex-col justify-between space-y-4">
+          <div className="max-w-7xl w-full h-full min-h-0 mx-auto flex flex-col justify-between space-y-4">
 
             {/* Top Action Header */}
             <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl bg-slate-900 text-white shadow-lg shrink-0">
@@ -2287,7 +2288,7 @@ export default function CompanyDocumentsManagementPage() {
             </div>
 
             {/* Document Viewer Frame */}
-            <div className="flex-1 w-full bg-slate-900/5 dark:bg-slate-950 rounded-2xl border border-border shadow-inner flex items-center justify-center p-2 overflow-hidden">
+            <div className="flex-1 min-h-0 w-full bg-slate-900/5 dark:bg-slate-950 rounded-2xl border border-border shadow-inner flex flex-col items-center justify-center p-2 overflow-hidden">
               {resolvedPreviewUrl && resolvedPreviewUrl !== "#" ? (
                 previewDoc.file_name?.match(/\.(jpeg|jpg|gif|png|webp|svg)/i) ? (
                   <img
@@ -2322,9 +2323,16 @@ export default function CompanyDocumentsManagementPage() {
                       className={`w-full max-w-4xl bg-white text-black dark:bg-slate-100 rounded-lg shadow-md p-4 sm:p-8 font-sans ${docxLoading || docxError ? "hidden" : "block"}`} 
                     />
                   </div>
+                ) : previewDoc.file_name?.match(/\.(xlsx|xls|csv)$/i) ? (
+                  <ExcelPreview
+                    fileUrl={resolvedPreviewUrl}
+                    fileName={previewDoc.file_name}
+                    onDownload={() => handleDownloadDocFile(previewDoc)}
+                    className="h-full w-full flex-1 min-h-0 border-0 shadow-none rounded-xl"
+                  />
                 ) : (
                   <iframe
-                    src={previewDoc.file_name?.match(/\.(pdf|doc)$/i) ? resolvedPreviewUrl : `https://docs.google.com/gview?url=${encodeURIComponent(resolvedPreviewUrl)}&embedded=true`}
+                    src={previewDoc.file_name?.match(/\.(pdf|doc|txt|json)$/i) ? resolvedPreviewUrl : `https://docs.google.com/gview?url=${encodeURIComponent(resolvedPreviewUrl)}&embedded=true`}
                     className="w-full h-[calc(100vh-16rem)] rounded-xl border-0 shadow-sm bg-white"
                     title="Document Preview Frame"
                   />

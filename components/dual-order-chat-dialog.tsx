@@ -58,6 +58,7 @@ import { resolveImageUrl } from "@/lib/utils";
 import { toast } from "sonner";
 import { ChatEmojiPicker } from "@/components/chat-emoji-picker";
 import { ChatMessageReactions, WhatsAppReactionHoverBar } from "@/components/chat-message-reactions";
+import { ExcelPreview } from "@/components/excel-preview";
 
 const isImageFile = (filename?: string | null) => {
   if (!filename) return false;
@@ -3010,11 +3011,19 @@ export function DualOrderChatDialog({
 
               {/* Preview Body */}
               <div className="flex-1 bg-muted/10 p-2 overflow-hidden flex items-center justify-center">
-                <iframe
-                  src={previewUrl}
-                  className="w-full h-full rounded-xl border border-border/40 bg-background"
-                  title="Document Preview"
-                />
+                {previewAttachment?.attachment_name?.match(/\.(xlsx|xls|csv)$/i) ? (
+                  <ExcelPreview
+                    fileUrl={previewUrl}
+                    fileName={previewAttachment.attachment_name}
+                    className="h-full border-0 shadow-none rounded-none"
+                  />
+                ) : (
+                  <iframe
+                    src={previewUrl}
+                    className="w-full h-full rounded-xl border border-border/40 bg-background"
+                    title="Document Preview"
+                  />
+                )}
               </div>
             </motion.div>
           </div>
