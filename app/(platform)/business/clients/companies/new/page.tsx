@@ -67,6 +67,8 @@ export default function NewCompanyPage() {
   const [dirEmailTouched, setDirEmailTouched] = useState(false);
   const [dirPhoneTouched, setDirPhoneTouched] = useState(false);
   const [nextCompanySeq, setNextCompanySeq] = useState<number>(1);
+  const [existingCompanies, setExistingCompanies] = useState<any[]>([]);
+  const [nameDuplicateError, setNameDuplicateError] = useState<string | null>(null);
 
   // Load clients list for parent client dropdown and get next sequence number
   useEffect(() => {
@@ -81,7 +83,10 @@ export default function NewCompanyPage() {
         if (cliRes.ok) setClients(await cliRes.json());
         if (compRes.ok) {
           const compData = await compRes.json();
-          if (Array.isArray(compData)) setNextCompanySeq(compData.length + 1);
+          if (Array.isArray(compData)) {
+            setExistingCompanies(compData);
+            setNextCompanySeq(compData.length + 1);
+          }
         }
       } catch (err) {
         console.error("Error fetching clients/companies list:", err);
@@ -92,10 +97,30 @@ export default function NewCompanyPage() {
     fetchClientsAndCount();
   }, []);
 
+  const checkNameDuplicate = (name: string, list: any[] = existingCompanies) => {
+    const clean = name.trim().toLowerCase();
+    if (!clean) {
+      setNameDuplicateError(null);
+      return null;
+    }
+    const matched = list.find(
+      (c) => (c.company_name || "").trim().toLowerCase() === clean
+    );
+    if (matched) {
+      const msg = `A company named "${matched.company_name}" already exists (${matched.company_code}).`;
+      setNameDuplicateError(msg);
+      return msg;
+    }
+    setNameDuplicateError(null);
+    return null;
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === "company_name") {
+      checkNameDuplicate(value);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -111,6 +136,16 @@ export default function NewCompanyPage() {
       setActiveTab("company");
       return;
     }
+
+    const dupErr = checkNameDuplicate(formData.company_name);
+    if (dupErr) {
+      setError(dupErr);
+      toast.error(dupErr);
+      setLoading(false);
+      setActiveTab("company");
+      return;
+    }
+
     if (!formData.key_contact_person.trim()) {
       setError("Key Contact Person Name is mandatory");
       setLoading(false);
@@ -278,8 +313,14 @@ export default function NewCompanyPage() {
                       onChange={handleInputChange} 
                       required 
                       placeholder="e.g. Acme Corporation" 
-                      className="h-10 rounded-xl border-border/50 bg-background/60"
+                      className={`h-10 rounded-xl bg-background/60 ${nameDuplicateError ? "border-destructive focus-visible:ring-destructive" : "border-border/50"}`}
                     />
+                    {nameDuplicateError && (
+                      <p className="text-[11px] text-destructive flex items-center gap-1.5 font-medium mt-1">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                        {nameDuplicateError}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-foreground" htmlFor="company_code">Company Code (Auto Generated)</label>

@@ -1682,6 +1682,9 @@ class PublicSendMessageRequest(BaseModel):
     message: str
     attachment_url: Optional[str] = None
     attachment_name: Optional[str] = None
+    quoted_message_id: Optional[int] = None
+    quoted_message_text: Optional[str] = None
+    quoted_sender_name: Optional[str] = None
 
 
 class AccurateConfigBase(BaseModel):

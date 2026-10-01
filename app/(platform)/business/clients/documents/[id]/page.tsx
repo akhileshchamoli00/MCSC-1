@@ -85,6 +85,13 @@ export const DOCUMENT_CATEGORIES = [
   "Miscellaneous Documents"
 ];
 
+interface OrderSummary {
+  order_number: string;
+  service_name: string;
+  status: string;
+  created_at?: string;
+}
+
 export default function CompanyDocumentsManagementPage() {
   const params = useParams();
   const companyId = params.id as string;
@@ -200,6 +207,7 @@ export default function CompanyDocumentsManagementPage() {
   const [editStakeholder, setEditStakeholder] = useState<any | null>(null);
   const [savingStakeholder, setSavingStakeholder] = useState(false);
   const [orderNumbers, setOrderNumbers] = useState<string[]>([]);
+  const [availableOrders, setAvailableOrders] = useState<OrderSummary[]>([]);
   const [selectedOrderNum, setSelectedOrderNum] = useState(orderNumberParam || "");
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
   const [orderDropdownOpen, setOrderDropdownOpen] = useState(false);
@@ -315,6 +323,37 @@ export default function CompanyDocumentsManagementPage() {
   // Search & Category filters for docs
   const [documentSearchQuery, setDocumentSearchQuery] = useState("");
   const [docCategoryFilter, setDocCategoryFilter] = useState("ALL");
+
+  const getOrderStatusBadgeClass = (status: string) => {
+    const s = (status || "").toUpperCase();
+    if (s === "COMPLETED") {
+      return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30";
+    }
+    if (s === "ON_HOLD") {
+      return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30";
+    }
+    if (s === "CANCELLED") {
+      return "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30";
+    }
+    return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30";
+  };
+
+  const getFilteredOrders = (query: string) => {
+    const q = query.toLowerCase().trim();
+    if (!q) return availableOrders;
+    return availableOrders.filter(ord => 
+      ord.order_number.toLowerCase().includes(q) ||
+      ord.service_name.toLowerCase().includes(q) ||
+      ord.status.toLowerCase().replace(/_/g, " ").includes(q)
+    );
+  };
+
+  const selectedOrderObj = availableOrders.find(
+    o => o.order_number.toUpperCase() === selectedOrderNum.trim().toUpperCase()
+  );
+  const editSelectedOrderObj = availableOrders.find(
+    o => o.order_number.toUpperCase() === (editDoc?.order_number || "").trim().toUpperCase()
+  );
 
   const activeOrderDocsCount = documents.filter((doc: any) => 
     activeOrder && doc.order_number && doc.order_number.trim().toUpperCase() === activeOrder.order_number.trim().toUpperCase()
@@ -476,7 +515,30 @@ export default function CompanyDocumentsManagementPage() {
       if (ordRes.status === "fulfilled" && ordRes.value.ok) {
         const allOrders = await ordRes.value.json();
         const companyOrders = allOrders.filter((o: any) => o.company_id?.toString() === companyId);
-        const uniqueOrderNums = Array.from(new Set(companyOrders.map((o: any) => o.order_number))) as string[];
+        
+        const orderMap = new Map<string, OrderSummary>();
+        companyOrders.forEach((o: any) => {
+          if (!o.order_number) return;
+          const num = o.order_number.trim();
+          const svcName = (o.service_name || o.job_title || (o.items && o.items[0]?.service_name) || (o.items && o.items[0]?.name) || "Service Package").trim();
+          const existing = orderMap.get(num);
+          if (!existing) {
+            orderMap.set(num, {
+              order_number: num,
+              service_name: svcName,
+              status: o.status || "ORDER_ASSIGNED",
+              created_at: o.created_at
+            });
+          } else {
+            if (svcName && !existing.service_name.includes(svcName)) {
+              existing.service_name += `, ${svcName}`;
+            }
+          }
+        });
+
+        const ordersList = Array.from(orderMap.values());
+        setAvailableOrders(ordersList);
+        const uniqueOrderNums = ordersList.map(o => o.order_number);
         setOrderNumbers(uniqueOrderNums);
 
         const targetOrderNum = orderNumberParam || (fromSource === "assigned-orders" && uniqueOrderNums.length > 0 ? uniqueOrderNums[0] : "");
@@ -1323,7 +1385,7 @@ export default function CompanyDocumentsManagementPage() {
                     <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold block mb-1">Order Number (Optional)</label>
                     <div className="relative">
                       <Input
-                        placeholder="Search orders..."
+                        placeholder="Search order # or service..."
                         value={orderSearchQuery}
                         onChange={(e) => {
                           setOrderSearchQuery(e.target.value);
@@ -1332,7 +1394,7 @@ export default function CompanyDocumentsManagementPage() {
                         }}
                         onFocus={() => setOrderDropdownOpen(true)}
                         onBlur={() => setTimeout(() => setOrderDropdownOpen(false), 200)}
-                        className="h-9 text-xs bg-muted/20 pr-8"
+                        className="h-9 text-xs bg-muted/20 pr-8 hover:bg-sky-50/40 dark:hover:bg-sky-950/20 hover:border-sky-300/50 focus:bg-background transition-colors"
                       />
                       {orderSearchQuery ? (
                         <button
@@ -1341,7 +1403,7 @@ export default function CompanyDocumentsManagementPage() {
                             setOrderSearchQuery("");
                             setSelectedOrderNum("");
                           }}
-                          className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground text-[11px]"
+                          className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground text-[11px] cursor-pointer"
                         >
                           ✕
                         </button>
@@ -1349,14 +1411,20 @@ export default function CompanyDocumentsManagementPage() {
                         <button
                           type="button"
                           onClick={() => setOrderDropdownOpen(!orderDropdownOpen)}
-                          className="absolute right-2 top-2.5 text-muted-foreground text-[10px]"
+                          className="absolute right-2 top-2.5 text-muted-foreground text-[10px] cursor-pointer"
                         >
                           ▼
                         </button>
                       )}
                     </div>
+                    {selectedOrderObj && (
+                      <p className="text-[10px] text-muted-foreground truncate mt-1 flex items-center gap-1 font-medium" title={selectedOrderObj.service_name}>
+                        <span className="text-primary font-bold shrink-0">{selectedOrderObj.order_number}:</span>
+                        <span className="truncate">{selectedOrderObj.service_name}</span>
+                      </p>
+                    )}
                     {orderDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-1 max-h-40 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md font-mono text-[11px]">
+                      <div className="absolute z-50 left-0 w-[340px] sm:w-[440px] max-w-[90vw] mt-1 max-h-60 overflow-y-auto rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-xl">
                         <div
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => {
@@ -1364,30 +1432,49 @@ export default function CompanyDocumentsManagementPage() {
                             setOrderSearchQuery("");
                             setOrderDropdownOpen(false);
                           }}
-                          className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 outline-none hover:bg-accent hover:text-accent-foreground text-muted-foreground italic border-b border-border/40"
+                          className="group relative flex w-full cursor-pointer select-none items-center justify-between rounded-md py-1.5 px-2 outline-none hover:bg-sky-50 dark:hover:bg-sky-950/40 text-muted-foreground italic border-b border-border/40 text-xs mb-1 transition-colors"
                         >
-                          None (General Document)
+                          <span className="group-hover:text-sky-950 dark:group-hover:text-sky-100 font-medium transition-colors">None (General Document)</span>
+                          <span className="text-[10px] text-muted-foreground/60 group-hover:text-sky-700 dark:group-hover:text-sky-300 not-italic transition-colors">Company-wide</span>
                         </div>
-                        {orderNumbers
-                          .filter(num => num.toLowerCase().includes(orderSearchQuery.toLowerCase()))
+                        {getFilteredOrders(orderSearchQuery)
                           .slice(0, 30)
-                          .map((num) => (
+                          .map((ord) => (
                             <div
-                              key={num}
+                              key={ord.order_number}
                               onMouseDown={(e) => e.preventDefault()}
                               onClick={() => {
-                                setSelectedOrderNum(num);
-                                setOrderSearchQuery(num);
+                                setSelectedOrderNum(ord.order_number);
+                                setOrderSearchQuery(ord.order_number);
                                 setOrderDropdownOpen(false);
                               }}
-                              className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 outline-none hover:bg-accent hover:text-accent-foreground"
+                              className={`group relative flex w-full cursor-pointer select-none items-center justify-between gap-2 rounded-md py-1.5 px-2 outline-none hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors ${
+                                selectedOrderNum === ord.order_number ? "bg-sky-100/70 text-sky-950 dark:bg-sky-950/60 dark:text-sky-100 font-medium" : ""
+                              }`}
                             >
-                              {num}
+                              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                <span className="font-mono font-bold text-xs shrink-0 text-foreground group-hover:text-sky-950 dark:group-hover:text-sky-100 transition-colors">
+                                  {ord.order_number}
+                                </span>
+                                <span className="text-muted-foreground/50 group-hover:text-sky-500 text-[10px] shrink-0 transition-colors">•</span>
+                                <span className="text-xs truncate text-muted-foreground group-hover:text-sky-900 dark:group-hover:text-sky-200 font-medium transition-colors" title={ord.service_name}>
+                                  {ord.service_name}
+                                </span>
+                              </div>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-[9px] font-mono uppercase px-1.5 py-0 shrink-0 border whitespace-nowrap",
+                                  getOrderStatusBadgeClass(ord.status)
+                                )}
+                              >
+                                {ord.status.replace(/_/g, " ")}
+                              </Badge>
                             </div>
                           ))}
-                        {orderNumbers.filter(num => num.toLowerCase().includes(orderSearchQuery.toLowerCase())).length === 0 && (
-                          <div className="py-2 text-center text-muted-foreground text-[10px]">
-                            No matching orders
+                        {getFilteredOrders(orderSearchQuery).length === 0 && (
+                          <div className="py-3 text-center text-muted-foreground text-xs">
+                            No matching orders found
                           </div>
                         )}
                       </div>
@@ -2008,7 +2095,7 @@ export default function CompanyDocumentsManagementPage() {
                 <label className="font-semibold text-foreground block">Order Number (Optional)</label>
                 <div className="relative">
                   <Input
-                    placeholder="Search or select order..."
+                    placeholder="Search order # or service..."
                     value={editOrderSearchQuery}
                     onChange={(e) => {
                       setEditOrderSearchQuery(e.target.value);
@@ -2020,7 +2107,7 @@ export default function CompanyDocumentsManagementPage() {
                       setEditOrderDropdownOpen(true);
                     }}
                     onBlur={() => setTimeout(() => setEditOrderDropdownOpen(false), 200)}
-                    className="h-9 text-xs font-mono font-bold bg-muted/20 pr-8"
+                    className="h-9 text-xs font-mono font-bold bg-muted/20 pr-8 hover:bg-sky-50/40 dark:hover:bg-sky-950/20 hover:border-sky-300/50 focus:bg-background transition-colors"
                   />
                   {(editDoc.order_number || editOrderSearchQuery) ? (
                     <button
@@ -2030,7 +2117,7 @@ export default function CompanyDocumentsManagementPage() {
                         setEditOrderSearchQuery("");
                         setEditDoc({ ...editDoc, order_number: "" });
                       }}
-                      className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground text-[11px]"
+                      className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground text-[11px] cursor-pointer"
                     >
                       ✕
                     </button>
@@ -2039,14 +2126,20 @@ export default function CompanyDocumentsManagementPage() {
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => setEditOrderDropdownOpen(!editOrderDropdownOpen)}
-                      className="absolute right-2 top-2.5 text-muted-foreground text-[10px]"
+                      className="absolute right-2 top-2.5 text-muted-foreground text-[10px] cursor-pointer"
                     >
                       ▼
                     </button>
                   )}
                 </div>
+                {editSelectedOrderObj && (
+                  <p className="text-[10px] text-muted-foreground truncate mt-1 flex items-center gap-1 font-medium" title={editSelectedOrderObj.service_name}>
+                    <span className="text-primary font-bold shrink-0">{editSelectedOrderObj.order_number}:</span>
+                    <span className="truncate">{editSelectedOrderObj.service_name}</span>
+                  </p>
+                )}
                 {editOrderDropdownOpen && (
-                  <div className="absolute z-50 w-full mt-1 max-h-40 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md font-mono text-[11px]">
+                  <div className="absolute z-50 left-0 w-full mt-1 max-h-60 overflow-y-auto rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-xl">
                     <div
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
@@ -2054,30 +2147,49 @@ export default function CompanyDocumentsManagementPage() {
                         setEditOrderSearchQuery("");
                         setEditOrderDropdownOpen(false);
                       }}
-                      className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 outline-none hover:bg-accent hover:text-accent-foreground text-muted-foreground italic border-b border-border/40"
+                      className="group relative flex w-full cursor-pointer select-none items-center justify-between rounded-md py-1.5 px-2 outline-none hover:bg-sky-50 dark:hover:bg-sky-950/40 text-muted-foreground italic border-b border-border/40 text-xs mb-1 transition-colors"
                     >
-                      None (General Document)
+                      <span className="group-hover:text-sky-950 dark:group-hover:text-sky-100 font-medium transition-colors">None (General Document)</span>
+                      <span className="text-[10px] text-muted-foreground/60 group-hover:text-sky-700 dark:group-hover:text-sky-300 not-italic transition-colors">Company-wide</span>
                     </div>
-                    {orderNumbers
-                      .filter(num => num.toLowerCase().includes(editOrderSearchQuery.toLowerCase()))
+                    {getFilteredOrders(editOrderSearchQuery)
                       .slice(0, 30)
-                      .map((num) => (
+                      .map((ord) => (
                         <div
-                          key={num}
+                          key={ord.order_number}
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => {
-                            setEditDoc({ ...editDoc, order_number: num });
-                            setEditOrderSearchQuery(num);
+                            setEditDoc({ ...editDoc, order_number: ord.order_number });
+                            setEditOrderSearchQuery(ord.order_number);
                             setEditOrderDropdownOpen(false);
                           }}
-                          className={`relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 outline-none hover:bg-accent hover:text-accent-foreground ${editDoc.order_number === num ? "bg-primary/10 text-primary font-bold" : ""}`}
+                          className={`group relative flex w-full cursor-pointer select-none items-center justify-between gap-2 rounded-md py-1.5 px-2 outline-none hover:bg-sky-50 dark:hover:bg-sky-950/40 transition-colors ${
+                            editDoc.order_number === ord.order_number ? "bg-sky-100/70 text-sky-950 dark:bg-sky-950/60 dark:text-sky-100 font-bold" : ""
+                          }`}
                         >
-                          {num}
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <span className="font-mono font-bold text-xs shrink-0 text-foreground group-hover:text-sky-950 dark:group-hover:text-sky-100 transition-colors">
+                              {ord.order_number}
+                            </span>
+                            <span className="text-muted-foreground/50 group-hover:text-sky-500 text-[10px] shrink-0 transition-colors">•</span>
+                            <span className="text-xs truncate text-muted-foreground group-hover:text-sky-900 dark:group-hover:text-sky-200 font-medium transition-colors" title={ord.service_name}>
+                              {ord.service_name}
+                            </span>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[9px] font-mono uppercase px-1.5 py-0 shrink-0 border whitespace-nowrap",
+                              getOrderStatusBadgeClass(ord.status)
+                            )}
+                          >
+                            {ord.status.replace(/_/g, " ")}
+                          </Badge>
                         </div>
                       ))}
-                    {orderNumbers.filter(num => num.toLowerCase().includes(editOrderSearchQuery.toLowerCase())).length === 0 && (
-                      <div className="py-2 text-center text-muted-foreground text-[10px]">
-                        No matching orders
+                    {getFilteredOrders(editOrderSearchQuery).length === 0 && (
+                      <div className="py-3 text-center text-muted-foreground text-xs">
+                        No matching orders found
                       </div>
                     )}
                   </div>

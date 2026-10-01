@@ -140,6 +140,11 @@ def create_client(
 
     customer_code = customer_in.customer_code or generate_client_id(db)
 
+    # Pre-validate company name uniqueness if a new company is being registered
+    if customer_in.company_name and not customer_in.company_id:
+        from routers.clients import check_duplicate_company_name
+        check_duplicate_company_name(db, customer_in.company_name)
+
     # Optional user account creation
     user_id = None
     if customer_in.create_portal_account or customer_in.password:

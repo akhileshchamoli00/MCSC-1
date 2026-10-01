@@ -4,6 +4,7 @@ import React, { useEffect } from "react";
 import Link from "next/link";
 import { useCart } from "@/contexts/cart-context";
 import { useLanguage } from "@/contexts/language-context";
+import { CART_DRAWER_TRANSLATIONS } from "@/lib/catalog-services";
 import { Button } from "@/components/ui/button";
 import {
   ShoppingCart,
@@ -30,6 +31,8 @@ export function CartDrawer() {
     setIsCartOpen,
   } = useCart();
   const { language } = useLanguage();
+  const activeLang = (language === "id" || language === "cn" ? language : "en") as "en" | "id" | "cn";
+  const t = CART_DRAWER_TRANSLATIONS[activeLang] || CART_DRAWER_TRANSLATIONS.en;
 
   const formatIDR = (val: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -84,9 +87,9 @@ export function CartDrawer() {
               <ShoppingCart className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-foreground">Service Cart</h3>
+              <h3 className="text-base font-bold text-foreground">{t.cartTitle}</h3>
               <p className="text-xs text-muted-foreground">
-                {totalItems} service{totalItems === 1 ? "" : "s"} selected for engagement
+                {totalItems} {t.itemsSelected}
               </p>
             </div>
           </div>
@@ -98,7 +101,7 @@ export function CartDrawer() {
                 onClick={clearCart}
                 className="text-xs text-muted-foreground hover:text-destructive h-8 px-2"
               >
-                Clear all
+                {t.clearAll}
               </Button>
             )}
             <Button
@@ -120,9 +123,9 @@ export function CartDrawer() {
               <div className="h-16 w-16 rounded-full bg-muted/40 mx-auto flex items-center justify-center text-muted-foreground/60">
                 <ShoppingCart className="h-8 w-8" />
               </div>
-              <h4 className="font-bold text-foreground text-sm">Your cart is empty</h4>
+              <h4 className="font-bold text-foreground text-sm">{t.emptyTitle}</h4>
               <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-                Explore our service catalog to select company incorporation, licensing, or legal packages.
+                {t.emptyDesc}
               </p>
               <Button
                 size="sm"
@@ -130,72 +133,79 @@ export function CartDrawer() {
                 asChild
                 className="mt-2 text-xs"
               >
-                <Link href={`/${language}/services/catalog`}>Browse Service Catalog</Link>
+                <Link href={`/${language}/services/catalog`}>{t.browseCatalog}</Link>
               </Button>
             </div>
           ) : (
             <div className="space-y-3">
-              {cart.map((item) => (
-                <div
-                  key={item.service.id}
-                  className="rounded-xl border border-border/60 bg-card p-3.5 space-y-2.5 shadow-2xs hover:border-primary/30 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-0.5">
-                      <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary uppercase">
-                        {item.service.id} • {item.service.categoryLabel}
-                      </span>
-                      <h5 className="text-xs font-bold text-foreground leading-snug pt-1">
-                        {item.service.title}
-                      </h5>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                      onClick={() => removeFromCart(item.service.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+              {cart.map((item) => {
+                const localizedTitle =
+                  item.service.translations?.[activeLang]?.title || item.service.title;
+                const localizedCategory =
+                  item.service.translations?.[activeLang]?.categoryLabel || item.service.categoryLabel;
 
-                  <div className="flex items-center justify-between pt-1 border-t border-border/40 text-xs">
-                    {/* Quantity Selector */}
-                    <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-0.5 border border-border/50">
+                return (
+                  <div
+                    key={item.service.id}
+                    className="rounded-xl border border-border/60 bg-card p-3.5 space-y-2.5 shadow-2xs hover:border-primary/30 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary uppercase">
+                          {item.service.id} • {localizedCategory}
+                        </span>
+                        <h5 className="text-xs font-bold text-foreground leading-snug pt-1">
+                          {localizedTitle}
+                        </h5>
+                      </div>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                        onClick={() =>
-                          updateQuantity(item.service.id, item.quantity - 1)
-                        }
+                        className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                        onClick={() => removeFromCart(item.service.id)}
                       >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="px-2 font-mono font-bold text-xs">
-                        {item.quantity}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                        onClick={() =>
-                          updateQuantity(item.service.id, item.quantity + 1)
-                        }
-                      >
-                        <Plus className="h-3 w-3" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
 
-                    {/* Line Total */}
-                    <div className="text-right">
-                      <span className="font-mono font-bold text-xs text-foreground">
-                        {formatIDR(item.service.basePrice * item.quantity)}
-                      </span>
+                    <div className="flex items-center justify-between pt-1 border-t border-border/40 text-xs">
+                      {/* Quantity Selector */}
+                      <div className="flex items-center gap-1 bg-muted/40 rounded-lg p-0.5 border border-border/50">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                          onClick={() =>
+                            updateQuantity(item.service.id, item.quantity - 1)
+                          }
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="px-2 font-mono font-bold text-xs">
+                          {item.quantity}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                          onClick={() =>
+                            updateQuantity(item.service.id, item.quantity + 1)
+                          }
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+
+                      {/* Line Total */}
+                      <div className="text-right">
+                        <span className="font-mono font-bold text-xs text-foreground">
+                          {formatIDR(item.service.basePrice * item.quantity)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -205,18 +215,18 @@ export function CartDrawer() {
           <div className="p-5 border-t border-border/50 bg-muted/10 space-y-3.5 shrink-0">
             <div className="w-full space-y-1.5 text-xs">
               <div className="flex justify-between text-muted-foreground">
-                <span>Subtotal</span>
+                <span>{t.subtotal}</span>
                 <span className="font-mono">{formatIDR(subtotal)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  PPN / VAT (11%)
+                  {t.taxLabel}
                   <span className="text-[10px] bg-muted px-1 rounded font-mono">Tax</span>
                 </span>
                 <span className="font-mono">{formatIDR(taxAmount)}</span>
               </div>
               <div className="flex justify-between text-sm font-bold text-foreground pt-1.5 border-t border-border/40">
-                <span>Total Amount</span>
+                <span>{t.totalAmount}</span>
                 <span className="font-mono text-primary text-base">
                   {formatIDR(totalAmount)}
                 </span>
@@ -230,18 +240,18 @@ export function CartDrawer() {
                 onClick={() => setIsCartOpen(false)}
               >
                 <Link href={`/${language}/services/catalog/checkout`}>
-                  Proceed to Checkout
+                  {t.proceedToCheckout}
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </Button>
 
               <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground pt-1">
                 <span className="flex items-center gap-1">
-                  <ShieldCheck className="h-3 w-3 text-emerald-600" /> Official Guarantee
+                  <ShieldCheck className="h-3 w-3 text-emerald-600" /> {t.officialGuarantee}
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
-                  <Lock className="h-3 w-3 text-muted-foreground" /> Secure Xendit Checkout
+                  <Lock className="h-3 w-3 text-muted-foreground" /> {t.secureCheckout}
                 </span>
               </div>
             </div>

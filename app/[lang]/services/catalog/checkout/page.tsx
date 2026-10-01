@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCart } from "@/contexts/cart-context";
+import { useLanguage } from "@/contexts/language-context";
+import { CHECKOUT_PAGE_TRANSLATIONS } from "@/lib/catalog-services";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,7 +33,11 @@ import { toast } from "sonner";
 export default function CatalogCheckoutPage() {
   const params = useParams();
   const router = useRouter();
-  const lang = (params?.lang as string) || "en";
+  const { language } = useLanguage();
+  const urlLang = (params?.lang as string) || language || "en";
+  const activeLang = (urlLang === "id" || urlLang === "cn" ? urlLang : "en") as "en" | "id" | "cn";
+  const t = CHECKOUT_PAGE_TRANSLATIONS[activeLang] || CHECKOUT_PAGE_TRANSLATIONS.en;
+
   const { cart, removeFromCart, updateQuantity, clearCart, subtotal, taxAmount, totalAmount } = useCart();
 
   // Form State
@@ -68,17 +74,17 @@ export default function CatalogCheckoutPage() {
     e.preventDefault();
 
     if (cart.length === 0) {
-      toast.error("Your cart is empty. Please select at least one service.");
+      toast.error(t.emptyCartNotice);
       return;
     }
 
     if (!formData.fullName.trim() || !formData.email.trim() || !formData.phone.trim()) {
-      toast.error("Please fill in all required customer details.");
+      toast.error(activeLang === "id" ? "Mohon lengkapi semua data wajib pelanggan." : activeLang === "cn" ? "请填写所有必填客户信息。" : "Please fill in all required customer details.");
       return;
     }
 
     if (!agreedTerms || !agreedRefund) {
-      toast.error("Please review and agree to the Terms of Service & Service Delivery Policy.");
+      toast.error(activeLang === "id" ? "Mohon setujui Syarat Layanan & Kebijakan Pengurusan." : activeLang === "cn" ? "请阅读并同意服务条款与政策。" : "Please review and agree to the Terms of Service & Service Delivery Policy.");
       return;
     }
 
@@ -87,7 +93,7 @@ export default function CatalogCheckoutPage() {
     try {
       // Generate clean order reference code
       const orderRef = `MCS-ORD-${Date.now().toString().slice(-6)}`;
-      const orderDate = new Date().toLocaleDateString("en-GB", {
+      const orderDate = new Date().toLocaleDateString(activeLang === "id" ? "id-ID" : activeLang === "cn" ? "zh-CN" : "en-GB", {
         day: "numeric",
         month: "short",
         year: "numeric",
@@ -100,8 +106,8 @@ export default function CatalogCheckoutPage() {
         customer: { ...formData },
         items: cart.map((item) => ({
           id: item.service.id,
-          title: item.service.title,
-          category: item.service.categoryLabel,
+          title: item.service.translations?.[activeLang]?.title || item.service.title,
+          category: item.service.translations?.[activeLang]?.categoryLabel || item.service.categoryLabel,
           unitPrice: item.service.basePrice,
           quantity: item.quantity,
           totalPrice: item.service.basePrice * item.quantity,
@@ -115,14 +121,14 @@ export default function CatalogCheckoutPage() {
       };
 
       // Simulate Xendit Invoice generation / API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 1200));
 
       setCompletedOrder(orderPayload);
       clearCart();
-      toast.success("Order created successfully! Proceed with payment instructions.");
+      toast.success(activeLang === "id" ? "Pesanan berhasil dibuat! Silakan lanjutkan pembayaran." : activeLang === "cn" ? "订单已成功生成！请按指引完成付款。" : "Order created successfully! Proceed with payment instructions.");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err: any) {
-      toast.error("Failed to generate checkout invoice. Please try again.");
+      toast.error(activeLang === "id" ? "Gagal memproses faktur pembayaran." : activeLang === "cn" ? "生成结算凭单失败，请重试。" : "Failed to generate checkout invoice. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -139,13 +145,13 @@ export default function CatalogCheckoutPage() {
               <CheckCircle2 className="h-8 w-8" />
             </div>
             <h2 className="text-xl sm:text-2xl font-extrabold text-foreground">
-              Order Confirmed & Invoice Issued
+              {t.thankYouTitle}
             </h2>
             <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
-              Thank you, <strong className="text-foreground">{completedOrder.customer.fullName}</strong>. Your engagement invoice has been generated via Xendit Payment Gateway.
+              {t.thankYouSubtitle}
             </p>
             <div className="inline-block bg-background px-3 py-1.5 rounded-lg border border-border/80 font-mono text-xs font-bold text-primary">
-              Order #{completedOrder.orderNumber}
+              {t.orderNumber}: #{completedOrder.orderNumber}
             </div>
           </div>
 
@@ -153,22 +159,26 @@ export default function CatalogCheckoutPage() {
           <div className="rounded-2xl border border-border/60 bg-card p-6 space-y-5 shadow-sm">
             <h3 className="text-sm font-bold text-foreground uppercase tracking-wider flex items-center gap-2 border-b border-border/40 pb-3">
               <CreditCard className="h-4 w-4 text-primary" />
-              Payment Information (Xendit Gateway)
+              {activeLang === "id" ? "Informasi Pembayaran (Xendit Gateway)" : activeLang === "cn" ? "支付结算信息（Xendit 网关）" : "Payment Information (Xendit Gateway)"}
             </h3>
 
             {completedOrder.paymentMethod === "va" && (
               <div className="space-y-3 p-4 rounded-xl bg-muted/30 border border-border/60">
                 <span className="text-xs text-muted-foreground block font-medium">
-                  Virtual Account Bank: <strong className="text-foreground uppercase">{completedOrder.selectedBank}</strong>
+                  {activeLang === "id" ? "Bank Virtual Account:" : activeLang === "cn" ? "虚拟账户银行:" : "Virtual Account Bank:"} <strong className="text-foreground uppercase">{completedOrder.selectedBank}</strong>
                 </span>
                 <div className="flex items-center justify-between bg-background p-3 rounded-lg border border-border font-mono">
-                  <span className="text-xs text-muted-foreground">VA Number:</span>
+                  <span className="text-xs text-muted-foreground">{t.vaNumberLabel}:</span>
                   <span className="text-sm sm:text-base font-bold text-primary tracking-wider">
                     8808 9200 4819 0281
                   </span>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Transfer exact amount to the virtual account above via mobile banking, ATM, or internet banking. Payment status verifies automatically within seconds.
+                  {activeLang === "id"
+                    ? "Transfer jumlah persis ke nomor virtual account di atas melalui mobile banking atau ATM. Status verifikasi instan dalam hitungan detik."
+                    : activeLang === "cn"
+                    ? "请通过手机银行或 ATM 向上述专属虚拟账户转入准确金额。系统将在几秒内自动核对到账。"
+                    : "Transfer exact amount to the virtual account above via mobile banking, ATM, or internet banking. Payment status verifies automatically within seconds."}
                 </p>
               </div>
             )}
@@ -176,17 +186,16 @@ export default function CatalogCheckoutPage() {
             {completedOrder.paymentMethod === "qris" && (
               <div className="space-y-3 p-4 rounded-xl bg-muted/30 border border-border/60 text-center">
                 <span className="text-xs font-bold text-foreground block">
-                  Scan QRIS with any e-Wallet or Mobile Banking
+                  {t.qrisScanTitle}
                 </span>
                 <div className="h-44 w-44 mx-auto bg-white rounded-xl p-2 border border-border/80 flex items-center justify-center shadow-inner">
-                  {/* QRIS Placeholder illustration */}
                   <div className="text-center space-y-1">
                     <QrCode className="h-28 w-28 text-black mx-auto" />
                     <span className="text-[9px] font-mono text-zinc-600 block uppercase">NMID: ID1020038910</span>
                   </div>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Compatible with BCA Mobile, GoPay, OVO, Dana, ShopeePay, and LinkAja.
+                  {t.qrisScanDesc}
                 </p>
               </div>
             )}
@@ -194,10 +203,14 @@ export default function CatalogCheckoutPage() {
             {completedOrder.paymentMethod === "card" && (
               <div className="p-4 rounded-xl bg-muted/30 border border-border/60 space-y-2">
                 <span className="text-xs font-bold text-foreground block">
-                  Credit / Debit Card Payment Verified
+                  {activeLang === "id" ? "Pembayaran Kartu Kredit / Debit Diverifikasi" : activeLang === "cn" ? "信用卡 / 借记卡支付已验证" : "Credit / Debit Card Payment Verified"}
                 </span>
                 <p className="text-xs text-muted-foreground">
-                  Your 3D-Secure transaction has been initiated. An electronic payment receipt has been sent to <strong>{completedOrder.customer.email}</strong>.
+                  {activeLang === "id"
+                    ? `Transaksi 3D-Secure telah diinisiasi. Tanda terima pembayaran elektronik dikirimkan ke ${completedOrder.customer.email}.`
+                    : activeLang === "cn"
+                    ? `您的 3D-Secure 交易已发起。电子付款收据已同步发送至 ${completedOrder.customer.email}。`
+                    : `Your 3D-Secure transaction has been initiated. An electronic payment receipt has been sent to ${completedOrder.customer.email}.`}
                 </p>
               </div>
             )}
@@ -205,7 +218,7 @@ export default function CatalogCheckoutPage() {
             {completedOrder.paymentMethod === "manual" && (
               <div className="p-4 rounded-xl bg-muted/30 border border-border/60 space-y-2 text-xs">
                 <span className="font-bold text-foreground block">
-                  Official Corporate Bank Account:
+                  {activeLang === "id" ? "Rekening Resmi Perusahaan:" : activeLang === "cn" ? "公司官方对公银行账户：" : "Official Corporate Bank Account:"}
                 </span>
                 <div className="font-mono space-y-1 bg-background p-2.5 rounded border text-[11.5px]">
                   <div>Bank: <strong>Bank Central Asia (BCA)</strong></div>
@@ -218,7 +231,7 @@ export default function CatalogCheckoutPage() {
             {/* Itemized Breakdown */}
             <div className="space-y-2 pt-2 border-t border-border/40 text-xs">
               <span className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider block">
-                Engaged Packages ({completedOrder.items.length})
+                {t.sec3Title} ({completedOrder.items.length})
               </span>
               {completedOrder.items.map((item: any, idx: number) => (
                 <div key={idx} className="flex justify-between py-1">
@@ -227,15 +240,15 @@ export default function CatalogCheckoutPage() {
                 </div>
               ))}
               <div className="pt-2 border-t border-border/40 flex justify-between text-muted-foreground">
-                <span>Subtotal</span>
+                <span>{t.subtotal}</span>
                 <span className="font-mono">{formatIDR(completedOrder.subtotal)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>PPN / VAT (11%)</span>
+                <span>{t.tax}</span>
                 <span className="font-mono">{formatIDR(completedOrder.taxAmount)}</span>
               </div>
               <div className="pt-1.5 border-t border-border/50 flex justify-between font-bold text-sm text-foreground">
-                <span>Total Amount Due</span>
+                <span>{t.totalDue}</span>
                 <span className="font-mono text-primary text-base">{formatIDR(completedOrder.totalAmount)}</span>
               </div>
             </div>
@@ -248,17 +261,16 @@ export default function CatalogCheckoutPage() {
               asChild
               className="w-full text-xs h-10 gap-1.5"
             >
-              <Link href={`/${lang}/services/catalog`}>
-                <ArrowLeft className="h-3.5 w-3.5" /> Return to Catalog
+              <Link href={`/${activeLang}/services/catalog`}>
+                <ArrowLeft className="h-3.5 w-3.5" /> {t.backToCatalog}
               </Link>
             </Button>
             <Button
               asChild
               className="w-full text-xs h-10 gap-1.5 font-bold"
             >
-              <Link href={`/${lang}/track-order`}>
-                Track Order Status
-                <ExternalLink className="h-3.5 w-3.5" />
+              <Link href={`/${activeLang}`}>
+                {t.backToHome}
               </Link>
             </Button>
           </div>
@@ -274,12 +286,16 @@ export default function CatalogCheckoutPage() {
         <div className="h-16 w-16 rounded-full bg-muted mx-auto flex items-center justify-center text-muted-foreground/50">
           <FileText className="h-8 w-8" />
         </div>
-        <h2 className="text-xl font-bold">Your cart is empty</h2>
+        <h2 className="text-xl font-bold">{t.emptyCartNotice}</h2>
         <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-          Please select services from our catalog to proceed with your corporate engagement and checkout.
+          {activeLang === "id"
+            ? "Silakan pilih layanan dari katalog kami untuk melanjutkan pendaftaran dan checkout."
+            : activeLang === "cn"
+            ? "请从我们的服务目录中挑选所需服务，以继续企业委托与结算。"
+            : "Please select services from our catalog to proceed with your corporate engagement and checkout."}
         </p>
         <Button asChild className="text-xs">
-          <Link href={`/${lang}/services/catalog`}>Explore Service Catalog</Link>
+          <Link href={`/${activeLang}/services/catalog`}>{t.backToCatalog}</Link>
         </Button>
       </div>
     );
@@ -291,16 +307,21 @@ export default function CatalogCheckoutPage() {
         {/* Breadcrumb & Title */}
         <div className="space-y-2">
           <Link
-            href={`/${lang}/services/catalog`}
+            href={`/${activeLang}/services/catalog`}
             className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors font-medium"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to Service Catalog
+            <ArrowLeft className="h-3.5 w-3.5" /> {t.backToCatalog}
           </Link>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-[10px] uppercase font-semibold">
+              {t.stepBadge}
+            </Badge>
+          </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-            Checkout & Service Engagement
+            {t.pageTitle}
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            Complete client identification and confirm payment preferences via Xendit Payment Gateway.
+            {t.pageSubtitle}
           </p>
         </div>
 
@@ -314,19 +335,19 @@ export default function CatalogCheckoutPage() {
                   1
                 </div>
                 <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">
-                  Client & Entity Identification
+                  {t.sec1Title}
                 </h3>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                 <div className="space-y-1 sm:col-span-2">
                   <label className="font-semibold text-foreground">
-                    Contact Person Full Name *
+                    {t.fullName}
                   </label>
                   <Input
                     required
                     name="fullName"
-                    placeholder="e.g. Alexander Wright"
+                    placeholder={t.fullNamePlaceholder}
                     value={formData.fullName}
                     onChange={handleInputChange}
                     className="h-9 text-xs"
@@ -335,40 +356,42 @@ export default function CatalogCheckoutPage() {
 
                 <div className="space-y-1">
                   <label className="font-semibold text-foreground">
-                    Email Address (For Invoices & Deliverables) *
+                    {t.email}
                   </label>
                   <Input
                     required
                     type="email"
                     name="email"
-                    placeholder="alexander@company.com"
+                    placeholder={t.emailPlaceholder}
                     value={formData.email}
                     onChange={handleInputChange}
                     className="h-9 text-xs"
                   />
+                  <p className="text-[10px] text-muted-foreground">{t.emailSubtext}</p>
                 </div>
 
                 <div className="space-y-1">
                   <label className="font-semibold text-foreground">
-                    WhatsApp / Phone Number *
+                    {t.phone}
                   </label>
                   <Input
                     required
                     name="phone"
-                    placeholder="+62 812 3456 789"
+                    placeholder={t.phonePlaceholder}
                     value={formData.phone}
                     onChange={handleInputChange}
                     className="h-9 text-xs font-mono"
                   />
+                  <p className="text-[10px] text-muted-foreground">{t.phoneSubtext}</p>
                 </div>
 
                 <div className="space-y-1">
                   <label className="font-semibold text-foreground">
-                    Company / Entity Name (If Applicable)
+                    {t.companyName}
                   </label>
                   <Input
                     name="companyName"
-                    placeholder="e.g. PT Mandiri Nusantara Solusi"
+                    placeholder={t.companyNamePlaceholder}
                     value={formData.companyName}
                     onChange={handleInputChange}
                     className="h-9 text-xs"
@@ -377,7 +400,7 @@ export default function CatalogCheckoutPage() {
 
                 <div className="space-y-1">
                   <label className="font-semibold text-foreground">
-                    Target City / Domicile
+                    {t.city}
                   </label>
                   <Input
                     name="city"
@@ -390,12 +413,12 @@ export default function CatalogCheckoutPage() {
 
                 <div className="space-y-1 sm:col-span-2">
                   <label className="font-semibold text-foreground">
-                    Special Service Instructions / Notes
+                    {t.notes}
                   </label>
                   <Textarea
                     name="notes"
                     rows={2}
-                    placeholder="Provide desired company names, business activity goals, or fast-track timeline requirements..."
+                    placeholder={t.notesPlaceholder}
                     value={formData.notes}
                     onChange={handleInputChange}
                     className="text-xs resize-y"
@@ -412,7 +435,7 @@ export default function CatalogCheckoutPage() {
                 </div>
                 <div className="flex items-center justify-between w-full">
                   <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">
-                    Select Payment Method
+                    {t.sec2Title}
                   </h3>
                   <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
                     <Lock className="h-3 w-3 text-emerald-600" /> Powered by Xendit
@@ -440,10 +463,10 @@ export default function CatalogCheckoutPage() {
                   />
                   <div className="space-y-1 text-xs">
                     <span className="font-bold text-foreground flex items-center gap-1.5">
-                      <Building className="h-4 w-4 text-primary" /> Virtual Account (VA)
+                      <Building className="h-4 w-4 text-primary" /> {t.methodVa}
                     </span>
                     <p className="text-[11px] text-muted-foreground">
-                      BCA, Mandiri, BNI, BRI, Permata. Automatic verification.
+                      {t.methodVaDesc}
                     </p>
                   </div>
                 </label>
@@ -466,10 +489,10 @@ export default function CatalogCheckoutPage() {
                   />
                   <div className="space-y-1 text-xs">
                     <span className="font-bold text-foreground flex items-center gap-1.5">
-                      <QrCode className="h-4 w-4 text-primary" /> QRIS Instant Pay
+                      <QrCode className="h-4 w-4 text-primary" /> {t.methodQris}
                     </span>
                     <p className="text-[11px] text-muted-foreground">
-                      Scan via GoPay, OVO, Dana, ShopeePay, or Mobile Banking.
+                      {t.methodQrisDesc}
                     </p>
                   </div>
                 </label>
@@ -492,10 +515,10 @@ export default function CatalogCheckoutPage() {
                   />
                   <div className="space-y-1 text-xs">
                     <span className="font-bold text-foreground flex items-center gap-1.5">
-                      <CreditCard className="h-4 w-4 text-primary" /> Credit / Debit Card
+                      <CreditCard className="h-4 w-4 text-primary" /> {t.methodCard}
                     </span>
                     <p className="text-[11px] text-muted-foreground">
-                      Visa, Mastercard, JCB with 3D Secure verification.
+                      {t.methodCardDesc}
                     </p>
                   </div>
                 </label>
@@ -518,10 +541,10 @@ export default function CatalogCheckoutPage() {
                   />
                   <div className="space-y-1 text-xs">
                     <span className="font-bold text-foreground flex items-center gap-1.5">
-                      <Receipt className="h-4 w-4 text-primary" /> Corporate Invoice
+                      <Receipt className="h-4 w-4 text-primary" /> {t.methodManual}
                     </span>
                     <p className="text-[11px] text-muted-foreground">
-                      Official proforma invoice for corporate wire transfer.
+                      {t.methodManualDesc}
                     </p>
                   </div>
                 </label>
@@ -531,7 +554,7 @@ export default function CatalogCheckoutPage() {
               {paymentMethod === "va" && (
                 <div className="p-3 bg-muted/20 rounded-xl border border-border/50 space-y-2">
                   <span className="text-[11px] font-bold text-foreground block">
-                    Select Virtual Account Destination Bank:
+                    {activeLang === "id" ? "Pilih Bank Virtual Account Tujuan:" : activeLang === "cn" ? "选择目标虚拟账户开户银行：" : "Select Virtual Account Destination Bank:"}
                   </span>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {["bca", "mandiri", "bni", "bri"].map((bank) => (
@@ -539,7 +562,7 @@ export default function CatalogCheckoutPage() {
                         key={bank}
                         type="button"
                         onClick={() => setSelectedBank(bank)}
-                        className={`py-2 px-3 rounded-lg border text-xs font-mono font-bold uppercase transition-all ${
+                        className={`py-2 px-3 rounded-lg border text-xs font-mono font-bold uppercase transition-all cursor-pointer ${
                           selectedBank === bank
                             ? "bg-primary text-primary-foreground border-primary"
                             : "bg-background border-border/70 hover:border-foreground/40 text-foreground"
@@ -556,7 +579,7 @@ export default function CatalogCheckoutPage() {
             {/* Step 3: Terms & Cancellation Consent (Mandatory for Xendit KYC) */}
             <div className="rounded-2xl border border-border/60 bg-muted/10 p-5 space-y-3 text-xs">
               <span className="font-bold uppercase tracking-wider text-muted-foreground text-[10px] block">
-                Legal & Service Policies Agreement
+                {t.trustGuarantee}
               </span>
 
               <label className="flex items-start gap-2.5 cursor-pointer select-none">
@@ -567,14 +590,7 @@ export default function CatalogCheckoutPage() {
                   className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
                 />
                 <span className="text-muted-foreground leading-relaxed">
-                  I have read and agree to the{" "}
-                  <Link href={`/${lang}/resources/faq`} target="_blank" className="text-primary underline font-medium">
-                    Terms of Engagement & Service Policy
-                  </Link>{" "}
-                  and{" "}
-                  <Link href={`/${lang}/privacy-policy`} target="_blank" className="text-primary underline font-medium">
-                    Privacy Policy
-                  </Link>.
+                  {t.term1}
                 </span>
               </label>
 
@@ -586,7 +602,7 @@ export default function CatalogCheckoutPage() {
                   className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
                 />
                 <span className="text-muted-foreground leading-relaxed">
-                  I understand that government filing fees (PNBP, AHU, OSS) and notary administrative disbursements are non-refundable once registered with the state portal.
+                  {t.term2}
                 </span>
               </label>
             </div>
@@ -596,78 +612,82 @@ export default function CatalogCheckoutPage() {
           <div className="lg:col-span-5 space-y-6">
             <div className="rounded-2xl border border-border/60 bg-card p-5 sm:p-6 space-y-4 shadow-sm sticky top-24">
               <h3 className="text-sm font-bold text-foreground uppercase tracking-wider flex items-center justify-between border-b border-border/40 pb-3">
-                <span>Order Summary</span>
+                <span>{t.sec3Title}</span>
                 <span className="text-xs font-mono font-normal text-muted-foreground">
-                  {cart.length} item{cart.length === 1 ? "" : "s"}
+                  {cart.length} {activeLang === "id" ? "layanan" : activeLang === "cn" ? "项服务" : "items"}
                 </span>
               </h3>
 
               {/* Items List */}
               <div className="space-y-3 max-h-72 overflow-y-auto pr-1 [scrollbar-width:thin]">
-                {cart.map((item) => (
-                  <div
-                    key={item.service.id}
-                    className="p-3 rounded-xl border border-border/50 bg-muted/20 space-y-2 text-xs"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <span className="text-[10px] font-mono font-bold text-primary uppercase">
-                          {item.service.id}
+                {cart.map((item) => {
+                  const localizedTitle =
+                    item.service.translations?.[activeLang]?.title || item.service.title;
+                  return (
+                    <div
+                      key={item.service.id}
+                      className="p-3 rounded-xl border border-border/50 bg-muted/20 space-y-2 text-xs"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] font-mono font-bold text-primary uppercase">
+                            {item.service.id}
+                          </span>
+                          <h5 className="font-bold text-foreground leading-tight">
+                            {localizedTitle}
+                          </h5>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 text-muted-foreground hover:text-destructive shrink-0 cursor-pointer"
+                          onClick={() => removeFromCart(item.service.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 border-t border-border/30">
+                        <div className="flex items-center gap-1 bg-background rounded p-0.5 border border-border/50">
+                          <button
+                            type="button"
+                            onClick={() => updateQuantity(item.service.id, item.quantity - 1)}
+                            className="px-1.5 py-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                          >
+                            <Minus className="h-2.5 w-2.5" />
+                          </button>
+                          <span className="px-1 font-mono font-bold text-[11px]">{item.quantity}</span>
+                          <button
+                            type="button"
+                            onClick={() => updateQuantity(item.service.id, item.quantity + 1)}
+                            className="px-1.5 py-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                          >
+                            <Plus className="h-2.5 w-2.5" />
+                          </button>
+                        </div>
+
+                        <span className="font-mono font-bold text-foreground">
+                          {formatIDR(item.service.basePrice * item.quantity)}
                         </span>
-                        <h5 className="font-bold text-foreground leading-tight">
-                          {item.service.title}
-                        </h5>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5 text-muted-foreground hover:text-destructive shrink-0"
-                        onClick={() => removeFromCart(item.service.id)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
                     </div>
-
-                    <div className="flex items-center justify-between pt-1 border-t border-border/30">
-                      <div className="flex items-center gap-1 bg-background rounded p-0.5 border border-border/50">
-                        <button
-                          type="button"
-                          onClick={() => updateQuantity(item.service.id, item.quantity - 1)}
-                          className="px-1.5 py-0.5 text-muted-foreground hover:text-foreground"
-                        >
-                          <Minus className="h-2.5 w-2.5" />
-                        </button>
-                        <span className="px-1 font-mono font-bold text-[11px]">{item.quantity}</span>
-                        <button
-                          type="button"
-                          onClick={() => updateQuantity(item.service.id, item.quantity + 1)}
-                          className="px-1.5 py-0.5 text-muted-foreground hover:text-foreground"
-                        >
-                          <Plus className="h-2.5 w-2.5" />
-                        </button>
-                      </div>
-
-                      <span className="font-mono font-bold text-foreground">
-                        {formatIDR(item.service.basePrice * item.quantity)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Breakdown */}
               <div className="space-y-2 pt-3 border-t border-border/40 text-xs">
                 <div className="flex justify-between text-muted-foreground">
-                  <span>Subtotal</span>
+                  <span>{t.subtotal}</span>
                   <span className="font-mono">{formatIDR(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
-                  <span>PPN / VAT (11%)</span>
+                  <span>{t.tax}</span>
                   <span className="font-mono">{formatIDR(taxAmount)}</span>
                 </div>
                 <div className="flex justify-between text-base font-extrabold text-foreground pt-2 border-t border-border/50">
-                  <span>Total Payable</span>
+                  <span>{t.totalDue}</span>
                   <span className="font-mono text-primary text-lg">{formatIDR(totalAmount)}</span>
                 </div>
               </div>
@@ -679,10 +699,10 @@ export default function CatalogCheckoutPage() {
                 className="w-full h-11 text-xs sm:text-sm font-bold gap-2 shadow-md cursor-pointer"
               >
                 {isSubmitting ? (
-                  <>Generating Xendit Invoice...</>
+                  <>{t.processingBtn}</>
                 ) : (
                   <>
-                    <Lock className="h-4 w-4" /> Place Order & Pay via Xendit
+                    <Lock className="h-4 w-4" /> {t.payNowBtn}
                   </>
                 )}
               </Button>
@@ -690,7 +710,7 @@ export default function CatalogCheckoutPage() {
               <div className="space-y-1.5 pt-2 text-[11px] text-muted-foreground text-center">
                 <p className="flex items-center justify-center gap-1 font-medium">
                   <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                  Official Notary & Indonesian Legal Entity Guarantee
+                  {t.trustGuaranteeDesc}
                 </p>
                 <p className="text-[10px]">
                   PT Mandiri Cipta Solusi • Springhill Office Tower Lantai 9 Unit 9C

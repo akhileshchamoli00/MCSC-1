@@ -50,6 +50,25 @@ def generate_company_code(db: Session, company_name: str = None) -> str:
         if not existing:
             return code
 
+def check_duplicate_company_name(db: Session, company_name: str, exclude_company_id: Optional[int] = None):
+    """
+    Enforces uniqueness of company names across client companies (case-insensitive and trimmed).
+    """
+    clean = (company_name or "").strip()
+    if not clean:
+        raise HTTPException(status_code=400, detail="Company Name cannot be blank.")
+    query = db.query(models.ClientCompany).filter(
+        func.lower(func.trim(models.ClientCompany.company_name)) == func.lower(clean)
+    )
+    if exclude_company_id:
+        query = query.filter(models.ClientCompany.id != exclude_company_id)
+    existing = query.first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"A company with the name '{clean}' already exists (Company Code: {existing.company_code})."
+        )
+
 def generate_client_code(db: Session) -> str:
     """
     Auto-generates client/partner code in format: X[Year2Digits][4DigitSequence]
@@ -1886,6 +1905,10 @@ def create_client(client_data: schemas.ClientCreate, db: Session = Depends(datab
 
     client_email = validate_and_clean_email(client_data.email, "Personal Email", required=True)
     client_phone = validate_and_clean_phone(client_data.phone, "Personal Phone", required=False)
+
+    company_name_str = (client_data.company_name or "").strip()
+    if company_name_str:
+        check_duplicate_company_name(db, company_name_str)
         
     new_user_id = None
     if client_data.create_portal_account:
@@ -2626,11 +2649,40 @@ def get_all_client_companies(db: Session = Depends(database.get_db), current_use
         joinedload(models.ClientCompany.stakeholders)
     ).order_by(models.ClientCompany.company_name).all()
 
+@router.get("/companies/check-name")
+def check_company_name_availability(
+    company_name: str = Query(...),
+    exclude_id: Optional[int] = Query(None),
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    clean = (company_name or "").strip()
+    if not clean:
+        return {"available": False, "reason": "Company name cannot be blank."}
+    
+    query = db.query(models.ClientCompany).filter(
+        func.lower(func.trim(models.ClientCompany.company_name)) == func.lower(clean)
+    )
+    if exclude_id:
+        query = query.filter(models.ClientCompany.id != exclude_id)
+    
+    existing = query.first()
+    if existing:
+        return {
+            "available": False,
+            "company_name": clean,
+            "company_code": existing.company_code,
+            "reason": f"A company with the name '{clean}' already exists ({existing.company_code})."
+        }
+    return {"available": True}
+
 @router.post("/companies/standalone", response_model=schemas.ClientCompanyResponse)
 def create_standalone_client_company(company_data: schemas.ClientCompanyCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_company", "create", db) or is_admin_or_hr(current_user) or is_employee_role(current_user)):
         raise HTTPException(status_code=403, detail="Not authorized to create standalone companies")
         
+    check_duplicate_company_name(db, company_data.company_name)
+
     if not company_data.key_contact_person or not str(company_data.key_contact_person).strip():
         raise HTTPException(status_code=400, detail="Key Contact Person Name is mandatory")
         
@@ -2692,6 +2744,8 @@ def create_standalone_client_company(company_data: schemas.ClientCompanyCreate, 
 def create_client_company(id: int, company_data: schemas.ClientCompanyCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
     if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_company", "create", db) or is_admin_or_hr(current_user) or is_employee_role(current_user) or is_client_themselves(current_user, id)):
         raise HTTPException(status_code=403, detail="Not authorized to create companies for this client")
+
+    check_duplicate_company_name(db, company_data.company_name)
 
     if not company_data.key_contact_person or not str(company_data.key_contact_person).strip():
         raise HTTPException(status_code=400, detail="Key Contact Person Name is mandatory")
@@ -2945,6 +2999,9 @@ def update_client_company(company_id: int, company_update: schemas.ClientCompany
         ).first()
         if existing_code:
             raise HTTPException(status_code=400, detail="Company code already exists")
+
+    if company_update.company_name:
+        check_duplicate_company_name(db, company_update.company_name, exclude_company_id=company_id)
         
     update_data = company_update.model_dump() if hasattr(company_update, "model_dump") else company_update.dict()
     
@@ -5217,6 +5274,82 @@ def get_order_taggable_users(
     return taggable_list
 
 
+def notify_quoted_message_author(
+    db: Session,
+    order_number: str,
+    first_order: models.ClientOrder,
+    quoted_message_id: Optional[int],
+    sender_user: models.User,
+    sender_display_name: str,
+    message_text: Optional[str] = None,
+    attachment_name: Optional[str] = None,
+    channel: str = "INTERNAL"
+) -> Optional[int]:
+    """
+    If a chat message quotes/replies to an earlier message, find the author of that earlier message
+    and notify them directly (even if they were not explicitly tagged).
+    Prevents leaking internal notes to external clients.
+    Returns the author user_id if a notification was dispatched, otherwise None.
+    """
+    if not quoted_message_id:
+        return None
+        
+    try:
+        quoted_msg = db.query(models.ClientOrderProgress).filter(
+            models.ClientOrderProgress.id == quoted_message_id
+        ).first()
+        if not quoted_msg or not quoted_msg.user_id:
+            return None
+            
+        author_id = quoted_msg.user_id
+        if author_id == sender_user.id:
+            return None
+            
+        author_user = db.query(models.User).filter(models.User.id == author_id).first()
+        if not author_user or not author_user.is_active:
+            return None
+
+        is_client_author = bool(author_user.role and author_user.role.name.upper() in ["CLIENT", "CUSTOMER", "MEMBER"])
+        
+        # Security/Privacy: Do NOT notify external clients about internal notes
+        if channel == "INTERNAL" and is_client_author:
+            return None
+            
+        clean_order_no = (order_number or "").strip().upper()
+        if is_client_author:
+            action_url = f"/client/chat?order={clean_order_no}"
+        else:
+            action_url = get_order_action_url_for_user(author_user, first_order.status, clean_order_no, db)
+            
+        notif_title = f"Replied to your message - #{clean_order_no}"
+        
+        if attachment_name:
+            notif_msg = f"{sender_display_name} replied to your message on Order #{clean_order_no} with an attachment: {attachment_name}"
+        elif message_text and message_text.strip():
+            snippet = message_text.strip()
+            preview = snippet[:75] + ("..." if len(snippet) > 75 else "")
+            notif_msg = f"{sender_display_name} replied to your message on Order #{clean_order_no}: \"{preview}\""
+        else:
+            notif_msg = f"{sender_display_name} replied to your message on Order #{clean_order_no}"
+            
+        from notification_manager import manager
+        manager.notify_user_sync(
+            db=db,
+            user_id=author_id,
+            title=notif_title,
+            message=notif_msg,
+            type="chat_reply",
+            module="clients",
+            reference_id=first_order.id,
+            action_url=action_url,
+            system_area="business"
+        )
+        return author_id
+    except Exception as err:
+        print(f"Notice: Failed to dispatch quote/reply notification: {err}")
+        return None
+
+
 @router.post("/orders/{order_number}/progress", response_model=schemas.ClientOrderProgressResponse)
 def add_order_progress(
     order_number: str,
@@ -5258,8 +5391,20 @@ def add_order_progress(
     
     formatted_resp = format_order_progress_response(db_progress, db)
     
-    # Tagging and Notifications logic
+    # Tagging, Quote/Reply, and Notifications logic
     message_text = progress_data.message or ""
+    
+    # 0. Quote / Reply notification: Notify the author of the quoted message directly
+    quoted_author_id = notify_quoted_message_author(
+        db=db,
+        order_number=order_number,
+        first_order=first_order,
+        quoted_message_id=progress_data.quoted_message_id,
+        sender_user=current_user,
+        sender_display_name=formatted_resp.sender_name,
+        message_text=message_text,
+        channel=target_channel
+    )
     
     if target_channel == "INTERNAL":
         tagged_user_ids = set()
@@ -5308,8 +5453,10 @@ def add_order_progress(
         # Send notifications
         from notification_manager import manager
         
-        # 1. Send notifications to tagged users
+        # 1. Send notifications to tagged users (skip if already notified via quote/reply)
         for uid in tagged_user_ids:
+            if uid == quoted_author_id:
+                continue
             tagged_user = db.query(models.User).filter(models.User.id == uid).first()
             if not tagged_user:
                 continue
@@ -5337,7 +5484,7 @@ def add_order_progress(
         # 2. Always notify assigned consultants (Person in Charge / PIC) for any internal chat activity
         assigned_consultant_uids = get_assigned_consultant_user_ids(order_number, db)
         for uid in assigned_consultant_uids:
-            if uid == current_user.id or uid in tagged_user_ids:
+            if uid == current_user.id or uid in tagged_user_ids or uid == quoted_author_id:
                 continue
             consultant_user = db.query(models.User).filter(models.User.id == uid).first()
             if not consultant_user:
@@ -5359,7 +5506,7 @@ def add_order_progress(
             # Client sent message -> Notify assigned consultant(s) (PIC)
             consultant_user_ids = get_assigned_consultant_user_ids(order_number, db)
             for uid in consultant_user_ids:
-                if uid != current_user.id:
+                if uid != current_user.id and uid != quoted_author_id:
                     consultant_user = db.query(models.User).filter(models.User.id == uid).first()
                     action_url = get_order_action_url_for_user(consultant_user, first_order.status, order_number, db) if consultant_user else f"/business/assigned-orders?order={order_number}&chat=true"
                     manager.notify_user_sync(
@@ -5377,7 +5524,7 @@ def add_order_progress(
             client_user_id = None
             if first_order.client and first_order.client.user_id:
                 client_user_id = first_order.client.user_id
-            if client_user_id and client_user_id != current_user.id:
+            if client_user_id and client_user_id != current_user.id and client_user_id != quoted_author_id:
                 manager.notify_user_sync(
                     db=db,
                     user_id=client_user_id,
@@ -5392,7 +5539,7 @@ def add_order_progress(
             # Also notify assigned consultants (PIC) if someone else (e.g. admin or teammate) sent message to client
             consultant_user_ids = get_assigned_consultant_user_ids(order_number, db)
             for uid in consultant_user_ids:
-                if uid != current_user.id:
+                if uid != current_user.id and uid != quoted_author_id:
                     consultant_user = db.query(models.User).filter(models.User.id == uid).first()
                     if consultant_user:
                         action_url = get_order_action_url_for_user(consultant_user, first_order.status, order_number, db)
@@ -5627,26 +5774,38 @@ async def upload_order_attachment(
     # 5. Notify assigned consultants and admins
     from notification_manager import manager
     try:
+        quoted_author_id = notify_quoted_message_author(
+            db=db,
+            order_number=order_number,
+            first_order=first_order,
+            quoted_message_id=quoted_message_id,
+            sender_user=current_user,
+            sender_display_name=formatted_resp.sender_name,
+            message_text=chat_message,
+            channel=target_channel
+        )
+
         if target_channel == "CLIENT":
             if current_user.role and current_user.role.name.upper() == "CLIENT":
                 consultant_user_ids = get_assigned_consultant_user_ids(order_number, db)
                 for uid in consultant_user_ids:
-                    consultant_user = db.query(models.User).filter(models.User.id == uid).first()
-                    action_url = get_order_action_url_for_user(consultant_user, first_order.status, order_number, db) if consultant_user else f"/business/assigned-orders?order={order_number}&chat=true"
-                    title_text = f"New Snippet Shared - #{order_number}" if is_snippet_upload else f"New Document Uploaded - #{order_number}"
-                    desc_text = f"Client shared an image snippet on Order #{order_number}" if is_snippet_upload else f"Client uploaded '{sanitized_filename}' on Order #{order_number}"
-                    manager.notify_user_sync(
-                        db=db,
-                        user_id=uid,
-                        title=title_text,
-                        message=desc_text,
-                        type="attendance",
-                        module="clients",
-                        reference_id=first_order.id,
-                        action_url=action_url
-                    )
+                    if uid != quoted_author_id:
+                        consultant_user = db.query(models.User).filter(models.User.id == uid).first()
+                        action_url = get_order_action_url_for_user(consultant_user, first_order.status, order_number, db) if consultant_user else f"/business/assigned-orders?order={order_number}&chat=true"
+                        title_text = f"New Snippet Shared - #{order_number}" if is_snippet_upload else f"New Document Uploaded - #{order_number}"
+                        desc_text = f"Client shared an image snippet on Order #{order_number}" if is_snippet_upload else f"Client uploaded '{sanitized_filename}' on Order #{order_number}"
+                        manager.notify_user_sync(
+                            db=db,
+                            user_id=uid,
+                            title=title_text,
+                            message=desc_text,
+                            type="attendance",
+                            module="clients",
+                            reference_id=first_order.id,
+                            action_url=action_url
+                        )
             else:
-                if company and company.client and company.client.user_id:
+                if company and company.client and company.client.user_id and company.client.user_id != quoted_author_id:
                     title_text = f"New Snippet in Chat - #{order_number}" if is_snippet_upload else f"New Attachment Received - #{order_number}"
                     desc_text = f"Consultant shared an image snippet on Order #{order_number}" if is_snippet_upload else f"Consultant shared '{sanitized_filename}' on Order #{order_number}"
                     manager.notify_user_sync(
@@ -5662,7 +5821,7 @@ async def upload_order_attachment(
         else:
             consultant_user_ids = get_assigned_consultant_user_ids(order_number, db)
             for uid in consultant_user_ids:
-                if uid != current_user.id:
+                if uid != current_user.id and uid != quoted_author_id:
                     consultant_user = db.query(models.User).filter(models.User.id == uid).first()
                     action_url = get_order_action_url_for_user(consultant_user, first_order.status, order_number, db) if consultant_user else f"/business/assigned-orders?order={order_number}&chat=true"
                     title_text = f"New Internal Snippet - #{order_number}" if is_snippet_upload else f"New Internal Attachment - #{order_number}"

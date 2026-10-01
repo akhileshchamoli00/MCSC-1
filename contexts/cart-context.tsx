@@ -2,6 +2,14 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 
+export interface LocalizedServiceContent {
+  title: string;
+  categoryLabel: string;
+  timeline: string;
+  description: string;
+  deliverables: string[];
+}
+
 export interface CatalogServiceItem {
   id: string; // e.g. "L004"
   title: string;
@@ -13,6 +21,12 @@ export interface CatalogServiceItem {
   description: string;
   deliverables: string[];
   popular?: boolean;
+  translations?: {
+    id?: LocalizedServiceContent;
+    cn?: LocalizedServiceContent;
+    en?: LocalizedServiceContent;
+    [key: string]: LocalizedServiceContent | undefined;
+  };
 }
 
 export interface CartItem {

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Building, Lock, User, Plus, CheckCircle, UserCheck, Building2, ShieldCheck, Mail, Phone, Calendar } from "lucide-react";
+import { ArrowLeft, Building, Lock, User, Plus, CheckCircle, UserCheck, Building2, ShieldCheck, Mail, Phone, Calendar, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -41,6 +41,25 @@ export default function NewCustomerPage() {
 
   // Available Companies to Link
   const [availableCompanies, setAvailableCompanies] = useState<CompanyOption[]>([]);
+  const [companyDuplicateError, setCompanyDuplicateError] = useState<string | null>(null);
+
+  const checkCompanyDuplicate = (name: string, list: CompanyOption[] = availableCompanies) => {
+    const clean = name.trim().toLowerCase();
+    if (!clean) {
+      setCompanyDuplicateError(null);
+      return null;
+    }
+    const matched = list.find(
+      (c) => (c.company_name || "").trim().toLowerCase() === clean
+    );
+    if (matched) {
+      const msg = `A company named "${matched.company_name}" already exists (${matched.company_code}).`;
+      setCompanyDuplicateError(msg);
+      return msg;
+    }
+    setCompanyDuplicateError(null);
+    return null;
+  };
 
   const [formData, setFormData] = useState({
     // Customer Personal Details
@@ -97,6 +116,9 @@ export default function NewCustomerPage() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === "company_name") {
+      checkCompanyDuplicate(value);
+    }
   };
 
   const handleSelectChange = (name: string, value: string) => {
@@ -119,10 +141,19 @@ export default function NewCustomerPage() {
       return;
     }
 
-    if (companyMode === "CREATE_NEW" && !formData.company_name.trim()) {
-      setError("Company Name is required when creating a new company.");
-      setActiveTab("company");
-      return;
+    if (companyMode === "CREATE_NEW") {
+      if (!formData.company_name.trim()) {
+        setError("Company Name is required when creating a new company.");
+        setActiveTab("company");
+        return;
+      }
+      const dup = checkCompanyDuplicate(formData.company_name);
+      if (dup) {
+        setError(dup);
+        toast.error(dup);
+        setActiveTab("company");
+        return;
+      }
     }
 
     setLoading(true);
@@ -462,9 +493,15 @@ export default function NewCustomerPage() {
                           placeholder="e.g. PT Maju Bersama Indonesia"
                           value={formData.company_name}
                           onChange={handleInputChange}
-                          className="h-9 text-xs rounded-xl bg-background"
+                          className={`h-9 text-xs rounded-xl bg-background ${companyDuplicateError ? "border-destructive focus-visible:ring-destructive" : ""}`}
                           required={companyMode === "CREATE_NEW"}
                         />
+                        {companyDuplicateError && (
+                          <p className="text-[11px] text-destructive flex items-center gap-1.5 font-medium mt-1">
+                            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                            {companyDuplicateError}
+                          </p>
+                        )}
                       </div>
 
                       <div className="space-y-1.5">

@@ -3,8 +3,13 @@
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useLanguage } from "@/contexts/language-context";
 import { useCart, CatalogServiceItem } from "@/contexts/cart-context";
-import { TOP_CATALOG_SERVICES, CATALOG_CATEGORIES } from "@/lib/catalog-services";
+import {
+  getLocalizedCatalogServices,
+  getLocalizedCategories,
+  CATALOG_PAGE_TRANSLATIONS,
+} from "@/lib/catalog-services";
 import {
   Building2,
   FileText,
@@ -31,7 +36,11 @@ import { Badge } from "@/components/ui/badge";
 
 export default function ServiceCatalogPage() {
   const params = useParams();
-  const lang = (params?.lang as string) || "en";
+  const { language } = useLanguage();
+  const urlLang = (params?.lang as string) || language || "en";
+  const activeLang = (urlLang === "id" || urlLang === "cn" ? urlLang : "en") as "en" | "id" | "cn";
+  const t = CATALOG_PAGE_TRANSLATIONS[activeLang] || CATALOG_PAGE_TRANSLATIONS.en;
+
   const { cart, addToCart, setIsCartOpen, totalItems, totalAmount } = useCart();
 
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -64,9 +73,12 @@ export default function ServiceCatalogPage() {
     }
   };
 
+  const allServices = useMemo(() => getLocalizedCatalogServices(activeLang), [activeLang]);
+  const categories = useMemo(() => getLocalizedCategories(activeLang), [activeLang]);
+
   // Filtered Services
   const filteredServices = useMemo(() => {
-    return TOP_CATALOG_SERVICES.filter((svc) => {
+    return allServices.filter((svc) => {
       const matchesCategory =
         selectedCategory === "all" || svc.category === selectedCategory;
       if (!matchesCategory) return false;
@@ -80,7 +92,7 @@ export default function ServiceCatalogPage() {
         svc.categoryLabel.toLowerCase().includes(q)
       );
     });
-  }, [selectedCategory, searchQuery]);
+  }, [allServices, selectedCategory, searchQuery]);
 
   const getItemCartQuantity = (serviceId: string) => {
     const item = cart.find((i) => i.service.id === serviceId);
@@ -98,15 +110,15 @@ export default function ServiceCatalogPage() {
             className="px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-primary/10 text-primary border-primary/30 inline-flex items-center gap-1.5"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            Official Service Catalog & Base Pricing
+            {t.heroBadge}
           </Badge>
 
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-foreground max-w-4xl mx-auto leading-tight">
-            Corporate Legal & Business Licensing Packages
+            {t.heroTitle}
           </h1>
 
           <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Browse our most requested Indonesian incorporation, RUPS, OSS-RBA licensing, and KITAS immigration services. Select packages, review exact deliverables, and engage our licensed consultants directly.
+            {t.heroDesc}
           </p>
 
           {/* Search Bar */}
@@ -114,7 +126,7 @@ export default function ServiceCatalogPage() {
             <Search className="absolute left-3.5 top-5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Search service by name or code (e.g. PT PMA, RUPS, KITAS)..."
+              placeholder={t.searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 h-11 text-xs sm:text-sm bg-background/90 shadow-sm border-border/70 rounded-xl"
@@ -127,7 +139,7 @@ export default function ServiceCatalogPage() {
       <section className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
         {/* Category Tabs */}
         <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden w-full">
-          {CATALOG_CATEGORIES.map((cat) => {
+          {categories.map((cat) => {
             const isActive = selectedCategory === cat.id;
             return (
               <button
@@ -144,13 +156,12 @@ export default function ServiceCatalogPage() {
                 <span>{cat.label}</span>
                 {cat.id === "all" ? (
                   <span className="text-[9.5px] sm:text-[10px] opacity-75 font-mono">
-                    ({TOP_CATALOG_SERVICES.length})
+                    ({allServices.length})
                   </span>
                 ) : (
                   <span className="text-[9.5px] sm:text-[10px] opacity-75 font-mono">
                     ({
-                      TOP_CATALOG_SERVICES.filter((s) => s.category === cat.id)
-                        .length
+                      allServices.filter((s) => s.category === cat.id).length
                     })
                   </span>
                 )}
@@ -162,11 +173,11 @@ export default function ServiceCatalogPage() {
         {/* Results Counter */}
         <div className="flex items-center justify-between text-xs text-muted-foreground border-b border-border/40 pb-3">
           <span>
-            Showing <strong className="text-foreground">{filteredServices.length}</strong> service packages
+            {t.showingServices} <strong className="text-foreground">{filteredServices.length}</strong> {t.packagesLabel}
           </span>
           <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px]">
             <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-            Verified Government Domicile & AHU Compliance Included
+            {t.complianceBadge}
           </span>
         </div>
 
@@ -185,7 +196,7 @@ export default function ServiceCatalogPage() {
                 {service.popular && (
                   <div className="absolute top-0 right-0">
                     <span className="inline-flex items-center gap-1 rounded-bl-xl bg-primary text-primary-foreground text-[10px] font-bold px-2.5 py-1 shadow-sm uppercase tracking-wider">
-                      <Sparkles className="h-2.5 w-2.5" /> Popular
+                      <Sparkles className="h-2.5 w-2.5" /> {t.popularBadge}
                     </span>
                   </div>
                 )}
@@ -214,13 +225,13 @@ export default function ServiceCatalogPage() {
                   {/* Estimated Timeline */}
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/30 px-2.5 py-1.5 rounded-lg border border-border/40 w-fit">
                     <Clock className="h-3.5 w-3.5 text-primary" />
-                    <span>Est. Turnaround: <strong className="text-foreground">{service.timeline}</strong></span>
+                    <span>{t.estTurnaround} <strong className="text-foreground">{service.timeline}</strong></span>
                   </div>
 
                   {/* Deliverables Checklist */}
                   <div className="space-y-2 pt-2 border-t border-border/40">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
-                      Package Deliverables:
+                      {t.deliverablesHeading}
                     </span>
                     <ul className="space-y-1.5 text-xs">
                       {service.deliverables.map((item, idx) => (
@@ -237,7 +248,7 @@ export default function ServiceCatalogPage() {
                 <div className="p-5 sm:p-6 pt-4 border-t border-border/50 bg-muted/15 flex items-center justify-between gap-3">
                   <div>
                     <span className="text-[10px] text-muted-foreground uppercase font-semibold block">
-                      Official Base Rate
+                      {t.officialBaseRate}
                     </span>
                     <span className="text-lg font-extrabold text-foreground font-mono">
                       {service.priceFormatted}
@@ -256,12 +267,12 @@ export default function ServiceCatalogPage() {
                     {inCart ? (
                       <>
                         <Check className="h-3.5 w-3.5" />
-                        In Cart ({cartQty})
+                        {t.inCart} ({cartQty})
                       </>
                     ) : (
                       <>
                         <ShoppingCart className="h-3.5 w-3.5" />
-                        Add to Cart
+                        {t.addToCart}
                       </>
                     )}
                   </Button>
@@ -275,9 +286,9 @@ export default function ServiceCatalogPage() {
         {filteredServices.length === 0 && (
           <div className="py-16 text-center space-y-3 bg-muted/10 rounded-2xl border border-dashed border-border/80 p-8">
             <HelpCircle className="h-10 w-10 text-muted-foreground/40 mx-auto" />
-            <h4 className="text-base font-bold text-foreground">No matching services found</h4>
+            <h4 className="text-base font-bold text-foreground">{t.noServicesTitle}</h4>
             <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-              We couldn't find any packages matching &ldquo;{searchQuery}&rdquo;. Try clearing your query or select &ldquo;All Services&rdquo;.
+              {t.noServicesDesc}
             </p>
             <Button
               variant="outline"
@@ -288,7 +299,7 @@ export default function ServiceCatalogPage() {
               }}
               className="text-xs mt-2"
             >
-              Reset Filters
+              {t.resetFilters}
             </Button>
           </div>
         )}
@@ -300,9 +311,9 @@ export default function ServiceCatalogPage() {
               <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                 <ShieldCheck className="h-5 w-5" />
               </div>
-              <h4 className="text-sm font-bold text-foreground">Official Government Filings</h4>
+              <h4 className="text-sm font-bold text-foreground">{t.guarantee1Title}</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                All incorporations, deeds, and licensing documents are executed by licensed Indonesian Notaries and registered on official AHU & OSS portals.
+                {t.guarantee1Desc}
               </p>
             </div>
 
@@ -310,9 +321,9 @@ export default function ServiceCatalogPage() {
               <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                 <Lock className="h-5 w-5" />
               </div>
-              <h4 className="text-sm font-bold text-foreground">Secure Xendit Payment Gateway</h4>
+              <h4 className="text-sm font-bold text-foreground">{t.guarantee2Title}</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Seamless multi-channel checkout supporting Virtual Accounts (BCA, Mandiri, BNI, BRI), QRIS, and International Credit/Debit Cards.
+                {t.guarantee2Desc}
               </p>
             </div>
 
@@ -320,24 +331,24 @@ export default function ServiceCatalogPage() {
               <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                 <PhoneCall className="h-5 w-5" />
               </div>
-              <h4 className="text-sm font-bold text-foreground">Direct Legal Consultant Support</h4>
+              <h4 className="text-sm font-bold text-foreground">{t.guarantee3Title}</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Every order is assigned a designated Corporate Consultant and Reviewer tracking your file to completion. Inquiries: contact@mcsc.co.id.
+                {t.guarantee3Desc}
               </p>
             </div>
           </div>
 
           <div className="pt-4 border-t border-border/40 flex flex-col sm:flex-row items-center justify-between text-xs text-muted-foreground gap-2">
             <span>
-              PT Mandiri Cipta Solusi (MCS Consulting) • Springhill Office Tower Lantai 9 Unit 9C, Kemayoran, Jakarta Pusat
+              {t.addressLine}
             </span>
             <div className="flex items-center gap-4">
-              <Link href={`/${lang}/privacy-policy`} className="hover:underline">
-                Privacy Policy
+              <Link href={`/${activeLang}/privacy-policy`} className="hover:underline">
+                {t.privacyPolicy}
               </Link>
               <span>•</span>
-              <Link href={`/${lang}/resources/faq`} className="hover:underline">
-                Terms of Engagement
+              <Link href={`/${activeLang}/resources/faq`} className="hover:underline">
+                {t.termsOfEngagement}
               </Link>
             </div>
           </div>
@@ -354,7 +365,7 @@ export default function ServiceCatalogPage() {
               </div>
               <div>
                 <span className="text-xs font-bold text-foreground block">
-                  {totalItems} service{totalItems === 1 ? "" : "s"} in cart
+                  {totalItems} {t.floatingCartCount}
                 </span>
                 <span className="text-xs font-mono font-extrabold text-primary">
                   {formatIDR(totalAmount)}
@@ -369,15 +380,15 @@ export default function ServiceCatalogPage() {
                 onClick={() => setIsCartOpen(true)}
                 className="h-9 text-xs font-semibold cursor-pointer"
               >
-                View Cart
+                {t.viewCart}
               </Button>
               <Button
                 asChild
                 size="sm"
                 className="h-9 gap-1.5 font-bold text-xs shadow-sm cursor-pointer"
               >
-                <Link href={`/${lang}/services/catalog/checkout`}>
-                  Checkout
+                <Link href={`/${activeLang}/services/catalog/checkout`}>
+                  {t.checkout}
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </Button>
