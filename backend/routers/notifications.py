@@ -49,7 +49,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = None):
         manager.disconnect(user_id, websocket)
 
 from typing import List, Optional
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
 @router.get("", response_model=List[schemas.NotificationResponse])
 def get_notifications(
@@ -138,6 +138,44 @@ def mark_all_as_read(
     query.update({"is_read": True}, synchronize_session=False)
     db.commit()
     return {"message": "All notifications marked as read"}
+
+@router.put("/order/{order_number}/read")
+def mark_order_notifications_as_read(
+    order_number: str,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    clean_no = (order_number or "").strip().upper()
+    order_records = db.query(models.ClientOrder.id).filter(
+        func.upper(models.ClientOrder.order_number) == clean_no
+    ).all()
+    order_ids = [o.id for o in order_records]
+
+    notif_filters = [
+        models.Notification.action_url.ilike(f"%order={clean_no}%"),
+        models.Notification.action_url.ilike(f"%order%3D{clean_no}%"),
+        models.Notification.title.ilike(f"%#{clean_no}%"),
+        models.Notification.message.ilike(f"%#{clean_no}%"),
+    ]
+    if order_ids:
+        notif_filters.append(models.Notification.reference_id.in_(order_ids))
+
+    updated_count = db.query(models.Notification).filter(
+        models.Notification.user_id == current_user.id,
+        models.Notification.is_read == False,
+        or_(*notif_filters)
+    ).update({"is_read": True}, synchronize_session=False)
+    db.commit()
+
+    if updated_count > 0:
+        if hasattr(manager, 'loop') and manager.loop:
+            import asyncio
+            asyncio.run_coroutine_threadsafe(manager.send_personal_message({
+                "action": "REFRESH_NOTIFICATIONS",
+                "order_number": clean_no
+            }, current_user.id), manager.loop)
+
+    return {"message": f"{updated_count} notifications marked as read", "updated_count": updated_count}
 
 @router.delete("/{notification_id}")
 def delete_notification(

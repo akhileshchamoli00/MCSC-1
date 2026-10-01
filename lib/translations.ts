@@ -66,6 +66,7 @@ export const translations = {
     services: {
       title: "Services",
       dropdown: {
+        catalog: "Service Catalog & Pricing",
         establishment: "Establishment of Business Entities",
         businessLicense: "Business License",
         companyChanges: "Changes in Company Documents",
@@ -505,6 +506,7 @@ export const translations = {
     services: {
       title: "Layanan",
       dropdown: {
+        catalog: "Katalog Layanan & Harga",
         establishment: "Pendirian Badan Usaha",
         businessLicense: "Perizinan Usaha",
         companyChanges: "Perubahan Dokumen Perusahaan",
@@ -943,6 +945,7 @@ export const translations = {
     services: {
       title: "服务",
       dropdown: {
+        catalog: "服务目录与定价",
         establishment: "商业实体设立",
         businessLicense: "营业执照",
         companyChanges: "公司文件变更",

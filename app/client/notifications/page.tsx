@@ -111,10 +111,6 @@ export default function ClientNotificationsPage() {
   };
 
   const handleRowClick = (notif: any) => {
-    if (!notif.is_read) {
-      markAsRead(notif.id);
-    }
-
     let targetUrl = notif.action_url || "";
     let orderNum: string | null = null;
     if (targetUrl) {
@@ -126,6 +122,29 @@ export default function ClientNotificationsPage() {
     if (!orderNum) {
       const orderMatch = (targetUrl + " " + (notif.title || "") + " " + (notif.message || "")).match(/((?:ORD|MCSX|MSCX|MCS|SINGLE)-[A-Za-z0-9\-]+)/i);
       orderNum = orderMatch ? orderMatch[1].toUpperCase() : null;
+    }
+
+    if (orderNum) {
+      const cleanOrder = orderNum.toUpperCase();
+      setNotifications(prev => prev.map(n => {
+        const isRelated = (
+          n.id === notif.id ||
+          (n.action_url && n.action_url.toUpperCase().includes(`ORDER=${cleanOrder}`)) ||
+          (n.title && n.title.toUpperCase().includes(`#${cleanOrder}`)) ||
+          (n.message && n.message.toUpperCase().includes(`#${cleanOrder}`))
+        );
+        return isRelated ? { ...n, is_read: true } : n;
+      }));
+
+      // Call backend to mark all notifications for this order chat as read
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/order/${encodeURIComponent(cleanOrder)}/read`, {
+        method: "PUT",
+        credentials: "include"
+      }).then(() => {
+        window.dispatchEvent(new Event("notifications-updated"));
+      }).catch(console.error);
+    } else if (!notif.is_read) {
+      markAsRead(notif.id);
     }
 
     if (!targetUrl && orderNum) {

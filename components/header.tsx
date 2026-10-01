@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Menu, X, ChevronDown } from "lucide-react";
+import { Menu, X, ChevronDown, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/contexts/language-context";
 import { translations } from "@/lib/translations";
@@ -9,6 +9,7 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { usePathname } from "next/navigation";
 import { AskLogo } from "@/components/ask-logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { useCart } from "@/contexts/cart-context";
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -17,6 +18,7 @@ export function Header() {
   const { language } = useLanguage();
   const t = translations[language];
   const pathname = usePathname();
+  const { totalItems, setIsCartOpen } = useCart();
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -30,6 +32,11 @@ export function Header() {
   ];
 
   const servicesItems = [
+    {
+      label: t.services.dropdown.catalog || "Service Catalog & Pricing",
+      href: `/${language}/services/catalog`,
+      isCatalog: true,
+    },
     {
       label: t.services.dropdown.establishment,
       href: `/${language}/services/establishment`,
@@ -139,12 +146,19 @@ export function Header() {
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`block px-4 py-2.5 text-sm transition-colors duration-200 ${pathname === item.href
+                        className={`flex items-center justify-between px-4 py-2.5 text-sm transition-colors duration-200 ${item.isCatalog
+                          ? "bg-primary/5 font-semibold text-primary hover:bg-primary/10 border-b border-border/40 mb-1"
+                          : pathname === item.href
                           ? "bg-muted text-foreground"
                           : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                           }`}
                       >
-                        {item.label}
+                        <span>{item.label}</span>
+                        {item.isCatalog && (
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-primary/20 text-primary">
+                            Catalog
+                          </span>
+                        )}
                       </Link>
                     ))}
                   </div>
@@ -218,6 +232,22 @@ export function Header() {
           ))}
 
           <div className="ml-2 xl:ml-2.5 2xl:ml-4 border-l border-border/40 pl-2 xl:pl-2.5 2xl:pl-4 flex items-center gap-1.5 xl:gap-2 2xl:gap-3 shrink-0">
+            {/* Cart Trigger */}
+            <button
+              type="button"
+              onClick={() => setIsCartOpen(true)}
+              className="relative p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-all duration-200 cursor-pointer"
+              aria-label="View Shopping Cart"
+              title="Shopping Cart"
+            >
+              <ShoppingCart className="h-4.5 w-4.5 2xl:h-5 2xl:w-5" />
+              {totalItems > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-xs animate-scale-in">
+                  {totalItems}
+                </span>
+              )}
+            </button>
+
             <LanguageSwitcher />
             <ThemeToggle variant="segmented" showLabel={true} />
             <div className="flex flex-col items-center gap-0.5 shrink-0">
@@ -234,18 +264,33 @@ export function Header() {
           </div>
         </nav>
 
-        {/* Mobile / Tablet Menu Button (Visible on screens < 1280px) */}
-        <button
-          className="rounded-lg p-2 transition-colors hover:bg-muted xl:hidden"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          aria-label="Toggle menu"
-        >
-          {mobileMenuOpen ? (
-            <X className="h-6 w-6" />
-          ) : (
-            <Menu className="h-6 w-6" />
-          )}
-        </button>
+        {/* Mobile / Tablet Cart & Menu Buttons (Visible on screens < 1280px) */}
+        <div className="flex items-center gap-1 xl:hidden">
+          <button
+            type="button"
+            onClick={() => setIsCartOpen(true)}
+            className="relative p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            aria-label="View Shopping Cart"
+          >
+            <ShoppingCart className="h-5 w-5" />
+            {totalItems > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-xs">
+                {totalItems}
+              </span>
+            )}
+          </button>
+          <button
+            className="rounded-lg p-2 transition-colors hover:bg-muted"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? (
+              <X className="h-6 w-6" />
+            ) : (
+              <Menu className="h-6 w-6" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Navigation */}
@@ -286,13 +331,20 @@ export function Header() {
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`rounded-lg px-4 py-2.5 text-sm transition-colors ${pathname === item.href
+                      className={`flex items-center justify-between rounded-lg px-4 py-2.5 text-sm transition-colors ${item.isCatalog
+                        ? "bg-primary/10 text-primary font-semibold hover:bg-primary/15"
+                        : pathname === item.href
                         ? "bg-muted text-foreground"
                         : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                         }`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      {item.label}
+                      <span>{item.label}</span>
+                      {item.isCatalog && (
+                        <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-primary/20 text-primary">
+                          Catalog
+                        </span>
+                      )}
                     </Link>
                   ))}
                 </div>
@@ -346,7 +398,26 @@ export function Header() {
               </Link>
             ))}
 
-            <div className="mt-6 border-t border-border/40 pt-6 flex flex-col gap-4">
+            <div className="mt-6 border-t border-border/40 pt-6 flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setIsCartOpen(true);
+                }}
+                className="w-full flex items-center justify-between rounded-lg border border-border/80 bg-background/80 px-4 py-3 text-sm font-semibold transition-colors hover:bg-muted text-foreground"
+              >
+                <span className="flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4 text-primary" />
+                  View Shopping Cart
+                </span>
+                {totalItems > 0 && (
+                  <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
+                    {totalItems}
+                  </span>
+                )}
+              </button>
+
               <Link
                 href="/login"
                 className="w-full rounded-lg bg-primary px-4 py-3 text-center text-sm font-semibold text-primary-foreground transition-colors hover:bg-foreground hover:text-background dark:hover:bg-white dark:hover:text-black"
@@ -354,7 +425,7 @@ export function Header() {
               >
                 Login
               </Link>
-              <div className="flex items-center justify-around gap-4">
+              <div className="flex items-center justify-around gap-4 pt-1">
                 <LanguageSwitcher />
                 <ThemeToggle variant="segmented" showLabel={true} />
               </div>

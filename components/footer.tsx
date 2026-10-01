@@ -99,6 +99,17 @@ export function Footer() {
             <ul className="space-y-2 text-sm">
               <li>
                 <Link
+                  href={`/${language}/services/catalog`}
+                  className="font-semibold text-primary transition-colors hover:underline flex items-center gap-1.5"
+                >
+                  <span>{t.services.dropdown.catalog}</span>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded-full bg-primary/20 text-primary">
+                    Catalog
+                  </span>
+                </Link>
+              </li>
+              <li>
+                <Link
                   href={`/${language}/services/establishment`}
                   className="text-foreground/80 transition-colors hover:text-foreground"
                 >

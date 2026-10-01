@@ -2210,28 +2210,10 @@ export default function CompanyDocumentsManagementPage() {
                       className={`w-full max-w-4xl bg-white text-black dark:bg-slate-100 rounded-lg shadow-md p-4 sm:p-8 font-sans ${docxLoading || docxError ? "hidden" : "block"}`} 
                     />
                   </div>
-                ) : previewDoc.file_name?.match(/\.doc$/i) ? (
-                  <div className="text-center space-y-4 p-8 bg-background rounded-2xl border border-border max-w-md m-auto shadow-sm">
-                    <div className="h-12 w-12 rounded-2xl bg-blue-500/10 text-blue-600 flex items-center justify-center mx-auto border border-blue-500/20">
-                      <FileText className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm text-foreground">Legacy Microsoft Word Document (.doc)</h4>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                        Legacy binary Word files (.doc) cannot be rendered inline in browsers. Please download the document to view or edit it in Microsoft Word.
-                      </p>
-                    </div>
-                    <Button
-                      onClick={() => handleDownloadDocFile(previewDoc)}
-                      className="font-bold gap-2 text-xs w-full"
-                    >
-                      <Download className="h-4 w-4" /> Download Document (.doc)
-                    </Button>
-                  </div>
                 ) : (
                   <iframe
-                    src={previewDoc.file_name?.match(/\.pdf$/i) ? resolvedPreviewUrl : `https://docs.google.com/gview?url=${encodeURIComponent(resolvedPreviewUrl)}&embedded=true`}
-                    className="w-full h-[calc(100vh-16rem)] rounded-xl border-0 shadow-sm"
+                    src={previewDoc.file_name?.match(/\.(pdf|doc)$/i) ? resolvedPreviewUrl : `https://docs.google.com/gview?url=${encodeURIComponent(resolvedPreviewUrl)}&embedded=true`}
+                    className="w-full h-[calc(100vh-16rem)] rounded-xl border-0 shadow-sm bg-white"
                     title="Document Preview Frame"
                   />
                 )

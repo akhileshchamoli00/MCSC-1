@@ -171,11 +171,6 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
   };
 
   const handleNotificationClick = (notif: any) => {
-    if (!notif.is_read) {
-      markAsRead(notif.id);
-    }
-    setOpen(false);
-
     let targetUrl = notif.action_url || "";
 
     // Extract order number from URL query parameters first, or pattern match across URL, title, and message
@@ -190,6 +185,42 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
       const orderMatch = (targetUrl + " " + (notif.title || "") + " " + (notif.message || "")).match(/((?:ORD|MCSX|MSCX|MCS|SINGLE)-[A-Za-z0-9\-]+)/i);
       orderNum = orderMatch ? orderMatch[1].toUpperCase() : null;
     }
+
+    if (orderNum) {
+      const cleanOrder = orderNum.toUpperCase();
+      // Mark all notifications for this order as read in state
+      setNotifications(prev => prev.map(n => {
+        const isRelated = (
+          n.id === notif.id ||
+          (n.action_url && n.action_url.toUpperCase().includes(`ORDER=${cleanOrder}`)) ||
+          (n.title && n.title.toUpperCase().includes(`#${cleanOrder}`)) ||
+          (n.message && n.message.toUpperCase().includes(`#${cleanOrder}`))
+        );
+        return isRelated ? { ...n, is_read: true } : n;
+      }));
+
+      setUnreadCount(prev => {
+        const unreadCountForOrder = notifications.filter(n => !n.is_read && (
+          n.id === notif.id ||
+          (n.action_url && n.action_url.toUpperCase().includes(`ORDER=${cleanOrder}`)) ||
+          (n.title && n.title.toUpperCase().includes(`#${cleanOrder}`)) ||
+          (n.message && n.message.toUpperCase().includes(`#${cleanOrder}`))
+        )).length;
+        return Math.max(0, prev - unreadCountForOrder);
+      });
+
+      // Call backend to mark all notifications for this order chat as read
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/order/${encodeURIComponent(cleanOrder)}/read`, {
+        method: "PUT",
+        credentials: "include"
+      }).then(() => {
+        window.dispatchEvent(new Event("notifications-updated"));
+      }).catch(console.error);
+    } else if (!notif.is_read) {
+      markAsRead(notif.id);
+    }
+
+    setOpen(false);
 
     if (!targetUrl && orderNum) {
       if (isClientUser) {

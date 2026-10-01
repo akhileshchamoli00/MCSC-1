@@ -3209,6 +3209,8 @@ async def preview_client_document(
     if not db_doc.file_url:
         raise HTTPException(status_code=400, detail="No file URL associated with this record")
         
+    import os
+    import asyncio
     import mimetypes
     from fastapi.responses import StreamingResponse
     import httpx
@@ -3238,11 +3240,48 @@ async def preview_client_document(
         "Access-Control-Expose-Headers": "Content-Disposition"
     }
 
+    # Fast-path for cached .doc -> .pdf preview
+    if ext == "doc" and not is_download:
+        from utils.doc_converter import get_cached_pdf_path
+        cache_key = f"doc_{document_id}_{safe_filename}"
+        cached_pdf = get_cached_pdf_path(cache_key)
+        if os.path.exists(cached_pdf) and os.path.getsize(cached_pdf) > 0:
+            pdf_filename = f"{safe_filename.rsplit('.', 1)[0]}.pdf"
+            pdf_headers = {
+                "Content-Disposition": f'inline; filename="{pdf_filename}"',
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            }
+            def iter_cached_pdf():
+                with open(cached_pdf, "rb") as f:
+                    yield from f
+            order_suffix = f" for order {db_doc.order_number}" if db_doc.order_number else ""
+            act_desc = f"Viewed document '{db_doc.file_name}' ({db_doc.document_type or 'General'}){order_suffix}"
+            log_activity(db, "DOCUMENT_VIEWED", act_desc, client_id=company.client_id, company_id=company_id, user_id=current_user.id)
+            return StreamingResponse(iter_cached_pdf(), media_type="application/pdf", headers=pdf_headers)
+
     # 1. Local storage case
     if db_doc.file_url.startswith("/uploads/"):
         import os
         local_path = os.path.join("uploads", db_doc.file_url.replace("/uploads/", "", 1))
         if os.path.exists(local_path):
+            if ext == "doc" and not is_download:
+                import asyncio
+                from utils.doc_converter import convert_doc_to_pdf
+                with open(local_path, "rb") as f:
+                    raw_bytes = f.read()
+                loop = asyncio.get_running_loop()
+                pdf_bytes = await loop.run_in_executor(None, convert_doc_to_pdf, raw_bytes, f"doc_{document_id}_{safe_filename}")
+                if pdf_bytes:
+                    pdf_filename = f"{safe_filename.rsplit('.', 1)[0]}.pdf"
+                    pdf_headers = {
+                        "Content-Disposition": f'inline; filename="{pdf_filename}"',
+                        "Access-Control-Expose-Headers": "Content-Disposition"
+                    }
+                    order_suffix = f" for order {db_doc.order_number}" if db_doc.order_number else ""
+                    act_desc = f"Viewed document '{db_doc.file_name}' ({db_doc.document_type or 'General'}){order_suffix}"
+                    log_activity(db, "DOCUMENT_VIEWED", act_desc, client_id=company.client_id, company_id=company_id, user_id=current_user.id)
+                    return Response(content=pdf_bytes, media_type="application/pdf", headers=pdf_headers)
+
             def iterfile():
                 with open(local_path, mode="rb") as f:
                     yield from f
@@ -3251,26 +3290,43 @@ async def preview_client_document(
         
     # 2. Dropbox path case
     if db_doc.file_url.startswith("/Clients/"):
-        # Check first if it actually exists locally (local fallback)
-        local_rel = db_doc.file_url.replace("/Clients/", "", 1)
         import os
+        local_rel = db_doc.file_url.replace("/Clients/", "", 1)
         local_path = os.path.join("uploads", local_rel)
+        resolved_local = None
         if os.path.exists(local_path):
+            resolved_local = local_path
+        else:
+            parts = local_rel.split("/")
+            if len(parts) >= 4:
+                old_rel = f"{parts[0]}/{parts[2]}/{parts[3]}"
+                old_path = os.path.join("uploads", old_rel)
+                if os.path.exists(old_path):
+                    resolved_local = old_path
+
+        if resolved_local:
+            if ext == "doc" and not is_download:
+                import asyncio
+                from utils.doc_converter import convert_doc_to_pdf
+                with open(resolved_local, "rb") as f:
+                    raw_bytes = f.read()
+                loop = asyncio.get_running_loop()
+                pdf_bytes = await loop.run_in_executor(None, convert_doc_to_pdf, raw_bytes, f"doc_{document_id}_{safe_filename}")
+                if pdf_bytes:
+                    pdf_filename = f"{safe_filename.rsplit('.', 1)[0]}.pdf"
+                    pdf_headers = {
+                        "Content-Disposition": f'inline; filename="{pdf_filename}"',
+                        "Access-Control-Expose-Headers": "Content-Disposition"
+                    }
+                    order_suffix = f" for order {db_doc.order_number}" if db_doc.order_number else ""
+                    act_desc = f"Viewed document '{db_doc.file_name}' ({db_doc.document_type or 'General'}){order_suffix}"
+                    log_activity(db, "DOCUMENT_VIEWED", act_desc, client_id=company.client_id, company_id=company_id, user_id=current_user.id)
+                    return Response(content=pdf_bytes, media_type="application/pdf", headers=pdf_headers)
+
             def iterfile():
-                with open(local_path, mode="rb") as f:
+                with open(resolved_local, mode="rb") as f:
                     yield from f
             return StreamingResponse(iterfile(), media_type=mime_type, headers=headers)
-            
-        # Check old local path fallback
-        parts = local_rel.split("/")
-        if len(parts) >= 4:
-            old_rel = f"{parts[0]}/{parts[2]}/{parts[3]}"
-            old_path = os.path.join("uploads", old_rel)
-            if os.path.exists(old_path):
-                def iterfile():
-                    with open(old_path, mode="rb") as f:
-                        yield from f
-                return StreamingResponse(iterfile(), media_type=mime_type, headers=headers)
                 
         # Resolve Dropbox temporary link
         from utils.dropbox_client import get_temporary_link
@@ -3279,6 +3335,27 @@ async def preview_client_document(
             raise HTTPException(status_code=400, detail=f"Failed to query Dropbox file link: {res.get('error')}")
             
         link = res.get("link")
+
+        # For .doc preview, download bytes from Dropbox, convert to PDF, and return
+        if ext == "doc" and not is_download:
+            import asyncio
+            from utils.doc_converter import convert_doc_to_pdf
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.get(link)
+                if resp.status_code == 200:
+                    raw_bytes = resp.content
+                    loop = asyncio.get_running_loop()
+                    pdf_bytes = await loop.run_in_executor(None, convert_doc_to_pdf, raw_bytes, f"doc_{document_id}_{safe_filename}")
+                    if pdf_bytes:
+                        pdf_filename = f"{safe_filename.rsplit('.', 1)[0]}.pdf"
+                        pdf_headers = {
+                            "Content-Disposition": f'inline; filename="{pdf_filename}"',
+                            "Access-Control-Expose-Headers": "Content-Disposition"
+                        }
+                        order_suffix = f" for order {db_doc.order_number}" if db_doc.order_number else ""
+                        act_desc = f"Viewed document '{db_doc.file_name}' ({db_doc.document_type or 'General'}){order_suffix}"
+                        log_activity(db, "DOCUMENT_VIEWED", act_desc, client_id=company.client_id, company_id=company_id, user_id=current_user.id)
+                        return Response(content=pdf_bytes, media_type="application/pdf", headers=pdf_headers)
         
         async def stream_file():
             async with httpx.AsyncClient() as client:
@@ -4416,6 +4493,39 @@ def mark_order_chat_as_read(
         if payload.last_message_id > read_record.last_read_message_id:
             read_record.last_read_message_id = payload.last_message_id
             read_record.read_at = now
+
+    # Automatically mark all unread notifications for this order chat as read
+    try:
+        order_records = db.query(models.ClientOrder.id).filter(
+            func.upper(models.ClientOrder.order_number) == clean_no
+        ).all()
+        order_ids = [o.id for o in order_records]
+
+        notif_filters = [
+            models.Notification.action_url.ilike(f"%order={clean_no}%"),
+            models.Notification.action_url.ilike(f"%order%3D{clean_no}%"),
+            models.Notification.title.ilike(f"%#{clean_no}%"),
+            models.Notification.message.ilike(f"%#{clean_no}%"),
+        ]
+        if order_ids:
+            notif_filters.append(models.Notification.reference_id.in_(order_ids))
+
+        updated_notifs = db.query(models.Notification).filter(
+            models.Notification.user_id == current_user.id,
+            models.Notification.is_read == False,
+            or_(*notif_filters)
+        ).update({"is_read": True}, synchronize_session=False)
+
+        if updated_notifs > 0:
+            from notification_manager import manager
+            if hasattr(manager, 'loop') and manager.loop:
+                import asyncio
+                asyncio.run_coroutine_threadsafe(manager.send_personal_message({
+                    "action": "REFRESH_NOTIFICATIONS",
+                    "order_number": clean_no
+                }, current_user.id), manager.loop)
+    except Exception as notif_err:
+        print(f"Warning: Failed to auto-mark order notifications as read: {notif_err}")
 
     db.commit()
     return {
