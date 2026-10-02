@@ -216,8 +216,25 @@ export default function CompanyDocumentsManagementPage() {
         if (!res.ok) throw new Error(`Could not load document (${res.status})`);
         return res.blob();
       })
-      .then((blob) => {
+      .then(async (blob) => {
         if (!isMounted) return;
+
+        // Check if the received blob is actually a valid PDF (%PDF header)
+        const headerSlice = blob.slice(0, 5);
+        const headerBuffer = await headerSlice.arrayBuffer();
+        const headerText = new TextDecoder().decode(headerBuffer);
+
+        if (!headerText.startsWith("%PDF")) {
+          // Content is not a valid PDF (e.g. raw .doc file when server PDF conversion is unavailable)
+          if (previewDoc.file_name?.match(/\.doc$/i)) {
+            setPdfError("This Word document (.doc) could not be converted to a PDF preview on the server. Please download the file to view.");
+          } else {
+            setPdfError("The received document could not be loaded as a PDF.");
+          }
+          setPdfLoading(false);
+          return;
+        }
+
         const pdfBlob = new Blob([blob], { type: "application/pdf" });
         const url = window.URL.createObjectURL(pdfBlob);
         setPdfBlobUrl((prev) => {
