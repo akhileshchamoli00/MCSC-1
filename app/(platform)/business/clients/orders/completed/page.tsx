@@ -3552,7 +3552,7 @@ export default function ClientOrdersPage() {
                           Issue Date: <span className="font-mono text-slate-900 font-bold">{new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                         </p>
                         <p className="text-[11px] text-slate-600 font-medium">
-                          Valid Until: <span className="font-mono text-slate-900 font-bold">{new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                          Valid Until: <span className="font-mono text-slate-900 font-bold">{new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                         </p>
                       </div>
                     </div>
@@ -3687,7 +3687,6 @@ export default function ClientOrdersPage() {
                     <div className="text-slate-550 text-[11px] leading-tight max-w-sm">
                       <p className="font-bold text-slate-700">Notice:</p>
                       <p>This Proforma Invoice is issued for milestone payment processing.</p>
-                      <p>Tax invoice (Faktur Pajak) will be provided upon full payment receipt.</p>
                     </div>
                     <div className="text-center w-56 space-y-6">
                       <p className="text-slate-500 font-semibold text-[11px]">Authorized Signature</p>
@@ -3960,7 +3959,6 @@ export default function ClientOrdersPage() {
                     <div className="text-slate-500 text-[11px] leading-tight max-w-sm">
                       <p className="font-bold text-slate-700">Notice:</p>
                       <p>This Final Invoice is issued for completed service deliverables.</p>
-                      <p>Tax invoice (Faktur Pajak) will be provided upon full payment receipt.</p>
                     </div>
                     <div className="text-center w-56 space-y-6">
                       <p className="text-slate-500 font-semibold text-[11px]">Authorized Signature</p>

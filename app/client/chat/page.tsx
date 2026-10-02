@@ -90,6 +90,26 @@ const formatSeenTime = (dateStr?: string) => {
   }
 };
 
+const formatMessageDateTime = (dateStr?: string | null) => {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    const dateFormatted = d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric"
+    });
+    const timeFormatted = d.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+    return `${dateFormatted}, ${timeFormatted}`;
+  } catch {
+    return "";
+  }
+};
+
 const SeenReceiptsIndicator = ({
   seenBy,
   isSelf,
@@ -104,6 +124,7 @@ const SeenReceiptsIndicator = ({
   const hasSeen = readers.length > 0;
 
   if (!hasSeen) {
+    if (!isSelf) return null;
     return (
       <TooltipProvider delayDuration={100}>
         <Tooltip>
@@ -1240,8 +1261,8 @@ export default function ClientOrderChatPage() {
                               {getMilestoneIcon(msg.message)}
                             </div>
                             <span className="font-medium text-[11px] sm:text-xs leading-snug">{cleanClientMilestoneMessage(msg.message)}</span>
-                            <span className="text-[10px] text-muted-foreground/60 dark:text-zinc-500 shrink-0 font-mono ml-0.5">
-                              {msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                            <span className="text-[10px] text-muted-foreground/60 dark:text-zinc-500 shrink-0 font-mono ml-0.5" title={msg.created_at ? new Date(msg.created_at).toLocaleString() : undefined}>
+                              {formatMessageDateTime(msg.created_at)}
                             </span>
                           </div>
                         </div>
@@ -1372,13 +1393,20 @@ export default function ClientOrderChatPage() {
                                     <Ban className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
                                     <span>This message was deleted</span>
                                   </div>
-                                  <div className="flex items-center justify-center shrink-0 self-center select-none">
-                                    <SeenReceiptsIndicator
-                                      seenBy={msg.seen_by}
-                                      isSelf={isSelf}
-                                      sentAt={msg.created_at}
-                                    />
-                                  </div>
+                                </div>
+                                <div
+                                  className={`flex items-center gap-1 mt-0.5 px-1 select-none text-[10px] text-muted-foreground/75 font-medium ${
+                                    isSelf ? "justify-end" : "justify-start"
+                                  }`}
+                                >
+                                  <span title={msg.created_at ? new Date(msg.created_at).toLocaleString() : undefined}>
+                                    {formatMessageDateTime(msg.created_at)}
+                                  </span>
+                                  <SeenReceiptsIndicator
+                                    seenBy={msg.seen_by}
+                                    isSelf={isSelf}
+                                    sentAt={msg.created_at}
+                                  />
                                 </div>
                               </div>
                             ) : (
@@ -1559,15 +1587,6 @@ export default function ClientOrderChatPage() {
                                       </button>
                                     </div>
                                   )}
-
-                                  {/* Outside on the right side, vertically centered in the middle */}
-                                  <div className="flex items-center justify-center shrink-0 self-center select-none">
-                                    <SeenReceiptsIndicator
-                                      seenBy={msg.seen_by}
-                                      isSelf={isSelf}
-                                      sentAt={msg.created_at}
-                                    />
-                                  </div>
                                 </div>
 
                                 {/* Reactions list at the bottom of the message */}
@@ -1576,6 +1595,22 @@ export default function ClientOrderChatPage() {
                                   onToggleReaction={emoji => handleToggleReaction(msg.id, emoji)}
                                   isSelf={isSelf}
                                 />
+
+                                {/* Sent Date and Time & Seen indicator */}
+                                <div
+                                  className={`flex items-center gap-1 mt-0.5 px-1 select-none text-[10px] text-muted-foreground/75 font-medium ${
+                                    isSelf ? "justify-end" : "justify-start"
+                                  }`}
+                                >
+                                  <span title={msg.created_at ? new Date(msg.created_at).toLocaleString() : undefined}>
+                                    {formatMessageDateTime(msg.created_at)}
+                                  </span>
+                                  <SeenReceiptsIndicator
+                                    seenBy={msg.seen_by}
+                                    isSelf={isSelf}
+                                    sentAt={msg.created_at}
+                                  />
+                                </div>
                               </div>
                             )}
                           </div>

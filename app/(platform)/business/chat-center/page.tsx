@@ -367,7 +367,7 @@ export default function AdminChatCenter() {
               {messages.map((msg) => {
                 const isMe = msg.sender_id === currentUserId;
                 const isClientMsg = msg.sender_role === "CLIENT";
-                const dateStr = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const dateStr = msg.created_at ? `${new Date(msg.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}, ${new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : "";
                 
                 return (
                   <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
