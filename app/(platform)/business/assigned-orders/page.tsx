@@ -59,7 +59,7 @@ export default function AssignedOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [savingStatus, setSavingStatus] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState<"ASSIGNED" | "IN_PROGRESS" | "REVIEW_ORDER" | "ON_HOLD" | "COMPLETED">("IN_PROGRESS");
+  const [activeTab, setActiveTab] = useState<"ALL" | "ASSIGNED" | "IN_PROGRESS" | "REVIEW_ORDER" | "ON_HOLD" | "COMPLETED">("ALL");
   const [currentPage, setCurrentPage] = useState(1);
 
   // Restore active tab from URL query parameter or sessionStorage on mount
@@ -69,7 +69,7 @@ export default function AssignedOrdersPage() {
     const tabParam = params.get("tab");
     const savedTab = sessionStorage.getItem("assigned_orders_active_tab");
     const targetTab = tabParam || savedTab;
-    if (targetTab && ["ASSIGNED", "IN_PROGRESS", "REVIEW_ORDER", "ON_HOLD", "COMPLETED"].includes(targetTab.toUpperCase())) {
+    if (targetTab && ["ALL", "ASSIGNED", "IN_PROGRESS", "REVIEW_ORDER", "ON_HOLD", "COMPLETED"].includes(targetTab.toUpperCase())) {
       setActiveTab(targetTab.toUpperCase() as any);
     }
   }, []);
@@ -770,21 +770,30 @@ export default function AssignedOrdersPage() {
         const isExecuting = checkIsExecuting(ord);
         const isReviewer = checkIsReviewer(ord);
 
+        const isNewlyAssigned = ASSIGNED_STATUSES.includes(status) && !isReviewOnly && isExecuting;
+        const isInProgress = IN_PROGRESS_STATUSES.includes(status) && !isReviewOnly && isExecuting;
+        const isReviewOrder = isReviewer && !COMPLETED_STATUSES.includes(status) && status !== "CANCELLED";
+        const isOnHold = ON_HOLD_STATUSES.includes(status) && !isReviewOnly && isExecuting;
+
+        // 0. All Assigned Orders (Full list of assigned orders, excluding completed & cancelled)
+        if (activeTab === "ALL") {
+          if (!isNewlyAssigned && !isInProgress && !isReviewOrder && !isOnHold) return false;
+        }
         // 1. Newly Assigned Orders: Followed by allocated consultant / admin
         if (activeTab === "ASSIGNED") {
-          if (isReviewOnly || !isExecuting || !ASSIGNED_STATUSES.includes(status)) return false;
+          if (!isNewlyAssigned) return false;
         }
         // 2. In-Progress Orders: Followed by allocated consultant / admin through execution lifecycle
         if (activeTab === "IN_PROGRESS") {
-          if (isReviewOnly || !isExecuting || !IN_PROGRESS_STATUSES.includes(status)) return false;
+          if (!isInProgress) return false;
         }
         // 3. Review Order: Stays in Review Order card throughout entire active lifecycle until completed or cancelled
         if (activeTab === "REVIEW_ORDER") {
-          if (!isReviewer || COMPLETED_STATUSES.includes(status) || status === "CANCELLED") return false;
+          if (!isReviewOrder) return false;
         }
         // 4. On-Hold Orders: Followed by allocated consultant / admin
         if (activeTab === "ON_HOLD") {
-          if (isReviewOnly || !isExecuting || !ON_HOLD_STATUSES.includes(status)) return false;
+          if (!isOnHold) return false;
         }
         // 5. Completed Orders: Concluded archive for executing consultants / admins
         if (activeTab === "COMPLETED") {
@@ -825,8 +834,10 @@ export default function AssignedOrdersPage() {
     const isRevOnly = checkIsReviewOnly(matched);
     const isRev = checkIsReviewer(matched);
 
-    let targetTab: "ASSIGNED" | "IN_PROGRESS" | "REVIEW_ORDER" | "ON_HOLD" | "COMPLETED" = "ASSIGNED";
-    if (isRevOnly) {
+    let targetTab: "ALL" | "ASSIGNED" | "IN_PROGRESS" | "REVIEW_ORDER" | "ON_HOLD" | "COMPLETED" = "ALL";
+    if (activeTab === "ALL" && !COMPLETED_STATUSES.includes(st) && st !== "CANCELLED") {
+      targetTab = "ALL";
+    } else if (isRevOnly) {
       if (!COMPLETED_STATUSES.includes(st) && st !== "CANCELLED") {
         targetTab = "REVIEW_ORDER";
       } else {
@@ -855,6 +866,7 @@ export default function AssignedOrdersPage() {
       const oExecuting = checkIsExecuting(ord);
       const oReviewer = checkIsReviewer(ord);
 
+      if (targetTab === "ALL" && (COMPLETED_STATUSES.includes(ost) || ost === "CANCELLED" || (!oExecuting && !oReviewer))) return false;
       if (targetTab === "ASSIGNED" && (oRevOnly || !oExecuting || !ASSIGNED_STATUSES.includes(ost))) return false;
       if (targetTab === "IN_PROGRESS" && (oRevOnly || !oExecuting || !IN_PROGRESS_STATUSES.includes(ost))) return false;
       if (targetTab === "REVIEW_ORDER" && (!oReviewer || COMPLETED_STATUSES.includes(ost) || ost === "CANCELLED")) return false;
@@ -1020,6 +1032,18 @@ export default function AssignedOrdersPage() {
   };
 
   // Mutually Exclusive Counts Across All Folders
+  const allOrdersCount = groupedOrders.filter(o => {
+    const st = (o.status || "").toUpperCase();
+    const isRevOnly = checkIsReviewOnly(o);
+    const isExec = checkIsExecuting(o);
+    const isRev = checkIsReviewer(o);
+    const isNewlyAssigned = ASSIGNED_STATUSES.includes(st) && !isRevOnly && isExec;
+    const isInProgress = IN_PROGRESS_STATUSES.includes(st) && !isRevOnly && isExec;
+    const isReviewOrder = isRev && !COMPLETED_STATUSES.includes(st) && st !== "CANCELLED";
+    const isOnHold = ON_HOLD_STATUSES.includes(st) && !isRevOnly && isExec;
+    return isNewlyAssigned || isInProgress || isReviewOrder || isOnHold;
+  }).length;
+
   const assignedOrdersCount = groupedOrders.filter(o => {
     const st = (o.status || "").toUpperCase();
     return ASSIGNED_STATUSES.includes(st) && !checkIsReviewOnly(o) && checkIsExecuting(o);
@@ -1100,278 +1124,345 @@ export default function AssignedOrdersPage() {
             </div>
           </div>
 
-          {/* 5 Interactive Workflow Folders */}
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2.5 sm:gap-3.5">
-
-            {/* FOLDER 1: NEWLY ASSIGNED */}
+          {/* Interactive Workflow Folders - Single Horizontal Row */}
+          <div className="w-full overflow-x-auto pt-3 pb-2 px-1 -mx-1 scrollbar-none mt-3 sm:mt-4">
             <div
-              onClick={() => setActiveTab("ASSIGNED")}
-              className={cn(
-                "group relative rounded-2xl border p-3.5 sm:p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
-                "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
-                activeTab === "ASSIGNED"
-                  ? "border-purple-500/60 ring-2 ring-purple-500/20 bg-gradient-to-br from-purple-500/10 via-purple-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-purple-500/5 -translate-y-0.5"
-                  : "border-border/60 hover:border-purple-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
-              )}
+              className="flex flex-row items-stretch gap-2 lg:gap-2.5 xl:gap-3 w-full min-w-[780px] lg:min-w-0"
+              style={{ display: "flex", flexDirection: "row", flexWrap: "nowrap" }}
             >
-              {/* Top Ear Tab Accent */}
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "p-3 rounded-xl transition-all duration-200 shrink-0",
-                    activeTab === "ASSIGNED"
-                      ? "bg-purple-600 text-white shadow-xs scale-105"
-                      : "bg-purple-500/10 text-purple-600 dark:text-purple-400 group-hover:bg-purple-500/20"
-                  )}>
-                    {activeTab === "ASSIGNED" ? <FolderOpen className="h-5 w-5" /> : <Folder className="h-5 w-5" />}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-sm tracking-tight text-foreground">
-                        Assigned Orders
-                      </h3>
-                      {activeTab === "ASSIGNED" && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/30 uppercase tracking-wider">
-                          Active
-                        </span>
-                      )}
+
+              {/* FOLDER 1 (LEFT-MOST): ALL ASSIGNED ORDERS */}
+              <div
+                onClick={() => setActiveTab("ALL")}
+                style={{ flex: "1 1 0%", minWidth: 0 }}
+                className={cn(
+                  "flex-1 min-w-0 group relative rounded-2xl border p-2.5 xl:p-3 2xl:p-3.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden flex flex-col justify-between",
+                  "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
+                  activeTab === "ALL"
+                    ? "border-blue-500/60 ring-2 ring-blue-500/20 bg-gradient-to-br from-blue-500/10 via-blue-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-blue-500/5 -translate-y-0.5"
+                    : "border-border/60 hover:border-blue-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
+                )}
+              >
+                {/* Top Ear Tab Accent */}
+                <div className="flex items-start justify-between gap-2 mb-2 xl:mb-2.5">
+                  <div className="flex items-center gap-2 xl:gap-2.5 min-w-0">
+                    <div className={cn(
+                      "p-2 xl:p-2.5 rounded-xl transition-all duration-200 shrink-0",
+                      activeTab === "ALL"
+                        ? "bg-blue-600 text-white shadow-xs scale-105"
+                        : "bg-blue-500/10 text-blue-600 dark:text-blue-400 group-hover:bg-blue-500/20"
+                    )}>
+                      {activeTab === "ALL" ? <FolderKanban className="h-4.5 w-4.5 xl:h-5 xl:w-5" /> : <Folder className="h-4.5 w-4.5 xl:h-5 xl:w-5" />}
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Newly assigned orders pending execution</p>
-                  </div>
-                </div>
-                <Badge
-                  variant={activeTab === "ASSIGNED" ? "default" : "secondary"}
-                  className={cn(
-                    "font-mono text-xs font-bold px-2.5 py-0.5 shrink-0",
-                    activeTab === "ASSIGNED" ? "bg-purple-600 text-white hover:bg-purple-600" : "bg-muted text-muted-foreground"
-                  )}
-                >
-                  {assignedOrdersCount}
-                </Badge>
-              </div>
-
-              {/* Folder Footer Metadata */}
-              <div className="pt-2.5 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground">
-                <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-purple-600 dark:text-purple-400 font-semibold">
-                  <ShoppingCart className="h-3 w-3" /> New Queue
-                </span>
-                <span className="font-medium text-foreground/80">{assignedOrdersCount} {assignedOrdersCount === 1 ? "order" : "orders"}</span>
-              </div>
-            </div>
-
-            {/* FOLDER 2: IN PROGRESS */}
-            <div
-              onClick={() => setActiveTab("IN_PROGRESS")}
-              className={cn(
-                "group relative rounded-2xl border p-3.5 sm:p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
-                "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
-                activeTab === "IN_PROGRESS"
-                  ? "border-sky-500/60 ring-2 ring-sky-500/20 bg-gradient-to-br from-sky-500/10 via-sky-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-sky-500/5 -translate-y-0.5"
-                  : "border-border/60 hover:border-sky-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
-              )}
-            >
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "p-3 rounded-xl transition-all duration-200 shrink-0",
-                    activeTab === "IN_PROGRESS"
-                      ? "bg-sky-600 text-white shadow-xs scale-105"
-                      : "bg-sky-500/10 text-sky-600 dark:text-sky-400 group-hover:bg-sky-500/20"
-                  )}>
-                    {activeTab === "IN_PROGRESS" ? <FolderClock className="h-5 w-5" /> : <Folder className="h-5 w-5" />}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-sm tracking-tight text-foreground">
-                        In-Progress
-                      </h3>
-                      {activeTab === "IN_PROGRESS" && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/30 uppercase tracking-wider">
-                          Active
-                        </span>
-                      )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h3 className="font-bold text-xs xl:text-sm tracking-tight text-foreground truncate">
+                          All Orders
+                        </h3>
+                        {activeTab === "ALL" && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-blue-500/15 text-blue-600 dark:text-blue-300 border border-blue-500/30 uppercase tracking-wider shrink-0">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] xl:text-[11px] text-muted-foreground mt-0.5 truncate">Full list of active assigned</p>
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Execution, prep & payment stages</p>
                   </div>
+                  <Badge
+                    variant={activeTab === "ALL" ? "default" : "secondary"}
+                    className={cn(
+                      "font-mono text-xs font-bold px-2 py-0.5 shrink-0",
+                      activeTab === "ALL" ? "bg-blue-600 text-white hover:bg-blue-600" : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {allOrdersCount}
+                  </Badge>
                 </div>
-                <Badge
-                  variant={activeTab === "IN_PROGRESS" ? "default" : "secondary"}
-                  className={cn(
-                    "font-mono text-xs font-bold px-2.5 py-0.5 shrink-0",
-                    activeTab === "IN_PROGRESS" ? "bg-sky-600 text-white hover:bg-sky-600" : "bg-muted text-muted-foreground"
-                  )}
-                >
-                  {inProgressOrdersCount}
-                </Badge>
+
+                {/* Folder Footer Metadata */}
+                <div className="pt-2 mt-2 border-t border-border/40 flex items-center justify-between text-[10px] xl:text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1.5 font-mono text-[9px] xl:text-[10px] uppercase tracking-wider text-blue-600 dark:text-blue-400 font-semibold truncate">
+                    <FolderKanban className="h-3 w-3 shrink-0" /> Full Queue
+                  </span>
+                  <span className="font-medium text-foreground/80 shrink-0">{allOrdersCount} active</span>
+                </div>
               </div>
 
-              <div className="pt-2.5 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground">
-                <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-sky-600 dark:text-sky-400 font-semibold">
-                  <Clock className="h-3 w-3" /> {reviewPrepOrdersCount} In Review/Prep
-                </span>
-                <span className="font-medium text-foreground/80">{inProgressOrdersCount} active</span>
-              </div>
-            </div>
-
-            {/* FOLDER 3: REVIEW ORDER */}
-            <div
-              onClick={() => setActiveTab("REVIEW_ORDER")}
-              className={cn(
-                "group relative rounded-2xl border p-3.5 sm:p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
-                "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
-                activeTab === "REVIEW_ORDER"
-                  ? "border-indigo-500/60 ring-2 ring-indigo-500/20 bg-gradient-to-br from-indigo-500/10 via-indigo-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-indigo-500/5 -translate-y-0.5"
-                  : "border-border/60 hover:border-indigo-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
-              )}
-            >
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "p-3 rounded-xl transition-all duration-200 shrink-0",
-                    activeTab === "REVIEW_ORDER"
-                      ? "bg-indigo-600 text-white shadow-xs scale-105"
-                      : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-500/20"
-                  )}>
-                    <ShieldCheck className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-sm tracking-tight text-foreground">
-                        Review Order
-                      </h3>
-                      {activeTab === "REVIEW_ORDER" && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border border-indigo-500/30 uppercase tracking-wider">
-                          Active
-                        </span>
-                      )}
+              {/* FOLDER 2: NEWLY ASSIGNED */}
+              <div
+                onClick={() => setActiveTab("ASSIGNED")}
+                style={{ flex: "1 1 0%", minWidth: 0 }}
+                className={cn(
+                  "flex-1 min-w-0 group relative rounded-2xl border p-2.5 xl:p-3 2xl:p-3.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden flex flex-col justify-between",
+                  "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
+                  activeTab === "ASSIGNED"
+                    ? "border-purple-500/60 ring-2 ring-purple-500/20 bg-gradient-to-br from-purple-500/10 via-purple-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-purple-500/5 -translate-y-0.5"
+                    : "border-border/60 hover:border-purple-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
+                )}
+              >
+                {/* Top Ear Tab Accent */}
+                <div className="flex items-start justify-between gap-2 mb-2 xl:mb-2.5">
+                  <div className="flex items-center gap-2 xl:gap-2.5 min-w-0">
+                    <div className={cn(
+                      "p-2 xl:p-2.5 rounded-xl transition-all duration-200 shrink-0",
+                      activeTab === "ASSIGNED"
+                        ? "bg-purple-600 text-white shadow-xs scale-105"
+                        : "bg-purple-500/10 text-purple-600 dark:text-purple-400 group-hover:bg-purple-500/20"
+                    )}>
+                      {activeTab === "ASSIGNED" ? <FolderOpen className="h-4.5 w-4.5 xl:h-5 xl:w-5" /> : <Folder className="h-4.5 w-4.5 xl:h-5 xl:w-5" />}
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Continuous review throughout order lifecycle</p>
-                  </div>
-                </div>
-                <Badge
-                  variant={activeTab === "REVIEW_ORDER" ? "default" : "secondary"}
-                  className={cn(
-                    "font-mono text-xs font-bold px-2.5 py-0.5 shrink-0",
-                    activeTab === "REVIEW_ORDER" ? "bg-indigo-600 text-white hover:bg-indigo-600" : "bg-muted text-muted-foreground"
-                  )}
-                >
-                  {reviewOrdersCount}
-                </Badge>
-              </div>
-
-              <div className="pt-2.5 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground">
-                <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold">
-                  <ShieldCheck className="h-3 w-3" /> Continuous Review
-                </span>
-                <span className="font-medium text-foreground/80">{reviewOrdersCount} active {reviewOrdersCount === 1 ? "review" : "reviews"}</span>
-              </div>
-            </div>
-
-            {/* FOLDER 4: ON-HOLD ORDERS */}
-            <div
-              onClick={() => setActiveTab("ON_HOLD")}
-              className={cn(
-                "group relative rounded-2xl border p-3.5 sm:p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
-                "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
-                activeTab === "ON_HOLD"
-                  ? "border-amber-500/60 ring-2 ring-amber-500/20 bg-gradient-to-br from-amber-500/10 via-amber-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-amber-500/5 -translate-y-0.5"
-                  : "border-border/60 hover:border-amber-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
-              )}
-            >
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "p-3 rounded-xl transition-all duration-200 shrink-0",
-                    activeTab === "ON_HOLD"
-                      ? "bg-amber-600 text-white shadow-xs scale-105"
-                      : "bg-amber-500/10 text-amber-600 dark:text-amber-400 group-hover:bg-amber-500/20"
-                  )}>
-                    {activeTab === "ON_HOLD" ? <PauseCircle className="h-5 w-5" /> : <Folder className="h-5 w-5" />}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-sm tracking-tight text-foreground">
-                        On-Hold Orders
-                      </h3>
-                      {activeTab === "ON_HOLD" && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30 uppercase tracking-wider">
-                          Active
-                        </span>
-                      )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h3 className="font-bold text-xs xl:text-sm tracking-tight text-foreground truncate">
+                          Assigned Orders
+                        </h3>
+                        {activeTab === "ASSIGNED" && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/30 uppercase tracking-wider shrink-0">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] xl:text-[11px] text-muted-foreground mt-0.5 truncate">Newly assigned pending execution</p>
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Paused orders with documented reasons</p>
                   </div>
+                  <Badge
+                    variant={activeTab === "ASSIGNED" ? "default" : "secondary"}
+                    className={cn(
+                      "font-mono text-xs font-bold px-2 py-0.5 shrink-0",
+                      activeTab === "ASSIGNED" ? "bg-purple-600 text-white hover:bg-purple-600" : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {assignedOrdersCount}
+                  </Badge>
                 </div>
-                <Badge
-                  variant={activeTab === "ON_HOLD" ? "default" : "secondary"}
-                  className={cn(
-                    "font-mono text-xs font-bold px-2.5 py-0.5 shrink-0",
-                    activeTab === "ON_HOLD" ? "bg-amber-600 text-white hover:bg-amber-600" : "bg-muted text-muted-foreground"
-                  )}
-                >
-                  {onHoldOrdersCount}
-                </Badge>
+
+                {/* Folder Footer Metadata */}
+                <div className="pt-2 mt-2 border-t border-border/40 flex items-center justify-between text-[10px] xl:text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1.5 font-mono text-[9px] xl:text-[10px] uppercase tracking-wider text-purple-600 dark:text-purple-400 font-semibold truncate">
+                    <ShoppingCart className="h-3 w-3 shrink-0" /> New Queue
+                  </span>
+                  <span className="font-medium text-foreground/80 shrink-0">{assignedOrdersCount} {assignedOrdersCount === 1 ? "order" : "orders"}</span>
+                </div>
               </div>
 
-              <div className="pt-2.5 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground">
-                <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-semibold">
-                  <AlertTriangle className="h-3 w-3" /> Awaiting Action
-                </span>
-                <span className="font-medium text-foreground/80">{onHoldOrdersCount} {onHoldOrdersCount === 1 ? "order" : "orders"}</span>
-              </div>
-            </div>
-
-            {/* FOLDER 5: COMPLETED ORDERS */}
-            <div
-              onClick={() => setActiveTab("COMPLETED")}
-              className={cn(
-                "col-span-2 sm:col-span-1 group relative rounded-2xl border p-3.5 sm:p-4.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden",
-                "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
-                activeTab === "COMPLETED"
-                  ? "border-emerald-500/60 ring-2 ring-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-emerald-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-emerald-500/5 -translate-y-0.5"
-                  : "border-border/60 hover:border-emerald-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
-              )}
-            >
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "p-3 rounded-xl transition-all duration-200 shrink-0",
-                    activeTab === "COMPLETED"
-                      ? "bg-emerald-600 text-white shadow-xs scale-105"
-                      : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-500/20"
-                  )}>
-                    {activeTab === "COMPLETED" ? <FolderCheck className="h-5 w-5" /> : <Folder className="h-5 w-5" />}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-sm tracking-tight text-foreground">
-                        Completed Orders
-                      </h3>
-                      {activeTab === "COMPLETED" && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 uppercase tracking-wider">
-                          Active
-                        </span>
-                      )}
+              {/* FOLDER 3: IN PROGRESS */}
+              <div
+                onClick={() => setActiveTab("IN_PROGRESS")}
+                style={{ flex: "1 1 0%", minWidth: 0 }}
+                className={cn(
+                  "flex-1 min-w-0 group relative rounded-2xl border p-2.5 xl:p-3 2xl:p-3.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden flex flex-col justify-between",
+                  "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
+                  activeTab === "IN_PROGRESS"
+                    ? "border-sky-500/60 ring-2 ring-sky-500/20 bg-gradient-to-br from-sky-500/10 via-sky-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-sky-500/5 -translate-y-0.5"
+                    : "border-border/60 hover:border-sky-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
+                )}
+              >
+                <div className="flex items-start justify-between gap-2 mb-2 xl:mb-2.5">
+                  <div className="flex items-center gap-2 xl:gap-2.5 min-w-0">
+                    <div className={cn(
+                      "p-2 xl:p-2.5 rounded-xl transition-all duration-200 shrink-0",
+                      activeTab === "IN_PROGRESS"
+                        ? "bg-sky-600 text-white shadow-xs scale-105"
+                        : "bg-sky-500/10 text-sky-600 dark:text-sky-400 group-hover:bg-sky-500/20"
+                    )}>
+                      {activeTab === "IN_PROGRESS" ? <FolderClock className="h-4.5 w-4.5 xl:h-5 xl:w-5" /> : <Folder className="h-4.5 w-4.5 xl:h-5 xl:w-5" />}
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Delivered & finalized orders archive</p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h3 className="font-bold text-xs xl:text-sm tracking-tight text-foreground truncate">
+                          In-Progress
+                        </h3>
+                        {activeTab === "IN_PROGRESS" && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/30 uppercase tracking-wider shrink-0">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] xl:text-[11px] text-muted-foreground mt-0.5 truncate">Execution, prep & payment stages</p>
+                    </div>
                   </div>
+                  <Badge
+                    variant={activeTab === "IN_PROGRESS" ? "default" : "secondary"}
+                    className={cn(
+                      "font-mono text-xs font-bold px-2 py-0.5 shrink-0",
+                      activeTab === "IN_PROGRESS" ? "bg-sky-600 text-white hover:bg-sky-600" : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {inProgressOrdersCount}
+                  </Badge>
                 </div>
-                <Badge
-                  variant={activeTab === "COMPLETED" ? "default" : "secondary"}
-                  className={cn(
-                    "font-mono text-xs font-bold px-2.5 py-0.5 shrink-0",
-                    activeTab === "COMPLETED" ? "bg-emerald-600 text-white hover:bg-emerald-600" : "bg-muted text-muted-foreground"
-                  )}
-                >
-                  {completedOrdersCount}
-                </Badge>
+
+                <div className="pt-2 mt-2 border-t border-border/40 flex items-center justify-between text-[10px] xl:text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1.5 font-mono text-[9px] xl:text-[10px] uppercase tracking-wider text-sky-600 dark:text-sky-400 font-semibold truncate">
+                    <Clock className="h-3 w-3 shrink-0" /> In Review/Prep
+                  </span>
+                  <span className="font-medium text-foreground/80 shrink-0">{inProgressOrdersCount} active</span>
+                </div>
               </div>
 
-              <div className="pt-2.5 mt-2 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground">
-                <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-semibold">
-                  <CheckCircle2 className="h-3 w-3" /> 100% Concluded
-                </span>
-                <span className="font-medium text-foreground/80">{completedOrdersCount} archived</span>
+              {/* FOLDER 4: REVIEW ORDER */}
+              <div
+                onClick={() => setActiveTab("REVIEW_ORDER")}
+                style={{ flex: "1 1 0%", minWidth: 0 }}
+                className={cn(
+                  "flex-1 min-w-0 group relative rounded-2xl border p-2.5 xl:p-3 2xl:p-3.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden flex flex-col justify-between",
+                  "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
+                  activeTab === "REVIEW_ORDER"
+                    ? "border-indigo-500/60 ring-2 ring-indigo-500/20 bg-gradient-to-br from-indigo-500/10 via-indigo-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-indigo-500/5 -translate-y-0.5"
+                    : "border-border/60 hover:border-indigo-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
+                )}
+              >
+                <div className="flex items-start justify-between gap-2 mb-2 xl:mb-2.5">
+                  <div className="flex items-center gap-2 xl:gap-2.5 min-w-0">
+                    <div className={cn(
+                      "p-2 xl:p-2.5 rounded-xl transition-all duration-200 shrink-0",
+                      activeTab === "REVIEW_ORDER"
+                        ? "bg-indigo-600 text-white shadow-xs scale-105"
+                        : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-500/20"
+                    )}>
+                      <ShieldCheck className="h-4.5 w-4.5 xl:h-5 xl:w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h3 className="font-bold text-xs xl:text-sm tracking-tight text-foreground truncate">
+                          Review Order
+                        </h3>
+                        {activeTab === "REVIEW_ORDER" && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border border-indigo-500/30 uppercase tracking-wider shrink-0">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] xl:text-[11px] text-muted-foreground mt-0.5 truncate">Continuous lifecycle review</p>
+                    </div>
+                  </div>
+                  <Badge
+                    variant={activeTab === "REVIEW_ORDER" ? "default" : "secondary"}
+                    className={cn(
+                      "font-mono text-xs font-bold px-2 py-0.5 shrink-0",
+                      activeTab === "REVIEW_ORDER" ? "bg-indigo-600 text-white hover:bg-indigo-600" : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {reviewOrdersCount}
+                  </Badge>
+                </div>
+
+                <div className="pt-2 mt-2 border-t border-border/40 flex items-center justify-between text-[10px] xl:text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1.5 font-mono text-[9px] xl:text-[10px] uppercase tracking-wider text-indigo-600 dark:text-indigo-400 font-semibold truncate">
+                    <ShieldCheck className="h-3 w-3 shrink-0" /> Review
+                  </span>
+                  <span className="font-medium text-foreground/80 shrink-0">{reviewOrdersCount} {reviewOrdersCount === 1 ? "review" : "reviews"}</span>
+                </div>
+              </div>
+
+              {/* FOLDER 5: ON-HOLD ORDERS */}
+              <div
+                onClick={() => setActiveTab("ON_HOLD")}
+                style={{ flex: "1 1 0%", minWidth: 0 }}
+                className={cn(
+                  "flex-1 min-w-0 group relative rounded-2xl border p-2.5 xl:p-3 2xl:p-3.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden flex flex-col justify-between",
+                  "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
+                  activeTab === "ON_HOLD"
+                    ? "border-amber-500/60 ring-2 ring-amber-500/20 bg-gradient-to-br from-amber-500/10 via-amber-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-amber-500/5 -translate-y-0.5"
+                    : "border-border/60 hover:border-amber-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
+                )}
+              >
+                <div className="flex items-start justify-between gap-2 mb-2 xl:mb-2.5">
+                  <div className="flex items-center gap-2 xl:gap-2.5 min-w-0">
+                    <div className={cn(
+                      "p-2 xl:p-2.5 rounded-xl transition-all duration-200 shrink-0",
+                      activeTab === "ON_HOLD"
+                        ? "bg-amber-600 text-white shadow-xs scale-105"
+                        : "bg-amber-500/10 text-amber-600 dark:text-amber-400 group-hover:bg-amber-500/20"
+                    )}>
+                      {activeTab === "ON_HOLD" ? <PauseCircle className="h-4.5 w-4.5 xl:h-5 xl:w-5" /> : <Folder className="h-4.5 w-4.5 xl:h-5 xl:w-5" />}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h3 className="font-bold text-xs xl:text-sm tracking-tight text-foreground truncate">
+                          On-Hold Orders
+                        </h3>
+                        {activeTab === "ON_HOLD" && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30 uppercase tracking-wider shrink-0">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] xl:text-[11px] text-muted-foreground mt-0.5 truncate">Paused pending client or docs</p>
+                    </div>
+                  </div>
+                  <Badge
+                    variant={activeTab === "ON_HOLD" ? "default" : "secondary"}
+                    className={cn(
+                      "font-mono text-xs font-bold px-2 py-0.5 shrink-0",
+                      activeTab === "ON_HOLD" ? "bg-amber-600 text-white hover:bg-amber-600" : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {onHoldOrdersCount}
+                  </Badge>
+                </div>
+
+                <div className="pt-2 mt-2 border-t border-border/40 flex items-center justify-between text-[10px] xl:text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1.5 font-mono text-[9px] xl:text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-semibold truncate">
+                    <AlertTriangle className="h-3 w-3 shrink-0" /> On-Hold
+                  </span>
+                  <span className="font-medium text-foreground/80 shrink-0">{onHoldOrdersCount} {onHoldOrdersCount === 1 ? "order" : "orders"}</span>
+                </div>
+              </div>
+
+              {/* FOLDER 6: COMPLETED ORDERS */}
+              <div
+                onClick={() => setActiveTab("COMPLETED")}
+                style={{ flex: "1 1 0%", minWidth: 0 }}
+                className={cn(
+                  "flex-1 min-w-0 group relative rounded-2xl border p-2.5 xl:p-3 2xl:p-3.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden flex flex-col justify-between",
+                  "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
+                  activeTab === "COMPLETED"
+                    ? "border-emerald-500/60 ring-2 ring-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-emerald-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-emerald-500/5 -translate-y-0.5"
+                    : "border-border/60 hover:border-emerald-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
+                )}
+              >
+                <div className="flex items-start justify-between gap-2 mb-2 xl:mb-2.5">
+                  <div className="flex items-center gap-2 xl:gap-2.5 min-w-0">
+                    <div className={cn(
+                      "p-2 xl:p-2.5 rounded-xl transition-all duration-200 shrink-0",
+                      activeTab === "COMPLETED"
+                        ? "bg-emerald-600 text-white shadow-xs scale-105"
+                        : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-500/20"
+                    )}>
+                      {activeTab === "COMPLETED" ? <FolderCheck className="h-4.5 w-4.5 xl:h-5 xl:w-5" /> : <Folder className="h-4.5 w-4.5 xl:h-5 xl:w-5" />}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h3 className="font-bold text-xs xl:text-sm tracking-tight text-foreground truncate">
+                          Completed Orders
+                        </h3>
+                        {activeTab === "COMPLETED" && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 uppercase tracking-wider shrink-0">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] xl:text-[11px] text-muted-foreground mt-0.5 truncate">Delivered & finalized archive</p>
+                    </div>
+                  </div>
+                  <Badge
+                    variant={activeTab === "COMPLETED" ? "default" : "secondary"}
+                    className={cn(
+                      "font-mono text-xs font-bold px-2 py-0.5 shrink-0",
+                      activeTab === "COMPLETED" ? "bg-emerald-600 text-white hover:bg-emerald-600" : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {completedOrdersCount}
+                  </Badge>
+                </div>
+
+                <div className="pt-2 mt-2 border-t border-border/40 flex items-center justify-between text-[10px] xl:text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1.5 font-mono text-[9px] xl:text-[10px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-semibold truncate">
+                    <CheckCircle2 className="h-3 w-3 shrink-0" /> Archive
+                  </span>
+                  <span className="font-medium text-foreground/80 shrink-0">{completedOrdersCount} archived</span>
+                </div>
               </div>
             </div>
           </div>
@@ -1384,6 +1475,12 @@ export default function AssignedOrdersPage() {
             {/* Active Folder Directory Breadcrumb */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground w-full sm:w-auto">
               <div className="flex items-center gap-2 font-semibold text-foreground bg-card/90 dark:bg-zinc-900/90 px-3 py-1.5 rounded-xl border border-border/60 shadow-2xs">
+                {activeTab === "ALL" && (
+                  <>
+                    <FolderKanban className="h-4 w-4 text-blue-500 shrink-0" />
+                    <span>All Assigned Orders Folder</span>
+                  </>
+                )}
                 {activeTab === "ASSIGNED" && (
                   <>
                     <FolderOpen className="h-4 w-4 text-purple-500 shrink-0" />
@@ -1426,7 +1523,7 @@ export default function AssignedOrdersPage() {
               <div className="relative w-full sm:w-72">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder={`Search inside ${activeTab === "ASSIGNED" ? "assigned orders" : activeTab === "IN_PROGRESS" ? "in-progress orders" : activeTab === "REVIEW_ORDER" ? "review orders" : activeTab === "ON_HOLD" ? "on-hold orders" : "completed orders"}...`}
+                  placeholder={`Search inside ${activeTab === "ALL" ? "all orders" : activeTab === "ASSIGNED" ? "assigned orders" : activeTab === "IN_PROGRESS" ? "in-progress orders" : activeTab === "REVIEW_ORDER" ? "review orders" : activeTab === "ON_HOLD" ? "on-hold orders" : "completed orders"}...`}
                   className="pl-8 h-9 text-xs rounded-lg bg-background/80"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -1450,20 +1547,22 @@ export default function AssignedOrdersPage() {
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <ShoppingCart className="h-12 w-12 text-muted-foreground/35 mb-3" />
                 <h3 className="font-bold text-lg">
-                  {activeTab === "ASSIGNED" ? "No Newly Assigned Orders" : activeTab === "IN_PROGRESS" ? "No In-Progress Orders" : activeTab === "REVIEW_ORDER" ? "No Review Orders" : activeTab === "ON_HOLD" ? "No On-Hold Orders" : "No Completed Orders"}
+                  {activeTab === "ALL" ? "No Active Assigned Orders" : activeTab === "ASSIGNED" ? "No Newly Assigned Orders" : activeTab === "IN_PROGRESS" ? "No In-Progress Orders" : activeTab === "REVIEW_ORDER" ? "No Review Orders" : activeTab === "ON_HOLD" ? "No On-Hold Orders" : "No Completed Orders"}
                 </h3>
                 <p className="text-sm text-muted-foreground max-w-sm mt-1">
                   {searchTerm
                     ? "No results match your search query."
-                    : activeTab === "ASSIGNED"
-                      ? "There are currently no new unstarted orders waiting in the assigned queue."
-                      : activeTab === "IN_PROGRESS"
-                        ? "There are currently no orders in active progress in your queue."
-                        : activeTab === "REVIEW_ORDER"
-                          ? "There are currently no active orders allocated to you for continuous lifecycle review."
-                          : activeTab === "ON_HOLD"
-                            ? "There are currently no paused orders placed on hold."
-                            : "There are currently no completed orders in your archive."}
+                    : activeTab === "ALL"
+                      ? "There are currently no active orders assigned to you."
+                      : activeTab === "ASSIGNED"
+                        ? "There are currently no new unstarted orders waiting in the assigned queue."
+                        : activeTab === "IN_PROGRESS"
+                          ? "There are currently no orders in active progress in your queue."
+                          : activeTab === "REVIEW_ORDER"
+                            ? "There are currently no active orders allocated to you for continuous lifecycle review."
+                            : activeTab === "ON_HOLD"
+                              ? "There are currently no paused orders placed on hold."
+                              : "There are currently no completed orders in your archive."}
                 </p>
               </div>
             ) : (

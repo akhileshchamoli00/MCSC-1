@@ -13,7 +13,7 @@ import {
   Search, 
   Loader2, 
   ArrowLeft, 
-  DollarSign, 
+  Banknote, 
   CheckCircle, 
   Clock, 
   Calendar, 
@@ -504,7 +504,7 @@ function NotaryPaymentsContent() {
           <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 flex-1 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-xs gap-3 sm:gap-4">
             <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0">
               <div className="p-2 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 shrink-0">
-                <DollarSign className="h-4 w-4" />
+                <Banknote className="h-4 w-4" />
               </div>
               <div className="min-w-0">
                 <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider truncate">Total Vendor Cost</p>
@@ -545,7 +545,7 @@ function NotaryPaymentsContent() {
           <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 flex-1 bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-xs gap-3 sm:gap-4">
             <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0">
               <div className="p-2 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 shrink-0">
-                <DollarSign className="h-4 w-4" />
+                <Banknote className="h-4 w-4" />
               </div>
               <div className="min-w-0">
                 <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider truncate">Total Earned</p>

@@ -54,7 +54,10 @@ import {
   Lock,
   FolderKanban,
   Sparkles,
-  X
+  X,
+  FileSpreadsheet,
+  ImageIcon,
+  File as FileIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
@@ -138,6 +141,11 @@ export default function CompanyDocumentsManagementPage() {
   const [docxError, setDocxError] = useState<string | null>(null);
   const docxContainerRef = useRef<HTMLDivElement>(null);
 
+  // PDF inline preview states
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!previewDoc || !previewDoc.file_name?.match(/\.docx$/i) || !resolvedPreviewUrl || resolvedPreviewUrl === "#") {
       setDocxLoading(false);
@@ -190,6 +198,47 @@ export default function CompanyDocumentsManagementPage() {
     };
   }, [previewDoc, resolvedPreviewUrl]);
 
+  // PDF fetch and preview blob generator
+  useEffect(() => {
+    if (!previewDoc || !previewDoc.file_name?.match(/\.(pdf|doc)$/i) || !resolvedPreviewUrl || resolvedPreviewUrl === "#") {
+      setPdfBlobUrl(null);
+      setPdfLoading(false);
+      setPdfError(null);
+      return;
+    }
+
+    let isMounted = true;
+    setPdfLoading(true);
+    setPdfError(null);
+
+    fetch(resolvedPreviewUrl, { credentials: "include" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Could not load document (${res.status})`);
+        return res.blob();
+      })
+      .then((blob) => {
+        if (!isMounted) return;
+        const pdfBlob = new Blob([blob], { type: "application/pdf" });
+        const url = window.URL.createObjectURL(pdfBlob);
+        setPdfBlobUrl((prev) => {
+          if (prev) window.URL.revokeObjectURL(prev);
+          return url;
+        });
+        setPdfLoading(false);
+      })
+      .catch((err: any) => {
+        console.error("PDF fetch error", err);
+        if (isMounted) {
+          setPdfError(err.message || "Failed to retrieve PDF document.");
+          setPdfLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [previewDoc, resolvedPreviewUrl]);
+
   const handleClosePreview = () => {
     setIsClosingPreview(true);
     setTimeout(() => {
@@ -197,6 +246,12 @@ export default function CompanyDocumentsManagementPage() {
       setResolvedPreviewUrl(null);
       setDocxLoading(false);
       setDocxError(null);
+      setPdfLoading(false);
+      setPdfError(null);
+      setPdfBlobUrl((prev) => {
+        if (prev) window.URL.revokeObjectURL(prev);
+        return null;
+      });
       setIsClosingPreview(false);
     }, 280);
   };
@@ -602,6 +657,82 @@ export default function CompanyDocumentsManagementPage() {
       return { label: `EXPIRING IN ${daysLeft} DAYS`, color: "bg-amber-500/15 text-amber-600 border-amber-500/30" };
     }
     return { label: "VALID", color: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" };
+  };
+
+  // Document Extension / Format Badge Helper
+  const getFileFormatBadge = (fileName?: string, fileUrl?: string) => {
+    const raw = fileName || fileUrl || "";
+    const clean = raw.split("?")[0].split("#")[0];
+    const ext = clean.includes(".") ? (clean.split(".").pop() || "").toLowerCase() : "";
+
+    if (!ext) {
+      return (
+        <span className="text-[10px] font-mono text-muted-foreground/60">-</span>
+      );
+    }
+
+    if (ext === "pdf") {
+      return (
+        <Badge
+          variant="outline"
+          className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30 shrink-0"
+          title="PDF Document"
+        >
+          <FileText className="h-3 w-3 text-rose-500 shrink-0" />
+          PDF
+        </Badge>
+      );
+    }
+
+    if (["doc", "docx"].includes(ext)) {
+      return (
+        <Badge
+          variant="outline"
+          className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30 shrink-0"
+          title={`Word Document (.${ext})`}
+        >
+          <FileText className="h-3 w-3 text-blue-500 shrink-0" />
+          {ext.toUpperCase()}
+        </Badge>
+      );
+    }
+
+    if (["xls", "xlsx", "csv"].includes(ext)) {
+      return (
+        <Badge
+          variant="outline"
+          className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 shrink-0"
+          title={`Spreadsheet (.${ext})`}
+        >
+          <FileSpreadsheet className="h-3 w-3 text-emerald-500 shrink-0" />
+          {ext.toUpperCase()}
+        </Badge>
+      );
+    }
+
+    if (["jpg", "jpeg", "png", "webp", "svg", "gif"].includes(ext)) {
+      return (
+        <Badge
+          variant="outline"
+          className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30 shrink-0"
+          title={`Image (${ext.toUpperCase()})`}
+        >
+          <ImageIcon className="h-3 w-3 text-purple-500 shrink-0" />
+          {ext.toUpperCase()}
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge
+        variant="outline"
+        className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30 shrink-0"
+        title={`File (.${ext})`}
+      >
+        <FileIcon className="h-3 w-3 text-slate-500 shrink-0" />
+        {ext.toUpperCase()}
+      </Badge>
+    );
   };
 
   const handleUploadDocuments = async () => {
@@ -1277,6 +1408,7 @@ export default function CompanyDocumentsManagementPage() {
                       <th className="px-4 py-3 w-12 text-center bg-muted">No.</th>
                       <th className="px-4 py-3 bg-muted">Document Type</th>
                       <th className="px-4 py-3 bg-muted">Description</th>
+                      <th className="px-4 py-3 text-center bg-muted">Format</th>
                       <th className="px-4 py-3 bg-muted">Order Number</th>
                       <th className="px-4 py-3 bg-muted">Issue Date</th>
                       <th className="px-4 py-3 bg-muted">Expiry Date</th>
@@ -1287,7 +1419,7 @@ export default function CompanyDocumentsManagementPage() {
                   <tbody className="divide-y divide-border/50 bg-background">
                     {filteredDocuments.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="px-4 py-8 text-center bg-muted/10">
+                        <td colSpan={9} className="px-4 py-8 text-center bg-muted/10">
                           <FileText className="mx-auto h-6 w-6 text-muted-foreground/40 mb-1" />
                           <p className="text-sm text-muted-foreground">
                             {documentSearchQuery.trim() ? "No matching documents found" : "No documents uploaded yet"}
@@ -1303,10 +1435,20 @@ export default function CompanyDocumentsManagementPage() {
                             {index + 1}
                           </td>
                           <td className="px-4 py-3 font-bold text-foreground">
-                            {doc.document_type || "General Document"}
+                            <div className="flex flex-col gap-0.5">
+                              <span>{doc.document_type || "General Document"}</span>
+                              {doc.file_name && (
+                                <span className="text-[11px] font-mono font-normal text-muted-foreground truncate max-w-[220px]" title={doc.file_name}>
+                                  {doc.file_name}
+                                </span>
+                              )}
+                            </div>
                           </td>
-                          <td className="px-4 py-3 text-muted-foreground text-xs font-medium max-w-[450px] whitespace-pre-line break-words leading-relaxed">
+                          <td className="px-4 py-3 text-muted-foreground text-xs font-medium max-w-[400px] whitespace-pre-line break-words leading-relaxed">
                             {doc.description || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {getFileFormatBadge(doc.file_name, doc.file_url)}
                           </td>
                           <td className="px-4 py-3 font-mono font-bold text-primary">
                             {doc.order_number || "-"}
@@ -2242,9 +2384,10 @@ export default function CompanyDocumentsManagementPage() {
                   <ArrowLeft className="h-4 w-4" /> Back to Documents
                 </Button>
                 <div className="h-4 w-px bg-slate-700 hidden sm:block" />
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-primary" />
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                  <FileText className="h-4 w-4 text-primary shrink-0" />
                   <span className="font-bold text-sm truncate max-w-xs sm:max-w-md">{previewDoc.document_type || "Document Preview"}</span>
+                  {getFileFormatBadge(previewDoc.file_name, previewDoc.file_url)}
                   {previewDoc.description && (
                     <span className="text-xs text-slate-400 hidden md:inline truncate max-w-sm">({previewDoc.description})</span>
                   )}
@@ -2268,7 +2411,7 @@ export default function CompanyDocumentsManagementPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => window.open(resolvedPreviewUrl, "_blank")}
+                    onClick={() => window.open(pdfBlobUrl || resolvedPreviewUrl, "_blank")}
                     className="h-8 gap-1.5 text-slate-300 hover:text-white hover:bg-slate-800 font-semibold text-xs cursor-pointer px-3 rounded-lg border border-slate-700/60 transition-colors"
                     title="Open Document in New Tab"
                   >
@@ -2330,9 +2473,45 @@ export default function CompanyDocumentsManagementPage() {
                     onDownload={() => handleDownloadDocFile(previewDoc)}
                     className="h-full w-full flex-1 min-h-0 border-0 shadow-none rounded-xl"
                   />
+                ) : previewDoc.file_name?.match(/\.(pdf|doc)$/i) ? (
+                  <div className="w-full h-[calc(100vh-16rem)] flex flex-col items-center justify-center relative">
+                    {pdfLoading && (
+                      <div className="flex flex-col items-center justify-center p-12 space-y-3 m-auto">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        <p className="text-xs font-semibold text-muted-foreground">Loading PDF Document...</p>
+                      </div>
+                    )}
+                    {pdfError && (
+                      <div className="text-center p-8 bg-background rounded-2xl border border-border space-y-3 max-w-md m-auto shadow-sm">
+                        <AlertCircle className="h-10 w-10 text-amber-500 mx-auto" />
+                        <p className="text-sm font-bold text-foreground">Could not preview document</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{pdfError}</p>
+                        <Button
+                          size="sm"
+                          onClick={() => handleDownloadDocFile(previewDoc)}
+                          className="font-bold gap-2 text-xs"
+                        >
+                          <Download className="h-4 w-4" /> Download File
+                        </Button>
+                      </div>
+                    )}
+                    {pdfBlobUrl && !pdfLoading && !pdfError && (
+                      <object
+                        data={`${pdfBlobUrl}#toolbar=1&navpanes=0`}
+                        type="application/pdf"
+                        className="w-full h-full rounded-xl border-0 shadow-sm bg-white"
+                      >
+                        <iframe
+                          src={`${pdfBlobUrl}#toolbar=1&navpanes=0`}
+                          className="w-full h-full rounded-xl border-0 shadow-sm bg-white"
+                          title="Document Preview Frame"
+                        />
+                      </object>
+                    )}
+                  </div>
                 ) : (
                   <iframe
-                    src={previewDoc.file_name?.match(/\.(pdf|doc|txt|json)$/i) ? resolvedPreviewUrl : `https://docs.google.com/gview?url=${encodeURIComponent(resolvedPreviewUrl)}&embedded=true`}
+                    src={previewDoc.file_name?.match(/\.(txt|json)$/i) ? resolvedPreviewUrl : `https://docs.google.com/gview?url=${encodeURIComponent(resolvedPreviewUrl)}&embedded=true`}
                     className="w-full h-[calc(100vh-16rem)] rounded-xl border-0 shadow-sm bg-white"
                     title="Document Preview Frame"
                   />

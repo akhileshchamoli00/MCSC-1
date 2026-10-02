@@ -29,7 +29,7 @@ import {
   ShoppingCart,
   ArrowLeft,
   Building,
-  DollarSign,
+  Banknote,
   Check,
   Tag,
   Receipt,
@@ -2070,7 +2070,7 @@ export default function ClientOrdersPage() {
             {/* Confirmed Value */}
             <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0 justify-start sm:justify-center">
               <div className="h-9 w-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
-                <DollarSign className="h-4 w-4" />
+                <Banknote className="h-4 w-4" />
               </div>
               <div className="min-w-0">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Confirmed Value</p>
@@ -3310,7 +3310,7 @@ export default function ClientOrdersPage() {
                         <div className="p-3.5 rounded-xl bg-zinc-50 border border-zinc-200 text-xs space-y-2">
                           <div className="flex justify-between items-center">
                             <span className="font-semibold text-zinc-700 flex items-center gap-1.5">
-                              <DollarSign className="h-4 w-4 text-zinc-500" /> Recorded Proforma Paid:
+                              <Banknote className="h-4 w-4 text-zinc-500" /> Recorded Proforma Paid:
                             </span>
                             <Badge variant="outline" className="font-mono font-bold bg-zinc-200 text-zinc-900 border-zinc-300 rounded-md">
                               {formatCurrency(selectedOrderGroup.proforma_paid_amount)}

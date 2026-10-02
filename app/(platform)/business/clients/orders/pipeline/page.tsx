@@ -15,7 +15,7 @@ import {
   Users, 
   ArrowLeft, 
   Eye, 
-  DollarSign, 
+  Banknote, 
   Loader2, 
   AlertCircle, 
   Clock, 
@@ -566,7 +566,7 @@ export default function PipelineOrdersPage() {
             {/* Est. Pipeline Value */}
             <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0 justify-start sm:justify-center">
               <div className="h-9 w-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
-                <DollarSign className="h-4 w-4" />
+                <Banknote className="h-4 w-4" />
               </div>
               <div className="min-w-0">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Est. Pipeline Value</p>

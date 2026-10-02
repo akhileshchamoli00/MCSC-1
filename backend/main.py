@@ -62,10 +62,10 @@ async def add_security_headers(request: Request, call_next):
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com data:; "
         "img-src 'self' data: blob: https://*.google.com; "
-        "frame-src 'self' https://calendar.google.com https://*.google.com https://*.google.co.id; "
-        "connect-src 'self' http://127.0.0.1:8000 http://localhost:8000 https://*; "
+        "frame-src 'self' blob: data: https://calendar.google.com https://*.google.com https://*.google.co.id; "
+        "connect-src 'self' blob: data: http://127.0.0.1:8000 http://localhost:8000 https://*; "
         "frame-ancestors 'self'; "
-        "object-src 'none'; "
+        "object-src 'self' blob:; "
         "base-uri 'self';"
     )
     response.headers["X-Content-Type-Options"] = "nosniff"

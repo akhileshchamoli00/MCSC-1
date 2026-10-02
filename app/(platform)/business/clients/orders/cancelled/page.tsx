@@ -21,7 +21,7 @@ import {
   ShoppingCart,
   ArrowLeft,
   Building,
-  DollarSign,
+  Banknote,
   Scale,
   Check,
   Tag,
@@ -698,7 +698,7 @@ export default function CancelledOrdersPage() {
             {/* Voided Value */}
             <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0 justify-start sm:justify-center">
               <div className="h-9 w-9 rounded-xl bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-500/20 shrink-0">
-                <DollarSign className="h-4 w-4" />
+                <Banknote className="h-4 w-4" />
               </div>
               <div className="min-w-0">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Voided Value</p>
