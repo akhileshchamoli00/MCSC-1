@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { 
   Bell, Calendar, Wallet, Clock, Monitor, Trash2, 
-  CheckCircle2, Search, Filter, Package, MessageSquare, FileText, Megaphone, Users, Building2, Briefcase
+  CheckCircle2, Search, Filter, Package, MessageSquare, FileText, Megaphone, Users, Building2, Briefcase, Mail, Check
 } from "lucide-react";
 import { format } from "date-fns";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -37,8 +37,16 @@ export default function NotificationsPage() {
   const initialSystem = searchParams.get("system");
 
   const [systemArea, setSystemArea] = useState<string>(
-    initialSystem === "business" || initialSystem === "hrms" ? initialSystem : (currentMode || "all")
+    initialSystem === "business" || initialSystem === "hrms" 
+      ? initialSystem 
+      : (currentMode === "business" ? "business" : "hrms")
   );
+
+  useEffect(() => {
+    if (!initialSystem && currentMode) {
+      setSystemArea(currentMode);
+    }
+  }, [currentMode, initialSystem]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState("ALL");
@@ -86,6 +94,22 @@ export default function NotificationsPage() {
       window.dispatchEvent(new Event("notifications-updated"));
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const markAsUnread = async (id: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}/unread`, {
+        credentials: "include",
+        method: "PUT",
+      });
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: false } : n));
+      window.dispatchEvent(new Event("notifications-updated"));
+      toast.success("Notification marked as unread for future review");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to mark as unread");
     }
   };
 
@@ -145,7 +169,7 @@ export default function NotificationsPage() {
         return isRelated ? { ...n, is_read: true } : n;
       }));
 
-      // Call backend to mark all notifications for this order chat as read
+      // Call backend to mark all notifications for this order (chats & documents) as read
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/order/${encodeURIComponent(cleanOrder)}/read`, {
         method: "PUT",
         credentials: "include"
@@ -165,7 +189,9 @@ export default function NotificationsPage() {
     }
 
     if (targetUrl) {
-      if (orderNum) {
+      const isDocNotif = targetUrl.includes("/documents") || notif.type === "document" || notif.module === "clients_documents";
+
+      if (orderNum && !isDocNotif) {
         if (targetUrl.includes("chat=false")) {
           targetUrl = targetUrl.replace("chat=false", "chat=true");
         } else if (!targetUrl.includes("chat=")) {
@@ -221,7 +247,7 @@ export default function NotificationsPage() {
         }
       }
 
-      if (orderNum) {
+      if (orderNum && !isDocNotif) {
         window.dispatchEvent(new CustomEvent("open-order-chat", {
           detail: { orderNumber: orderNum, chat: true }
         }));
@@ -283,27 +309,24 @@ export default function NotificationsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Notifications</h1>
-          <p className="text-muted-foreground text-xs sm:text-sm">Manage notifications separately for HRMS and Business operations.</p>
+          <p className="text-muted-foreground text-xs sm:text-sm">Manage notifications separately for HRMS and ERP operations.</p>
         </div>
         <Button onClick={markAllAsRead} size="sm" className="gap-2 font-semibold">
-          <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Mark {systemArea !== "all" ? systemArea.toUpperCase() : "all"} read
+          <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Mark {systemArea === "business" ? "ERP" : (systemArea === "hrms" ? "HRMS" : "all")} read
         </Button>
       </div>
 
       {/* SYSTEM AREA SELECTION TABS */}
       <div className="flex items-center justify-between gap-4 border-b border-border/40 pb-2">
         <Tabs value={systemArea} onValueChange={setSystemArea} className="w-full sm:w-auto">
-          <TabsList className="h-10 grid grid-cols-3 bg-muted/60 p-1 w-full sm:w-[380px]">
-            <TabsTrigger value="all" className="text-xs font-semibold">
-              All Notifications
-            </TabsTrigger>
+          <TabsList className="h-10 grid grid-cols-2 bg-muted/60 p-1 w-full sm:w-[280px]">
             <TabsTrigger value="hrms" className="text-xs font-semibold gap-1.5">
               <span className="h-2 w-2 rounded-full bg-indigo-400 inline-block"></span>
               HRMS
             </TabsTrigger>
             <TabsTrigger value="business" className="text-xs font-semibold gap-1.5">
               <span className="h-2 w-2 rounded-full bg-emerald-400 inline-block"></span>
-              Business
+              ERP
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -355,17 +378,17 @@ export default function NotificationsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-xl border border-border/40 overflow-hidden">
+          <div className="rounded-xl border border-border/40 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40">
                   <TableHead className="w-[50px]"></TableHead>
-                  <TableHead>Notification</TableHead>
-                  <TableHead>Area</TableHead>
-                  <TableHead>Module</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="min-w-[200px]">Notification</TableHead>
+                  <TableHead className="w-[90px] text-center">Area</TableHead>
+                  <TableHead className="w-[140px]">Module</TableHead>
+                  <TableHead className="w-[160px]">Date</TableHead>
+                  <TableHead className="w-[100px] text-center">Status</TableHead>
+                  <TableHead className="w-[140px] text-right pr-4">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -377,7 +400,7 @@ export default function NotificationsPage() {
                   <TableRow>
                     <TableCell colSpan={7} className="text-center h-48 text-muted-foreground">
                       <Bell className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                      <p className="text-sm font-semibold">No {systemArea !== "all" ? systemArea.toUpperCase() : ""} notifications found.</p>
+                      <p className="text-sm font-semibold">No {systemArea === "business" ? "ERP" : (systemArea === "hrms" ? "HRMS" : "")} notifications found.</p>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -387,39 +410,92 @@ export default function NotificationsPage() {
                       className={`cursor-pointer transition-colors hover:bg-muted/20 ${!notif.is_read ? (notif.system_area === 'business' ? "bg-emerald-500/[0.03] font-medium" : "bg-indigo-500/[0.03] font-medium") : ""}`}
                       onClick={() => handleRowClick(notif)}
                     >
-                      <TableCell>
+                      <TableCell className="w-[50px] text-center">
                         <div className="h-8 w-8 rounded-lg bg-muted/60 flex items-center justify-center">
                           {getIcon(notif.type, notif.module)}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="font-semibold text-xs sm:text-sm text-foreground">{notif.title}</div>
-                        <div className="text-xs text-muted-foreground line-clamp-1">{notif.message}</div>
+                      <TableCell className="max-w-[280px] md:max-w-[360px] lg:max-w-[420px]">
+                        <div className="font-semibold text-xs sm:text-sm text-foreground truncate" title={notif.title}>{notif.title}</div>
+                        <div className="text-xs text-muted-foreground truncate" title={notif.message}>{notif.message}</div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="w-[90px] text-center whitespace-nowrap">
                         <span className={`inline-flex items-center text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${notif.system_area === 'business' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20'}`}>
-                          {notif.system_area || "HRMS"}
+                          {notif.system_area === 'business' ? "ERP" : (notif.system_area ? notif.system_area.toUpperCase() : "HRMS")}
                         </span>
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-[10px] font-medium">{notif.module}</Badge>
+                      <TableCell className="w-[140px] whitespace-nowrap">
+                        <Badge variant="outline" className="text-[10px] font-medium max-w-[130px] truncate" title={notif.module}>{notif.module}</Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
+                      <TableCell className="w-[160px] text-muted-foreground text-xs whitespace-nowrap">
                         {notif.created_at ? format(new Date(notif.created_at), "MMM d, yyyy h:mm a") : "-"}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="w-[100px] text-center whitespace-nowrap">
                         {!notif.is_read ? (
-                          <Badge variant="default" className={notif.system_area === 'business' ? "bg-emerald-600 text-white" : "bg-indigo-600 text-white"}>Unread</Badge>
+                          <Badge 
+                            variant="default" 
+                            className={`cursor-pointer select-none transition-opacity hover:opacity-85 ${notif.system_area === 'business' ? "bg-emerald-600 text-white" : "bg-indigo-600 text-white"}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markAsRead(notif.id);
+                            }}
+                            title="Click to mark as read"
+                          >
+                            Unread
+                          </Badge>
                         ) : (
-                          <Badge variant="secondary" className="bg-muted text-muted-foreground">Read</Badge>
+                          <Badge 
+                            variant="secondary" 
+                            className="bg-muted text-muted-foreground hover:bg-amber-500/15 hover:text-amber-400 cursor-pointer select-none transition-colors border border-dashed border-muted-foreground/30 text-[11px]"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markAsUnread(notif.id, e);
+                            }}
+                            title="Click to mark as unread for future review"
+                          >
+                            Read
+                          </Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="w-[140px] text-right space-x-1 whitespace-nowrap pr-4">
+                        {notif.is_read ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-7 px-2.5 text-xs text-amber-500 dark:text-amber-400 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 hover:text-amber-300 font-semibold cursor-pointer shadow-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markAsUnread(notif.id, e);
+                            }}
+                            title="Mark as unread for future review"
+                          >
+                            <Mail className="h-3.5 w-3.5 mr-1" />
+                            Mark unread
+                          </Button>
+                        ) : (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-7 px-2 text-xs font-medium text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markAsRead(notif.id);
+                            }}
+                            title="Mark as read"
+                          >
+                            <Check className="h-3.5 w-3.5 mr-1" />
+                            Mark read
+                          </Button>
+                        )}
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={(e) => deleteNotification(notif.id, e)}
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteNotification(notif.id, e);
+                          }}
+                          title="Delete notification"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>

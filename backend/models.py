@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Date, Enum, Float, JSON, Table, Text, UniqueConstraint
 import enum
+from typing import Optional
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -787,6 +788,10 @@ class ClientDocument(Base):
     company = relationship("ClientCompany", back_populates="documents")
     uploader = relationship("User")
 
+    @property
+    def uploader_name(self) -> Optional[str]:
+        return self.uploader.name if self.uploader else None
+
 
 class ClientService(Base):
     __tablename__ = "client_services"
@@ -852,6 +857,7 @@ class ClientOrder(Base):
     # Accurate Online Integration Fields
     accurate_so_id = Column(String, nullable=True, index=True) # Accurate Sales Order (Proforma) ID
     accurate_so_no = Column(String, nullable=True, index=True) # e.g. SO.2026.09.0001
+    accurate_dp_inv_no = Column(String, nullable=True, index=True) # Accurate Sales Down Payment (Uang Muka) No e.g. SID.2026.10.0001
     accurate_inv_id = Column(String, nullable=True, index=True) # Accurate Sales Invoice ID
     accurate_inv_no = Column(String, nullable=True, index=True) # e.g. INV.2026.09.0001
     accurate_receipt_no = Column(String, nullable=True) # e.g. CR.2026.09.0001
@@ -860,6 +866,8 @@ class ClientOrder(Base):
     accurate_last_synced_at = Column(DateTime(timezone=True), nullable=True)
     
     # Invoice & Deliverables Email Dispatch Tracking
+    quotation_sent_at = Column(DateTime(timezone=True), nullable=True)
+    quotation_sent_to = Column(String, nullable=True)
     proforma_sent_at = Column(DateTime(timezone=True), nullable=True)
     proforma_sent_to = Column(String, nullable=True)
     final_invoice_sent_at = Column(DateTime(timezone=True), nullable=True)

@@ -26,7 +26,8 @@ import {
   PauseCircle,
   AlertTriangle,
   ShieldCheck,
-  Scale
+  Scale,
+  GitBranch
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -59,7 +60,7 @@ export default function AssignedOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [savingStatus, setSavingStatus] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState<"ALL" | "ASSIGNED" | "IN_PROGRESS" | "REVIEW_ORDER" | "ON_HOLD" | "COMPLETED">("ALL");
+  const [activeTab, setActiveTab] = useState<"ALL" | "INQUIRY" | "ASSIGNED" | "IN_PROGRESS" | "REVIEW_ORDER" | "ON_HOLD" | "COMPLETED">("ALL");
   const [currentPage, setCurrentPage] = useState(1);
 
   // Restore active tab from URL query parameter or sessionStorage on mount
@@ -69,8 +70,11 @@ export default function AssignedOrdersPage() {
     const tabParam = params.get("tab");
     const savedTab = sessionStorage.getItem("assigned_orders_active_tab");
     const targetTab = tabParam || savedTab;
-    if (targetTab && ["ALL", "ASSIGNED", "IN_PROGRESS", "REVIEW_ORDER", "ON_HOLD", "COMPLETED"].includes(targetTab.toUpperCase())) {
-      setActiveTab(targetTab.toUpperCase() as any);
+    if (targetTab) {
+      const normalized = targetTab.toUpperCase() === "ENQUIRY" ? "INQUIRY" : targetTab.toUpperCase();
+      if (["ALL", "INQUIRY", "ASSIGNED", "IN_PROGRESS", "REVIEW_ORDER", "ON_HOLD", "COMPLETED"].includes(normalized)) {
+        setActiveTab(normalized as any);
+      }
     }
   }, []);
 
@@ -497,6 +501,11 @@ export default function AssignedOrdersPage() {
   const handleUpdateStatus = async (group: any, newStatus: string) => {
     if (!group || !newStatus || newStatus === group.status) return;
 
+    if (checkIsEnquiry(group) && ENQUIRY_STATUSES.includes(newStatus)) {
+      executeUpdateStatus(group, newStatus);
+      return;
+    }
+
     const orderNum = group.order_number;
     setPendingDocCount(group.document_count ?? 0);
     setLoadingDocCount(true);
@@ -616,6 +625,8 @@ export default function AssignedOrdersPage() {
 
       if (newStatus === "FINAL_DOC_READY") {
         toast.success(`Order ${group.order_number} marked as Final Docs Ready and moved to Completed Orders`);
+      } else if (checkIsInquiry(group) || INQUIRY_STATUSES.includes(newStatus)) {
+        toast.success(`Inquiry order ${group.order_number} status updated to ${getInquiryStatusLabel(newStatus)}`);
       } else {
         toast.success(`Order ${group.order_number} status updated to ${newStatus.replace(/_/g, " ")}`);
       }
@@ -635,7 +646,29 @@ export default function AssignedOrdersPage() {
     }
   };
 
+  const INQUIRY_STATUSES = [
+    "UNDER_INITIAL_CHECK",
+    "NEED_MORE_INFO",
+    "CHECK_COMPLETED",
+    "PIPELINE",
+    "PROSPECT",
+    "BEING_CHECKED"
+  ];
+  const ENQUIRY_STATUSES = INQUIRY_STATUSES;
+
+  const checkIsInquiry = (ord: any) => INQUIRY_STATUSES.includes((ord?.status || "").toUpperCase());
+  const checkIsEnquiry = checkIsInquiry;
+
+  const getInquiryStatusLabel = (status: string) => {
+    const s = (status || "").toUpperCase();
+    if (s === "NEED_MORE_INFO") return "Need More Info";
+    if (s === "CHECK_COMPLETED") return "Initial Check Passed";
+    return "Under Initial Check";
+  };
+  const getEnquiryStatusLabel = getInquiryStatusLabel;
+
   const ALLOWED_EXECUTION_STATUSES = [
+    ...ENQUIRY_STATUSES,
     "CONFIRMED",
     "ORDER_ASSIGNED",
     "IN_PROGRESS",
@@ -691,6 +724,7 @@ export default function AssignedOrdersPage() {
   ];
 
   const CONSULTANT_EDITABLE_STATUSES = [
+    ...ENQUIRY_STATUSES,
     "ORDER_ASSIGNED",
     "IN_PROGRESS",
     "ON_HOLD",
@@ -766,36 +800,42 @@ export default function AssignedOrdersPage() {
         const status = (ord.status || "").toUpperCase();
         if (!ALLOWED_EXECUTION_STATUSES.includes(status)) return false;
 
+        const isInquiry = checkIsInquiry(ord);
         const isReviewOnly = checkIsReviewOnly(ord);
         const isExecuting = checkIsExecuting(ord);
         const isReviewer = checkIsReviewer(ord);
 
-        const isNewlyAssigned = ASSIGNED_STATUSES.includes(status) && !isReviewOnly && isExecuting;
-        const isInProgress = IN_PROGRESS_STATUSES.includes(status) && !isReviewOnly && isExecuting;
-        const isReviewOrder = isReviewer && !COMPLETED_STATUSES.includes(status) && status !== "CANCELLED";
-        const isOnHold = ON_HOLD_STATUSES.includes(status) && !isReviewOnly && isExecuting;
+        const isNewlyAssigned = !isInquiry && ASSIGNED_STATUSES.includes(status) && !isReviewOnly && isExecuting;
+        const isInProgress = !isInquiry && IN_PROGRESS_STATUSES.includes(status) && !isReviewOnly && isExecuting;
+        const isReviewOrder = !isInquiry && isReviewer && !COMPLETED_STATUSES.includes(status) && status !== "CANCELLED";
+        const isOnHold = !isInquiry && ON_HOLD_STATUSES.includes(status) && !isReviewOnly && isExecuting;
+        const isInquiryOrder = isInquiry && (isAdmin || isExecuting || isReviewer);
 
-        // 0. All Assigned Orders (Full list of assigned orders, excluding completed & cancelled)
-        if (activeTab === "ALL") {
-          if (!isNewlyAssigned && !isInProgress && !isReviewOrder && !isOnHold) return false;
+        // 0. Inquiry Orders (Pre-order initial check)
+        if (activeTab === "INQUIRY") {
+          if (!isInquiryOrder) return false;
         }
-        // 1. Newly Assigned Orders: Followed by allocated consultant / admin
+        // 1. All Assigned Orders (Full list of assigned orders, excluding completed & cancelled)
+        if (activeTab === "ALL") {
+          if (!isInquiryOrder && !isNewlyAssigned && !isInProgress && !isReviewOrder && !isOnHold) return false;
+        }
+        // 2. Newly Assigned Orders: Followed by allocated consultant / admin
         if (activeTab === "ASSIGNED") {
           if (!isNewlyAssigned) return false;
         }
-        // 2. In-Progress Orders: Followed by allocated consultant / admin through execution lifecycle
+        // 3. In-Progress Orders: Followed by allocated consultant / admin through execution lifecycle
         if (activeTab === "IN_PROGRESS") {
           if (!isInProgress) return false;
         }
-        // 3. Review Order: Stays in Review Order card throughout entire active lifecycle until completed or cancelled
+        // 4. Review Order: Stays in Review Order card throughout entire active lifecycle until completed or cancelled
         if (activeTab === "REVIEW_ORDER") {
           if (!isReviewOrder) return false;
         }
-        // 4. On-Hold Orders: Followed by allocated consultant / admin
+        // 5. On-Hold Orders: Followed by allocated consultant / admin
         if (activeTab === "ON_HOLD") {
           if (!isOnHold) return false;
         }
-        // 5. Completed Orders: Concluded archive for executing consultants / admins
+        // 6. Completed Orders: Concluded archive for executing consultants / admins
         if (activeTab === "COMPLETED") {
           if (isReviewOnly || !isExecuting || !COMPLETED_STATUSES.includes(status)) return false;
         }
@@ -823,7 +863,7 @@ export default function AssignedOrdersPage() {
 
   const [highlightedOrderNum, setHighlightedOrderNum] = useState<string | null>(null);
 
-  const openOrderDirectly = (orderNum: string, openChat: boolean = true) => {
+  const openOrderDirectly = (orderNum: string, openChat: boolean = false) => {
     if (!orderNum) return;
 
     // Find in grouped orders
@@ -834,8 +874,10 @@ export default function AssignedOrdersPage() {
     const isRevOnly = checkIsReviewOnly(matched);
     const isRev = checkIsReviewer(matched);
 
-    let targetTab: "ALL" | "ASSIGNED" | "IN_PROGRESS" | "REVIEW_ORDER" | "ON_HOLD" | "COMPLETED" = "ALL";
-    if (activeTab === "ALL" && !COMPLETED_STATUSES.includes(st) && st !== "CANCELLED") {
+    let targetTab: "ALL" | "INQUIRY" | "ASSIGNED" | "IN_PROGRESS" | "REVIEW_ORDER" | "ON_HOLD" | "COMPLETED" = "ALL";
+    if (INQUIRY_STATUSES.includes(st)) {
+      targetTab = "INQUIRY";
+    } else if (activeTab === "ALL" && !COMPLETED_STATUSES.includes(st) && st !== "CANCELLED") {
       targetTab = "ALL";
     } else if (isRevOnly) {
       if (!COMPLETED_STATUSES.includes(st) && st !== "CANCELLED") {
@@ -866,7 +908,8 @@ export default function AssignedOrdersPage() {
       const oExecuting = checkIsExecuting(ord);
       const oReviewer = checkIsReviewer(ord);
 
-      if (targetTab === "ALL" && (COMPLETED_STATUSES.includes(ost) || ost === "CANCELLED" || (!oExecuting && !oReviewer))) return false;
+      if (targetTab === "INQUIRY" && (!INQUIRY_STATUSES.includes(ost) || (!oExecuting && !oReviewer && !isAdmin))) return false;
+      if (targetTab === "ALL" && (COMPLETED_STATUSES.includes(ost) || ost === "CANCELLED" || (!oExecuting && !oReviewer && !isAdmin))) return false;
       if (targetTab === "ASSIGNED" && (oRevOnly || !oExecuting || !ASSIGNED_STATUSES.includes(ost))) return false;
       if (targetTab === "IN_PROGRESS" && (oRevOnly || !oExecuting || !IN_PROGRESS_STATUSES.includes(ost))) return false;
       if (targetTab === "REVIEW_ORDER" && (!oReviewer || COMPLETED_STATUSES.includes(ost) || ost === "CANCELLED")) return false;
@@ -936,14 +979,16 @@ export default function AssignedOrdersPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
+    const autoOpen = !!sessionStorage.getItem("auto_open_order_chat");
     const orderNum = params.get("order") || sessionStorage.getItem("auto_open_order_chat");
     const openChat = params.get("chat");
+    const shouldOpenChat = openChat === "true" || autoOpen;
 
     if (!orderNum) return;
 
     if (orders.length > 0) {
       hasProcessedUrlOrder.current = true;
-      openOrderDirectly(orderNum, openChat !== "false");
+      openOrderDirectly(orderNum, shouldOpenChat);
       sessionStorage.removeItem("auto_open_order_chat");
       const url = new URL(window.location.href);
       if (url.searchParams.has("order") || url.searchParams.has("chat")) {
@@ -953,7 +998,7 @@ export default function AssignedOrdersPage() {
       }
     } else if (!hasProcessedUrlOrder.current) {
       hasProcessedUrlOrder.current = true;
-      openOrderDirectly(orderNum, openChat !== "false");
+      openOrderDirectly(orderNum, shouldOpenChat);
     }
   }, [orders, groupedOrders]);
 
@@ -978,6 +1023,15 @@ export default function AssignedOrdersPage() {
 
   const getOrderStatusColor = (status: string) => {
     switch (status) {
+      case "UNDER_INITIAL_CHECK":
+      case "PIPELINE":
+      case "BEING_CHECKED":
+      case "PROSPECT":
+        return "bg-amber-500/10 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 font-bold";
+      case "NEED_MORE_INFO":
+        return "bg-rose-500/10 dark:bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30 font-bold";
+      case "CHECK_COMPLETED":
+        return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 font-bold";
       case "COMPLETED": return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold";
       case "CONFIRMED": return "bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20 font-bold";
       case "DRAFT": return "bg-zinc-500/10 dark:bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border-zinc-500/20 font-bold";
@@ -1032,41 +1086,51 @@ export default function AssignedOrdersPage() {
   };
 
   // Mutually Exclusive Counts Across All Folders
+  const inquiryOrdersCount = groupedOrders.filter(o => {
+    const st = (o.status || "").toUpperCase();
+    if (!INQUIRY_STATUSES.includes(st)) return false;
+    if (!myEmpId && isAdmin) return true;
+    return checkIsExecuting(o) || checkIsReviewer(o);
+  }).length;
+  const enquiryOrdersCount = inquiryOrdersCount;
+
   const allOrdersCount = groupedOrders.filter(o => {
     const st = (o.status || "").toUpperCase();
+    const isInq = INQUIRY_STATUSES.includes(st);
     const isRevOnly = checkIsReviewOnly(o);
     const isExec = checkIsExecuting(o);
     const isRev = checkIsReviewer(o);
-    const isNewlyAssigned = ASSIGNED_STATUSES.includes(st) && !isRevOnly && isExec;
-    const isInProgress = IN_PROGRESS_STATUSES.includes(st) && !isRevOnly && isExec;
-    const isReviewOrder = isRev && !COMPLETED_STATUSES.includes(st) && st !== "CANCELLED";
-    const isOnHold = ON_HOLD_STATUSES.includes(st) && !isRevOnly && isExec;
-    return isNewlyAssigned || isInProgress || isReviewOrder || isOnHold;
+    const isNewlyAssigned = !isInq && ASSIGNED_STATUSES.includes(st) && !isRevOnly && isExec;
+    const isInProgress = !isInq && IN_PROGRESS_STATUSES.includes(st) && !isRevOnly && isExec;
+    const isReviewOrder = !isInq && isRev && !COMPLETED_STATUSES.includes(st) && st !== "CANCELLED";
+    const isOnHold = !isInq && ON_HOLD_STATUSES.includes(st) && !isRevOnly && isExec;
+    const isInquiryOrder = isInq && (isAdmin || isExec || isRev);
+    return isInquiryOrder || isNewlyAssigned || isInProgress || isReviewOrder || isOnHold;
   }).length;
 
   const assignedOrdersCount = groupedOrders.filter(o => {
     const st = (o.status || "").toUpperCase();
-    return ASSIGNED_STATUSES.includes(st) && !checkIsReviewOnly(o) && checkIsExecuting(o);
+    return !checkIsInquiry(o) && ASSIGNED_STATUSES.includes(st) && !checkIsReviewOnly(o) && checkIsExecuting(o);
   }).length;
 
   const inProgressOrdersCount = groupedOrders.filter(o => {
     const st = (o.status || "").toUpperCase();
-    return IN_PROGRESS_STATUSES.includes(st) && !checkIsReviewOnly(o) && checkIsExecuting(o);
+    return !checkIsEnquiry(o) && IN_PROGRESS_STATUSES.includes(st) && !checkIsReviewOnly(o) && checkIsExecuting(o);
   }).length;
 
   const reviewOrdersCount = groupedOrders.filter(o => {
     const st = (o.status || "").toUpperCase();
-    return checkIsReviewer(o) && !COMPLETED_STATUSES.includes(st) && st !== "CANCELLED";
+    return !checkIsEnquiry(o) && checkIsReviewer(o) && !COMPLETED_STATUSES.includes(st) && st !== "CANCELLED";
   }).length;
 
   const onHoldOrdersCount = groupedOrders.filter(o => {
     const st = (o.status || "").toUpperCase();
-    return ON_HOLD_STATUSES.includes(st) && !checkIsReviewOnly(o) && checkIsExecuting(o);
+    return !checkIsEnquiry(o) && ON_HOLD_STATUSES.includes(st) && !checkIsReviewOnly(o) && checkIsExecuting(o);
   }).length;
 
   const completedOrdersCount = groupedOrders.filter(o => {
     const st = (o.status || "").toUpperCase();
-    return COMPLETED_STATUSES.includes(st) && !checkIsReviewOnly(o) && checkIsExecuting(o);
+    return !checkIsEnquiry(o) && COMPLETED_STATUSES.includes(st) && !checkIsReviewOnly(o) && checkIsExecuting(o);
   }).length;
 
   const reviewPrepOrdersCount = groupedOrders.filter(o => {
@@ -1131,7 +1195,64 @@ export default function AssignedOrdersPage() {
               style={{ display: "flex", flexDirection: "row", flexWrap: "nowrap" }}
             >
 
-              {/* FOLDER 1 (LEFT-MOST): ALL ASSIGNED ORDERS */}
+              {/* FOLDER 1 (LEFT-MOST): INQUIRY ORDERS */}
+              <div
+                onClick={() => setActiveTab("INQUIRY")}
+                style={{ flex: "1 1 0%", minWidth: 0 }}
+                className={cn(
+                  "flex-1 min-w-0 group relative rounded-2xl border p-2.5 xl:p-3 2xl:p-3.5 transition-all duration-200 cursor-pointer text-left select-none overflow-hidden flex flex-col justify-between",
+                  "bg-card/70 dark:bg-zinc-900/70 backdrop-blur-md",
+                  activeTab === "INQUIRY"
+                    ? "border-amber-500/60 ring-2 ring-amber-500/20 bg-gradient-to-br from-amber-500/10 via-amber-500/[0.03] to-card dark:to-zinc-900 shadow-md shadow-amber-500/5 -translate-y-0.5"
+                    : "border-border/60 hover:border-amber-500/40 hover:bg-muted/40 hover:-translate-y-0.5 shadow-xs"
+                )}
+              >
+                {/* Top Ear Tab Accent */}
+                <div className="flex items-start justify-between gap-2 mb-2 xl:mb-2.5">
+                  <div className="flex items-center gap-2 xl:gap-2.5 min-w-0">
+                    <div className={cn(
+                      "p-2 xl:p-2.5 rounded-xl transition-all duration-200 shrink-0",
+                      activeTab === "INQUIRY"
+                        ? "bg-amber-600 text-white shadow-xs scale-105"
+                        : "bg-amber-500/10 text-amber-600 dark:text-amber-400 group-hover:bg-amber-500/20"
+                    )}>
+                      {activeTab === "INQUIRY" ? <GitBranch className="h-4.5 w-4.5 xl:h-5 xl:w-5" /> : <Folder className="h-4.5 w-4.5 xl:h-5 xl:w-5" />}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h3 className="font-bold text-xs xl:text-sm tracking-tight text-foreground truncate">
+                          Inquiry Orders
+                        </h3>
+                        {activeTab === "INQUIRY" && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 uppercase tracking-wider shrink-0">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] xl:text-[11px] text-muted-foreground mt-0.5 truncate">Pre-order initial check & info</p>
+                    </div>
+                  </div>
+                  <Badge
+                    variant={activeTab === "INQUIRY" ? "default" : "secondary"}
+                    className={cn(
+                      "font-mono text-xs font-bold px-2 py-0.5 shrink-0",
+                      activeTab === "INQUIRY" ? "bg-amber-600 text-white hover:bg-amber-600" : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {inquiryOrdersCount}
+                  </Badge>
+                </div>
+
+                {/* Folder Footer Metadata */}
+                <div className="pt-2 mt-2 border-t border-border/40 flex items-center justify-between text-[10px] xl:text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-1.5 font-mono text-[9px] xl:text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-semibold truncate">
+                    <Clock className="h-3 w-3 shrink-0" /> Initial Check
+                  </span>
+                  <span className="font-medium text-foreground/80 shrink-0">{inquiryOrdersCount} {inquiryOrdersCount === 1 ? "order" : "orders"}</span>
+                </div>
+              </div>
+
+              {/* FOLDER 2: ALL ASSIGNED ORDERS */}
               <div
                 onClick={() => setActiveTab("ALL")}
                 style={{ flex: "1 1 0%", minWidth: 0 }}
@@ -1481,6 +1602,12 @@ export default function AssignedOrdersPage() {
                     <span>All Assigned Orders Folder</span>
                   </>
                 )}
+                {activeTab === "INQUIRY" && (
+                  <>
+                    <GitBranch className="h-4 w-4 text-amber-500 shrink-0" />
+                    <span>Inquiry Orders Folder</span>
+                  </>
+                )}
                 {activeTab === "ASSIGNED" && (
                   <>
                     <FolderOpen className="h-4 w-4 text-purple-500 shrink-0" />
@@ -1523,7 +1650,7 @@ export default function AssignedOrdersPage() {
               <div className="relative w-full sm:w-72">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder={`Search inside ${activeTab === "ALL" ? "all orders" : activeTab === "ASSIGNED" ? "assigned orders" : activeTab === "IN_PROGRESS" ? "in-progress orders" : activeTab === "REVIEW_ORDER" ? "review orders" : activeTab === "ON_HOLD" ? "on-hold orders" : "completed orders"}...`}
+                  placeholder={`Search inside ${activeTab === "ALL" ? "all orders" : activeTab === "INQUIRY" ? "inquiry orders" : activeTab === "ASSIGNED" ? "assigned orders" : activeTab === "IN_PROGRESS" ? "in-progress orders" : activeTab === "REVIEW_ORDER" ? "review orders" : activeTab === "ON_HOLD" ? "on-hold orders" : "completed orders"}...`}
                   className="pl-8 h-9 text-xs rounded-lg bg-background/80"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -1547,22 +1674,24 @@ export default function AssignedOrdersPage() {
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <ShoppingCart className="h-12 w-12 text-muted-foreground/35 mb-3" />
                 <h3 className="font-bold text-lg">
-                  {activeTab === "ALL" ? "No Active Assigned Orders" : activeTab === "ASSIGNED" ? "No Newly Assigned Orders" : activeTab === "IN_PROGRESS" ? "No In-Progress Orders" : activeTab === "REVIEW_ORDER" ? "No Review Orders" : activeTab === "ON_HOLD" ? "No On-Hold Orders" : "No Completed Orders"}
+                  {activeTab === "ALL" ? "No Active Assigned Orders" : activeTab === "INQUIRY" ? "No Inquiry Orders Found" : activeTab === "ASSIGNED" ? "No Newly Assigned Orders" : activeTab === "IN_PROGRESS" ? "No In-Progress Orders" : activeTab === "REVIEW_ORDER" ? "No Review Orders" : activeTab === "ON_HOLD" ? "No On-Hold Orders" : "No Completed Orders"}
                 </h3>
                 <p className="text-sm text-muted-foreground max-w-sm mt-1">
                   {searchTerm
                     ? "No results match your search query."
                     : activeTab === "ALL"
                       ? "There are currently no active orders assigned to you."
-                      : activeTab === "ASSIGNED"
-                        ? "There are currently no new unstarted orders waiting in the assigned queue."
-                        : activeTab === "IN_PROGRESS"
-                          ? "There are currently no orders in active progress in your queue."
-                          : activeTab === "REVIEW_ORDER"
-                            ? "There are currently no active orders allocated to you for continuous lifecycle review."
-                            : activeTab === "ON_HOLD"
-                              ? "There are currently no paused orders placed on hold."
-                              : "There are currently no completed orders in your archive."}
+                      : activeTab === "INQUIRY"
+                        ? "There are currently no inquiry pre-orders allocated to you for initial check."
+                        : activeTab === "ASSIGNED"
+                          ? "There are currently no new unstarted orders waiting in the assigned queue."
+                          : activeTab === "IN_PROGRESS"
+                            ? "There are currently no orders in active progress in your queue."
+                            : activeTab === "REVIEW_ORDER"
+                              ? "There are currently no active orders allocated to you for continuous lifecycle review."
+                              : activeTab === "ON_HOLD"
+                                ? "There are currently no paused orders placed on hold."
+                                : "There are currently no completed orders in your archive."}
                 </p>
               </div>
             ) : (
@@ -1594,12 +1723,16 @@ export default function AssignedOrdersPage() {
                                 sessionStorage.setItem("assigned_orders_highlighted_order", ord.order_number);
                               }
                             }}
-                            className={`transition-all duration-300 border-b last:border-0 ${isHighlighted
-                                ? "bg-blue-500/15 dark:bg-blue-500/20 ring-2 ring-blue-500 ring-inset shadow-md"
+                            className={`transition-colors duration-200 border-b last:border-0 ${isHighlighted
+                                ? "bg-blue-500/15 dark:bg-blue-500/25 border-y-2 border-blue-500"
                                 : "hover:bg-muted/30 cursor-pointer"
                               }`}
                           >
-                            <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5">
+                            <td className={`p-4 text-center font-mono align-top pt-5 transition-colors ${
+                              isHighlighted
+                                ? "border-l-4 border-l-blue-500 font-bold text-blue-950 dark:text-blue-100"
+                                : "font-medium text-muted-foreground"
+                            }`}>
                               #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + idx))}
                             </td>
                             <td className="p-4 align-top pt-5">
@@ -1767,7 +1900,24 @@ export default function AssignedOrdersPage() {
                               {formatDate(ord.created_at)}
                             </td>
                             <td className="p-4 text-center align-top pt-5">
-                              {CONSULTANT_EDITABLE_STATUSES.includes((ord.status || "").toUpperCase()) ? (
+                              {checkIsEnquiry(ord) ? (
+                                <select
+                                  value={["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED"].includes((ord.status || "").toUpperCase()) ? ord.status.toUpperCase() : "UNDER_INITIAL_CHECK"}
+                                  disabled={savingStatus}
+                                  onChange={(e) => handleUpdateStatus(ord, e.target.value)}
+                                  className={`h-8 px-2.5 py-1 text-xs font-bold rounded-md border shadow-xs bg-background transition-colors cursor-pointer ${
+                                    ord.status === "CHECK_COMPLETED"
+                                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                                      : ord.status === "NEED_MORE_INFO"
+                                      ? "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30"
+                                      : "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                                  }`}
+                                >
+                                  <option value="UNDER_INITIAL_CHECK">UNDER INITIAL CHECK</option>
+                                  <option value="NEED_MORE_INFO">NEED MORE INFO</option>
+                                  <option value="CHECK_COMPLETED">INITIAL CHECK PASSED</option>
+                                </select>
+                              ) : CONSULTANT_EDITABLE_STATUSES.includes((ord.status || "").toUpperCase()) ? (
                                 <select
                                   value={ord.status}
                                   disabled={savingStatus}
@@ -1797,7 +1947,9 @@ export default function AssignedOrdersPage() {
                                 </Badge>
                               )}
                             </td>
-                            <td className="p-4 text-right align-top pt-5">
+                            <td className={`p-4 text-right align-top pt-5 transition-colors ${
+                              isHighlighted ? "border-r-2 border-r-blue-500" : ""
+                            }`}>
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -2018,7 +2170,24 @@ export default function AssignedOrdersPage() {
                         {/* Bottom Actions Row: Status Selector & Chat Button */}
                         <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/50">
                           <div className="flex-1 max-w-[200px]" onClick={(e) => e.stopPropagation()}>
-                            {canSelectStatus ? (
+                            {checkIsEnquiry(ord) ? (
+                              <select
+                                value={["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED"].includes((ord.status || "").toUpperCase()) ? ord.status.toUpperCase() : "UNDER_INITIAL_CHECK"}
+                                disabled={savingStatus}
+                                onChange={(e) => handleUpdateStatus(ord, e.target.value)}
+                                className={`w-full h-9 px-2 text-xs font-bold rounded-lg border shadow-xs bg-background transition-colors cursor-pointer ${
+                                  ord.status === "CHECK_COMPLETED"
+                                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                                    : ord.status === "NEED_MORE_INFO"
+                                    ? "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30"
+                                    : "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                                }`}
+                              >
+                                <option value="UNDER_INITIAL_CHECK">UNDER INITIAL CHECK</option>
+                                <option value="NEED_MORE_INFO">NEED MORE INFO</option>
+                                <option value="CHECK_COMPLETED">INITIAL CHECK PASSED</option>
+                              </select>
+                            ) : canSelectStatus ? (
                               <select
                                 value={ord.status}
                                 disabled={savingStatus}
@@ -2204,7 +2373,24 @@ export default function AssignedOrdersPage() {
                         <span className="text-[10px] font-mono text-muted-foreground italic">View-only Stage</span>
                       )}
                     </div>
-                    {CONSULTANT_EDITABLE_STATUSES.includes((selectedGroup.status || "").toUpperCase()) ? (
+                    {checkIsInquiry(selectedGroup) ? (
+                      <select
+                        value={["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED"].includes((selectedGroup.status || "").toUpperCase()) ? selectedGroup.status.toUpperCase() : "UNDER_INITIAL_CHECK"}
+                        disabled={savingStatus}
+                        onChange={(e) => handleUpdateStatus(selectedGroup, e.target.value)}
+                        className={`h-9 w-full px-3 text-xs font-bold rounded-lg border shadow-xs bg-background transition-colors cursor-pointer ${
+                          selectedGroup.status === "CHECK_COMPLETED"
+                            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                            : selectedGroup.status === "NEED_MORE_INFO"
+                            ? "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30"
+                            : "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                        }`}
+                      >
+                        <option value="UNDER_INITIAL_CHECK">UNDER INITIAL CHECK</option>
+                        <option value="NEED_MORE_INFO">NEED MORE INFO</option>
+                        <option value="CHECK_COMPLETED">INITIAL CHECK PASSED</option>
+                      </select>
+                    ) : CONSULTANT_EDITABLE_STATUSES.includes((selectedGroup.status || "").toUpperCase()) ? (
                       <select
                         value={selectedGroup.status}
                         disabled={savingStatus}

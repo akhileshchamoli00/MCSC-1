@@ -287,7 +287,7 @@ export default function EditClientOrderPage() {
 
       setSelectedOrderGroup(targetGroup);
 
-      if (targetGroup.status === "PIPELINE" && searchParams.get("type") !== "pipeline") {
+      if (["PIPELINE", "UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED", "PROSPECT", "BEING_CHECKED"].includes(targetGroup.status) && searchParams.get("type") !== "pipeline") {
         router.replace(`/business/clients/orders/${orderNumber}/edit?type=pipeline`, { scroll: false });
       }
       
@@ -713,7 +713,8 @@ export default function EditClientOrderPage() {
       }
 
       toast.success("Order changes saved successfully!");
-      if (editForm.status === "PIPELINE" || selectedOrderGroup?.status === "PIPELINE") {
+      const ENQUIRY_STATUSES = ["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED", "PIPELINE", "PROSPECT", "BEING_CHECKED"];
+      if (ENQUIRY_STATUSES.includes(editForm.status) || ENQUIRY_STATUSES.includes(selectedOrderGroup?.status)) {
         router.push("/business/clients/orders/pipeline");
       } else {
         router.push("/business/clients/orders");
@@ -731,7 +732,8 @@ export default function EditClientOrderPage() {
   };
 
   const editItemsTotal = (editForm.items || []).reduce((acc, curr) => acc + (curr.unit_price || 0), 0);
-  const isPipelineOrder = selectedOrderGroup?.status === "PIPELINE" || editForm.status === "PIPELINE";
+  const ENQUIRY_STATUS_LIST = ["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED", "PIPELINE", "PROSPECT", "BEING_CHECKED"];
+  const isPipelineOrder = ENQUIRY_STATUS_LIST.includes(selectedOrderGroup?.status || "") || ENQUIRY_STATUS_LIST.includes(editForm.status || "");
 
   if (loading) {
     return (
@@ -780,10 +782,10 @@ export default function EditClientOrderPage() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-base font-extrabold tracking-tight text-foreground flex items-center gap-1.5 truncate">
-                Edit Service Order: <span className="font-mono text-primary truncate">{orderNumber}</span>
+                {isPipelineOrder ? "Edit Inquiry Order:" : "Edit Service Order:"} <span className="font-mono text-primary truncate">{orderNumber}</span>
               </h1>
               <Badge variant="outline" className={`text-[10px] font-mono uppercase font-bold py-0.5 px-2 shrink-0 ${isPipelineOrder ? 'bg-amber-500/10 text-amber-600 border-amber-500/30' : 'bg-primary/10 text-primary border-primary/30'}`}>
-                {editForm.status.replace("_", " ")}
+                {editForm.status.replace(/_/g, " ")}
               </Badge>
             </div>
             <p className="text-[11px] text-muted-foreground mt-0.5 truncate sm:whitespace-normal">
@@ -1387,29 +1389,35 @@ export default function EditClientOrderPage() {
                     onChange={(e) => handleStatusChange(e.target.value)}
                     className="flex h-8 w-full rounded-md border border-border/70 bg-background px-2.5 py-1 text-xs font-bold shadow-2xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
                   >
-                    <option value="PIPELINE">PIPELINE</option>
-                    <option value="DRAFT">DRAFT</option>
-                    <option value="PROFORMA_GENERATED">PROFORMA GENERATED</option>
-                    <option value="WAITING_ON_CLIENT">WAITING ON CLIENT</option>
-                    <option value="CONFIRMED">CONFIRMED</option>
-                    <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
-                    <option value="IN_PROGRESS">IN PROGRESS</option>
-                    <option value="REVIEW_DOCS">REVIEW DOCS</option>
-                    <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
-                    <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
-                    <option value="AWAITING_SIGNING_NOTARIZATION">AWAITING SIGNING / NOTARIZATION</option>
-                    <option value="AWAITING_DOCUMENT_RETURN">AWAITING DOCUMENT RETURN FROM CLIENT</option>
-                    <option value="AWAITING_THIRD_PARTY_RESPONSE">AWAITING THIRD-PARTY RESPONSE (VENDOR)</option>
-                    <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
-                    <option value="FINAL_DOC_READY">FINAL DOC READY</option>
-                    <option value="INVOICE_GENERATED">INVOICE GENERATED</option>
-                    <option value="WAITING_FOR_FINAL_PAYMENT">WAITING FOR FINAL PAYMENT</option>
-                    <option value="FINAL_PAYMENT_COMPLETED">FINAL PAYMENT COMPLETED</option>
-                    <option value="SOFT_COPY_DELIVERED">SOFT COPY DELIVERED</option>
-                    <option value="HARD_COPY_DELIVERED">HARD COPY DELIVERED</option>
-                    <option value="ON_HOLD">ON HOLD</option>
-                    <option value="COMPLETED">COMPLETED</option>
-                    <option value="CANCELLED">CANCELLED</option>
+                    <optgroup label="Inquiry Orders (Pre-Order Initial Check)">
+                      <option value="UNDER_INITIAL_CHECK">UNDER INITIAL CHECK</option>
+                      <option value="NEED_MORE_INFO">NEED MORE INFO</option>
+                      <option value="CHECK_COMPLETED">INITIAL CHECK PASSED</option>
+                    </optgroup>
+                    <optgroup label="Active Orders Lifecycle">
+                      <option value="DRAFT">DRAFT</option>
+                      <option value="PROFORMA_GENERATED">PROFORMA GENERATED</option>
+                      <option value="WAITING_ON_CLIENT">WAITING ON CLIENT</option>
+                      <option value="CONFIRMED">CONFIRMED</option>
+                      <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
+                      <option value="IN_PROGRESS">IN PROGRESS</option>
+                      <option value="REVIEW_DOCS">REVIEW DOCS</option>
+                      <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
+                      <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
+                      <option value="AWAITING_SIGNING_NOTARIZATION">AWAITING SIGNING / NOTARIZATION</option>
+                      <option value="AWAITING_DOCUMENT_RETURN">AWAITING DOCUMENT RETURN FROM CLIENT</option>
+                      <option value="AWAITING_THIRD_PARTY_RESPONSE">AWAITING THIRD-PARTY RESPONSE (VENDOR)</option>
+                      <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
+                      <option value="FINAL_DOC_READY">FINAL DOC READY</option>
+                      <option value="INVOICE_GENERATED">INVOICE GENERATED</option>
+                      <option value="WAITING_FOR_FINAL_PAYMENT">WAITING FOR FINAL PAYMENT</option>
+                      <option value="FINAL_PAYMENT_COMPLETED">FINAL PAYMENT COMPLETED</option>
+                      <option value="SOFT_COPY_DELIVERED">SOFT COPY DELIVERED</option>
+                      <option value="HARD_COPY_DELIVERED">HARD COPY DELIVERED</option>
+                      <option value="ON_HOLD">ON HOLD</option>
+                      <option value="COMPLETED">COMPLETED</option>
+                      <option value="CANCELLED">CANCELLED</option>
+                    </optgroup>
                   </select>
 
                   {editForm.status === "ON_HOLD" && (
@@ -1500,155 +1508,151 @@ export default function EditClientOrderPage() {
             </Card>
 
             {/* STEP 4: CONSULTANT ROSTER */}
-            {!isPipelineOrder && (
-              <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
-                <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <Users className="h-3.5 w-3.5 text-primary shrink-0" />
-                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
-                      4. Consultant Roster ({editForm.consultant_ids.length})
-                    </CardTitle>
-                  </div>
-                  {editForm.consultant_ids.length > 0 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setEditForm(prev => ({ ...prev, consultant_ids: [] }))}
-                      className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-destructive gap-0.5 font-medium shrink-0"
-                    >
-                      Clear All
-                    </Button>
-                  )}
-                </CardHeader>
-                <CardContent className="p-2.5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                    {(() => {
-                      const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
-                      const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
-                      const licensingEmployees = employees.filter((emp) => licensingMemberIds.includes(emp.id));
+            <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
+              <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Users className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
+                    4. {isPipelineOrder ? "Initial Check Consultants" : "Consultant Roster"} ({editForm.consultant_ids.length})
+                  </CardTitle>
+                </div>
+                {editForm.consultant_ids.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditForm(prev => ({ ...prev, consultant_ids: [] }))}
+                    className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-destructive gap-0.5 font-medium shrink-0"
+                  >
+                    Clear All
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent className="p-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {(() => {
+                    const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
+                    const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
+                    const licensingEmployees = employees.filter((emp) => licensingMemberIds.includes(emp.id));
 
-                      if (licensingEmployees.length === 0) {
-                        return <span className="text-xs text-muted-foreground italic py-2 text-center col-span-2">No licensing consultants available</span>;
-                      }
+                    if (licensingEmployees.length === 0) {
+                      return <span className="text-xs text-muted-foreground italic py-2 text-center col-span-2">No licensing consultants available</span>;
+                    }
 
-                      return licensingEmployees.map((emp) => {
-                        const isSelected = (editForm.consultant_ids || []).includes(emp.id);
-                        const isReviewer = (editForm.reviewer_ids || (editForm.reviewer_id ? [editForm.reviewer_id] : [])).includes(emp.id);
-                        return (
-                          <label
-                            key={emp.id}
-                            title={isReviewer ? `${emp.first_name} ${emp.last_name} is currently selected as a Designated Order Reviewer.` : undefined}
-                            className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-[10.5px] transition-colors ${
-                              isReviewer
-                                ? "opacity-50 border-dashed border-purple-300 dark:border-purple-800 bg-purple-50/40 dark:bg-purple-950/20 cursor-not-allowed"
-                                : isSelected 
-                                  ? "border-primary bg-primary/10 text-primary font-bold shadow-2xs cursor-pointer" 
-                                  : "border-border/60 bg-background/50 hover:bg-muted/40 cursor-pointer"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              disabled={isReviewer}
-                              onChange={() => toggleEditConsultantSelect(emp.id)}
-                              className="h-3 w-3 rounded border-gray-300 text-primary focus:ring-primary accent-primary shrink-0 cursor-pointer disabled:cursor-not-allowed"
-                            />
-                            <div className="truncate flex-1">
-                              <div className="font-semibold text-foreground truncate flex items-center justify-between gap-1">
-                                <span>{emp.first_name} {emp.last_name}</span>
-                                {isReviewer && (
-                                  <span className="text-[8px] font-bold text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/50 px-1 py-0.2 rounded shrink-0">
-                                    Reviewer
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[9px] text-muted-foreground truncate">{emp.job_title || "Consultant"}</div>
+                    return licensingEmployees.map((emp) => {
+                      const isSelected = (editForm.consultant_ids || []).includes(emp.id);
+                      const isReviewer = (editForm.reviewer_ids || (editForm.reviewer_id ? [editForm.reviewer_id] : [])).includes(emp.id);
+                      return (
+                        <label
+                          key={emp.id}
+                          title={isReviewer ? `${emp.first_name} ${emp.last_name} is currently selected as a Designated Order Reviewer.` : undefined}
+                          className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-[10.5px] transition-colors ${
+                            isReviewer
+                              ? "opacity-50 border-dashed border-purple-300 dark:border-purple-800 bg-purple-50/40 dark:bg-purple-950/20 cursor-not-allowed"
+                              : isSelected 
+                                ? "border-primary bg-primary/10 text-primary font-bold shadow-2xs cursor-pointer" 
+                                : "border-border/60 bg-background/50 hover:bg-muted/40 cursor-pointer"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            disabled={isReviewer}
+                            onChange={() => toggleEditConsultantSelect(emp.id)}
+                            className="h-3 w-3 rounded border-gray-300 text-primary focus:ring-primary accent-primary shrink-0 cursor-pointer disabled:cursor-not-allowed"
+                          />
+                          <div className="truncate flex-1">
+                            <div className="font-semibold text-foreground truncate flex items-center justify-between gap-1">
+                              <span>{emp.first_name} {emp.last_name}</span>
+                              {isReviewer && (
+                                <span className="text-[8px] font-bold text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/50 px-1 py-0.2 rounded shrink-0">
+                                  Reviewer
+                                </span>
+                              )}
                             </div>
-                          </label>
-                        );
-                      });
-                    })()}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                            <div className="text-[9px] text-muted-foreground truncate">{emp.job_title || "Consultant"}</div>
+                          </div>
+                        </label>
+                      );
+                    });
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* STEP 5: DESIGNATED REVIEWER */}
-            {!isPipelineOrder && (
-              <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
-                <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
-                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
-                      5. Designated Reviewers ({editForm.reviewer_ids && editForm.reviewer_ids.length > 0 ? `${editForm.reviewer_ids.length} Selected` : "Optional"})
-                    </CardTitle>
-                  </div>
-                  {editForm.reviewer_ids && editForm.reviewer_ids.length > 0 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setEditForm(prev => ({ ...prev, reviewer_ids: [], reviewer_id: null }))}
-                      className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-destructive gap-0.5 font-medium shrink-0"
-                    >
-                      <X className="h-2.5 w-2.5" /> Clear All
-                    </Button>
-                  )}
-                </CardHeader>
-                <CardContent className="p-2.5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                    {(() => {
-                      const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
-                      const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
-                      const licensingEmployees = employees.filter((emp) => licensingMemberIds.includes(emp.id));
+            <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
+              <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
+                    5. {isPipelineOrder ? "Designated Reviewers (Initial Verification)" : "Designated Reviewers"} ({editForm.reviewer_ids && editForm.reviewer_ids.length > 0 ? `${editForm.reviewer_ids.length} Selected` : "Optional"})
+                  </CardTitle>
+                </div>
+                {editForm.reviewer_ids && editForm.reviewer_ids.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditForm(prev => ({ ...prev, reviewer_ids: [], reviewer_id: null }))}
+                    className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-destructive gap-0.5 font-medium shrink-0"
+                  >
+                    <X className="h-2.5 w-2.5" /> Clear All
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent className="p-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {(() => {
+                    const licensingTeam = (teams || []).find((t: any) => t.name.toLowerCase() === "licensing team");
+                    const licensingMemberIds = licensingTeam ? (licensingTeam.members || []).map((m: any) => m.id) : [];
+                    const licensingEmployees = employees.filter((emp) => licensingMemberIds.includes(emp.id));
 
-                      if (licensingEmployees.length === 0) {
-                        return <span className="text-xs text-muted-foreground italic py-2 text-center col-span-2">No licensing consultants available</span>;
-                      }
+                    if (licensingEmployees.length === 0) {
+                      return <span className="text-xs text-muted-foreground italic py-2 text-center col-span-2">No licensing consultants available</span>;
+                    }
 
-                      return licensingEmployees.map((emp) => {
-                        const currentReviewers = editForm.reviewer_ids || (editForm.reviewer_id ? [editForm.reviewer_id] : []);
-                        const isSelected = currentReviewers.includes(emp.id);
-                        const isConsultant = (editForm.consultant_ids || []).includes(emp.id);
-                        return (
-                          <label
-                            key={emp.id}
-                            title={isConsultant ? `${emp.first_name} ${emp.last_name} is already allocated as an executing consultant.` : undefined}
-                            className={`flex items-center gap-1.5 p-1.5 rounded-lg border select-none text-[10.5px] transition-all ${
-                              isConsultant
-                                ? "opacity-50 border-dashed border-primary/40 bg-primary/5 cursor-not-allowed"
-                                : isSelected 
-                                  ? "border-purple-500/80 bg-purple-500/15 text-purple-800 dark:text-purple-300 font-bold shadow-2xs ring-1 ring-purple-500/40 cursor-pointer" 
-                                  : "border-border/60 bg-background/50 hover:bg-muted/40 hover:border-border cursor-pointer"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              disabled={isConsultant}
-                              onChange={() => toggleEditReviewerSelect(emp.id)}
-                              className="h-3 w-3 rounded border-gray-300 text-purple-600 focus:ring-purple-500 accent-purple-600 shrink-0 cursor-pointer disabled:cursor-not-allowed"
-                            />
-                            <div className="truncate flex-1">
-                              <div className="font-semibold text-foreground truncate flex items-center justify-between gap-1">
-                                <span>{emp.first_name} {emp.last_name}</span>
-                                {isConsultant && (
-                                  <span className="text-[8px] font-bold text-primary bg-primary/10 px-1 py-0.2 rounded shrink-0">
-                                    Consultant
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[9px] text-muted-foreground truncate">{emp.job_title || "Reviewer"}</div>
+                    return licensingEmployees.map((emp) => {
+                      const currentReviewers = editForm.reviewer_ids || (editForm.reviewer_id ? [editForm.reviewer_id] : []);
+                      const isSelected = currentReviewers.includes(emp.id);
+                      const isConsultant = (editForm.consultant_ids || []).includes(emp.id);
+                      return (
+                        <label
+                          key={emp.id}
+                          title={isConsultant ? `${emp.first_name} ${emp.last_name} is already allocated as an executing consultant.` : undefined}
+                          className={`flex items-center gap-1.5 p-1.5 rounded-lg border select-none text-[10.5px] transition-all ${
+                            isConsultant
+                              ? "opacity-50 border-dashed border-primary/40 bg-primary/5 cursor-not-allowed"
+                              : isSelected 
+                                ? "border-purple-500/80 bg-purple-500/15 text-purple-800 dark:text-purple-300 font-bold shadow-2xs ring-1 ring-purple-500/40 cursor-pointer" 
+                                : "border-border/60 bg-background/50 hover:bg-muted/40 hover:border-border cursor-pointer"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            disabled={isConsultant}
+                            onChange={() => toggleEditReviewerSelect(emp.id)}
+                            className="h-3 w-3 rounded border-gray-300 text-purple-600 focus:ring-purple-500 accent-purple-600 shrink-0 cursor-pointer disabled:cursor-not-allowed"
+                          />
+                          <div className="truncate flex-1">
+                            <div className="font-semibold text-foreground truncate flex items-center justify-between gap-1">
+                              <span>{emp.first_name} {emp.last_name}</span>
+                              {isConsultant && (
+                                <span className="text-[8px] font-bold text-primary bg-primary/10 px-1 py-0.2 rounded shrink-0">
+                                  Consultant
+                                </span>
+                              )}
                             </div>
-                          </label>
-                        );
-                      });
-                    })()}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                            <div className="text-[9px] text-muted-foreground truncate">{emp.job_title || "Reviewer"}</div>
+                          </div>
+                        </label>
+                      );
+                    });
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* STEP 6: INTERNAL DELIVERY NOTES */}
             <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
@@ -1656,7 +1660,7 @@ export default function EditClientOrderPage() {
                 <div className="flex items-center gap-1.5 min-w-0">
                   <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
                   <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
-                    {isPipelineOrder ? "4. Pipeline Lead Notes" : "6. Internal Delivery Notes"}
+                    6. {isPipelineOrder ? "Inquiry Notes & Feasibility" : "Internal Delivery Notes"}
                   </CardTitle>
                 </div>
                 <span className="text-[9px] text-muted-foreground font-mono italic shrink-0">For Delivery Manager</span>
@@ -1668,7 +1672,7 @@ export default function EditClientOrderPage() {
                   onChange={(e) => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
                   rows={2}
                   className="flex w-full rounded-lg border border-border/60 bg-background p-2 text-xs placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary leading-relaxed font-normal resize-none"
-                  placeholder="Note from order creator to delivery manager (internal only)..."
+                  placeholder={isPipelineOrder ? "Notes regarding client inquiry, initial feasibility, and background..." : "Note from order creator to delivery manager (internal only)..."}
                 />
               </CardContent>
             </Card>

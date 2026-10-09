@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bell, Trash2, Calendar, Wallet, Monitor, CheckCircle2, Clock, Package, MessageSquare, FileText, Megaphone, Briefcase, Users, Building2, ShieldCheck, UserCheck } from "lucide-react";
+import { Bell, Trash2, Calendar, Wallet, Monitor, CheckCircle2, Clock, Package, MessageSquare, FileText, Megaphone, Briefcase, Users, Building2, ShieldCheck, UserCheck, Mail, Check } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,7 +34,11 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
   // Active system area: explicit prop -> route detection -> user context mode
   const activeArea: "hrms" | "business" | "all" = 
     systemArea || 
-    (pathname.startsWith("/client") || pathname.startsWith("/business") ? "business" : (currentMode || "hrms"));
+    (pathname.startsWith("/hrms") 
+      ? "hrms" 
+      : (pathname.startsWith("/business") || pathname.startsWith("/client") 
+          ? "business" 
+          : (currentMode === "hrms" ? "hrms" : "business")));
 
   useEffect(() => {
     const role = (localStorage.getItem("user_role") || "").toUpperCase();
@@ -98,8 +102,8 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
         if (data.action === "REFRESH_NOTIFICATIONS" || data.type === "NOTIFICATION_REMOVED") {
           fetchNotifications();
         } else if (data.system_area) {
-          // If WS message has matching system_area or is shared, re-fetch
-          if (activeArea === "all" || data.system_area === "shared" || data.system_area === activeArea) {
+          // If WS message has matching system_area, re-fetch
+          if (activeArea === "all" || data.system_area === activeArea) {
             fetchNotifications();
           }
         } else {
@@ -120,7 +124,8 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
     };
   }, [activeArea]);
 
-  const markAsRead = async (id: number) => {
+  const markAsRead = async (id: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     try {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}/read`, {
         method: "PUT",
@@ -132,6 +137,24 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
       window.dispatchEvent(new Event("notifications-updated"));
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const markAsUnread = async (id: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}/unread`, {
+        method: "PUT",
+        credentials: "include"
+      });
+      
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: false } : n));
+      setUnreadCount(prev => prev + 1);
+      window.dispatchEvent(new Event("notifications-updated"));
+      toast.success("Notification marked as unread for future review");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to mark notification as unread");
     }
   };
 
@@ -209,7 +232,7 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
         return Math.max(0, prev - unreadCountForOrder);
       });
 
-      // Call backend to mark all notifications for this order chat as read
+      // Call backend to mark all notifications for this order (chats & documents) as read
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/order/${encodeURIComponent(cleanOrder)}/read`, {
         method: "PUT",
         credentials: "include"
@@ -233,8 +256,10 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
     }
 
     if (targetUrl) {
-      // Ensure chat=true is ALWAYS set for order navigation when clicking notifications
-      if (orderNum) {
+      const isDocNotif = targetUrl.includes("/documents") || notif.type === "document" || notif.module === "clients_documents";
+
+      // Ensure chat=true is only set for order chat navigation (NOT for document navigation)
+      if (orderNum && !isDocNotif) {
         if (targetUrl.includes("chat=false")) {
           targetUrl = targetUrl.replace("chat=false", "chat=true");
         } else if (!targetUrl.includes("chat=")) {
@@ -297,8 +322,8 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
         }
       }
 
-      // Dispatch custom event in case user is already viewing the target orders page
-      if (orderNum) {
+      // Dispatch custom event only for chat notifications
+      if (orderNum && !isDocNotif) {
         window.dispatchEvent(new CustomEvent("open-order-chat", {
           detail: { orderNumber: orderNum, chat: true }
         }));
@@ -344,7 +369,7 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
     return <Bell className="h-4 w-4 text-muted-foreground" />;
   };
 
-  const areaTitle = activeArea === "business" ? "Business Notifications" : (activeArea === "hrms" ? "HRMS Notifications" : "Notifications");
+  const areaTitle = activeArea === "business" ? "ERP Notifications" : (activeArea === "hrms" ? "HRMS Notifications" : "Notifications");
   const viewAllUrl = isClientUser 
     ? "/client/notifications" 
     : (activeArea === "business" ? "/shared/notifications?system=business" : "/shared/notifications?system=hrms");
@@ -392,7 +417,7 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
                 <Bell className="h-5 w-5 text-zinc-500" />
               </div>
               <p className="text-xs font-semibold text-zinc-300">All caught up!</p>
-              <p className="text-[11px] mt-0.5 text-zinc-500">No new {activeArea !== "all" ? activeArea.toUpperCase() : ""} notifications.</p>
+              <p className="text-[11px] mt-0.5 text-zinc-500">No new {activeArea === "business" ? "ERP" : (activeArea === "hrms" ? "HRMS" : "")} notifications.</p>
             </div>
           ) : (
             <div className="flex flex-col divide-y divide-zinc-800/60">
@@ -415,12 +440,35 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
                       <p className={`text-xs font-bold leading-tight truncate ${!notif.is_read ? "text-white" : "text-zinc-400"}`}>
                         {notif.title}
                       </p>
-                      <button 
-                        onClick={(e) => deleteNotification(notif.id, e)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-rose-400 shrink-0 p-1 -mr-1 -mt-1 rounded-md hover:bg-rose-500/10"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0 -mr-1 -mt-1">
+                        {notif.is_read ? (
+                          <button 
+                            type="button"
+                            onClick={(e) => markAsUnread(notif.id, e)}
+                            title="Mark as unread for future review"
+                            className="opacity-70 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-amber-400 p-1 rounded-md hover:bg-amber-500/10 cursor-pointer"
+                          >
+                            <Mail className="h-3.5 w-3.5" />
+                          </button>
+                        ) : (
+                          <button 
+                            type="button"
+                            onClick={(e) => markAsRead(notif.id, e)}
+                            title="Mark as read"
+                            className="opacity-70 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-emerald-400 p-1 rounded-md hover:bg-emerald-500/10 cursor-pointer"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        <button 
+                          type="button"
+                          onClick={(e) => deleteNotification(notif.id, e)}
+                          title="Delete notification"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-rose-400 p-1 rounded-md hover:bg-rose-500/10 cursor-pointer"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
                     </div>
                     <p className={`text-[11px] line-clamp-2 pr-1 leading-relaxed ${!notif.is_read ? "text-zinc-300" : "text-zinc-500"}`}>
                       {notif.message}
@@ -431,7 +479,7 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
                       </span>
                       {notif.system_area && (
                         <span className={`text-[9px] uppercase font-bold px-1.5 py-0.2 rounded border ${notif.system_area === 'business' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>
-                          {notif.system_area}
+                          {notif.system_area === 'business' ? 'ERP' : notif.system_area.toUpperCase()}
                         </span>
                       )}
                     </div>
@@ -445,7 +493,7 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
         <div className="p-2 border-t border-zinc-800/80 bg-white/[0.02]">
           <Link href={viewAllUrl} onClick={() => setOpen(false)}>
             <Button variant="ghost" className="w-full text-xs font-semibold h-8 text-zinc-300 hover:text-white hover:bg-white/10 rounded-lg">
-              View All {activeArea === "business" ? "Business" : (activeArea === "hrms" ? "HRMS" : "")} Notifications
+              View All {activeArea === "business" ? "ERP" : (activeArea === "hrms" ? "HRMS" : "")} Notifications
             </Button>
           </Link>
         </div>

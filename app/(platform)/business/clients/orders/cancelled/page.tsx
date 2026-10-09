@@ -91,7 +91,7 @@ export default function CancelledOrdersPage() {
   const [proformaPercent, setProformaPercent] = useState<number>(70);
   const [tempPercent, setTempPercent] = useState<string>("70");
   const [tempAmount, setTempAmount] = useState<string>("");
-  const [isPph21, setIsPph21] = useState<boolean>(false);
+  const [isPph23, setIsPph23] = useState<boolean>(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [downloadingFinalPdf, setDownloadingFinalPdf] = useState(false);
 
@@ -963,7 +963,7 @@ export default function CancelledOrdersPage() {
                                   } else {
                                     setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
                                   }
-                                  setIsPph21(false);
+                                  setIsPph23(false);
                                   setIsViewOpen(true);
                                   fetchProgressUpdates(ord.order_number);
                                 }}

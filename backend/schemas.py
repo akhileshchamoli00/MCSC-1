@@ -1007,12 +1007,15 @@ class ClientOrderResponse(BaseModel):
     notary_payment_ref: Optional[str] = None
     accurate_so_id: Optional[str] = None
     accurate_so_no: Optional[str] = None
+    accurate_dp_inv_no: Optional[str] = None
     accurate_inv_id: Optional[str] = None
     accurate_inv_no: Optional[str] = None
     accurate_receipt_no: Optional[str] = None
     accurate_sync_status: Optional[str] = "NOT_SYNCED"
     accurate_sync_error: Optional[str] = None
     accurate_last_synced_at: Optional[datetime] = None
+    quotation_sent_at: Optional[datetime] = None
+    quotation_sent_to: Optional[str] = None
     proforma_sent_at: Optional[datetime] = None
     proforma_sent_to: Optional[str] = None
     final_invoice_sent_at: Optional[datetime] = None
@@ -1241,6 +1244,7 @@ class ClientDocumentResponse(BaseModel):
     expiry_date: Optional[date] = None
     uploaded_at: Optional[datetime] = None
     uploaded_by: Optional[int] = None
+    uploader_name: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -21,8 +21,10 @@ import {
   AlertTriangle,
   Trash2,
   MailCheck,
-  SlidersHorizontal,
-  X
+  X,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -88,12 +90,29 @@ export default function CompaniesDirectory() {
   const [validationFilter, setValidationFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Column-Specific Filters State
-  const [showColumnFilters, setShowColumnFilters] = useState(true);
-  const [colFilterCompany, setColFilterCompany] = useState("");
-  const [colFilterClient, setColFilterClient] = useState("");
-  const [colFilterContact, setColFilterContact] = useState("");
-  const [colFilterTaxLocation, setColFilterTaxLocation] = useState("");
+  // Column Header Sorting State
+  const [sortColumn, setSortColumn] = useState<string | null>("company_name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  const handleSort = (columnKey: string) => {
+    if (sortColumn === columnKey) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(columnKey);
+      setSortDirection("asc");
+    }
+  };
+
+  const renderSortIcon = (columnKey: string) => {
+    if (sortColumn === columnKey) {
+      return sortDirection === "asc" ? (
+        <ArrowUp className="h-3 w-3 text-primary shrink-0" />
+      ) : (
+        <ArrowDown className="h-3 w-3 text-primary shrink-0" />
+      );
+    }
+    return <ArrowUpDown className="h-3 w-3 opacity-30 group-hover/th:opacity-80 transition-opacity shrink-0" />;
+  };
 
   const isRestoredRef = useRef(false);
   const prevFiltersRef = useRef<string>("");
@@ -105,11 +124,8 @@ export default function CompaniesDirectory() {
         searchTerm,
         statusFilter,
         validationFilter,
-        showColumnFilters,
-        colFilterCompany,
-        colFilterClient,
-        colFilterContact,
-        colFilterTaxLocation,
+        sortColumn,
+        sortDirection,
         currentPage,
       };
       sessionStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(dataToSave));
@@ -129,11 +145,8 @@ export default function CompaniesDirectory() {
         if (typeof parsed.searchTerm === "string") setSearchTerm(parsed.searchTerm);
         if (typeof parsed.statusFilter === "string") setStatusFilter(parsed.statusFilter);
         if (typeof parsed.validationFilter === "string") setValidationFilter(parsed.validationFilter);
-        if (typeof parsed.showColumnFilters === "boolean") setShowColumnFilters(parsed.showColumnFilters);
-        if (typeof parsed.colFilterCompany === "string") setColFilterCompany(parsed.colFilterCompany);
-        if (typeof parsed.colFilterClient === "string") setColFilterClient(parsed.colFilterClient);
-        if (typeof parsed.colFilterContact === "string") setColFilterContact(parsed.colFilterContact);
-        if (typeof parsed.colFilterTaxLocation === "string") setColFilterTaxLocation(parsed.colFilterTaxLocation);
+        if (typeof parsed.sortColumn === "string") setSortColumn(parsed.sortColumn);
+        if (parsed.sortDirection === "asc" || parsed.sortDirection === "desc") setSortDirection(parsed.sortDirection);
         if (typeof parsed.currentPage === "number" && parsed.currentPage > 0) setCurrentPage(parsed.currentPage);
       }
     } catch (e) {
@@ -153,31 +166,13 @@ export default function CompaniesDirectory() {
     searchTerm,
     statusFilter,
     validationFilter,
-    showColumnFilters,
-    colFilterCompany,
-    colFilterClient,
-    colFilterContact,
-    colFilterTaxLocation,
+    sortColumn,
+    sortDirection,
     currentPage,
   ]);
 
-  const activeColFilterCount = useMemo(() => {
-    return [
-      colFilterCompany.trim(),
-      colFilterClient.trim(),
-      colFilterContact.trim(),
-      colFilterTaxLocation.trim(),
-      statusFilter !== "ALL" ? statusFilter : "",
-      validationFilter !== "ALL" ? validationFilter : "",
-    ].filter(Boolean).length;
-  }, [colFilterCompany, colFilterClient, colFilterContact, colFilterTaxLocation, statusFilter, validationFilter]);
-
   const handleClearAllFilters = () => {
     setSearchTerm("");
-    setColFilterCompany("");
-    setColFilterClient("");
-    setColFilterContact("");
-    setColFilterTaxLocation("");
     setStatusFilter("ALL");
     setValidationFilter("ALL");
     setCurrentPage(1);
@@ -206,10 +201,6 @@ export default function CompaniesDirectory() {
       searchTerm,
       statusFilter,
       validationFilter,
-      colFilterCompany,
-      colFilterClient,
-      colFilterContact,
-      colFilterTaxLocation,
     ]);
     if (prevFiltersRef.current && prevFiltersRef.current !== currentFiltersStr) {
       setCurrentPage(1);
@@ -219,10 +210,6 @@ export default function CompaniesDirectory() {
     searchTerm,
     statusFilter,
     validationFilter,
-    colFilterCompany,
-    colFilterClient,
-    colFilterContact,
-    colFilterTaxLocation,
   ]);
 
   const [errorMsg, setErrorMsg] = useState("");
@@ -366,7 +353,7 @@ export default function CompaniesDirectory() {
   };
 
   const filteredCompanies = companies.filter(c => {
-    // 1. Global Search (now includes contact email, client email, phone, tax, address, contact, etc.)
+    // 1. Global Search (name, code, industry, contact, client, tax, aol, address)
     const term = searchTerm.trim().toLowerCase();
     if (term) {
       const name = (c.company_name || "").toLowerCase();
@@ -399,48 +386,12 @@ export default function CompaniesDirectory() {
       if (!matchesGlobal) return false;
     }
 
-    // 2. Column: Company Profile
-    if (colFilterCompany.trim()) {
-      const q = colFilterCompany.trim().toLowerCase();
-      const name = (c.company_name || "").toLowerCase();
-      const code = (c.company_code || "").toLowerCase();
-      const ind = (c.industry || "").toLowerCase();
-      if (!name.includes(q) && !code.includes(q) && !ind.includes(q)) return false;
-    }
-
-    // 3. Column: Parent Client
-    if (colFilterClient.trim()) {
-      const q = colFilterClient.trim().toLowerCase();
-      const clientPerson = (c.client?.contact_person || "").toLowerCase();
-      const clientEmail = (c.client?.email || "").toLowerCase();
-      const clientPhone = (c.client?.phone || "").toLowerCase();
-      if (!clientPerson.includes(q) && !clientEmail.includes(q) && !clientPhone.includes(q)) return false;
-    }
-
-    // 4. Column: Key Contact
-    if (colFilterContact.trim()) {
-      const q = colFilterContact.trim().toLowerCase();
-      const contactPerson = (c.key_contact_person || "").toLowerCase();
-      const contactEmail = (c.key_contact_email || "").toLowerCase();
-      const contactPhone = (c.key_contact_phone || "").toLowerCase();
-      if (!contactPerson.includes(q) && !contactEmail.includes(q) && !contactPhone.includes(q)) return false;
-    }
-
-    // 5. Column: Tax & Location
-    if (colFilterTaxLocation.trim()) {
-      const q = colFilterTaxLocation.trim().toLowerCase();
-      const tax = (c.tax_number || "").toLowerCase();
-      const aol = (c.accurate_customer_no || "").toLowerCase();
-      const addr = (c.address || "").toLowerCase();
-      if (!tax.includes(q) && !aol.includes(q) && !addr.includes(q)) return false;
-    }
-
-    // 6. Operational Status (ACTIVE / DISABLED)
+    // 2. Operational Status (ACTIVE / DISABLED)
     if (statusFilter !== "ALL" && c.status !== statusFilter) {
       return false;
     }
 
-    // 7. Validation Status (VALIDATED / PENDING / REVISION)
+    // 3. Validation Status (VALIDATED / PENDING / REVISION)
     const valStatus = c.validation_status || "PENDING_VALIDATION";
     if (validationFilter === "VALIDATED" && valStatus !== "VALIDATED") return false;
     if (validationFilter === "PENDING" && valStatus !== "PENDING_VALIDATION") return false;
@@ -449,10 +400,48 @@ export default function CompaniesDirectory() {
     return true;
   });
 
-  const totalPages = Math.ceil(filteredCompanies.length / 10);
+  const sortedCompanies = useMemo(() => {
+    if (!sortColumn) return filteredCompanies;
+
+    return [...filteredCompanies].sort((a, b) => {
+      let aVal = "";
+      let bVal = "";
+
+      switch (sortColumn) {
+        case "company_name":
+          aVal = a.company_name || "";
+          bVal = b.company_name || "";
+          break;
+        case "parent_client":
+          aVal = a.client?.contact_person || a.client?.email || "";
+          bVal = b.client?.contact_person || b.client?.email || "";
+          break;
+        case "key_contact":
+          aVal = a.key_contact_person || a.key_contact_email || "";
+          bVal = b.key_contact_person || b.key_contact_email || "";
+          break;
+        case "tax_location":
+          aVal = a.tax_number || a.address || "";
+          bVal = b.tax_number || b.address || "";
+          break;
+        case "status":
+          aVal = `${a.status || ""} ${a.validation_status || ""}`;
+          bVal = `${b.status || ""} ${b.validation_status || ""}`;
+          break;
+        default:
+          return 0;
+      }
+
+      return sortDirection === "asc"
+        ? String(aVal).localeCompare(String(bVal))
+        : String(bVal).localeCompare(String(aVal));
+    });
+  }, [filteredCompanies, sortColumn, sortDirection]);
+
+  const totalPages = Math.ceil(sortedCompanies.length / 10);
   const startIndex = (currentPage - 1) * 10;
   const endIndex = startIndex + 10;
-  const paginatedCompanies = filteredCompanies.slice(startIndex, endIndex);
+  const paginatedCompanies = sortedCompanies.slice(startIndex, endIndex);
 
   const totalCompaniesCount = companies.length;
   const validatedCount = companies.filter(c => c.validation_status === "VALIDATED").length;
@@ -565,24 +554,7 @@ export default function CompaniesDirectory() {
               />
             </div>
 
-            {/* Column Filters Toggle Button */}
-            <Button
-              type="button"
-              variant={showColumnFilters ? "secondary" : "outline"}
-              size="sm"
-              onClick={() => setShowColumnFilters(!showColumnFilters)}
-              className="h-9 px-3 text-xs font-semibold gap-1.5 rounded-xl border-border/50 shrink-0"
-              title="Toggle per-column table filters"
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              <span>Column Filters</span>
-              {activeColFilterCount > 0 && (
-                <Badge variant="default" className="h-4 px-1.5 text-[9px] font-bold rounded-full ml-0.5">
-                  {activeColFilterCount}
-                </Badge>
-              )}
-            </Button>
-            {(activeColFilterCount > 0 || searchTerm) && (
+            {searchTerm && (
               <Button
                 type="button"
                 variant="ghost"
@@ -590,7 +562,7 @@ export default function CompaniesDirectory() {
                 onClick={handleClearAllFilters}
                 className="h-9 px-2.5 text-xs text-muted-foreground hover:text-destructive gap-1 shrink-0"
               >
-                <X className="h-3.5 w-3.5" /> Clear Filters
+                <X className="h-3.5 w-3.5" /> Clear
               </Button>
             )}
 
@@ -646,96 +618,58 @@ export default function CompaniesDirectory() {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                  <th className="p-3 pl-4 min-w-[220px]">Company Profile</th>
-                  <th className="p-3 min-w-[170px]">Parent Client</th>
-                  <th className="p-3 min-w-[180px]">Key Contact</th>
-                  <th className="p-3 min-w-[170px]">Tax & Location</th>
-                  <th className="p-3 min-w-[140px]">Status</th>
+                  <th 
+                    onClick={() => handleSort("company_name")}
+                    className="p-3 pl-4 min-w-[220px] cursor-pointer select-none group/th hover:text-foreground hover:bg-muted/60 transition-colors"
+                    title="Click to sort by Company Profile"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Company Profile</span>
+                      {renderSortIcon("company_name")}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort("parent_client")}
+                    className="p-3 min-w-[170px] cursor-pointer select-none group/th hover:text-foreground hover:bg-muted/60 transition-colors"
+                    title="Click to sort by Parent Client"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Parent Client</span>
+                      {renderSortIcon("parent_client")}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort("key_contact")}
+                    className="p-3 min-w-[180px] cursor-pointer select-none group/th hover:text-foreground hover:bg-muted/60 transition-colors"
+                    title="Click to sort by Key Contact"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Key Contact</span>
+                      {renderSortIcon("key_contact")}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort("tax_location")}
+                    className="p-3 min-w-[170px] cursor-pointer select-none group/th hover:text-foreground hover:bg-muted/60 transition-colors"
+                    title="Click to sort by Tax & Location"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Tax & Location</span>
+                      {renderSortIcon("tax_location")}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort("status")}
+                    className="p-3 min-w-[140px] cursor-pointer select-none group/th hover:text-foreground hover:bg-muted/60 transition-colors"
+                    title="Click to sort by Status"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Status</span>
+                      {renderSortIcon("status")}
+                    </div>
+                  </th>
                   <th className="p-3 text-right pr-4 min-w-[100px]">Actions</th>
                 </tr>
-                {showColumnFilters && (
-                  <tr className="bg-muted/15 border-b border-border/50 text-xs">
-                    {/* 1. Company Profile */}
-                    <th className="py-1.5 px-2 pl-4">
-                      <Input
-                        placeholder="Company name, code, industry..."
-                        value={colFilterCompany}
-                        onChange={(e) => setColFilterCompany(e.target.value)}
-                        className="h-7 text-[11px] px-2 rounded-md bg-background/80 border-border/60 placeholder:text-muted-foreground/50 w-full"
-                      />
-                    </th>
-                    {/* 2. Parent Client */}
-                    <th className="py-1.5 px-2">
-                      <Input
-                        placeholder="Representative or client email..."
-                        value={colFilterClient}
-                        onChange={(e) => setColFilterClient(e.target.value)}
-                        className="h-7 text-[11px] px-2 rounded-md bg-background/80 border-border/60 placeholder:text-muted-foreground/50 w-full"
-                      />
-                    </th>
-                    {/* 3. Key Contact */}
-                    <th className="py-1.5 px-2">
-                      <Input
-                        placeholder="Contact person, email, phone..."
-                        value={colFilterContact}
-                        onChange={(e) => setColFilterContact(e.target.value)}
-                        className="h-7 text-[11px] px-2 rounded-md bg-background/80 border-border/60 placeholder:text-muted-foreground/50 w-full"
-                      />
-                    </th>
-                    {/* 4. Tax & Location */}
-                    <th className="py-1.5 px-2">
-                      <Input
-                        placeholder="Tax ID, AOL code, address..."
-                        value={colFilterTaxLocation}
-                        onChange={(e) => setColFilterTaxLocation(e.target.value)}
-                        className="h-7 text-[11px] px-2 rounded-md bg-background/80 border-border/60 placeholder:text-muted-foreground/50 w-full"
-                      />
-                    </th>
-                    {/* 5. Status */}
-                    <th className="py-1.5 px-2">
-                      <div className="flex items-center gap-1">
-                        <select
-                          value={statusFilter}
-                          onChange={(e) => setStatusFilter(e.target.value)}
-                          className="h-7 w-1/2 text-[10px] px-1 rounded-md bg-background/80 border border-border/60 font-medium text-foreground truncate"
-                          title="Filter operational status"
-                        >
-                          <option value="ALL">All Status</option>
-                          <option value="ACTIVE">ACTIVE</option>
-                          <option value="DISABLED">DISABLED</option>
-                        </select>
-                        <select
-                          value={validationFilter}
-                          onChange={(e) => setValidationFilter(e.target.value)}
-                          className="h-7 w-1/2 text-[10px] px-1 rounded-md bg-background/80 border border-border/60 font-medium text-foreground truncate"
-                          title="Filter verification status"
-                        >
-                          <option value="ALL">All Verify</option>
-                          <option value="VALIDATED">Verified</option>
-                          <option value="PENDING">Pending</option>
-                          <option value="REVISION">Revision</option>
-                        </select>
-                      </div>
-                    </th>
-                    {/* 6. Actions */}
-                    <th className="py-1.5 px-2 pr-4 text-right">
-                      {activeColFilterCount > 0 ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleClearAllFilters}
-                          className="h-7 px-2 text-[10px] text-destructive hover:bg-destructive/10 font-bold w-full gap-0.5 justify-center"
-                          title="Reset all filters"
-                        >
-                          <X className="h-3 w-3" /> Reset
-                        </Button>
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground/40 italic block text-right pr-2">Filter</span>
-                      )}
-                    </th>
-                  </tr>
-                )}
               </thead>
               <tbody className="divide-y divide-border/30">
                 {paginatedCompanies.length === 0 ? (
@@ -745,11 +679,11 @@ export default function CompaniesDirectory() {
                         <Building2 className="h-10 w-10 text-muted-foreground/30 stroke-[1.5]" />
                         <span className="text-sm font-semibold text-foreground/80">No Companies Found</span>
                         <p className="text-xs max-w-sm text-muted-foreground">
-                          {activeColFilterCount > 0 || searchTerm
+                          {searchTerm || statusFilter !== "ALL" || validationFilter !== "ALL"
                             ? "No companies match the specified search or filter criteria. You can adjust or reset the filters above."
                             : 'Click "Add Company" above to register your first corporate client profile.'}
                         </p>
-                        {(activeColFilterCount > 0 || searchTerm) && (
+                        {(searchTerm || statusFilter !== "ALL" || validationFilter !== "ALL") && (
                           <Button
                             type="button"
                             variant="outline"
@@ -757,7 +691,7 @@ export default function CompaniesDirectory() {
                             onClick={handleClearAllFilters}
                             className="mt-1 text-xs font-semibold h-8 px-3"
                           >
-                            Reset All Filters
+                            Reset Filters
                           </Button>
                         )}
                       </div>

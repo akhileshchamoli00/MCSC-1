@@ -60,8 +60,10 @@ import {
   Zap,
   MailCheck,
   AlertTriangle,
-  SlidersHorizontal,
-  Copy
+  Copy,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -95,16 +97,36 @@ export default function ClientOrdersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearchTerm = useDebounce(searchTerm, 250);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(15);
 
-  // Column-Specific Filters State
-  const [colFilterOrderId, setColFilterOrderId] = useState("");
-  const [colFilterCompany, setColFilterCompany] = useState("");
-  const [colFilterService, setColFilterService] = useState("");
-  const [colFilterConsultant, setColFilterConsultant] = useState("");
-  const [colFilterAmount, setColFilterAmount] = useState("");
-  const [colFilterPayment, setColFilterPayment] = useState("ALL");
-  const [colFilterStatus, setColFilterStatus] = useState("ALL");
-  const [showColumnFilters, setShowColumnFilters] = useState(true);
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
+
+  // Column Header Sorting State
+  const [sortColumn, setSortColumn] = useState<string | null>("created_at");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  const handleSort = (columnKey: string) => {
+    if (sortColumn === columnKey) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(columnKey);
+      setSortDirection("asc");
+    }
+  };
+
+  const renderSortIcon = (columnKey: string) => {
+    if (sortColumn === columnKey) {
+      return sortDirection === "asc" ? (
+        <ArrowUp className="h-3 w-3 text-primary shrink-0" />
+      ) : (
+        <ArrowDown className="h-3 w-3 text-primary shrink-0" />
+      );
+    }
+    return <ArrowUpDown className="h-3 w-3 opacity-30 group-hover/th:opacity-80 transition-opacity shrink-0" />;
+  };
 
   // Copy Order ID State & Handler
   const [copiedOrderNumber, setCopiedOrderNumber] = useState<string | null>(null);
@@ -129,15 +151,10 @@ export default function ClientOrdersPage() {
     try {
       const dataToSave = {
         searchTerm,
-        colFilterOrderId,
-        colFilterCompany,
-        colFilterService,
-        colFilterConsultant,
-        colFilterAmount,
-        colFilterPayment,
-        colFilterStatus,
-        showColumnFilters,
+        sortColumn,
+        sortDirection,
         currentPage,
+        pageSize,
       };
       sessionStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(dataToSave));
       localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(dataToSave));
@@ -154,20 +171,16 @@ export default function ClientOrdersPage() {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (typeof parsed.searchTerm === "string") setSearchTerm(parsed.searchTerm);
-        if (typeof parsed.colFilterOrderId === "string") setColFilterOrderId(parsed.colFilterOrderId);
-        if (typeof parsed.colFilterCompany === "string") setColFilterCompany(parsed.colFilterCompany);
-        if (typeof parsed.colFilterService === "string") setColFilterService(parsed.colFilterService);
-        if (typeof parsed.colFilterConsultant === "string") setColFilterConsultant(parsed.colFilterConsultant);
-        if (typeof parsed.colFilterAmount === "string") setColFilterAmount(parsed.colFilterAmount);
-        if (typeof parsed.colFilterPayment === "string") setColFilterPayment(parsed.colFilterPayment);
-        if (typeof parsed.colFilterStatus === "string") setColFilterStatus(parsed.colFilterStatus);
-        if (typeof parsed.showColumnFilters === "boolean") setShowColumnFilters(parsed.showColumnFilters);
+        if (typeof parsed.sortColumn === "string") setSortColumn(parsed.sortColumn);
+        if (parsed.sortDirection === "asc" || parsed.sortDirection === "desc") setSortDirection(parsed.sortDirection);
         if (typeof parsed.currentPage === "number" && parsed.currentPage > 0) setCurrentPage(parsed.currentPage);
+        if (typeof parsed.pageSize === "number" && [15, 25, 50, 100].includes(parsed.pageSize)) {
+          setPageSize(parsed.pageSize);
+        }
       }
     } catch (e) {
       console.error("Error reading saved filters:", e);
     } finally {
-      // Defer enabling auto-save until initial state updates have settled
       setTimeout(() => {
         isRestoredRef.current = true;
       }, 100);
@@ -180,38 +193,14 @@ export default function ClientOrdersPage() {
     saveCurrentFilters();
   }, [
     searchTerm,
-    colFilterOrderId,
-    colFilterCompany,
-    colFilterService,
-    colFilterConsultant,
-    colFilterAmount,
-    colFilterPayment,
-    colFilterStatus,
-    showColumnFilters,
+    sortColumn,
+    sortDirection,
     currentPage,
+    pageSize,
   ]);
-
-  const activeColFilterCount = useMemo(() => {
-    return [
-      colFilterOrderId.trim(),
-      colFilterCompany.trim(),
-      colFilterService.trim(),
-      colFilterConsultant.trim(),
-      colFilterAmount.trim(),
-      colFilterPayment !== "ALL" ? colFilterPayment : "",
-      colFilterStatus !== "ALL" ? colFilterStatus : "",
-    ].filter(Boolean).length;
-  }, [colFilterOrderId, colFilterCompany, colFilterService, colFilterConsultant, colFilterAmount, colFilterPayment, colFilterStatus]);
 
   const handleClearAllFilters = () => {
     setSearchTerm("");
-    setColFilterOrderId("");
-    setColFilterCompany("");
-    setColFilterService("");
-    setColFilterConsultant("");
-    setColFilterAmount("");
-    setColFilterPayment("ALL");
-    setColFilterStatus("ALL");
     setCurrentPage(1);
     try {
       sessionStorage.removeItem(FILTERS_STORAGE_KEY);
@@ -231,33 +220,15 @@ export default function ClientOrdersPage() {
     }
   }, [userLoading, canView, hasPermission, router]);
 
-  // Reset page to 1 only when user actually changes a search/filter criterion (not during hydration)
+  // Reset page to 1 only when user actually changes search criterion (not during hydration)
   useEffect(() => {
     if (!isRestoredRef.current) return;
-    const currentFiltersStr = JSON.stringify([
-      debouncedSearchTerm,
-      colFilterOrderId,
-      colFilterCompany,
-      colFilterService,
-      colFilterConsultant,
-      colFilterAmount,
-      colFilterPayment,
-      colFilterStatus,
-    ]);
+    const currentFiltersStr = JSON.stringify([debouncedSearchTerm]);
     if (prevFiltersRef.current && prevFiltersRef.current !== currentFiltersStr) {
       setCurrentPage(1);
     }
     prevFiltersRef.current = currentFiltersStr;
-  }, [
-    debouncedSearchTerm,
-    colFilterOrderId,
-    colFilterCompany,
-    colFilterService,
-    colFilterConsultant,
-    colFilterAmount,
-    colFilterPayment,
-    colFilterStatus,
-  ]);
+  }, [debouncedSearchTerm]);
 
   // Modal States
   const [isViewOpen, setIsViewOpen] = useState(false);
@@ -549,7 +520,7 @@ export default function ClientOrdersPage() {
   const [proformaPercent, setProformaPercent] = useState<number>(70);
   const [tempPercent, setTempPercent] = useState<string>("70");
   const [tempAmount, setTempAmount] = useState<string>("");
-  const [isPph21, setIsPph21] = useState<boolean>(false);
+  const [isPph23, setIsPph23] = useState<boolean>(false);
 
 
 
@@ -661,6 +632,19 @@ export default function ClientOrdersPage() {
   }, [isViewOpen, isChatOpen, isProformaPreviewOpen, isFinalInvoicePreviewOpen]);
 
   const [highlightedOrderNum, setHighlightedOrderNum] = useState<string | null>(null);
+
+  // Restore highlighted order from sessionStorage on mount (matching allocated orders)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      const saved = sessionStorage.getItem("active_orders_highlighted_order");
+      if (saved) {
+        setHighlightedOrderNum(saved);
+      }
+    }
+  }, []);
   const [deletedItemIds, setDeletedItemIds] = useState<number[]>([]);
 
   // Group raw rows by order_number
@@ -699,6 +683,7 @@ export default function ClientOrdersPage() {
         is_final_invoice_finalized: ord.is_final_invoice_finalized || false,
         accurate_so_id: ord.accurate_so_id || null,
         accurate_so_no: ord.accurate_so_no || null,
+        accurate_dp_inv_no: ord.accurate_dp_inv_no || null,
         accurate_inv_id: ord.accurate_inv_id || null,
         accurate_inv_no: ord.accurate_inv_no || null,
         accurate_receipt_no: ord.accurate_receipt_no || null,
@@ -715,7 +700,9 @@ export default function ClientOrdersPage() {
         signed_docs_sent_at: ord.signed_docs_sent_at || null,
         signed_docs_sent_to: ord.signed_docs_sent_to || null,
         deliverables_sent_at: ord.deliverables_sent_at || null,
-        deliverables_sent_to: ord.deliverables_sent_to || null
+        deliverables_sent_to: ord.deliverables_sent_to || null,
+        quotation_sent_at: ord.quotation_sent_at || null,
+        quotation_sent_to: ord.quotation_sent_to || null
       });
     }
     const group = groupedOrdersMap.get(key);
@@ -759,9 +746,12 @@ export default function ClientOrdersPage() {
     if (ord.signed_docs_sent_to) group.signed_docs_sent_to = ord.signed_docs_sent_to;
     if (ord.deliverables_sent_at) group.deliverables_sent_at = ord.deliverables_sent_at;
     if (ord.deliverables_sent_to) group.deliverables_sent_to = ord.deliverables_sent_to;
+    if (ord.quotation_sent_at) group.quotation_sent_at = ord.quotation_sent_at;
+    if (ord.quotation_sent_to) group.quotation_sent_to = ord.quotation_sent_to;
 
     if (ord.accurate_so_no) group.accurate_so_no = ord.accurate_so_no;
     if (ord.accurate_so_id) group.accurate_so_id = ord.accurate_so_id;
+    if (ord.accurate_dp_inv_no) group.accurate_dp_inv_no = ord.accurate_dp_inv_no;
     if (ord.accurate_inv_no) group.accurate_inv_no = ord.accurate_inv_no;
     if (ord.accurate_inv_id) group.accurate_inv_id = ord.accurate_inv_id;
     if (ord.accurate_receipt_no) group.accurate_receipt_no = ord.accurate_receipt_no;
@@ -784,7 +774,7 @@ export default function ClientOrdersPage() {
 
   const groupedOrders = Array.from(groupedOrdersMap.values());
 
-  const openOrderDirectly = (orderNum: string, openChat: boolean = true) => {
+  const openOrderDirectly = (orderNum: string, openChat: boolean = false) => {
     if (!orderNum) return;
 
     const matched = groupedOrdersMap.get(orderNum) || Array.from(groupedOrdersMap.values()).find(g => g.order_number?.toUpperCase() === orderNum.toUpperCase());
@@ -792,20 +782,21 @@ export default function ClientOrdersPage() {
       setSearchTerm("");
       const orderIdx = Array.from(groupedOrdersMap.values()).findIndex(o => o.order_number?.toUpperCase() === orderNum.toUpperCase());
       if (orderIdx !== -1) {
-        const targetPage = Math.floor(orderIdx / 10) + 1;
+        const targetPage = Math.floor(orderIdx / pageSize) + 1;
         setCurrentPage(targetPage);
       }
       setSelectedOrderGroup(matched);
       if (openChat) {
         setIsChatOpen(true);
         fetchProgressUpdates(matched.order_number);
-      } else {
-        setIsViewOpen(true);
       }
 
       setHighlightedOrderNum(matched.order_number);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("active_orders_highlighted_order", matched.order_number);
+      }
       setTimeout(() => {
-        const el = document.getElementById(`order-row-${matched.order_number}`);
+        const el = document.getElementById(`order-row-${matched.order_number}`) || document.getElementById(`mobile-order-row-${matched.order_number}`);
         const scrollParent = el?.closest('main') || document.querySelector('main');
         if (el && scrollParent) {
           const parentRect = scrollParent.getBoundingClientRect();
@@ -821,10 +812,6 @@ export default function ClientOrdersPage() {
           document.body.scrollTop = 0;
         }
       }, 300);
-
-      setTimeout(() => {
-        setHighlightedOrderNum(null);
-      }, 4000);
     } else {
       // Fallback: If not in current active orders list, fetch directly from backend API
       fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/clients/orders/group/${encodeURIComponent(orderNum)}`, {
@@ -836,11 +823,13 @@ export default function ClientOrdersPage() {
             const groupData = Array.isArray(data) && data.length > 0 ? data[0] : data;
             if (groupData && groupData.order_number) {
               setSelectedOrderGroup(groupData);
+              setHighlightedOrderNum(groupData.order_number);
+              if (typeof window !== "undefined") {
+                sessionStorage.setItem("active_orders_highlighted_order", groupData.order_number);
+              }
               if (openChat) {
                 setIsChatOpen(true);
                 fetchProgressUpdates(groupData.order_number);
-              } else {
-                setIsViewOpen(true);
               }
             }
           }
@@ -870,13 +859,13 @@ export default function ClientOrdersPage() {
   // Auto-open chat from URL query parameter or sessionStorage (for notifications & deep linking)
   useEffect(() => {
     const orderNum = searchParams?.get("order") || (typeof window !== "undefined" ? sessionStorage.getItem("auto_open_order_chat") : null);
-    const openChat = searchParams?.get("chat");
+    const shouldOpenChat = searchParams?.get("chat") === "true" || (typeof window !== "undefined" && !!sessionStorage.getItem("auto_open_order_chat"));
 
     if (!orderNum) return;
 
     if (orders.length > 0) {
       hasProcessedUrlOrderRef.current = true;
-      openOrderDirectly(orderNum, openChat !== "false");
+      openOrderDirectly(orderNum, shouldOpenChat);
       if (typeof window !== "undefined") {
         sessionStorage.removeItem("auto_open_order_chat");
         const url = new URL(window.location.href);
@@ -888,7 +877,7 @@ export default function ClientOrdersPage() {
       }
     } else if (!hasProcessedUrlOrderRef.current) {
       hasProcessedUrlOrderRef.current = true;
-      openOrderDirectly(orderNum, openChat !== "false");
+      openOrderDirectly(orderNum, shouldOpenChat);
     }
   }, [searchParams, orders]);
 
@@ -979,9 +968,9 @@ export default function ClientOrdersPage() {
     return groupedOrders
       .filter((ord) => {
         const isCompletedAndPaid = ord.status === "COMPLETED" && ord.payment_status === "PAID";
-        const isPipeline = (ord.status || "").toUpperCase() === "PIPELINE";
+        const isEnquiry = ["PIPELINE", "PROSPECT", "UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED", "BEING_CHECKED", "ENQUIRY"].includes((ord.status || "").toUpperCase());
         const isCancelled = (ord.status || "").toUpperCase() === "CANCELLED";
-        return !isCompletedAndPaid && !isPipeline && !isCancelled;
+        return !isCompletedAndPaid && !isEnquiry && !isCancelled;
       })
       .sort((a, b) => {
         const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -1005,82 +994,90 @@ export default function ClientOrdersPage() {
         return false;
       }
     }
-
-    // 2. Column: Order ID & Date
-    if (colFilterOrderId.trim()) {
-      const q = colFilterOrderId.trim().toLowerCase();
-      const orderNum = (ord.order_number || "").toLowerCase();
-      const dateStr = ord.created_at ? formatDate(ord.created_at).toLowerCase() : "";
-      if (!orderNum.includes(q) && !dateStr.includes(q)) return false;
-    }
-
-    // 3. Column: Company Entity / Client
-    if (colFilterCompany.trim()) {
-      const q = colFilterCompany.trim().toLowerCase();
-      const compName = (ord.company_name || "").toLowerCase();
-      const clientName = (ord.client_name || "").toLowerCase();
-      if (!compName.includes(q) && !clientName.includes(q)) return false;
-    }
-
-    // 4. Column: Service Package / Memo
-    if (colFilterService.trim()) {
-      const q = colFilterService.trim().toLowerCase();
-      const itemsStr = (ord.items || []).map((i: any) => `${i.job_title} ${i.job_id} ${i.branch_name || ""}`).join(" ").toLowerCase();
-      if (!itemsStr.includes(q)) return false;
-    }
-
-    // 5. Column: Assigned Consultants
-    if (colFilterConsultant.trim()) {
-      const q = colFilterConsultant.trim().toLowerCase();
-      const consultantsStr = (ord.consultants || []).map((c: any) => c.name).join(" ").toLowerCase();
-      const reviewerStr = ord.reviewer?.name?.toLowerCase() || "";
-      const reviewersStr = (ord.reviewers || []).map((r: any) => r.name).join(" ").toLowerCase();
-      if (!consultantsStr.includes(q) && !reviewerStr.includes(q) && !reviewersStr.includes(q)) return false;
-    }
-
-    // 6. Column: Total Amount
-    if (colFilterAmount.trim()) {
-      const q = colFilterAmount.trim().replace(/,/g, "");
-      const total = ord.total_amount || 0;
-      if (q.startsWith(">=")) {
-        const val = parseFloat(q.slice(2));
-        if (!isNaN(val) && total < val) return false;
-      } else if (q.startsWith("<=")) {
-        const val = parseFloat(q.slice(2));
-        if (!isNaN(val) && total > val) return false;
-      } else if (q.startsWith(">")) {
-        const val = parseFloat(q.slice(1));
-        if (!isNaN(val) && total <= val) return false;
-      } else if (q.startsWith("<")) {
-        const val = parseFloat(q.slice(1));
-        if (!isNaN(val) && total >= val) return false;
-      } else {
-        const val = parseFloat(q);
-        if (!isNaN(val)) {
-          if (!String(Math.round(total)).includes(q) && Math.abs(total - val) > 1) return false;
-        } else {
-          if (!String(Math.round(total)).includes(q)) return false;
-        }
-      }
-    }
-
-    // 7. Column: Payment Status
-    if (colFilterPayment !== "ALL") {
-      if ((ord.payment_status || "UNPAID").toUpperCase() !== colFilterPayment.toUpperCase()) return false;
-    }
-
-    // 8. Column: Lifecycle Status
-    if (colFilterStatus !== "ALL") {
-      if ((ord.status || "").toUpperCase() !== colFilterStatus.toUpperCase()) return false;
-    }
-
     return true;
   });
 
-  const totalPages = Math.ceil(filteredOrders.length / 10);
-  const startIndex = (currentPage - 1) * 10;
-  const endIndex = startIndex + 10;
-  const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
+  const sortedOrders = useMemo(() => {
+    if (!sortColumn) return filteredOrders;
+
+    return [...filteredOrders].sort((a, b) => {
+      let aVal: any = "";
+      let bVal: any = "";
+
+      switch (sortColumn) {
+        case "id":
+          aVal = a.id || 0;
+          bVal = b.id || 0;
+          return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+
+        case "order_number":
+          aVal = a.order_number || "";
+          bVal = b.order_number || "";
+          return sortDirection === "asc"
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+
+        case "created_at":
+          aVal = a.created_at ? new Date(a.created_at).getTime() : 0;
+          bVal = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+
+        case "company_name":
+          aVal = a.company_name || a.client_name || "";
+          bVal = b.company_name || b.client_name || "";
+          return sortDirection === "asc"
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+
+        case "service":
+          aVal = a.items?.[0]?.job_title || "";
+          bVal = b.items?.[0]?.job_title || "";
+          return sortDirection === "asc"
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+
+        case "consultants":
+          aVal = (a.consultants || []).map((c: any) => c.name).join(", ") || a.reviewer?.name || "";
+          bVal = (b.consultants || []).map((c: any) => c.name).join(", ") || b.reviewer?.name || "";
+          return sortDirection === "asc"
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+
+        case "total_amount":
+          aVal = Number(a.total_amount) || 0;
+          bVal = Number(b.total_amount) || 0;
+          return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+
+        case "payment_status":
+          aVal = a.payment_status || "UNPAID";
+          bVal = b.payment_status || "UNPAID";
+          return sortDirection === "asc"
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+
+        case "status":
+          aVal = a.status || "";
+          bVal = b.status || "";
+          return sortDirection === "asc"
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+
+        default:
+          return 0;
+      }
+    });
+  }, [filteredOrders, sortColumn, sortDirection]);
+
+  const totalPages = Math.ceil(sortedOrders.length / pageSize) || 1;
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedOrders = sortedOrders.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
 
   const totalOrdersCount = activeOrders.length;
   const totalRevenue = activeOrders.reduce((acc, curr) => acc + (curr.total_amount || 0), 0);
@@ -2110,8 +2107,8 @@ export default function ClientOrdersPage() {
         </div>
 
         {/* Main Orders Table */}
-        <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
-          <div className="p-4 bg-muted/20 border-b border-border/40 flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <Card className="border-border/40 shadow-sm bg-background/50 backdrop-blur-md rounded-2xl overflow-hidden">
+          <div className="p-4 bg-muted/20 border-b border-border/40 flex flex-col sm:flex-row gap-3 items-center justify-between rounded-t-2xl">
             <div className="flex items-center gap-2.5 w-full sm:w-auto flex-1 flex-wrap">
               <div className="relative w-full sm:w-80">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -2122,22 +2119,7 @@ export default function ClientOrdersPage() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <Button
-                type="button"
-                variant={showColumnFilters ? "secondary" : "outline"}
-                size="sm"
-                onClick={() => setShowColumnFilters(!showColumnFilters)}
-                className="h-9 px-3 rounded-xl text-xs font-semibold gap-1.5 shrink-0"
-              >
-                <SlidersHorizontal className="h-3.5 w-3.5" />
-                <span>Column Filters</span>
-                {activeColFilterCount > 0 && (
-                  <Badge variant="default" className="h-4 px-1.5 text-[9px] font-bold rounded-full ml-0.5">
-                    {activeColFilterCount}
-                  </Badge>
-                )}
-              </Button>
-              {activeColFilterCount > 0 && (
+              {searchTerm && (
                 <Button
                   type="button"
                   variant="ghost"
@@ -2145,155 +2127,121 @@ export default function ClientOrdersPage() {
                   onClick={handleClearAllFilters}
                   className="h-9 px-2.5 text-xs text-muted-foreground hover:text-destructive gap-1 shrink-0"
                 >
-                  <X className="h-3.5 w-3.5" /> Clear Filters
+                  <X className="h-3.5 w-3.5" /> Clear
                 </Button>
               )}
             </div>
-            <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold tracking-wider shrink-0">
-              Showing {paginatedOrders.length} of {filteredOrders.length} entries
-            </span>
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="text-[11px] font-medium">Show</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                  className="h-8 px-2 py-0.5 text-xs font-semibold rounded-lg bg-background border border-border/60 text-foreground cursor-pointer hover:bg-accent/50 focus:outline-none focus:ring-1 focus:ring-primary transition-colors shadow-2xs"
+                  aria-label="Select orders per page"
+                >
+                  <option value={15}>15</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <span className="text-[11px] font-medium">per page</span>
+              </div>
+              <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold tracking-wider hidden sm:inline">
+                Showing {sortedOrders.length === 0 ? 0 : startIndex + 1}–{Math.min(sortedOrders.length, endIndex)} of {sortedOrders.length} entries
+              </span>
+            </div>
           </div>
 
           <CardContent className="p-0">
-            <div className="hidden md:block overflow-x-auto">
+            <div className="hidden md:block overflow-x-auto relative">
               <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                        <th className="py-2.5 px-2 w-8 text-center">No.</th>
-                        <th className="py-2.5 px-2 whitespace-nowrap w-28">Order ID & Date</th>
-                        <th className="py-2.5 px-2 min-w-[130px] max-w-[170px]">Company Entity</th>
-                        <th className="py-2.5 px-2.5 min-w-[240px] max-w-[340px]">Service Package</th>
-                        <th className="py-2.5 px-3 w-36 min-w-[145px] max-w-[170px] whitespace-nowrap text-left">Assigned Consultants</th>
-                        <th className="py-2.5 px-3 text-right whitespace-nowrap w-28 min-w-[105px]">Total Amount</th>
-                        <th className="py-2.5 px-2 text-center whitespace-nowrap min-w-[85px]">Payment</th>
-                        <th className="py-2.5 px-2 text-left whitespace-nowrap">Lifecycle Status</th>
-                        <th className="py-2.5 px-2 text-right whitespace-nowrap">Actions</th>
+                    <thead className="sticky top-0 z-30">
+                      <tr className="border-b border-border/60 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
+                        <th 
+                          onClick={() => handleSort("id")}
+                          className="sticky top-0 z-30 py-2.5 px-2 w-10 min-w-[38px] max-w-[42px] text-center bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors"
+                          title="Click to sort by Sequence #"
+                        >
+                          <div className="flex items-center justify-center gap-0.5">
+                            <span>No.</span>
+                            {renderSortIcon("id")}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleSort("order_number")}
+                          className="sticky top-0 z-30 py-2.5 px-2 whitespace-nowrap w-28 min-w-[110px] max-w-[125px] bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors"
+                          title="Click to sort by Order ID & Date"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Order ID & Date</span>
+                            {renderSortIcon("order_number")}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleSort("company_name")}
+                          className="sticky top-0 z-30 py-2.5 px-2 min-w-[120px] max-w-[155px] bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors"
+                          title="Click to sort by Company Entity"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Company Entity</span>
+                            {renderSortIcon("company_name")}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleSort("service")}
+                          className="sticky top-0 z-30 py-2.5 px-2.5 min-w-[190px] max-w-[270px] bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors"
+                          title="Click to sort by Service Package"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Service Package</span>
+                            {renderSortIcon("service")}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleSort("consultants")}
+                          className="sticky top-0 z-30 py-2.5 px-2.5 w-32 min-w-[125px] max-w-[150px] whitespace-nowrap text-left bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors"
+                          title="Click to sort by Assigned Consultants"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Assigned Consultants</span>
+                            {renderSortIcon("consultants")}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleSort("total_amount")}
+                          className="sticky top-0 z-30 py-2.5 px-2.5 text-right whitespace-nowrap w-24 min-w-[95px] max-w-[115px] bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors"
+                          title="Click to sort by Total Amount"
+                        >
+                          <div className="flex items-center justify-end gap-1">
+                            <span>Total Amount</span>
+                            {renderSortIcon("total_amount")}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleSort("payment_status")}
+                          className="sticky top-0 z-30 py-2.5 px-2 text-center whitespace-nowrap min-w-[95px] max-w-[125px] bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors"
+                          title="Click to sort by Payment"
+                        >
+                          <div className="flex items-center justify-center gap-1">
+                            <span>Payment</span>
+                            {renderSortIcon("payment_status")}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleSort("status")}
+                          className="sticky top-0 z-30 py-2.5 px-2 text-left whitespace-nowrap min-w-[110px] max-w-[135px] bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors"
+                          title="Click to sort by Lifecycle Status"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Lifecycle Status</span>
+                            {renderSortIcon("status")}
+                          </div>
+                        </th>
+                        <th className="sticky top-0 right-0 z-40 py-2.5 px-2 text-right whitespace-nowrap bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs border-l border-border/40 min-w-[105px]">
+                          Actions
+                        </th>
                       </tr>
-                      {showColumnFilters && (
-                        <tr className="bg-muted/15 border-b border-border/50 text-xs">
-                          {/* 1. No. */}
-                          <th className="py-1.5 px-1 text-center align-middle">
-                            {activeColFilterCount > 0 ? (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleClearAllFilters}
-                                className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 mx-auto"
-                                title="Reset all column filters"
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground/40 font-mono">#</span>
-                            )}
-                          </th>
-                          {/* 2. Order ID */}
-                          <th className="py-1.5 px-1.5">
-                            <Input
-                              placeholder="ID / date..."
-                              value={colFilterOrderId}
-                              onChange={(e) => setColFilterOrderId(e.target.value)}
-                              className="h-7 text-[11px] px-1.5 rounded-md bg-background/80 border-border/60 font-mono placeholder:text-muted-foreground/50 w-full"
-                            />
-                          </th>
-                          {/* 3. Company Entity */}
-                          <th className="py-1.5 px-1.5">
-                            <Input
-                              placeholder="Company / client..."
-                              value={colFilterCompany}
-                              onChange={(e) => setColFilterCompany(e.target.value)}
-                              className="h-7 text-[11px] px-2 rounded-md bg-background/80 border-border/60 placeholder:text-muted-foreground/50 w-full"
-                            />
-                          </th>
-                          {/* 4. Service Package */}
-                          <th className="py-1.5 px-1.5">
-                            <Input
-                              placeholder="Service / code / memo..."
-                              value={colFilterService}
-                              onChange={(e) => setColFilterService(e.target.value)}
-                              className="h-7 text-[11px] px-2 rounded-md bg-background/80 border-border/60 placeholder:text-muted-foreground/50 w-full"
-                            />
-                          </th>
-                          {/* 5. Assigned Consultants */}
-                          <th className="py-1.5 px-1.5">
-                            <Input
-                              placeholder="Consultant / reviewer..."
-                              value={colFilterConsultant}
-                              onChange={(e) => setColFilterConsultant(e.target.value)}
-                              className="h-7 text-[11px] px-2 rounded-md bg-background/80 border-border/60 placeholder:text-muted-foreground/50 w-full"
-                            />
-                          </th>
-                          {/* 6. Total Amount */}
-                          <th className="py-1.5 px-1.5">
-                            <Input
-                              placeholder="e.g. >5M"
-                              value={colFilterAmount}
-                              onChange={(e) => setColFilterAmount(e.target.value)}
-                              className="h-7 text-[11px] px-2 rounded-md bg-background/80 border-border/60 font-mono text-right placeholder:text-muted-foreground/50 w-full"
-                            />
-                          </th>
-                          {/* 7. Payment */}
-                          <th className="py-1.5 px-1.5">
-                            <select
-                              value={colFilterPayment}
-                              onChange={(e) => setColFilterPayment(e.target.value)}
-                              className="h-7 w-full text-[11px] px-1 rounded-md bg-background/80 border border-border/60 font-bold text-foreground text-center"
-                            >
-                              <option value="ALL">All</option>
-                              <option value="PAID">PAID</option>
-                              <option value="PARTIALLY_PAID">PARTIAL</option>
-                              <option value="UNPAID">UNPAID</option>
-                            </select>
-                          </th>
-                          {/* 8. Lifecycle Status */}
-                          <th className="py-1.5 px-1.5">
-                            <select
-                              value={colFilterStatus}
-                              onChange={(e) => setColFilterStatus(e.target.value)}
-                              className="h-7 w-full text-[11px] px-1 rounded-md bg-background/80 border border-border/60 font-bold text-foreground truncate"
-                            >
-                              <option value="ALL">All Stages</option>
-                              <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
-                              <option value="IN_PROGRESS">IN PROGRESS</option>
-                              <option value="REVIEW_DOCS">REVIEW DOCS</option>
-                              <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
-                              <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
-                              <option value="AWAITING_SIGNING_NOTARIZATION">AWAITING SIGNING / NOTARIZATION</option>
-                              <option value="AWAITING_DOCUMENT_RETURN">AWAITING DOCUMENT RETURN FROM CLIENT</option>
-                              <option value="AWAITING_THIRD_PARTY_RESPONSE">AWAITING THIRD-PARTY RESPONSE (VENDOR)</option>
-                              <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOC PREP</option>
-                              <option value="FINAL_DOC_READY">FINAL DOC READY</option>
-                              <option value="WAITING_ON_CLIENT">WAITING ON CLIENT</option>
-                              <option value="WAITING_FOR_FINAL_PAYMENT">WAITING FINAL PAYMENT</option>
-                              <option value="FINAL_PAYMENT_COMPLETED">FINAL PAYMENT COMPLETED</option>
-                              <option value="SOFT_COPY_DELIVERED">SOFT COPY DELIVERED</option>
-                              <option value="HARD_COPY_DELIVERED">HARD COPY DELIVERED</option>
-                              <option value="ON_HOLD">ON HOLD</option>
-                              <option value="CONFIRMED">CONFIRMED</option>
-                              <option value="DRAFT">DRAFT</option>
-                              <option value="PROFORMA_GENERATED">PROFORMA GENERATED</option>
-                            </select>
-                          </th>
-                          {/* 9. Actions */}
-                          <th className="py-1.5 px-1.5 text-right">
-                            {activeColFilterCount > 0 ? (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleClearAllFilters}
-                                className="h-7 px-2 text-[10px] text-destructive hover:bg-destructive/10 font-bold w-full gap-0.5"
-                                title="Reset all filters"
-                              >
-                                <X className="h-3 w-3" /> Reset
-                              </Button>
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground/40 italic block text-right pr-2">Filter</span>
-                            )}
-                          </th>
-                        </tr>
-                      )}
                     </thead>
                     <tbody className="divide-y divide-border/30">
                       {paginatedOrders.length === 0 ? (
@@ -2303,11 +2251,11 @@ export default function ClientOrdersPage() {
                               <ShoppingCart className="h-10 w-10 text-muted-foreground/30 stroke-[1.5]" />
                               <span className="text-sm font-semibold text-foreground/80">No Client Orders Found</span>
                               <p className="text-xs max-w-sm text-muted-foreground">
-                                {activeColFilterCount > 0 || searchTerm
-                                  ? "No orders match the specified filter criteria. You can adjust or reset the column filters above."
+                                {searchTerm
+                                  ? "No orders match the specified search criteria. You can clear the search bar above."
                                   : 'Click "Create New Order" above to issue your first service order.'}
                               </p>
-                              {(activeColFilterCount > 0 || searchTerm) && (
+                              {searchTerm && (
                                 <Button
                                   type="button"
                                   variant="outline"
@@ -2315,7 +2263,7 @@ export default function ClientOrdersPage() {
                                   onClick={handleClearAllFilters}
                                   className="mt-1 text-xs font-semibold h-8 px-3"
                                 >
-                                  Reset All Filters
+                                  Clear Search
                                 </Button>
                               )}
                             </div>
@@ -2328,21 +2276,40 @@ export default function ClientOrdersPage() {
                           <tr
                             key={ord.order_number || index}
                             id={`order-row-${ord.order_number}`}
-                            className={`transition-all duration-300 border-b border-border/30 last:border-0 ${isHighlighted
-                                ? "bg-emerald-500/20 dark:bg-emerald-500/25 ring-2 ring-emerald-500 ring-inset shadow-md"
-                                : "hover:bg-muted/40"
-                              }`}
+                            onClick={() => {
+                              setHighlightedOrderNum(ord.order_number);
+                              if (typeof window !== "undefined") {
+                                sessionStorage.setItem("active_orders_highlighted_order", ord.order_number);
+                              }
+                            }}
+                            className={`group transition-colors duration-200 cursor-pointer ${
+                              isHighlighted
+                                ? "bg-sky-500/15 dark:bg-sky-500/25 border-y-2 border-sky-500"
+                                : "border-b border-border/30 last:border-0 hover:bg-muted/40"
+                            }`}
                           >
-                            <td className="py-2 px-2 text-center font-mono font-medium text-muted-foreground align-top pt-2.5 text-xs">
+                            <td className={`py-2 px-2 text-center font-mono align-top pt-2.5 text-xs transition-colors w-10 min-w-[38px] max-w-[42px] ${
+                              isHighlighted
+                                ? "border-l-4 border-l-sky-500 text-sky-950 dark:text-sky-100 font-bold"
+                                : "font-medium text-muted-foreground"
+                            }`}>
                               #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + index))}
                             </td>
-                            <td className="py-2 px-2 align-top pt-2.5 whitespace-nowrap">
+                            <td className="py-2 px-2 align-top pt-2.5 whitespace-nowrap w-28 min-w-[110px] max-w-[125px]">
                               <div className="inline-flex items-center gap-1.5 group/copy">
                                 {ord.company_id ? (
-                                  <Link href={`/business/clients/documents/${ord.company_id}?from=orders`}>
+                                  <Link
+                                    href={`/business/clients/documents/${ord.company_id}?order=${ord.order_number}&from=orders`}
+                                    onClick={() => {
+                                      setHighlightedOrderNum(ord.order_number);
+                                      if (typeof window !== "undefined") {
+                                        sessionStorage.setItem("active_orders_highlighted_order", ord.order_number);
+                                      }
+                                    }}
+                                  >
                                     <Badge
                                       variant="outline"
-                                      className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2 py-0.5 rounded hover:border-emerald-500/40 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
+                                      className="bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 font-mono text-zinc-800 dark:text-zinc-200 font-bold text-xs px-2 py-0.5 rounded hover:border-sky-500/40 hover:text-sky-600 dark:hover:text-sky-400 transition-colors cursor-pointer"
                                       title="Go to Company Documents Folder"
                                     >
                                       {ord.order_number}
@@ -2379,7 +2346,7 @@ export default function ClientOrdersPage() {
                                 </div>
                               )}
                             </td>
-                            <td className="py-2 px-2 font-bold text-foreground align-top pt-2.5 min-w-[130px] max-w-[170px]">
+                            <td className="py-2 px-2 font-bold text-foreground align-top pt-2.5 min-w-[120px] max-w-[155px]">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-sm font-bold leading-snug break-words">{ord.company_name || "Personal Client Account"}</span>
                                 {(() => {
@@ -2407,18 +2374,35 @@ export default function ClientOrdersPage() {
                                 <Building className="h-3 w-3 text-muted-foreground shrink-0" /> <span className="truncate">{ord.client_name || "Representative"}</span>
                               </div>
                             </td>
-                            <td className="py-2 px-2.5 align-top pt-2.5 min-w-[240px] max-w-[340px]">
+                            <td className="py-2 px-2.5 align-top pt-2.5 min-w-[190px] max-w-[270px]">
                               {ord.items && ord.items.length > 0 ? (
-                                <div className="space-y-1.5 w-full">
+                                <div className="space-y-2 w-full my-1">
                                   {ord.items.map((item: any, idx: number) => (
-                                    <div key={idx} className="space-y-1 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
+                                    <div
+                                      key={idx}
+                                      className={`p-2 rounded-lg border space-y-1.5 transition-all duration-200 ${
+                                        isHighlighted
+                                          ? "border-sky-300 dark:border-sky-700 bg-white dark:bg-zinc-900 shadow-2xs"
+                                          : "border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-950/20 shadow-none"
+                                      }`}
+                                    >
                                       <div className="flex flex-wrap items-center gap-1.5">
-                                        <span className="font-semibold text-foreground text-xs leading-normal break-words">
+                                        <span className="font-bold text-foreground text-xs leading-normal break-words flex items-center gap-1.5">
+                                          <span className="h-1.5 w-1.5 rounded-full bg-sky-500 shrink-0" />
                                           {item.job_title}
                                         </span>
                                         {item.job_id && (
-                                          <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                          <Badge
+                                            variant="outline"
+                                            className="text-[9.5px] font-mono font-bold py-0.5 px-1.5 bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30 shrink-0"
+                                            title={`Job ID: ${item.job_id}`}
+                                          >
                                             {item.job_id}
+                                          </Badge>
+                                        )}
+                                        {item.pricing_tier && (
+                                          <Badge variant="secondary" className="text-[9px] py-0 px-1.5 font-medium capitalize shrink-0">
+                                            {item.pricing_tier.toLowerCase().replace('_', ' ')}
                                           </Badge>
                                         )}
                                         {renderVendorBadge(item)}
@@ -2427,7 +2411,7 @@ export default function ClientOrdersPage() {
                                         <div className="flex items-center">
                                           <Badge 
                                             variant="outline" 
-                                            className="text-[9px] font-medium py-0.5 px-1.5 bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30 max-w-[240px] inline-flex items-center gap-1 overflow-hidden"
+                                            className="text-[9px] font-medium py-0.5 px-1.5 bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30 max-w-[220px] inline-flex items-center gap-1 overflow-hidden"
                                             title={`Memo: ${item.branch_name}`}
                                           >
                                             <span className="font-bold uppercase tracking-wider text-[8px] opacity-75 shrink-0">Memo:</span>
@@ -2442,7 +2426,7 @@ export default function ClientOrdersPage() {
                                 <span className="text-muted-foreground italic text-xs">-</span>
                               )}
                             </td>
-                            <td className="py-2 px-3 align-top pt-2.5 w-36 min-w-[145px] max-w-[170px]">
+                            <td className="py-2 px-2.5 align-top pt-2.5 w-32 min-w-[125px] max-w-[150px]">
                               <div className="flex flex-col items-start gap-1 w-full">
                                 {(() => {
                                   const revList = ord.reviewers && ord.reviewers.length > 0 ? ord.reviewers : (ord.reviewer ? [ord.reviewer] : []);
@@ -2475,10 +2459,10 @@ export default function ClientOrdersPage() {
                                 ) : null}
                               </div>
                             </td>
-                            <td className="py-2 px-3 text-right font-mono font-bold text-sm text-foreground align-top pt-2.5 whitespace-nowrap">
+                            <td className="py-2 px-2.5 text-right font-mono font-bold text-sm text-foreground align-top pt-2.5 whitespace-nowrap w-24 min-w-[95px] max-w-[115px]">
                               {formatCurrency(ord.total_amount)}
                             </td>
-                            <td className="py-2 px-2 text-center align-top pt-2.5 whitespace-nowrap min-w-[85px]">
+                            <td className="py-2 px-2 text-center align-top pt-2.5 min-w-[95px] max-w-[125px]">
                               <div className="flex flex-col items-center gap-1 justify-center">
                                 <Badge className={`${getPaymentStatusColor(ord.payment_status)} font-bold font-mono border text-[10px] px-2 py-0.5`}>
                                   {ord.payment_status || "UNPAID"}
@@ -2488,35 +2472,43 @@ export default function ClientOrdersPage() {
                                 {(() => {
                                   const accStatus = ord.accurate_sync_status;
                                   if (accStatus === "PAID") {
+                                    const receipts = (ord.accurate_receipt_no || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                                    const receiptLabel = receipts.length > 1
+                                      ? `${receipts[receipts.length - 1]} (+${receipts.length - 1})`
+                                      : (receipts[0] || "Paid");
                                     return (
-                                      <Badge variant="outline" className="text-[8.5px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 flex items-center gap-0.5 py-0.5 px-1.5" title={`Accurate Receipt: ${ord.accurate_receipt_no || 'Paid'}`}>
-                                        <CheckCircle2 className="h-2.5 w-2.5 text-emerald-600" /> AOL: {ord.accurate_receipt_no || "Paid"}
+                                      <Badge variant="outline" className="text-[8.5px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 flex items-center gap-0.5 py-0.5 px-1.5 max-w-[120px] overflow-hidden" title={`Accurate Receipt: ${ord.accurate_receipt_no || 'Paid'}`}>
+                                        <CheckCircle2 className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
+                                        <span className="truncate">AOL: {receiptLabel}</span>
                                       </Badge>
                                     );
                                   }
                                   if (accStatus === "INV_CREATED") {
                                     return (
-                                      <Badge variant="outline" className="text-[8.5px] font-mono font-bold bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30 flex items-center gap-0.5 py-0.5 px-1.5" title={`Accurate Invoice: ${ord.accurate_inv_no}`}>
-                                        <Receipt className="h-2.5 w-2.5 text-blue-600" /> AOL: {ord.accurate_inv_no || "Invoice"}
+                                      <Badge variant="outline" className="text-[8.5px] font-mono font-bold bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30 flex items-center gap-0.5 py-0.5 px-1.5 max-w-[120px] overflow-hidden" title={`Accurate Invoice: ${ord.accurate_inv_no}`}>
+                                        <Receipt className="h-2.5 w-2.5 text-blue-600 shrink-0" />
+                                        <span className="truncate">AOL: {ord.accurate_inv_no || "Invoice"}</span>
                                       </Badge>
                                     );
                                   }
                                   if (accStatus === "SO_CREATED") {
                                     return (
-                                      <Badge variant="outline" className="text-[8.5px] font-mono font-bold bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 flex items-center gap-0.5 py-0.5 px-1.5" title={`Accurate Sales Order: ${ord.accurate_so_no}`}>
-                                        <Zap className="h-2.5 w-2.5 text-purple-600" /> AOL: {ord.accurate_so_no || "SO Active"}
+                                      <Badge variant="outline" className="text-[8.5px] font-mono font-bold bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 flex items-center gap-0.5 py-0.5 px-1.5 max-w-[120px] overflow-hidden" title={`Accurate Sales Order: ${ord.accurate_so_no}`}>
+                                        <Zap className="h-2.5 w-2.5 text-purple-600 shrink-0" />
+                                        <span className="truncate">AOL: {ord.accurate_so_no || "SO Active"}</span>
                                       </Badge>
                                     );
                                   }
                                   if (accStatus === "FAILED") {
                                     return (
                                       <div className="flex items-center gap-0.5">
-                                        <Badge variant="outline" className="text-[8.5px] font-mono font-bold bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30 flex items-center gap-0.5 py-0.5 px-1.5" title={ord.accurate_sync_error || "Accurate sync failed"}>
-                                          <AlertCircle className="h-2.5 w-2.5 text-red-600" /> AOL: Failed
+                                        <Badge variant="outline" className="text-[8.5px] font-mono font-bold bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30 flex items-center gap-0.5 py-0.5 px-1.5 max-w-[105px] overflow-hidden" title={ord.accurate_sync_error || "Accurate sync failed"}>
+                                          <AlertCircle className="h-2.5 w-2.5 text-red-600 shrink-0" />
+                                          <span className="truncate">AOL: Failed</span>
                                         </Badge>
                                         <button
                                           onClick={() => handleSyncAccurate(ord.order_number || ord.id)}
-                                          className="h-4 w-4 rounded-full bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center text-red-600 transition-colors"
+                                          className="h-4 w-4 rounded-full bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center text-red-600 transition-colors shrink-0"
                                           title="Retry Accurate Sync"
                                         >
                                           <RefreshCw className="h-2.5 w-2.5" />
@@ -2527,10 +2519,10 @@ export default function ClientOrdersPage() {
                                   return (
                                     <button
                                       onClick={() => handleSyncAccurate(ord.order_number || ord.id)}
-                                      className="text-[8.5px] font-mono font-semibold text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors opacity-60 hover:opacity-100"
+                                      className="text-[8.5px] font-mono font-semibold text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors opacity-60 hover:opacity-100 shrink-0"
                                       title="Sync with Accurate Online"
                                     >
-                                      <Zap className="h-2.5 w-2.5 text-purple-500" /> Sync AOL
+                                      <Zap className="h-2.5 w-2.5 text-purple-500 shrink-0" /> Sync AOL
                                     </button>
                                   );
                                 })()}
@@ -2539,20 +2531,20 @@ export default function ClientOrdersPage() {
                                 {ord.last_invoice_sent_at ? (
                                   <Badge
                                     variant="outline"
-                                    className="text-[8.5px] font-mono font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30 flex items-center gap-1 py-0.5 px-1.5"
+                                    className="text-[8.5px] font-mono font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30 flex items-center gap-1 py-0.5 px-1.5 max-w-[120px] overflow-hidden"
                                     title={`Invoice dispatched ${ord.invoice_delivery_channel === 'BOTH' ? 'via Email & WhatsApp' : ord.invoice_delivery_channel === 'WHATSAPP' ? 'via WhatsApp' : 'via Email'} on ${formatDate(ord.last_invoice_sent_at)} to ${ord.last_invoice_sent_to || 'client'}`}
                                   >
-                                    <MailCheck className="h-2.5 w-2.5 text-sky-600 dark:text-sky-400" />
-                                    <span>{ord.final_invoice_sent_at ? "Final Inv" : "Proforma"}</span>
+                                    <MailCheck className="h-2.5 w-2.5 text-sky-600 dark:text-sky-400 shrink-0" />
+                                    <span className="truncate">{ord.final_invoice_sent_at ? "Final Inv" : "Proforma"}</span>
                                   </Badge>
                                 ) : (ord.is_proforma_finalized || ord.is_final_invoice_finalized) ? (
                                   <Badge
                                     variant="outline"
-                                    className="text-[8.5px] font-mono font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 flex items-center gap-1 py-0.5 px-1.5"
+                                    className="text-[8.5px] font-mono font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 flex items-center gap-1 py-0.5 px-1.5 max-w-[120px] overflow-hidden"
                                     title="Invoice PDF finalized in storage, but email has not yet been sent to client"
                                   >
-                                    <Clock className="h-2.5 w-2.5 text-amber-600" />
-                                    <span>Inv Unsent</span>
+                                    <Clock className="h-2.5 w-2.5 text-amber-600 shrink-0" />
+                                    <span className="truncate">Inv Unsent</span>
                                   </Badge>
                                 ) : null}
 
@@ -2560,11 +2552,11 @@ export default function ClientOrdersPage() {
                                 {ord.signed_docs_sent_at && (
                                   <Badge
                                     variant="outline"
-                                    className="text-[8.5px] font-mono font-medium bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/30 flex items-center gap-1 py-0.5 px-1.5"
+                                    className="text-[8.5px] font-mono font-medium bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/30 flex items-center gap-1 py-0.5 px-1.5 max-w-[120px] overflow-hidden"
                                     title={`Pre-documents for signature dispatched via Email on ${formatDate(ord.signed_docs_sent_at)} to ${ord.signed_docs_sent_to || 'client'}`}
                                   >
-                                    <MailCheck className="h-2.5 w-2.5 text-indigo-600 dark:text-indigo-400" />
-                                    <span>Sign Sent</span>
+                                    <MailCheck className="h-2.5 w-2.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                    <span className="truncate">Sign Sent</span>
                                   </Badge>
                                 )}
 
@@ -2572,11 +2564,11 @@ export default function ClientOrdersPage() {
                                 {ord.deliverables_sent_at && (
                                   <Badge
                                     variant="outline"
-                                    className="text-[8.5px] font-mono font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 flex items-center gap-1 py-0.5 px-1.5"
+                                    className="text-[8.5px] font-mono font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 flex items-center gap-1 py-0.5 px-1.5 max-w-[120px] overflow-hidden"
                                     title={`Final documents delivered to ${ord.deliverables_sent_to || 'client'} on ${formatDate(ord.deliverables_sent_at)}`}
                                   >
-                                    <FileCheck className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400" />
-                                    <span>Docs Sent</span>
+                                    <FileCheck className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                    <span className="truncate">Docs Sent</span>
                                   </Badge>
                                 )}
 
@@ -2646,12 +2638,16 @@ export default function ClientOrdersPage() {
                                 )}
                               </div>
                             </td>
-                            <td className="py-2 px-2 text-left align-top pt-2.5 whitespace-nowrap">
+                            <td className="py-2 px-2 text-left align-top pt-2.5 whitespace-nowrap min-w-[110px] max-w-[135px]">
                               <Badge className={`${getOrderStatusColor(ord.status)} font-bold border text-[10px] px-2 py-0.5`}>
                                 {ord.status || "CONFIRMED"}
                               </Badge>
                             </td>
-                            <td className="py-2 px-2 text-right align-top pt-2.5 whitespace-nowrap">
+                            <td className={`sticky right-0 z-20 py-2 px-2 text-right align-top pt-2.5 whitespace-nowrap transition-colors border-l border-border/40 min-w-[105px] ${
+                              isHighlighted
+                                ? "bg-sky-50 dark:bg-sky-950 border-r-2 border-r-sky-500"
+                                : "bg-card group-hover:bg-muted/50 dark:bg-zinc-950 dark:group-hover:bg-zinc-900"
+                            }`}>
                               <div className="flex items-center justify-end gap-1">
                                 {['DOCUMENTS_REVIEWED', 'PRE_DOC_SENT_FOR_SIGNATURE', 'PRE_DOCS_SENT', 'AWAITING_SIGNING_NOTARIZATION', 'AWAITING_DOCUMENT_RETURN', 'AWAITING_THIRD_PARTY_RESPONSE'].includes(ord.status) && (
                                   <Button
@@ -2668,7 +2664,7 @@ export default function ClientOrdersPage() {
                                     <Send className="h-3 w-3" /> {ord.signed_docs_sent_at ? "Re-send Signature" : "Send for Signature"}
                                   </Button>
                                 )}
-                                {(['FINAL_PAYMENT_COMPLETED', 'SOFT_COPY_DELIVERED', 'HARD_COPY_DELIVERED', 'COMPLETED'].includes(ord.status) || ord.payment_status === "PAID") && (
+                                {((['FINAL_PAYMENT_COMPLETED', 'SOFT_COPY_DELIVERED', 'HARD_COPY_DELIVERED', 'COMPLETED'].includes(ord.status)) || (ord.status === 'FINAL_DOC_READY' && ord.payment_status === 'PAID')) && (
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -2685,6 +2681,10 @@ export default function ClientOrdersPage() {
                                   className="h-6 w-6 rounded p-0"
                                   title="Edit Order & Consultants"
                                   onClick={() => {
+                                    setHighlightedOrderNum(ord.order_number);
+                                    if (typeof window !== "undefined") {
+                                      sessionStorage.setItem("active_orders_highlighted_order", ord.order_number);
+                                    }
                                     saveCurrentFilters();
                                     router.push(`/business/clients/orders/${ord.order_number}/edit`);
                                   }}
@@ -2697,6 +2697,10 @@ export default function ClientOrdersPage() {
                                   className="h-6 w-6 rounded p-0"
                                   title="View Order Details"
                                   onClick={() => {
+                                    setHighlightedOrderNum(ord.order_number);
+                                    if (typeof window !== "undefined") {
+                                      sessionStorage.setItem("active_orders_highlighted_order", ord.order_number);
+                                    }
                                     setSelectedOrderGroup(ord);
                                     const pct = ord.proforma_stage_percent || 70;
                                     setProformaPercent(pct);
@@ -2706,7 +2710,7 @@ export default function ClientOrdersPage() {
                                     } else {
                                       setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
                                     }
-                                    setIsPph21(false);
+                                    setIsPph23(false);
                                     setIsViewOpen(true);
                                     fetchProgressUpdates(ord.order_number);
                                   }}
@@ -2719,6 +2723,10 @@ export default function ClientOrdersPage() {
                                   className="h-6 w-6 rounded p-0"
                                   title="Order Chat"
                                   onClick={() => {
+                                    setHighlightedOrderNum(ord.order_number);
+                                    if (typeof window !== "undefined") {
+                                      sessionStorage.setItem("active_orders_highlighted_order", ord.order_number);
+                                    }
                                     setSelectedOrderGroup(ord);
                                     setIsChatOpen(true);
                                     fetchProgressUpdates(ord.order_number);
@@ -2732,6 +2740,10 @@ export default function ClientOrdersPage() {
                                   className="h-6 w-6 rounded p-0"
                                   title="Delete Order"
                                   onClick={() => {
+                                    setHighlightedOrderNum(ord.order_number);
+                                    if (typeof window !== "undefined") {
+                                      sessionStorage.setItem("active_orders_highlighted_order", ord.order_number);
+                                    }
                                     setSelectedOrderGroup(ord);
                                     setIsDeleteOpen(true);
                                   }}
@@ -2755,7 +2767,7 @@ export default function ClientOrdersPage() {
                       <ShoppingCart className="h-10 w-10 text-muted-foreground/30 stroke-[1.5] mx-auto mb-2" />
                       <span className="text-sm font-semibold text-foreground/80 block">No Client Orders Found</span>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {activeColFilterCount > 0 || searchTerm
+                        {searchTerm
                           ? "No orders match the specified filter criteria."
                           : 'Click "Create New Order" above to issue your first service order.'}
                       </p>
@@ -2769,11 +2781,14 @@ export default function ClientOrdersPage() {
                           id={`mobile-order-row-${ord.order_number}`}
                           onClick={() => {
                             setHighlightedOrderNum(ord.order_number);
+                            if (typeof window !== "undefined") {
+                              sessionStorage.setItem("active_orders_highlighted_order", ord.order_number);
+                            }
                           }}
                           className={cn(
                             "p-4 space-y-3 transition-all duration-200 cursor-pointer",
                             isHighlighted
-                              ? "bg-emerald-500/10 dark:bg-emerald-500/15 border-l-4 border-l-emerald-500"
+                              ? "bg-sky-500/10 dark:bg-sky-500/15 border-l-4 border-l-sky-500"
                               : "hover:bg-muted/30"
                           )}
                         >
@@ -2785,12 +2800,18 @@ export default function ClientOrdersPage() {
                               </span>
                               {ord.company_id ? (
                                 <Link
-                                  href={`/business/clients/documents/${ord.company_id}?from=orders`}
-                                  onClick={(e) => e.stopPropagation()}
+                                  href={`/business/clients/documents/${ord.company_id}?order=${ord.order_number}&from=orders`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setHighlightedOrderNum(ord.order_number);
+                                    if (typeof window !== "undefined") {
+                                      sessionStorage.setItem("active_orders_highlighted_order", ord.order_number);
+                                    }
+                                  }}
                                 >
                                   <Badge
                                     variant="outline"
-                                    className="font-mono font-bold text-xs bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-200 hover:border-emerald-500/40 hover:text-emerald-600 transition-colors"
+                                    className="font-mono font-bold text-xs bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-800 dark:text-zinc-200 hover:border-sky-500/40 hover:text-sky-600 transition-colors"
                                   >
                                     {ord.order_number}
                                   </Badge>
@@ -2838,15 +2859,23 @@ export default function ClientOrdersPage() {
 
                           {/* Service items */}
                           {ord.items && ord.items.length > 0 && (
-                            <div className="bg-muted/20 rounded-xl p-2.5 border border-border/50 text-xs space-y-1">
+                            <div className="bg-muted/20 rounded-xl p-2.5 border border-border/50 text-xs space-y-1.5">
                               <div className="text-[11px] font-semibold text-muted-foreground mb-1">
                                 Services ({ord.items.length})
                               </div>
                               {ord.items.map((it: any, iIdx: number) => (
-                                <div key={iIdx} className="flex items-center justify-between gap-2">
-                                  <span className="font-medium text-foreground truncate">{it.service_name || it.job_title}</span>
+                                <div key={iIdx} className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-background/60 border border-border/40">
+                                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-sky-500 shrink-0" />
+                                    <span className="font-bold text-foreground truncate text-xs">{it.service_name || it.job_title}</span>
+                                    {it.job_id && (
+                                      <Badge variant="outline" className="text-[9px] font-mono font-bold py-0 px-1.5 bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30 shrink-0">
+                                        {it.job_id}
+                                      </Badge>
+                                    )}
+                                  </div>
                                   {it.pricing_tier && (
-                                    <Badge variant="secondary" className="text-[9px] py-0 px-1 capitalize shrink-0">
+                                    <Badge variant="secondary" className="text-[9px] py-0 px-1 capitalize shrink-0 font-mono">
                                       {it.pricing_tier.toLowerCase().replace('_', ' ')}
                                     </Badge>
                                   )}
@@ -2877,6 +2906,10 @@ export default function ClientOrdersPage() {
                               variant="outline"
                               className="gap-1.5 font-bold h-9 px-3 border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30 shadow-xs"
                               onClick={() => {
+                                setHighlightedOrderNum(ord.order_number);
+                                if (typeof window !== "undefined") {
+                                  sessionStorage.setItem("active_orders_highlighted_order", ord.order_number);
+                                }
                                 setSelectedOrderGroup(ord);
                                 setIsChatOpen(true);
                                 fetchProgressUpdates(ord.order_number);
@@ -2891,6 +2924,10 @@ export default function ClientOrdersPage() {
                                 variant="outline"
                                 className="h-9 px-2.5 text-xs font-semibold gap-1"
                                 onClick={() => {
+                                  setHighlightedOrderNum(ord.order_number);
+                                  if (typeof window !== "undefined") {
+                                    sessionStorage.setItem("active_orders_highlighted_order", ord.order_number);
+                                  }
                                   setSelectedOrderGroup(ord);
                                   const pct = ord.proforma_stage_percent || 70;
                                   setProformaPercent(pct);
@@ -2900,7 +2937,7 @@ export default function ClientOrdersPage() {
                                   } else {
                                     setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
                                   }
-                                  setIsPph21(false);
+                                  setIsPph23(false);
                                   setIsViewOpen(true);
                                   fetchProgressUpdates(ord.order_number);
                                 }}
@@ -2913,6 +2950,10 @@ export default function ClientOrdersPage() {
                                 variant="outline"
                                 className="h-9 px-2.5 text-xs font-semibold gap-1"
                                 onClick={() => {
+                                  setHighlightedOrderNum(ord.order_number);
+                                  if (typeof window !== "undefined") {
+                                    sessionStorage.setItem("active_orders_highlighted_order", ord.order_number);
+                                  }
                                   saveCurrentFilters();
                                   router.push(`/business/clients/orders/${ord.order_number}/edit`);
                                 }}
@@ -2925,6 +2966,10 @@ export default function ClientOrdersPage() {
                                 variant="ghost"
                                 className="h-9 w-9 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
                                 onClick={() => {
+                                  setHighlightedOrderNum(ord.order_number);
+                                  if (typeof window !== "undefined") {
+                                    sessionStorage.setItem("active_orders_highlighted_order", ord.order_number);
+                                  }
                                   setSelectedOrderGroup(ord);
                                   setIsDeleteOpen(true);
                                 }}
@@ -2948,6 +2993,10 @@ export default function ClientOrdersPage() {
                     startIndex={startIndex}
                     endIndex={endIndex}
                     totalEntries={filteredOrders.length}
+                    pageSize={pageSize}
+                    pageSizeOptions={[15, 25, 50, 100]}
+                    onPageSizeChange={handlePageSizeChange}
+                    itemName="orders"
                   />
                 )}
               </CardContent>
@@ -3241,14 +3290,14 @@ export default function ClientOrdersPage() {
                           <div className="flex items-center gap-2 pt-1.5">
                             <input
                               type="checkbox"
-                              id="pph21-checkbox"
-                              checked={isPph21}
+                              id="pph23-checkbox"
+                              checked={isPph23}
                               disabled={selectedOrderGroup.is_proforma_finalized}
-                              onChange={(e) => setIsPph21(e.target.checked)}
+                              onChange={(e) => setIsPph23(e.target.checked)}
                               className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 cursor-pointer accent-zinc-900 disabled:cursor-not-allowed"
                             />
-                            <label htmlFor="pph21-checkbox" className="text-xs font-semibold text-zinc-700 cursor-pointer select-none">
-                              Add PPH 21 (2% Tax WHT)
+                            <label htmlFor="pph23-checkbox" className="text-xs font-semibold text-zinc-700 cursor-pointer select-none">
+                              Add PPH 23 (2% Tax WHT)
                             </label>
                           </div>
                         </div>
@@ -3284,9 +3333,9 @@ export default function ClientOrdersPage() {
                               {formatCurrency((selectedOrderGroup.total_amount * proformaPercent) / 100)}
                             </span>
                           </div>
-                          {isPph21 && (
+                          {isPph23 && (
                             <div className="flex justify-between items-center text-red-600 font-semibold">
-                              <span>WHT PPh 21 (2%):</span>
+                              <span>WHT PPh 23 (2%):</span>
                               <span className="font-mono">
                                 -{formatCurrency(((selectedOrderGroup.total_amount * proformaPercent) / 100) * 0.02)}
                               </span>
@@ -3296,7 +3345,7 @@ export default function ClientOrdersPage() {
                             <span className="text-zinc-900 font-bold">Proforma Amount Due:</span>
                             <span className="font-extrabold font-mono text-zinc-950 text-base">
                               {formatCurrency(
-                                isPph21
+                                isPph23
                                   ? ((selectedOrderGroup.total_amount * proformaPercent) / 100) * 0.98
                                   : (selectedOrderGroup.total_amount * proformaPercent) / 100
                               )}
@@ -3368,7 +3417,7 @@ export default function ClientOrdersPage() {
                         </div>
                       )}
 
-                      {(['FINAL_PAYMENT_COMPLETED', 'SOFT_COPY_DELIVERED', 'HARD_COPY_DELIVERED', 'COMPLETED'].includes(selectedOrderGroup?.status) || selectedOrderGroup?.payment_status === "PAID") && (
+                      {((['FINAL_PAYMENT_COMPLETED', 'SOFT_COPY_DELIVERED', 'HARD_COPY_DELIVERED', 'COMPLETED'].includes(selectedOrderGroup?.status)) || (selectedOrderGroup?.status === 'FINAL_DOC_READY' && selectedOrderGroup?.payment_status === 'PAID')) && (
                         <Button
                           type="button"
                           onClick={() => handleOpenSendDocs(selectedOrderGroup)}
@@ -3400,43 +3449,63 @@ export default function ClientOrdersPage() {
                             return (
                               <tr key={item.id || idx} className="hover:bg-zinc-50/60 transition-colors">
                                 <td className="p-4 align-top">
-                                  <div className="p-3 rounded-xl border border-zinc-200 bg-zinc-50/50 shadow-none space-y-1.5 transition-all duration-200 max-w-xl">
-                                    <div className="flex flex-wrap items-center gap-1.5">
-                                      <span className="font-bold text-zinc-950 text-xs leading-normal break-words">
+                                  <div className="p-3.5 rounded-xl border border-zinc-200 bg-zinc-50/60 shadow-xs space-y-2.5 transition-all duration-200 max-w-2xl">
+                                    {/* Job Header Bar: Highlighted Title + Job ID & Badges */}
+                                    <div className="flex items-center justify-between border-b border-zinc-200/80 pb-2 gap-2 flex-wrap">
+                                      <span className="font-bold text-zinc-950 text-sm flex items-center gap-2">
+                                        <span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />
                                         {item.job_title}
                                       </span>
-                                      {item.job_id && (
-                                        <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-white text-zinc-700 border-zinc-200 shrink-0">
-                                          {item.job_id}
-                                        </Badge>
-                                      )}
-                                      {item.branch_name && (
-                                        <Badge variant="outline" className="text-[9px] font-medium py-0 px-1.5 bg-white text-zinc-700 border-zinc-200 shrink-0">
-                                          {item.branch_name}
-                                        </Badge>
-                                      )}
-                                      {item.pricing_tier && (
-                                        <Badge variant="secondary" className="text-[9px] py-0 px-1.5 font-medium capitalize shrink-0 bg-white text-zinc-600 border border-zinc-200">
-                                          {item.pricing_tier.toLowerCase().replace('_', ' ')}
-                                        </Badge>
-                                      )}
-                                      {renderVendorBadge(item)}
+                                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                        {item.job_id && (
+                                          <Badge
+                                            variant="outline"
+                                            className="font-mono font-bold text-xs bg-sky-500/10 hover:bg-sky-500/20 border-sky-500/30 text-sky-700 dark:text-sky-400 shrink-0 shadow-2xs"
+                                            title={`Job ID: ${item.job_id}`}
+                                          >
+                                            {item.job_id}
+                                          </Badge>
+                                        )}
+                                        {item.branch_name && (
+                                          <Badge
+                                            variant="outline"
+                                            className="text-[9.5px] font-semibold py-0.5 px-2 bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30 shrink-0"
+                                            title={`Memo: ${item.branch_name}`}
+                                          >
+                                            <span className="font-bold uppercase tracking-wider text-[8px] opacity-75 mr-1">Memo:</span>
+                                            <span className="truncate max-w-[160px] inline-block align-bottom">{item.branch_name}</span>
+                                          </Badge>
+                                        )}
+                                        {item.pricing_tier && (
+                                          <Badge
+                                            variant="secondary"
+                                            className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 bg-white text-zinc-700 border border-zinc-200 shrink-0"
+                                          >
+                                            Tier: {item.pricing_tier}
+                                          </Badge>
+                                        )}
+                                        {renderVendorBadge(item)}
+                                      </div>
                                     </div>
+
+                                    {/* Scope Description with Highlighted Accent Border */}
                                     {(() => {
                                       const matchedService = services.find((s) => s.id === item.service_id);
                                       const desc = item.description || matchedService?.description;
-                                      if (!desc) return null;
+                                      if (!desc) {
+                                        return <span className="text-xs text-zinc-400 italic pl-4 block">No scope description provided.</span>;
+                                      }
                                       return (
                                         <div className="space-y-1">
                                           {isExpanded && (
-                                            <div className="mt-1 border-l-2 border-zinc-300 pl-2 py-0.5 text-xs text-zinc-700">
+                                            <div className="text-xs text-zinc-700 leading-relaxed whitespace-pre-wrap pl-4 border-l-2 border-primary/30 py-1 transition-all duration-200">
                                               {formatInvoiceDescription(desc, true)}
                                             </div>
                                           )}
                                           <button
                                             type="button"
                                             onClick={() => toggleItemExpansion(itemKey)}
-                                            className="text-[10px] text-zinc-500 hover:text-zinc-900 font-semibold hover:underline block"
+                                            className="text-[10.5px] text-primary hover:text-primary/80 font-bold hover:underline block pl-4"
                                           >
                                             {isExpanded ? "Hide details" : "Show details"}
                                           </button>
@@ -3444,13 +3513,14 @@ export default function ClientOrdersPage() {
                                       );
                                     })()}
 
+                                    {/* Service Instructions Box */}
                                     {item.service_instructions && (
-                                      <div className="mt-1.5 p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 space-y-0.5">
-                                        <div className="flex items-center gap-1.5 font-bold text-[10px] text-amber-700">
-                                          <FileText className="h-3 w-3 shrink-0" />
+                                      <div className="mt-2 p-2.5 rounded-lg bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-1">
+                                        <div className="flex items-center gap-1.5 font-bold text-[10px] text-amber-700 dark:text-amber-400">
+                                          <FileText className="h-3.5 w-3.5 shrink-0" />
                                           <span>Service Instructions:</span>
                                         </div>
-                                        <p className="text-xs font-medium leading-relaxed whitespace-pre-wrap text-zinc-900">
+                                        <p className="text-xs font-medium leading-relaxed whitespace-pre-wrap text-zinc-900 dark:text-zinc-100">
                                           {item.service_instructions}
                                         </p>
                                       </div>
@@ -3762,9 +3832,9 @@ export default function ClientOrdersPage() {
                           <span>Proforma Subtotal:</span>
                           <span className="font-bold text-slate-900">{formatCurrency((selectedOrderGroup.total_amount * proformaPercent) / 100)}</span>
                         </div>
-                        {isPph21 && (
+                        {isPph23 && (
                           <div className="flex justify-between py-1 border-b border-slate-200 text-red-600 font-bold">
-                            <span>WHT PPh 21 (2% Deduction):</span>
+                            <span>WHT PPh 23 (2% Deduction):</span>
                             <span>-{formatCurrency(((selectedOrderGroup.total_amount * proformaPercent) / 100) * 0.02)}</span>
                           </div>
                         )}
@@ -3772,7 +3842,7 @@ export default function ClientOrdersPage() {
                           <span>Total Amount Due:</span>
                           <span>
                             {formatCurrency(
-                              isPph21
+                              isPph23
                                 ? ((selectedOrderGroup.total_amount * proformaPercent) / 100) * 0.98
                                 : (selectedOrderGroup.total_amount * proformaPercent) / 100
                             )}
@@ -4025,8 +4095,8 @@ export default function ClientOrdersPage() {
                           : ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100);
                         const isCustomProforma = (selectedOrderGroup.proforma_paid_amount !== undefined && selectedOrderGroup.proforma_paid_amount !== null && selectedOrderGroup.proforma_paid_amount > 0);
                         const subtotalAfterDeduction = Math.max(0, selectedOrderGroup.total_amount - proformaDeduction);
-                        const pph21Val = isPph21 ? subtotalAfterDeduction * 0.02 : 0;
-                        const finalDue = subtotalAfterDeduction - pph21Val;
+                        const pph23Val = isPph23 ? subtotalAfterDeduction * 0.02 : 0;
+                        const finalDue = subtotalAfterDeduction - pph23Val;
 
                         return (
                           <div className="w-full sm:w-96 space-y-2 text-sm font-mono">
@@ -4038,10 +4108,10 @@ export default function ClientOrdersPage() {
                               <span>Less: Proforma Paid {isCustomProforma ? "(Custom Received)" : `(${selectedOrderGroup.proforma_stage_percent || proformaPercent}%)`}:</span>
                               <span className="font-bold text-amber-600">-{formatCurrency(proformaDeduction)}</span>
                             </div>
-                            {isPph21 && (
+                            {isPph23 && (
                               <div className="flex justify-between py-1 border-b border-slate-200 text-red-650 font-bold">
-                                <span>WHT PPh 21 (2% Deduction):</span>
-                                <span>-{formatCurrency(pph21Val)}</span>
+                                <span>WHT PPh 23 (2% Deduction):</span>
+                                <span>-{formatCurrency(pph23Val)}</span>
                               </div>
                             )}
                             <div className="flex justify-between py-3 px-4 rounded-lg bg-blue-600 text-white text-base font-extrabold shadow-sm">

@@ -4,10 +4,11 @@ import { useState, useEffect } from "react";
 import { 
   Bell, Calendar, Wallet, Clock, Monitor, Trash2, 
   CheckCircle2, Search, Package, MessageSquare, FileText, Megaphone,
-  Filter, CheckCheck, Inbox
+  Filter, CheckCheck, Inbox, Mail, Check
 } from "lucide-react";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -68,16 +69,31 @@ export default function ClientNotificationsPage() {
   }, []);
 
   const markAsRead = async (id: number) => {
-
     try {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}/read`, {
-      credentials: "include",
+        credentials: "include",
         method: "PUT",
-        });
+      });
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
       window.dispatchEvent(new Event("notifications-updated"));
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const markAsUnread = async (id: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}/unread`, {
+        credentials: "include",
+        method: "PUT",
+      });
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: false } : n));
+      window.dispatchEvent(new Event("notifications-updated"));
+      toast.success("Notification marked as unread for future review");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to mark as unread");
     }
   };
 
@@ -322,11 +338,11 @@ export default function ClientNotificationsPage() {
               <TableHeader>
                 <TableRow className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
                   <TableHead className="w-[50px] pl-5"></TableHead>
-                  <TableHead>Notification Details</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Date & Time</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right pr-5">Action</TableHead>
+                  <TableHead className="min-w-[200px]">Notification Details</TableHead>
+                  <TableHead className="w-[130px]">Category</TableHead>
+                  <TableHead className="w-[160px]">Date & Time</TableHead>
+                  <TableHead className="w-[100px]">Status</TableHead>
+                  <TableHead className="w-[140px] text-right pr-5">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -360,14 +376,14 @@ export default function ClientNotificationsPage() {
                       }`}
                       onClick={() => handleRowClick(notif)}
                     >
-                      <TableCell className="pl-5">
+                      <TableCell className="w-[50px] pl-5">
                         <div className="h-8 w-8 rounded-xl bg-muted/60 border border-border/40 flex items-center justify-center shrink-0">
                           {getIcon(notif.type, notif.module)}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="font-bold text-foreground text-xs leading-tight">{notif.title}</div>
-                        <div className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">{notif.message}</div>
+                      <TableCell className="max-w-[280px] md:max-w-[360px] lg:max-w-[440px]">
+                        <div className="font-bold text-foreground text-xs leading-tight truncate">{notif.title}</div>
+                        <div className="text-[11px] text-muted-foreground truncate mt-0.5">{notif.message}</div>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="bg-muted/40 text-muted-foreground border-border/40 text-[10px] font-bold px-2 py-0.5 rounded-full capitalize">
@@ -383,10 +399,45 @@ export default function ClientNotificationsPage() {
                             Unread
                           </Badge>
                         ) : (
-                          <span className="text-[11px] text-muted-foreground/60 font-medium">Read</span>
+                          <Badge 
+                            variant="secondary" 
+                            className="bg-muted text-muted-foreground hover:bg-amber-500/15 hover:text-amber-400 cursor-pointer select-none transition-colors border border-dashed border-muted-foreground/30 text-[11px]"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markAsUnread(notif.id, e);
+                            }}
+                            title="Click to mark as unread for future review"
+                          >
+                            Read (Mark unread)
+                          </Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-right pr-5 whitespace-nowrap">
+                      <TableCell className="text-right pr-5 whitespace-nowrap space-x-1">
+                        {notif.is_read ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-7 px-2 text-xs text-amber-400 border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-300"
+                            onClick={(e) => markAsUnread(notif.id, e)}
+                            title="Mark as unread for future review"
+                          >
+                            <Mail className="h-3.5 w-3.5 mr-1" />
+                            Mark unread
+                          </Button>
+                        ) : (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10"
+                            onClick={(e) => {
+                              if (e) e.stopPropagation();
+                              markAsRead(notif.id);
+                            }}
+                            title="Mark as read"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Button 
                           variant="ghost" 
                           size="icon" 

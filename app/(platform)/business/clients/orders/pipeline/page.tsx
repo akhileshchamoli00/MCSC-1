@@ -31,7 +31,11 @@ import {
   X,
   Calendar,
   Copy,
-  Check
+  Check,
+  MailCheck,
+  Send,
+  RefreshCw,
+  Link2
 } from "lucide-react";
 import domToImage from "dom-to-image";
 import { jsPDF } from "jspdf";
@@ -51,6 +55,8 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useUser } from "@/contexts/user-context";
+import { OrderEmailDispatchDialog } from "@/components/orders";
+import { isValidPhoneNumber } from "@/components/ui/phone-input";
 
 export default function PipelineOrdersPage() {
   const router = useRouter();
@@ -87,6 +93,14 @@ export default function PipelineOrdersPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isMoveToActiveOpen, setIsMoveToActiveOpen] = useState(false);
   const [movingOrder, setMovingOrder] = useState(false);
+
+  // Quotation Email Dispatch State
+  const [isEmailConfirmOpen, setIsEmailConfirmOpen] = useState(false);
+  const [emailConfirmType, setEmailConfirmType] = useState<'proforma' | 'final' | 'quotation' | null>('quotation');
+  const [selectedInvoiceEmails, setSelectedInvoiceEmails] = useState<string[]>([]);
+  const [emailConfirmPhone, setEmailConfirmPhone] = useState("");
+  const [invoiceDeliveryChannel, setInvoiceDeliveryChannel] = useState<'both' | 'email' | 'whatsapp'>('both');
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   // Lock body scroll when overlays are active
   useEffect(() => {
@@ -191,6 +205,10 @@ export default function PipelineOrdersPage() {
         total_amount: 0,
         notes: ord.notes,
         created_at: ord.created_at,
+        quotation_sent_at: ord.quotation_sent_at || null,
+        quotation_sent_to: ord.quotation_sent_to || null,
+        payment_link: ord.payment_link || null,
+        xendit_invoice_id: ord.xendit_invoice_id || null,
         items: []
       });
     }
@@ -207,6 +225,10 @@ export default function PipelineOrdersPage() {
     if (ord.client_name) group.client_name = ord.client_name;
     if (ord.notes) group.notes = ord.notes;
     if (ord.created_at) group.created_at = ord.created_at;
+    if (ord.quotation_sent_at) group.quotation_sent_at = ord.quotation_sent_at;
+    if (ord.quotation_sent_to) group.quotation_sent_to = ord.quotation_sent_to;
+    if (ord.payment_link) group.payment_link = ord.payment_link;
+    if (ord.xendit_invoice_id) group.xendit_invoice_id = ord.xendit_invoice_id;
     if (ord.reviewer_id) group.reviewer_id = ord.reviewer_id;
     if (ord.reviewer) group.reviewer = ord.reviewer;
     if (ord.reviewer_ids && ord.reviewer_ids.length > 0) {
@@ -249,10 +271,12 @@ export default function PipelineOrdersPage() {
     return map;
   }, [groupedOrders]);
 
-  // Filter ONLY PIPELINE orders (sorted reverse-chronologically so latest pipeline order is at top)
+  // Filter all Inquiry orders (sorted reverse-chronologically so latest inquiry order is at top)
+  const ENQUIRY_STATUS_LIST = ["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED", "PIPELINE", "PROSPECT", "BEING_CHECKED"];
+
   const pipelineOrders = useMemo(() => {
     return groupedOrders
-      .filter((ord) => (ord.status || "").toUpperCase() === "PIPELINE")
+      .filter((ord) => ENQUIRY_STATUS_LIST.includes((ord.status || "").toUpperCase()))
       .sort((a, b) => {
         const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
         const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
@@ -317,8 +341,9 @@ export default function PipelineOrdersPage() {
     const compName = (ord.company_name || "").toLowerCase();
     const itemsStr = (ord.items || []).map((i: any) => `${i.job_title} ${i.job_id} ${i.branch_name || ""}`).join(" ").toLowerCase();
     const consultantsStr = (ord.consultants || []).map((c: any) => c.name).join(" ").toLowerCase();
+    const reviewersStr = (ord.reviewers || (ord.reviewer ? [ord.reviewer] : [])).map((r: any) => r.name).join(" ").toLowerCase();
     const dateStr = ord.created_at ? formatDate(ord.created_at).toLowerCase() : "";
-    return orderNum.includes(term) || clientName.includes(term) || compName.includes(term) || itemsStr.includes(term) || consultantsStr.includes(term) || dateStr.includes(term);
+    return orderNum.includes(term) || clientName.includes(term) || compName.includes(term) || itemsStr.includes(term) || consultantsStr.includes(term) || reviewersStr.includes(term) || dateStr.includes(term);
   });
 
   const totalPages = Math.ceil(filteredOrders.length / 10) || 1;
@@ -452,6 +477,145 @@ export default function PipelineOrdersPage() {
     setTimeout(cleanup, 5000);
   };
 
+  const handleOpenSendQuotationModal = () => {
+    if (!selectedOrderGroup) return;
+
+    const billingCompanyId = selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id;
+    const companyObj = companies.find((c: any) => c.id === billingCompanyId);
+    const targetCompanyObj = companies.find((c: any) => c.id === selectedOrderGroup.company_id);
+    const clientObj = clients.find((c: any) => c.id === (companyObj?.client_id || selectedOrderGroup.client_id) || c.contact_person === selectedOrderGroup.client_name);
+
+    const targetEmail = companyObj?.key_contact_email || targetCompanyObj?.key_contact_email || clientObj?.email || "";
+    const targetPhone = companyObj?.key_contact_phone || targetCompanyObj?.key_contact_phone || clientObj?.phone || clientObj?.phone_number || "";
+
+    setEmailConfirmType('quotation');
+    setSelectedInvoiceEmails(targetEmail ? [targetEmail.trim()] : []);
+    setEmailConfirmPhone(targetPhone);
+    setInvoiceDeliveryChannel('both');
+    setIsEmailConfirmOpen(true);
+  };
+
+  const executeSendQuotationEmail = async () => {
+    if (!selectedOrderGroup) return;
+
+    const isEmailActive = invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'email';
+    const isWhatsAppActive = invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'whatsapp';
+
+    const billingCompanyId = selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id;
+    const companyObj = companies.find((c: any) => c.id === billingCompanyId);
+    const targetCompanyObj = companies.find((c: any) => c.id === selectedOrderGroup.company_id);
+    const effectiveCompany = companyObj || targetCompanyObj;
+    const isCompanyVerified = effectiveCompany ? (effectiveCompany.validation_status === 'VALIDATED' || effectiveCompany.validation_status === 'VERIFIED') : true;
+    const companyValStatus = effectiveCompany?.validation_status || 'PENDING_VALIDATION';
+
+    if (isEmailActive) {
+      if (!isCompanyVerified) {
+        toast.error(`Cannot send quotation email: Company '${effectiveCompany?.company_name || selectedOrderGroup.company_name}' has not been verified (Current status: ${companyValStatus}). Please validate and verify the company profile first.`);
+        return;
+      }
+      if (selectedInvoiceEmails.length === 0) {
+        toast.error("Please select at least one registered recipient email address from the contacts list.");
+        return;
+      }
+    }
+
+    if (isWhatsAppActive) {
+      if (!emailConfirmPhone.trim()) {
+        toast.error("Please enter a WhatsApp mobile number to send WhatsApp notification.");
+        return;
+      }
+      if (!isValidPhoneNumber(emailConfirmPhone)) {
+        toast.error("Please enter a valid WhatsApp mobile number (6 to 15 digits).");
+        return;
+      }
+    }
+
+    setSendingEmail(true);
+    setIsEmailConfirmOpen(false);
+
+    try {
+      const primaryEmail = selectedInvoiceEmails[0] || "";
+      const additionalEmails = selectedInvoiceEmails.slice(1);
+
+      // Generate PDF blob from the quotation document rendered in the DOM
+      let pdfBlob: Blob | null = null;
+      const element = document.getElementById("quotation-doc");
+      const company = selectedOrderGroup?.company_name || selectedOrderGroup?.client_name || "Client";
+      const contractRef = selectedOrderGroup?.order_number || "Inquiry_Order";
+      const rawFileName = `${company}_Quotation_${contractRef}`;
+      const cleanFileName = rawFileName.replace(/[/\\?%*:|"<> ]/g, "_");
+      const fileName = `${cleanFileName}.pdf`;
+
+      if (element) {
+        try {
+          const imgData = await domToImage.toJpeg(element, {
+            quality: 0.98,
+            bgcolor: "#ffffff"
+          });
+          const pdf = new jsPDF({
+            orientation: "portrait",
+            unit: "mm",
+            format: "a4"
+          });
+          const imgWidth = 190;
+          const imgHeight = (element.clientHeight * imgWidth) / element.clientWidth;
+          pdf.addImage(imgData, "JPEG", 10, 10, imgWidth, imgHeight);
+          pdfBlob = pdf.output("blob");
+        } catch (pdfErr) {
+          console.warn("DOM to PDF capture fallback:", pdfErr);
+        }
+      }
+
+      const formData = new FormData();
+      if (pdfBlob) {
+        formData.append("file", pdfBlob, fileName);
+      }
+      formData.append("recipient_email", primaryEmail.trim());
+      formData.append("recipient_phone", emailConfirmPhone.trim());
+      formData.append("send_email", String(isEmailActive));
+      formData.append("send_whatsapp", String(isWhatsAppActive));
+      if (additionalEmails.length > 0) {
+        formData.append("additional_recipients", additionalEmails.join(","));
+      }
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${selectedOrderGroup.order_number}/send-quotation-email`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const updatedOrders = await res.json();
+        const channelLabel = invoiceDeliveryChannel === 'both'
+          ? "via Email & WhatsApp"
+          : (invoiceDeliveryChannel === 'email' ? "via Email" : "via WhatsApp");
+
+        toast.success(`Successfully dispatched official quotation ${channelLabel}!`);
+
+        if (updatedOrders && updatedOrders.length > 0) {
+          const firstUpdated = updatedOrders[0];
+          setSelectedOrderGroup((prev: any) => prev ? { ...prev, ...firstUpdated, quotation_sent_at: firstUpdated.quotation_sent_at || new Date().toISOString() } : null);
+          setOrders(prev => prev.map(ord => ord.order_number === selectedOrderGroup.order_number ? { ...ord, ...firstUpdated, quotation_sent_at: firstUpdated.quotation_sent_at || new Date().toISOString() } : ord));
+        }
+        fetchData();
+      } else {
+        let errMsg = "Failed to send quotation email";
+        try {
+          const err = await res.json();
+          errMsg = err.detail || err.message || errMsg;
+        } catch {
+          errMsg = `Server returned status ${res.status}: ${res.statusText || "Internal Server Error"}`;
+        }
+        toast.error(errMsg);
+      }
+    } catch (err: any) {
+      console.error("Error sending quotation email:", err);
+      toast.error(err.message || "Failed to send quotation email");
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   const handleDeleteSubmit = async () => {
 
     if (!selectedOrderGroup) return;
@@ -502,6 +666,79 @@ export default function PipelineOrdersPage() {
     }
   };
 
+  const handleUpdateStatus = async (orderNumber: string, newStatus: string) => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/group/${encodeURIComponent(orderNumber)}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) {
+        toast.success(`Order ${orderNumber} status updated to ${newStatus.replace(/_/g, " ")}`);
+        fetchData();
+        if (selectedOrderGroup && selectedOrderGroup.order_number === orderNumber) {
+          setSelectedOrderGroup((prev: any) => ({ ...prev, status: newStatus }));
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || "Failed to update order status");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error updating order status");
+    }
+  };
+
+  const handleSyncPayment = async (orderNumber: string) => {
+    if (!orderNumber) return;
+    const toastId = toast.loading("Verifying payment with Xendit...");
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/sync-payment`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (res.ok && data.status === "success") {
+        toast.success(data.message || "Payment verified! Order moved to Active.", { id: toastId });
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("active_orders_highlighted_order", orderNumber);
+        }
+        if (isQuotationOpen) {
+          setIsQuotationOpen(false);
+        }
+        router.push(`/business/clients/orders?order=${encodeURIComponent(orderNumber)}`);
+      } else if (res.ok && data.status === "received") {
+        toast.info(`Payment status: ${data.xendit_status || "PENDING"}`, { id: toastId });
+      } else {
+        toast.info(data.detail || data.message || "No payment detected yet.", { id: toastId });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error verifying payment", { id: toastId });
+    }
+  };
+
+  const renderStatusBadge = (status: string) => {
+    const norm = (status || "").toUpperCase();
+    let badgeStyle = "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30";
+    let label = "Under Initial Check";
+
+    if (norm === "NEED_MORE_INFO") {
+      badgeStyle = "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30";
+      label = "Need More Info";
+    } else if (norm === "CHECK_COMPLETED") {
+      badgeStyle = "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30";
+      label = "Initial Check Passed";
+    }
+
+    return (
+      <Badge className={`${badgeStyle} font-bold border text-[11px] whitespace-nowrap`}>
+        {label}
+      </Badge>
+    );
+  };
+
   const renderVendorBadge = (item: any) => {
     if (!item.notary && !item.notary_id) return null;
     const vendorName = item.notary?.name || "Assigned Vendor";
@@ -529,7 +766,7 @@ export default function PipelineOrdersPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground font-medium">Verifying pipeline order permissions...</p>
+        <p className="text-sm text-muted-foreground font-medium">Verifying inquiry order permissions...</p>
       </div>
     );
   }
@@ -538,7 +775,7 @@ export default function PipelineOrdersPage() {
     return (
       <div className="flex h-64 items-center justify-center gap-3 text-muted-foreground">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm font-medium">Loading pipeline orders...</p>
+        <p className="text-sm font-medium">Loading inquiry orders...</p>
       </div>
     );
   }
@@ -552,13 +789,13 @@ export default function PipelineOrdersPage() {
           {/* Minimalist Metric Strip - Expanded Horizontally */}
           <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-xs flex-1 gap-3 sm:gap-4">
             
-            {/* Pipeline Orders */}
+            {/* Inquiry Orders */}
             <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0 justify-start sm:justify-center">
               <div className="h-9 w-9 rounded-xl bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/20 shrink-0">
                 <GitBranch className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Pipeline Deals</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Inquiry Orders</p>
                 <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{totalOrdersCount}</p>
               </div>
             </div>
@@ -569,7 +806,7 @@ export default function PipelineOrdersPage() {
                 <Banknote className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Est. Pipeline Value</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Est. Value</p>
                 <p className="text-base sm:text-lg font-bold text-foreground leading-tight">{formatCurrency(totalEstimatedValue)}</p>
               </div>
             </div>
@@ -597,13 +834,14 @@ export default function PipelineOrdersPage() {
             </div>
           </div>
 
-          {/* Create Pipeline Order Button */}
+          {/* Create Inquiry Order Button */}
           <Link href="/business/clients/orders/new?type=pipeline" className="shrink-0 flex items-stretch">
             <Button className="w-full sm:w-auto gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm">
-              <Plus className="h-4 w-4" /> Create Pipeline Order
+              <Plus className="h-4 w-4" /> Create Inquiry Order
             </Button>
           </Link>
         </div>
+
 
         {/* Main Orders Table */}
         <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
@@ -611,7 +849,7 @@ export default function PipelineOrdersPage() {
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search Order ID, Company, Service..."
+                placeholder="Search Order ID, Company, Service, Staff..."
                 className="pl-8 h-9 text-xs rounded-lg"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -626,9 +864,9 @@ export default function PipelineOrdersPage() {
             {filteredOrders.length === 0 ? (
               <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
                 <GitBranch className="h-10 w-10 text-muted-foreground/35" />
-                <span className="text-sm font-semibold">No Pipeline Orders Found</span>
+                <span className="text-sm font-semibold">No Inquiry Orders Found</span>
                 <p className="text-xs max-w-sm">
-                  {searchTerm ? "No pipeline orders match your search criteria." : 'Click "Create Pipeline Order" above to input a new prospective sales order.'}
+                  {searchTerm ? "No inquiry orders match your search criteria." : 'Click "Create Inquiry Order" above to input a new prospective sales order.'}
                 </p>
               </div>
             ) : (
@@ -641,8 +879,9 @@ export default function PipelineOrdersPage() {
                         <th className="p-4 whitespace-nowrap">Order ID & Date</th>
                         <th className="p-4">Company Entity</th>
                         <th className="p-4">Service Package</th>
+                        <th className="p-4">Initial Check Team</th>
                         <th className="p-4 text-right">Total Amount</th>
-                        <th className="p-4 text-center">Stage</th>
+                        <th className="p-4 text-center">Status</th>
                         <th className="p-4 text-right">Actions</th>
                       </tr>
                     </thead>
@@ -655,11 +894,11 @@ export default function PipelineOrdersPage() {
                           <td className="p-4 align-top pt-5 whitespace-nowrap">
                             <div className="inline-flex items-center gap-1.5 group/copy">
                               {ord.company_id ? (
-                                <Link href={`/business/clients/documents/${ord.company_id}?from=pipeline`}>
+                                <Link href={`/business/clients/documents/${ord.company_id}?order=${encodeURIComponent(ord.order_number)}&from=pipeline`}>
                                   <Badge
                                     variant="outline"
                                     className="font-mono font-bold text-xs bg-indigo-500/10 hover:bg-indigo-500/20 border-indigo-500/30 text-indigo-600 dark:text-indigo-400 cursor-pointer transition-colors px-2 py-0.5 rounded"
-                                    title="Go to Company Documents Folder"
+                                    title="View Documents for this Inquiry Order"
                                   >
                                     {ord.order_number}
                                   </Badge>
@@ -758,29 +997,98 @@ export default function PipelineOrdersPage() {
                               <span className="text-muted-foreground italic text-xs">-</span>
                             )}
                           </td>
+                          <td className="p-4 align-top pt-5">
+                            <div className="space-y-1.5 max-w-[190px]">
+                              {/* Reviewers */}
+                              {(() => {
+                                const revs = ord.reviewers && ord.reviewers.length > 0 ? ord.reviewers : (ord.reviewer ? [ord.reviewer] : []);
+                                if (revs.length === 0) return null;
+                                return (
+                                  <div className="flex flex-wrap gap-1">
+                                    {revs.map((r: any) => (
+                                      <Badge key={r.id || r.name} variant="outline" className="text-[9px] font-semibold py-0.5 px-1.5 bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30 flex items-center gap-1 shadow-2xs">
+                                        <ShieldCheck className="h-2.5 w-2.5 text-purple-600 shrink-0" />
+                                        <span className="truncate max-w-[110px]" title={`Reviewer: ${r.name}`}>Rev: {r.name}</span>
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+
+                              {/* Consultants */}
+                              {ord.consultants && ord.consultants.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {ord.consultants.map((c: any) => (
+                                    <Badge key={c.id || c.name} variant="outline" className="text-[9px] font-medium py-0.5 px-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/25 flex items-center gap-1 shadow-2xs">
+                                      <UserCheck className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
+                                      <span className="truncate max-w-[110px]" title={`Consultant: ${c.name}`}>{c.name}</span>
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                (!ord.reviewers || ord.reviewers.length === 0) && !ord.reviewer && (
+                                  <span className="text-[10px] text-muted-foreground italic">Unassigned</span>
+                                )
+                              )}
+                            </div>
+                          </td>
                           <td className="p-4 text-right font-mono font-bold text-sm text-foreground align-top pt-5">
                             {formatCurrency(ord.total_amount)}
                           </td>
                           <td className="p-4 text-center align-top pt-5">
-                            <Badge className="bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/30 font-bold border text-[11px]">
-                              PIPELINE
-                            </Badge>
+                            <div className="flex flex-col items-center gap-1.5">
+                              {renderStatusBadge(ord.status)}
+                              {(ord.payment_link || ord.xendit_invoice_id || ord.quotation_sent_at) && (
+                                <button
+                                  type="button"
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (ord.payment_link) {
+                                      navigator.clipboard.writeText(ord.payment_link);
+                                      toast.success("Payment link copied to clipboard!");
+                                      return;
+                                    }
+                                    const toastId = toast.loading("Generating payment link...");
+                                    try {
+                                      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${ord.order_number}/payment-link`, {
+                                        credentials: "include",
+                                        method: "POST",
+                                      });
+                                      if (res.ok) {
+                                        const data = await res.json();
+                                        toast.success("Payment link copied to clipboard!", { id: toastId });
+                                        if (data.payment_link) {
+                                          navigator.clipboard.writeText(data.payment_link);
+                                          setOrders((prev: any[]) => prev.map(o => o.order_number === ord.order_number ? { ...o, payment_link: data.payment_link } : o));
+                                        }
+                                      } else {
+                                        toast.error("Failed to generate payment link", { id: toastId });
+                                      }
+                                    } catch (err) {
+                                      console.error(err);
+                                      toast.error("Error generating link", { id: toastId });
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:underline cursor-pointer transition-colors"
+                                  title="Copy Xendit payment link to clipboard"
+                                >
+                                  <Link2 className="h-2.5 w-2.5" /> Copy Payment Link
+                                </button>
+                              )}
+                              {(ord.xendit_invoice_id || ord.payment_link || ord.quotation_sent_at) && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-5 px-1.5 text-[9.5px] font-semibold gap-1 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/15 shadow-none"
+                                  title="Check payment status with Xendit"
+                                  onClick={() => handleSyncPayment(ord.order_number)}
+                                >
+                                  <RefreshCw className="h-2.5 w-2.5" /> Check Payment
+                                </Button>
+                              )}
+                            </div>
                           </td>
                           <td className="p-4 text-right space-x-1.5 align-top pt-5 whitespace-nowrap">
-                            {/* Quotation Button */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 px-2.5 text-xs font-bold gap-1.5 shadow-xs inline-flex items-center border-blue-500/30 text-blue-700 dark:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 transition-all hover:scale-[1.02]"
-                              title="Open Official Quotation"
-                              onClick={() => {
-                                setSelectedOrderGroup(ord);
-                                setIsQuotationOpen(true);
-                              }}
-                            >
-                              <FileText className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /> Quotation
-                            </Button>
-
                             {/* Move to Active Button */}
                             <Button
                               size="sm"
@@ -799,20 +1107,20 @@ export default function PipelineOrdersPage() {
                             <Button
                               size="icon"
                               variant="ghost"
-                              title="Edit Pipeline Order"
+                              title="Edit Inquiry Order"
                               onClick={() => router.push(`/business/clients/orders/${ord.order_number}/edit?type=pipeline`)}
                             >
                               <Edit className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                             </Button>
 
-                            {/* View Details Button */}
+                            {/* View Quotation Button (Eye Action) */}
                             <Button
                               size="icon"
                               variant="ghost"
-                              title="View Order Details"
+                              title="View Quotation"
                               onClick={() => {
                                 setSelectedOrderGroup(ord);
-                                setIsViewOpen(true);
+                                setIsQuotationOpen(true);
                               }}
                             >
                               <Eye className="h-4 w-4 text-slate-500 hover:text-foreground" />
@@ -822,7 +1130,7 @@ export default function PipelineOrdersPage() {
                             <Button
                               size="icon"
                               variant="ghost"
-                              title="Delete Pipeline Order"
+                              title="Delete Inquiry Order"
                               onClick={() => {
                                 setSelectedOrderGroup(ord);
                                 setIsDeleteOpen(true);
@@ -863,14 +1171,14 @@ export default function PipelineOrdersPage() {
               <div>
                 <DialogTitle className="text-base font-bold">Move Order to Active</DialogTitle>
                 <DialogDescription className="text-xs">
-                  Transition this pipeline order into active execution.
+                  Transition this inquiry order into active execution lifecycle.
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
           <div className="space-y-3 py-2 text-xs">
             <p className="text-foreground leading-relaxed">
-              Are you sure you want to move order <span className="font-mono font-bold text-primary">{selectedOrderGroup?.order_number}</span> to Active Orders?
+              Are you sure you want to move inquiry order <span className="font-mono font-bold text-primary">{selectedOrderGroup?.order_number}</span> to Active Orders?
             </p>
             <div className="p-3 bg-muted/40 rounded-xl border border-border/40 space-y-1.5 text-xs">
               <div className="flex justify-between">
@@ -885,9 +1193,13 @@ export default function PipelineOrdersPage() {
                 <span className="text-muted-foreground">Line Items:</span>
                 <span className="font-bold text-foreground">{selectedOrderGroup?.items?.length || 0} service(s)</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Initial Check Status:</span>
+                <span className="font-bold text-foreground">{(selectedOrderGroup?.status || "").replace(/_/g, " ")}</span>
+              </div>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Once moved, the order will receive status <span className="font-bold text-foreground">DRAFT</span> and appear in the Active Orders board for consultant assignment and billing.
+              Once moved, the order will become an active order with lifecycle status <span className="font-bold text-foreground">DRAFT</span> and payment status <span className="font-bold text-foreground">{selectedOrderGroup?.payment_status === 'PAID' ? 'PAID' : 'UNPAID'}</span>.
             </p>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
@@ -904,7 +1216,7 @@ export default function PipelineOrdersPage() {
               className="font-bold text-xs h-9 gap-1.5"
             >
               {movingOrder ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-              {movingOrder ? "Moving..." : "Confirm & Move to Active"}
+              {movingOrder ? "Moving..." : "Move to Active (Draft)"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -919,9 +1231,9 @@ export default function PipelineOrdersPage() {
                 <Trash2 className="h-5 w-5" />
               </div>
               <div>
-                <DialogTitle className="text-base font-bold">Delete Pipeline Order</DialogTitle>
+                <DialogTitle className="text-base font-bold">Delete Inquiry Order</DialogTitle>
                 <DialogDescription className="text-xs">
-                  Permanently remove this prospect order from the pipeline.
+                  Permanently remove this pre-order inquiry.
                 </DialogDescription>
               </div>
             </div>
@@ -1161,7 +1473,7 @@ export default function PipelineOrdersPage() {
                       onClick={() => setIsQuotationOpen(false)}
                       className="gap-2 font-bold shadow-xs bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border-zinc-300 dark:bg-black dark:hover:bg-zinc-900 dark:text-white dark:border-white/60 dark:hover:border-white h-8 text-xs transition-colors"
                     >
-                      <ArrowLeft className="h-4 w-4" /> Back to Pipeline Orders
+                      <ArrowLeft className="h-4 w-4" /> Back to Inquiry Orders
                     </Button>
                     <div className="h-4 w-px bg-border hidden sm:block" />
                     <span className="font-bold text-xs sm:text-sm flex items-center gap-2 text-foreground">
@@ -1170,9 +1482,31 @@ export default function PipelineOrdersPage() {
                   </div>
 
                   <div className="flex items-center gap-2 text-xs">
-                    <Badge className="bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/30 gap-1.5 px-3 py-1.5 text-xs font-bold font-mono">
-                      <GitBranch className="h-3.5 w-3.5" /> Pipeline Prospect
-                    </Badge>
+                    {selectedOrderGroup.quotation_sent_at && (
+                      <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 gap-1.5 px-3 py-1.5 text-xs font-bold font-mono" title={`Quotation dispatched on ${formatDate(selectedOrderGroup.quotation_sent_at)} to ${selectedOrderGroup.quotation_sent_to || 'client'}`}>
+                        <MailCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Dispatched {formatDate(selectedOrderGroup.quotation_sent_at)}
+                      </Badge>
+                    )}
+                    <Button
+                      onClick={handleOpenSendQuotationModal}
+                      disabled={sendingEmail}
+                      size="sm"
+                      variant="outline"
+                      className={`gap-2 font-bold text-xs h-8 px-4 ${
+                        selectedOrderGroup.quotation_sent_at
+                          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
+                          : "bg-blue-600 hover:bg-blue-700 text-white border-transparent shadow-xs"
+                      }`}
+                    >
+                      {sendingEmail ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : selectedOrderGroup.quotation_sent_at ? (
+                        <MailCheck className="h-4 w-4" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                      {selectedOrderGroup.quotation_sent_at ? "Resend Quotation" : "Send Quotation"}
+                    </Button>
                     <Button
                       onClick={handleDownloadPDF}
                       disabled={downloadingPdf}
@@ -1262,7 +1596,7 @@ export default function PipelineOrdersPage() {
                           <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider block mb-1">PROPOSAL CONDITIONS</span>
                           <p className="font-bold text-base text-blue-700">14-Day Price Guarantee</p>
                           <p className="text-slate-600 text-xs">Standard Milestone Billing (50% Down Payment on Confirmation)</p>
-                          <p className="text-slate-500 text-xs">Status: <span className="font-black text-indigo-600">PIPELINE PROSPECT</span></p>
+                          <p className="text-slate-500 text-xs">Status: <span className="font-black text-indigo-600">INQUIRY PRE-ORDER</span></p>
                         </div>
                       </div>
 
@@ -1401,6 +1735,31 @@ export default function PipelineOrdersPage() {
           );
         })()}
       </AnimatePresence>
+
+      {/* Quotation Email & WhatsApp Confirmation Modal */}
+      <OrderEmailDispatchDialog
+        open={isEmailConfirmOpen}
+        onOpenChange={setIsEmailConfirmOpen}
+        emailConfirmType={emailConfirmType}
+        setEmailConfirmType={setEmailConfirmType}
+        selectedOrderGroup={selectedOrderGroup}
+        companies={companies}
+        invoiceDeliveryChannel={invoiceDeliveryChannel}
+        setInvoiceDeliveryChannel={setInvoiceDeliveryChannel}
+        selectedInvoiceEmails={selectedInvoiceEmails}
+        setSelectedInvoiceEmails={setSelectedInvoiceEmails}
+        emailConfirmPhone={emailConfirmPhone}
+        setEmailConfirmPhone={setEmailConfirmPhone}
+        sendingEmail={sendingEmail}
+        onSend={executeSendQuotationEmail}
+        onCancel={() => {
+          setIsEmailConfirmOpen(false);
+          setEmailConfirmType(null);
+          setSelectedInvoiceEmails([]);
+          setEmailConfirmPhone("");
+          setInvoiceDeliveryChannel('both');
+        }}
+      />
 
       <style jsx global>{`
         @media print {

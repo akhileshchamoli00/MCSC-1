@@ -609,6 +609,272 @@ def send_invoice_attachment_email(recipient_email: str, recipient_name: str, inv
     return send_smtp_email(msg, recipient_email, f"{invoice_type} invoice email", cc_emails=cc_emails)
 
 
+def send_quotation_attachment_email(
+    recipient_email: str,
+    recipient_name: str,
+    order_number: str,
+    company_name: str,
+    pdf_content: bytes,
+    pdf_filename: str,
+    payment_url: str = None,
+    total_amount: float = 0.0,
+    cc_emails: Optional[List[str]] = None
+) -> bool:
+    """
+    Send official service quotation and inquiry details attachment to prospect client,
+    with an optional Xendit payment checkout URL and CC recipients.
+    """
+    subject = f"PT Mandiri Cipta Solusi - Official Service Quotation & Inquiry Details ({order_number})"
+    from datetime import datetime
+    transmission_id = datetime.now().strftime("%Y%m%d%H%M%S%f")
+
+    formatted_amount = f"IDR {int(total_amount):,}".replace(",", ".") if total_amount > 0 else "-"
+
+    # 1. Plain Text Fallback Body
+    text_body = f"""Dear {recipient_name},
+
+Thank you for your inquiry with PT Mandiri Cipta Solusi (MCS Consulting).
+
+Please find attached our official Service Quotation and Inquiry Details ({pdf_filename}) for your prospective service order {order_number}.
+
+Inquiry Reference: {order_number}
+Company / Client: {company_name}
+Total Quotation Amount: {formatted_amount}
+"""
+    if payment_url:
+        text_body += f"""
+You can accept and pay this quotation online using the secure payment link below:
+{payment_url}
+
+Payment Methods: Bank Virtual Account (BCA, Mandiri, BNI, BRI, Permata), QRIS, Credit Card, and E-Wallets.
+Secure checkout powered by Xendit (PCI-DSS Certified Encryption).
+
+Upon successful payment, your order will automatically be confirmed and moved to Active Orders for immediate processing by our consultant team.
+"""
+    text_body += """
+If you have any questions or require further adjustments to the proposed scope, please feel free to reply directly to this email.
+
+Best regards,
+PT Mandiri Cipta Solusi (MCS Consulting)
+Springhill Office Tower, Lantai 9 Unit 9C, Jakarta Utara 14410
+https://www.mcsc.co.id
+"""
+
+    # 2. Professional HTML Body
+    payment_section_html = ""
+    if payment_url:
+        payment_section_html = f"""
+        <div class="details-card">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Inquiry Reference:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right; font-family: monospace; font-weight: bold;">{order_number}</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Client / Company:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right;">{company_name}</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Total Quotation:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right; color: #1d4ed8; font-weight: bold;">{formatted_amount}</td>
+            </tr>
+            <tr>
+              <td class="details-label">Quotation Attachment:</td>
+              <td class="details-value" style="text-align: right;">{pdf_filename}</td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="cta-container">
+          <div style="font-size: 13px; color: #475569; margin-bottom: 12px; text-align: center; font-weight: 500;">
+            Ready to proceed? Use the secure link below to accept and pay this quotation:
+          </div>
+          <a href="{payment_url}" class="btn" target="_blank" style="background: linear-gradient(135deg, #2563eb, #1d4ed8); display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-weight: 700; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.25);">Accept Quotation &amp; Pay Online</a>
+          <div class="security-note" style="margin-top: 14px; font-size: 11px; color: #64748b; line-height: 1.5; text-align: center;">
+            &#128274; <strong>Secure payment powered by Xendit</strong><br>
+            Supports Bank Virtual Account (BCA, Mandiri, BNI, BRI), QRIS, Credit Card, and E-Wallets.<br>
+            <em>Once payment is completed, your order will automatically be confirmed and moved to Active Orders.</em>
+          </div>
+        </div>
+        """
+    else:
+        payment_section_html = f"""
+        <div class="details-card">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Inquiry Reference:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right; font-family: monospace; font-weight: bold;">{order_number}</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Client / Company:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right;">{company_name}</td>
+            </tr>
+            <tr>
+              <td class="details-label" style="padding-bottom: 8px;">Total Quotation:</td>
+              <td class="details-value" style="padding-bottom: 8px; text-align: right; color: #1d4ed8; font-weight: bold;">{formatted_amount}</td>
+            </tr>
+            <tr>
+              <td class="details-label">Quotation Attachment:</td>
+              <td class="details-value" style="text-align: right;">{pdf_filename}</td>
+            </tr>
+          </table>
+        </div>
+        """
+
+    html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{subject}</title>
+  <style>
+    body {{
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      background-color: #f8fafc;
+      color: #334155;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }}
+    .wrapper {{
+      width: 100%;
+      background-color: #f8fafc;
+      padding: 30px 10px;
+    }}
+    .container {{
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      border: 1px solid #e2e8f0;
+    }}
+    .header {{
+      background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+      padding: 28px 24px;
+      text-align: center;
+    }}
+    .content {{
+      padding: 32px 28px;
+    }}
+    .greeting {{
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 14px;
+    }}
+    .message {{
+      font-size: 14px;
+      line-height: 1.6;
+      color: #334155;
+      margin-bottom: 20px;
+    }}
+    .details-card {{
+      background-color: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+    }}
+    .details-label {{
+      font-size: 13px;
+      color: #64748b;
+      font-weight: 500;
+    }}
+    .details-value {{
+      font-size: 13px;
+      color: #0f172a;
+      font-weight: 600;
+    }}
+    .cta-container {{
+      text-align: center;
+      margin: 28px 0 16px 0;
+      padding: 20px;
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: 10px;
+    }}
+    .footer {{
+      background-color: #f8fafc;
+      padding: 24px 28px;
+      text-align: center;
+      border-top: 1px solid #f1f5f9;
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }}
+    .footer a {{
+      color: #64748b;
+      text-decoration: underline;
+    }}
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="header">
+        <img src="cid:msc_logo" alt="MCS Consulting Logo" style="height: 48px; width: auto; display: block; margin: 0 auto;">
+        <div style="color: #ffffff; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-top: 10px;">
+          Official Service Quotation
+        </div>
+      </div>
+      <div class="content">
+        <div class="greeting">Dear {recipient_name},</div>
+        <div class="message">
+          Thank you for reaching out to <strong>PT Mandiri Cipta Solusi (MCS Consulting)</strong>. Please find attached our official <strong>Service Quotation &amp; Inquiry Details</strong> ({pdf_filename}) for your prospective service order.
+        </div>
+        
+        {payment_section_html}
+        
+        <div class="message" style="margin-bottom: 0; margin-top: 24px;">
+          If you have any questions, require adjustments to the scope of work, or would like to discuss this quotation further, please reply directly to this email or contact your assigned consulting manager.
+        </div>
+      </div>
+      <div class="footer">
+        This is an official quotation transmission from PT Mandiri Cipta Solusi.<br>
+        Springhill Office Tower Lantai 9 Unit 9C, Kemayoran, Jakarta Utara 14410 | <a href="https://www.mcsc.co.id">www.mcsc.co.id</a>
+      </div>
+      <div style="display:none !important; font-size:1px; color:#ffffff; line-height:1px; max-height:0px; max-width:0px; opacity:0; overflow:hidden;">
+        Transmission ID: {transmission_id}
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+    msg = MIMEMultipart("mixed")
+    msg['Subject'] = subject
+
+    alt_part = MIMEMultipart("alternative")
+    alt_part.attach(MIMEText(text_body, 'plain'))
+    alt_part.attach(MIMEText(html_body, 'html'))
+    msg.attach(alt_part)
+
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    logo_path = os.path.join(base_dir, "public", "logo.png")
+    if os.path.exists(logo_path):
+        from email.mime.image import MIMEImage
+        try:
+            with open(logo_path, "rb") as f:
+                logo_data = f.read()
+                msg_image = MIMEImage(logo_data)
+                msg_image.add_header('Content-ID', '<msc_logo>')
+                msg_image.add_header('Content-Disposition', 'inline')
+                msg.attach(msg_image)
+        except Exception as img_err:
+            print("Failed to attach logo inline:", img_err)
+
+    if pdf_content:
+        from email.mime.application import MIMEApplication
+        part = MIMEApplication(pdf_content, Name=pdf_filename)
+        part['Content-Disposition'] = f'attachment; filename="{pdf_filename}"'
+        msg.attach(part)
+
+    return send_smtp_email(msg, recipient_email, "quotation email", cc_emails=cc_emails)
+
+
 def send_notary_payment_voucher_email(
     notary_email: str,
     notary_name: str,

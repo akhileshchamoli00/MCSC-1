@@ -160,7 +160,18 @@ export function ExcelPreview({ fileUrl, fileName, onDownload, className = "" }: 
       } catch (err: any) {
         console.error("Spreadsheet loading error:", err);
         if (isMounted) {
-          setError(err.message || "Failed to parse and render spreadsheet file.");
+          const msg = err?.message || "";
+          if (
+            msg.toLowerCase().includes("password") ||
+            msg.toLowerCase().includes("encrypt") ||
+            msg.toLowerCase().includes("unsupported") ||
+            msg.toLowerCase().includes("cfb") ||
+            msg.toLowerCase().includes("zip")
+          ) {
+            setError("This Excel spreadsheet is password-protected or encrypted. Please download the file to open and enter the password.");
+          } else {
+            setError(msg || "Failed to parse and render spreadsheet file.");
+          }
           setLoading(false);
         }
       }

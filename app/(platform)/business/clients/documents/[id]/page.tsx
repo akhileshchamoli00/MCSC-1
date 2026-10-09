@@ -179,7 +179,17 @@ export default function CompanyDocumentsManagementPage() {
           } catch (renderErr: any) {
             console.error("docx render error", renderErr);
             if (isMounted) {
-              setDocxError(renderErr.message || "Failed to render Word document preview.");
+              const msg = renderErr?.message || "";
+              if (
+                msg.toLowerCase().includes("central directory") ||
+                msg.toLowerCase().includes("zip") ||
+                msg.toLowerCase().includes("password") ||
+                msg.toLowerCase().includes("encrypt")
+              ) {
+                setDocxError("This Word document is password-protected or encrypted. Please download the file to open and enter the password.");
+              } else {
+                setDocxError(msg || "Failed to render Word document preview.");
+              }
               setDocxLoading(false);
             }
           }
@@ -428,12 +438,20 @@ export default function CompanyDocumentsManagementPage() {
     o => o.order_number.toUpperCase() === (editDoc?.order_number || "").trim().toUpperCase()
   );
 
+  const isPipelineInquiry = fromSource === "pipeline";
+  const activeOrderNumber = (activeOrder?.order_number || orderNumberParam || "").trim().toUpperCase();
+
   const activeOrderDocsCount = documents.filter((doc: any) => 
-    activeOrder && doc.order_number && doc.order_number.trim().toUpperCase() === activeOrder.order_number.trim().toUpperCase()
+    activeOrderNumber && doc.order_number && doc.order_number.trim().toUpperCase() === activeOrderNumber
   ).length;
 
   const filteredDocuments = documents.filter((doc: any) => {
-    if (activeOrder && filterByActiveOrder) {
+    // When navigating from inquiry / pipeline, strictly restrict to this inquiry order's documents
+    if (isPipelineInquiry && activeOrderNumber) {
+      if (!doc.order_number || doc.order_number.trim().toUpperCase() !== activeOrderNumber) {
+        return false;
+      }
+    } else if (activeOrder && filterByActiveOrder) {
       if (!doc.order_number || doc.order_number.trim().toUpperCase() !== activeOrder.order_number.trim().toUpperCase()) {
         return false;
       }
@@ -449,7 +467,8 @@ export default function CompanyDocumentsManagementPage() {
       (doc.document_type || "").toLowerCase().includes(query) ||
       (doc.description || "").toLowerCase().includes(query) ||
       (doc.order_number || "").toLowerCase().includes(query) ||
-      (doc.file_name || "").toLowerCase().includes(query)
+      (doc.file_name || "").toLowerCase().includes(query) ||
+      (doc.uploader_name || "").toLowerCase().includes(query)
     );
   });
 
@@ -614,7 +633,7 @@ export default function CompanyDocumentsManagementPage() {
         const uniqueOrderNums = ordersList.map(o => o.order_number);
         setOrderNumbers(uniqueOrderNums);
 
-        const targetOrderNum = orderNumberParam || (fromSource === "assigned-orders" && uniqueOrderNums.length > 0 ? uniqueOrderNums[0] : "");
+        const targetOrderNum = orderNumberParam || ((fromSource === "assigned-orders" || fromSource === "orders") && uniqueOrderNums.length > 0 ? uniqueOrderNums[0] : "");
         if (targetOrderNum) {
           const matchingItems = companyOrders.filter((o: any) => o.order_number?.toUpperCase() === targetOrderNum.toUpperCase());
           if (matchingItems.length > 0) {
@@ -630,6 +649,28 @@ export default function CompanyDocumentsManagementPage() {
               created_at: first.created_at
             });
             setActiveOrderItems(matchingItems);
+            setSelectedOrderNum(targetOrderNum);
+            setOrderSearchQuery(targetOrderNum);
+
+            // Automatically mark notifications for this order as read when viewed by the PIC
+            fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/order/${encodeURIComponent(targetOrderNum.toUpperCase())}/read`, {
+              method: "PUT",
+              credentials: "include"
+            }).then(() => {
+              window.dispatchEvent(new Event("notifications-updated"));
+            }).catch(console.error);
+          } else {
+            setActiveOrder({
+              order_number: targetOrderNum,
+              status: "INQUIRY",
+              items: [],
+              consultants: [],
+              reviewer: null,
+              reviewer_ids: [],
+              reviewers: [],
+              created_at: new Date().toISOString()
+            });
+            setActiveOrderItems([]);
             setSelectedOrderNum(targetOrderNum);
             setOrderSearchQuery(targetOrderNum);
           }
@@ -770,8 +811,9 @@ export default function CompanyDocumentsManagementPage() {
       });
       formData.append("document_type", uploadRow.type);
       if (uploadRow.description) formData.append("description", uploadRow.description);
-      if (selectedOrderNum && selectedOrderNum.trim()) {
-        formData.append("order_number", selectedOrderNum.trim());
+      const orderNumToSave = (isPipelineInquiry ? activeOrderNumber : selectedOrderNum)?.trim();
+      if (orderNumToSave) {
+        formData.append("order_number", orderNumToSave);
       }
       if (uploadRow.date) formData.append("document_date", uploadRow.date);
       if (uploadRow.expiry_date) formData.append("expiry_date", uploadRow.expiry_date);
@@ -805,8 +847,8 @@ export default function CompanyDocumentsManagementPage() {
       setDocuments(prev => [...prev, ...newDocsList]);
       const count = uploadRow.files.length;
       setUploadRow({ files: [], type: "", description: "", document_path: "", date: "", expiry_date: "" });
-      setSelectedOrderNum("");
-      setOrderSearchQuery("");
+      setSelectedOrderNum(isPipelineInquiry ? activeOrderNumber : "");
+      setOrderSearchQuery(isPipelineInquiry ? activeOrderNumber : "");
       toast.success(`${count} document(s) uploaded successfully!`);
       fetchInitialData();
     } catch (err: any) {
@@ -1070,7 +1112,14 @@ export default function CompanyDocumentsManagementPage() {
     const tabParam = searchParams ? searchParams.get("tab") : null;
     const role = typeof window !== "undefined" ? localStorage.getItem("user_role") : null;
 
-    if (fromSource === "company-docs") {
+    if (fromSource === "pipeline") {
+      const orderParam = searchParams ? searchParams.get("order") : null;
+      let targetUrl = `/business/clients/orders/pipeline`;
+      if (orderParam) {
+        targetUrl += `?order=${encodeURIComponent(orderParam)}`;
+      }
+      router.push(targetUrl);
+    } else if (fromSource === "company-docs") {
       router.push("/business/clients/documents");
     } else if (fromSource === "assigned-orders") {
       const orderParam = searchParams ? searchParams.get("order") : null;
@@ -1080,7 +1129,12 @@ export default function CompanyDocumentsManagementPage() {
       }
       router.push(targetUrl);
     } else if (fromSource === "orders") {
-      router.push("/business/clients/orders");
+      const orderParam = searchParams ? searchParams.get("order") : null;
+      let targetUrl = `/business/clients/orders`;
+      if (orderParam) {
+        targetUrl += `?order=${encodeURIComponent(orderParam)}`;
+      }
+      router.push(targetUrl);
     } else {
       if (role === "CLIENT") {
         router.push("/client/dashboard");
@@ -1143,7 +1197,7 @@ export default function CompanyDocumentsManagementPage() {
               <div className="flex items-center gap-2.5 flex-wrap">
                 <Badge className="bg-primary text-primary-foreground font-mono font-bold text-xs px-2.5 py-1 gap-1.5 shadow-sm">
                   <FolderKanban className="h-3.5 w-3.5" />
-                  ORDER #{activeOrder.order_number}
+                  {isPipelineInquiry ? "INQUIRY ORDER #" : "ORDER #"}{activeOrder.order_number}
                 </Badge>
                 
                 <Badge variant="outline" className={`${getOrderStatusColor(activeOrder.status)} text-xs px-2.5 py-0.5 border font-semibold`}>
@@ -1212,7 +1266,7 @@ export default function CompanyDocumentsManagementPage() {
             {/* Right Actions: Quick Progression, Status Switcher, Chat & Return */}
             <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
               {/* Contextual Quick Transition Buttons */}
-              {activeOrder.status === "ORDER_ASSIGNED" && (
+              {!isPipelineInquiry && activeOrder.status === "ORDER_ASSIGNED" && (
                 <Button
                   size="sm"
                   onClick={() => handleUpdateActiveOrderStatus("IN_PROGRESS")}
@@ -1223,7 +1277,7 @@ export default function CompanyDocumentsManagementPage() {
                 </Button>
               )}
 
-              {activeOrder.status === "REVIEW_DOCS" && (
+              {!isPipelineInquiry && activeOrder.status === "REVIEW_DOCS" && (
                 <Button
                   size="sm"
                   onClick={() => handleUpdateActiveOrderStatus("DOCUMENTS_REVIEWED")}
@@ -1234,7 +1288,7 @@ export default function CompanyDocumentsManagementPage() {
                 </Button>
               )}
 
-              {(activeOrder.status === "DOCUMENTS_REVIEWED" || activeOrder.status === "FINAL_DOCUMENT_PREPARATION" || activeOrder.status === "PRE_DOCS_SENT") && (
+              {!isPipelineInquiry && (activeOrder.status === "DOCUMENTS_REVIEWED" || activeOrder.status === "FINAL_DOCUMENT_PREPARATION" || activeOrder.status === "PRE_DOCS_SENT") && (
                 <Button
                   size="sm"
                   onClick={() => handleUpdateActiveOrderStatus("FINAL_DOC_READY")}
@@ -1246,27 +1300,29 @@ export default function CompanyDocumentsManagementPage() {
               )}
 
               {/* Status Switcher Select */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-1 hidden sm:inline">Stage:</span>
-                <select
-                  value={activeOrder.status || "IN_PROGRESS"}
-                  disabled={updatingOrderStatus}
-                  onChange={(e) => handleUpdateActiveOrderStatus(e.target.value)}
-                  className={`h-9 px-2.5 py-1 text-xs font-bold rounded-md border shadow-xs bg-background transition-colors cursor-pointer ${getOrderStatusColor(activeOrder.status)}`}
-                >
-                  <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
-                  <option value="IN_PROGRESS">IN PROGRESS</option>
-                  <option value="REVIEW_DOCS">REVIEW DOCS</option>
-                  <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
-                  <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
-                  <option value="AWAITING_SIGNING_NOTARIZATION">AWAITING SIGNING / NOTARIZATION</option>
-                  <option value="AWAITING_DOCUMENT_RETURN">AWAITING DOCUMENT RETURN FROM CLIENT</option>
-                  <option value="AWAITING_THIRD_PARTY_RESPONSE">AWAITING THIRD-PARTY RESPONSE (VENDOR)</option>
-                  <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
-                  <option value="FINAL_DOC_READY">FINAL DOC READY</option>
-                  <option value="ON_HOLD">ON HOLD</option>
-                </select>
-              </div>
+              {!isPipelineInquiry && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-1 hidden sm:inline">Stage:</span>
+                  <select
+                    value={activeOrder.status || "IN_PROGRESS"}
+                    disabled={updatingOrderStatus}
+                    onChange={(e) => handleUpdateActiveOrderStatus(e.target.value)}
+                    className={`h-9 px-2.5 py-1 text-xs font-bold rounded-md border shadow-xs bg-background transition-colors cursor-pointer ${getOrderStatusColor(activeOrder.status)}`}
+                  >
+                    <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
+                    <option value="IN_PROGRESS">IN PROGRESS</option>
+                    <option value="REVIEW_DOCS">REVIEW DOCS</option>
+                    <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
+                    <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
+                    <option value="AWAITING_SIGNING_NOTARIZATION">AWAITING SIGNING / NOTARIZATION</option>
+                    <option value="AWAITING_DOCUMENT_RETURN">AWAITING DOCUMENT RETURN FROM CLIENT</option>
+                    <option value="AWAITING_THIRD_PARTY_RESPONSE">AWAITING THIRD-PARTY RESPONSE (VENDOR)</option>
+                    <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
+                    <option value="FINAL_DOC_READY">FINAL DOC READY</option>
+                    <option value="ON_HOLD">ON HOLD</option>
+                  </select>
+                </div>
+              )}
 
               {/* Order Chat */}
               <Button
@@ -1279,16 +1335,18 @@ export default function CompanyDocumentsManagementPage() {
                 <span className="hidden sm:inline">Order Chat</span>
               </Button>
 
-              {/* Return to Assigned Orders */}
+              {/* Return to Assigned Orders / Inquiry Orders */}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleBackClick}
                 className="h-9 gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
-                title="Return to Allocated Orders Workspace"
+                title={isPipelineInquiry ? "Return to Inquiry Orders" : "Return to Allocated Orders Workspace"}
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
-                <span className="hidden md:inline">Return to Orders</span>
+                <span className="hidden md:inline">
+                  {isPipelineInquiry ? "Return to Inquiry Orders" : "Return to Orders"}
+                </span>
               </Button>
             </div>
           </div>
@@ -1300,20 +1358,22 @@ export default function CompanyDocumentsManagementPage() {
         if (tab === "documents") fetchDocuments();
         if (tab === "activities") fetchActivities();
       }} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-6 max-w-2xl">
-          <TabsTrigger value="documents" className="gap-2 text-xs font-semibold">
-            <FileText className="h-4 w-4" /> Legal Documents
-          </TabsTrigger>
-          <TabsTrigger value="dropbox" className="gap-2 text-xs font-semibold">
-            <Upload className="h-4 w-4" /> Dropbox Files
-          </TabsTrigger>
-          <TabsTrigger value="stakeholders" className="gap-2 text-xs font-semibold">
-            <Users className="h-4 w-4" /> Board & Shareholders
-          </TabsTrigger>
-          <TabsTrigger value="activities" className="gap-2 text-xs font-semibold">
-            <History className="h-4 w-4" /> Activity Log
-          </TabsTrigger>
-        </TabsList>
+        {!isPipelineInquiry && (
+          <TabsList className="grid w-full grid-cols-4 mb-6 max-w-2xl">
+            <TabsTrigger value="documents" className="gap-2 text-xs font-semibold">
+              <FileText className="h-4 w-4" /> Legal Documents
+            </TabsTrigger>
+            <TabsTrigger value="dropbox" className="gap-2 text-xs font-semibold">
+              <Upload className="h-4 w-4" /> Dropbox Files
+            </TabsTrigger>
+            <TabsTrigger value="stakeholders" className="gap-2 text-xs font-semibold">
+              <Users className="h-4 w-4" /> Board & Shareholders
+            </TabsTrigger>
+            <TabsTrigger value="activities" className="gap-2 text-xs font-semibold">
+              <History className="h-4 w-4" /> Activity Log
+            </TabsTrigger>
+          </TabsList>
+        )}
 
         <TabsContent value="dropbox" className="space-y-6">
           <Card className="border-border/50 shadow-sm">
@@ -1355,7 +1415,7 @@ export default function CompanyDocumentsManagementPage() {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2.5 flex-wrap xl:flex-nowrap w-full sm:w-auto">
-                {activeOrder && (
+                {!isPipelineInquiry && activeOrder && (
                   <div className="flex items-center bg-muted/60 p-0.5 rounded-lg border border-border/60 text-xs shrink-0">
                     <button
                       type="button"
@@ -1427,6 +1487,7 @@ export default function CompanyDocumentsManagementPage() {
                       <th className="px-4 py-3 bg-muted">Description</th>
                       <th className="px-4 py-3 text-center bg-muted">Format</th>
                       <th className="px-4 py-3 bg-muted">Order Number</th>
+                      <th className="px-4 py-3 bg-muted">Upload Date & Time</th>
                       <th className="px-4 py-3 bg-muted">Issue Date</th>
                       <th className="px-4 py-3 bg-muted">Expiry Date</th>
                       <th className="px-4 py-3 text-center bg-muted">Compliance Status</th>
@@ -1436,11 +1497,18 @@ export default function CompanyDocumentsManagementPage() {
                   <tbody className="divide-y divide-border/50 bg-background">
                     {filteredDocuments.length === 0 && (
                       <tr>
-                        <td colSpan={9} className="px-4 py-8 text-center bg-muted/10">
+                        <td colSpan={10} className="px-4 py-8 text-center bg-muted/10">
                           <FileText className="mx-auto h-6 w-6 text-muted-foreground/40 mb-1" />
-                          <p className="text-sm text-muted-foreground">
-                            {documentSearchQuery.trim() ? "No matching documents found" : "No documents uploaded yet"}
+                          <p className="text-sm font-semibold text-foreground">
+                            {isPipelineInquiry 
+                              ? `No documents uploaded yet for Inquiry Order #${activeOrderNumber}` 
+                              : (documentSearchQuery.trim() ? "No matching documents found" : "No documents uploaded yet")}
                           </p>
+                          {isPipelineInquiry && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Use the upload form below to add documents specifically for this inquiry order.
+                            </p>
+                          )}
                         </td>
                       </tr>
                     )}
@@ -1469,6 +1537,26 @@ export default function CompanyDocumentsManagementPage() {
                           </td>
                           <td className="px-4 py-3 font-mono font-bold text-primary">
                             {doc.order_number || "-"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {doc.uploaded_at ? (
+                              <div className="flex flex-col gap-0.5">
+                                <div className="flex items-center gap-1.5 font-mono text-foreground font-semibold">
+                                  <Clock className="h-3 w-3 text-muted-foreground/70 shrink-0" />
+                                  <span>{format(new Date(doc.uploaded_at), "MMM d, yyyy")}</span>
+                                </div>
+                                <div className="text-[11px] text-muted-foreground font-mono pl-4.5 flex items-center gap-1">
+                                  <span>{format(new Date(doc.uploaded_at), "HH:mm:ss")}</span>
+                                  {doc.uploader_name && (
+                                    <span className="text-[10px] text-muted-foreground/80 font-sans truncate max-w-[130px]" title={`Uploaded by ${doc.uploader_name}`}>
+                                      • {doc.uploader_name}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground font-mono">-</span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-muted-foreground font-mono">
                             {doc.document_date ? format(new Date(doc.document_date), "MMM d, yyyy") : "-"}
@@ -1542,39 +1630,50 @@ export default function CompanyDocumentsManagementPage() {
                 {/* Metadata Fields Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
                   <div className="relative">
-                    <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold block mb-1">Order Number (Optional)</label>
+                    <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold block mb-1">
+                      Order Number {isPipelineInquiry ? "(Locked to Inquiry Order)" : "(Optional)"}
+                    </label>
                     <div className="relative">
                       <Input
-                        placeholder="Search order # or service..."
-                        value={orderSearchQuery}
+                        placeholder={isPipelineInquiry ? `Order #${activeOrderNumber}` : "Search order # or service..."}
+                        value={isPipelineInquiry ? activeOrderNumber : orderSearchQuery}
+                        disabled={isPipelineInquiry}
+                        readOnly={isPipelineInquiry}
                         onChange={(e) => {
+                          if (isPipelineInquiry) return;
                           setOrderSearchQuery(e.target.value);
                           setSelectedOrderNum(e.target.value);
                           setOrderDropdownOpen(true);
                         }}
-                        onFocus={() => setOrderDropdownOpen(true)}
-                        onBlur={() => setTimeout(() => setOrderDropdownOpen(false), 200)}
-                        className="h-9 text-xs bg-muted/20 pr-8 hover:bg-sky-50/40 dark:hover:bg-sky-950/20 hover:border-sky-300/50 focus:bg-background transition-colors"
+                        onFocus={() => !isPipelineInquiry && setOrderDropdownOpen(true)}
+                        onBlur={() => !isPipelineInquiry && setTimeout(() => setOrderDropdownOpen(false), 200)}
+                        className={`h-9 text-xs bg-muted/20 pr-8 transition-colors ${
+                          isPipelineInquiry 
+                            ? "cursor-not-allowed font-mono font-bold text-primary bg-primary/5 border-primary/30" 
+                            : "hover:bg-sky-50/40 dark:hover:bg-sky-950/20 hover:border-sky-300/50 focus:bg-background"
+                        }`}
                       />
-                      {orderSearchQuery ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOrderSearchQuery("");
-                            setSelectedOrderNum("");
-                          }}
-                          className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground text-[11px] cursor-pointer"
-                        >
-                          ✕
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setOrderDropdownOpen(!orderDropdownOpen)}
-                          className="absolute right-2 top-2.5 text-muted-foreground text-[10px] cursor-pointer"
-                        >
-                          ▼
-                        </button>
+                      {!isPipelineInquiry && (
+                        orderSearchQuery ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOrderSearchQuery("");
+                              setSelectedOrderNum("");
+                            }}
+                            className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground text-[11px] cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setOrderDropdownOpen(!orderDropdownOpen)}
+                            className="absolute right-2 top-2.5 text-muted-foreground text-[10px] cursor-pointer"
+                          >
+                            ▼
+                          </button>
+                        )
                       )}
                     </div>
                     {selectedOrderObj && (
@@ -2180,6 +2279,13 @@ export default function CompanyDocumentsManagementPage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Document Metadata & Expiry</DialogTitle>
+            {editDoc?.uploaded_at && (
+              <DialogDescription className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-0.5 font-mono">
+                <Clock className="h-3 w-3 text-muted-foreground/70" />
+                Uploaded: {format(new Date(editDoc.uploaded_at), "MMM d, yyyy HH:mm:ss")}
+                {editDoc.uploader_name ? ` by ${editDoc.uploader_name}` : ""}
+              </DialogDescription>
+            )}
           </DialogHeader>
           {editDoc && (
             <div className="space-y-4 py-2 text-xs">
@@ -2405,6 +2511,13 @@ export default function CompanyDocumentsManagementPage() {
                   <FileText className="h-4 w-4 text-primary shrink-0" />
                   <span className="font-bold text-sm truncate max-w-xs sm:max-w-md">{previewDoc.document_type || "Document Preview"}</span>
                   {getFileFormatBadge(previewDoc.file_name, previewDoc.file_url)}
+                  {previewDoc.uploaded_at && (
+                    <span className="text-[11px] text-slate-300 font-mono hidden lg:inline-flex items-center gap-1 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60">
+                      <Clock className="h-3 w-3 text-slate-400" />
+                      {format(new Date(previewDoc.uploaded_at), "MMM d, yyyy HH:mm:ss")}
+                      {previewDoc.uploader_name && <span className="text-slate-400">• {previewDoc.uploader_name}</span>}
+                    </span>
+                  )}
                   {previewDoc.description && (
                     <span className="text-xs text-slate-400 hidden md:inline truncate max-w-sm">({previewDoc.description})</span>
                   )}

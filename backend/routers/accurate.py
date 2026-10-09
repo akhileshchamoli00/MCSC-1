@@ -464,7 +464,7 @@ def sync_order_manually(
             message=already_msg if so_res.get("already_synced") else new_msg,
             order_id=order.id,
             order_number=order_num,
-            accurate_doc_no=order.accurate_receipt_no or order.accurate_so_no,
+            accurate_doc_no=order.accurate_receipt_no or order.accurate_dp_inv_no or order.accurate_so_no,
             sync_status=order.accurate_sync_status or "SO_CREATED",
             details=so_res
         )

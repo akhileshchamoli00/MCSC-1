@@ -520,7 +520,7 @@ export default function SharedDocuments() {
                             Category / Type
                           </TableHead>
                           <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-2 px-4 w-[16%]">
-                            Uploaded Date
+                            Uploaded Date & Time
                           </TableHead>
                           <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-right py-2 px-4 w-[14%]">
                             Vault Action
@@ -579,15 +579,22 @@ export default function SharedDocuments() {
                                 </Badge>
                               </TableCell>
 
-                              {/* Uploaded Date */}
+                              {/* Uploaded Date & Time */}
                               <TableCell className="py-2.5 px-4 text-xs text-muted-foreground whitespace-nowrap">
-                                <div className="flex items-center gap-1.5">
-                                  <Calendar className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
-                                  <span>
-                                    {doc.uploaded_at
-                                      ? format(new Date(doc.uploaded_at), "MMM d, yyyy")
-                                      : "-"}
-                                  </span>
+                                <div className="flex flex-col gap-0.5">
+                                  <div className="flex items-center gap-1.5 font-medium text-foreground">
+                                    <Calendar className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
+                                    <span>
+                                      {doc.uploaded_at
+                                        ? format(new Date(doc.uploaded_at), "MMM d, yyyy")
+                                        : "-"}
+                                    </span>
+                                  </div>
+                                  {doc.uploaded_at && (
+                                    <span className="text-[10px] text-muted-foreground font-mono pl-5">
+                                      {format(new Date(doc.uploaded_at), "HH:mm:ss")}
+                                    </span>
+                                  )}
                                 </div>
                               </TableCell>
 

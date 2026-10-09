@@ -96,8 +96,8 @@ function getHeaderInfo(pathname: string, currentMode: string): {
   }
   if (pathname.includes("/clients/orders/pipeline")) {
     return {
-      title: "Pipeline Orders",
-      subtitle: "Track incoming deals and prospective orders before activation.",
+      title: "Inquiry Orders",
+      subtitle: "Track pre-order inquiries, initial checks, and feasibility before order activation.",
       icon: Clock,
       iconColor: "text-amber-400 bg-amber-500/15 border-amber-500/30 shadow-[0_0_8px_rgba(251,191,36,0.25)]"
     };

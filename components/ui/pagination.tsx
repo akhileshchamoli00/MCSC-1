@@ -158,6 +158,9 @@ export interface TablePaginationProps extends PaginationControlsProps {
   endIndex?: number;
   totalEntries?: number;
   itemName?: string;
+  pageSize?: number;
+  pageSizeOptions?: number[];
+  onPageSizeChange?: (pageSize: number) => void;
 }
 
 export function TablePagination({
@@ -170,8 +173,11 @@ export function TablePagination({
   itemName = "entries",
   className,
   showEdges = false,
+  pageSize,
+  pageSizeOptions,
+  onPageSizeChange,
 }: TablePaginationProps) {
-  if (totalPages <= 1) return null;
+  if (totalPages <= 1 && (!pageSizeOptions || pageSizeOptions.length === 0)) return null;
 
   const hasRange =
     startIndex !== undefined &&
@@ -185,15 +191,34 @@ export function TablePagination({
         className
       )}
     >
-      {hasRange ? (
-        <div className="text-xs text-muted-foreground order-2 sm:order-1">
-          Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{" "}
-          <span className="font-medium text-foreground">{Math.min(totalEntries, endIndex)}</span> of{" "}
-          <span className="font-medium text-foreground">{totalEntries}</span> {itemName}
-        </div>
-      ) : (
-        <div className="order-2 sm:order-1" />
-      )}
+      <div className="flex items-center gap-4 flex-wrap order-2 sm:order-1">
+        {hasRange ? (
+          <div className="text-xs text-muted-foreground">
+            Showing <span className="font-medium text-foreground">{totalEntries === 0 ? 0 : startIndex + 1}</span> to{" "}
+            <span className="font-medium text-foreground">{Math.min(totalEntries, endIndex)}</span> of{" "}
+            <span className="font-medium text-foreground">{totalEntries}</span> {itemName}
+          </div>
+        ) : null}
+
+        {pageSizeOptions && pageSizeOptions.length > 0 && onPageSizeChange && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span>Show</span>
+            <select
+              value={pageSize ?? 10}
+              onChange={(e) => onPageSizeChange(Number(e.target.value))}
+              className="h-8 px-2 py-0.5 text-xs font-semibold rounded-lg bg-background border border-border/70 text-foreground cursor-pointer hover:bg-accent/50 focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+              aria-label="Items per page"
+            >
+              {pageSizeOptions.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+            <span>per page</span>
+          </div>
+        )}
+      </div>
 
       <div className="order-1 sm:order-2">
         <PaginationControls

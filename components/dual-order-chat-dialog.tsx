@@ -2,391 +2,33 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  MessageSquare,
-  Users,
+  AlertTriangle,
   Send,
   Loader2,
-  Lock,
-  Globe,
-  AlertTriangle,
-  RotateCw,
-  Clock,
-  Building,
-  Package,
   X,
-  ArrowLeft,
-  User,
-  ShieldAlert,
-  Sparkles,
-  CreditCard,
-  FileCheck,
   FileText,
   Eye,
-  ShieldCheck,
-  ExternalLink,
-  Copy,
-  Calendar,
-  Mail,
-  Phone,
-  Layers,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Pencil,
-  Trash2,
   Check,
-  CheckCheck,
-  Reply,
-  Quote,
-  Ban,
-  Cloud,
-  FileDown,
-  Paperclip,
-  Image as ImageIcon,
-  Scale
+  Trash2,
+  Edit2
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger
-} from "@/components/ui/tooltip";
-import { resolveImageUrl } from "@/lib/utils";
 import { toast } from "sonner";
-import { ChatEmojiPicker } from "@/components/chat-emoji-picker";
-import { ChatMessageReactions, WhatsAppReactionHoverBar } from "@/components/chat-message-reactions";
 import { ExcelPreview } from "@/components/excel-preview";
 
-const isImageFile = (filename?: string | null) => {
-  if (!filename) return false;
-  return /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(filename);
-};
-
-const formatFileSize = (bytes?: number) => {
-  if (!bytes || bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-};
-
-const deduplicateMessages = (msgs: any[]) => {
-  if (!Array.isArray(msgs)) return [];
-  const map = new Map<string | number, any>();
-  for (const m of msgs) {
-    if (!m) continue;
-    const key = m.id !== undefined && m.id !== null ? `id-${m.id}` : `msg-${m.created_at || ""}-${m.message || ""}`;
-    map.set(key, m);
-  }
-  return Array.from(map.values());
-};
-
-const formatSeenTime = (dateStr?: string) => {
-  if (!dateStr) return "";
-  try {
-    const d = new Date(dateStr);
-    const now = new Date();
-    const isToday = d.toDateString() === now.toDateString();
-    const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    if (isToday) return `Today at ${timeStr}`;
-    return `${d.toLocaleDateString([], { month: "short", day: "numeric" })} at ${timeStr}`;
-  } catch {
-    return dateStr;
-  }
-};
-
-const formatMessageDateTime = (dateStr?: string | null) => {
-  if (!dateStr) return "";
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return "";
-    const dateFormatted = d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric"
-    });
-    const timeFormatted = d.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-    return `${dateFormatted}, ${timeFormatted}`;
-  } catch {
-    return "";
-  }
-};
-
-const SeenReceiptsIndicator = ({
-  seenBy,
-  isSelf,
-  sentAt
-}: {
-  seenBy?: any[];
-  isSelf: boolean;
-  sentAt?: string;
-  colorScheme?: string;
-}) => {
-  const readers = seenBy || [];
-  const hasSeen = readers.length > 0;
-
-  if (!hasSeen) {
-    if (!isSelf) return null;
-    return (
-      <TooltipProvider delayDuration={100}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              className="flex items-center p-0.5 opacity-60 hover:opacity-100 transition-opacity focus:outline-none"
-              aria-label="Delivered"
-            >
-              <Check className="h-3.5 w-3.5 text-muted-foreground" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent
-            side="top"
-            align="center"
-            sideOffset={8}
-            collisionPadding={16}
-            className="z-[99999] px-2.5 py-1 rounded-lg bg-popover text-popover-foreground border border-border shadow-lg text-[11px] font-medium [&_.rotate-45]:hidden"
-          >
-            {sentAt ? `Delivered • ${formatSeenTime(sentAt)}` : "Delivered"}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
-
-  return (
-    <TooltipProvider delayDuration={100}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            className="flex items-center gap-0.5 cursor-pointer p-0.5 rounded hover:bg-muted/60 transition-colors focus:outline-none"
-            aria-label={`Seen by ${readers.map(r => r.name).join(", ")}`}
-          >
-            <CheckCheck className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 transition-colors" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent
-          side="top"
-          align="center"
-          sideOffset={8}
-          collisionPadding={16}
-          className="z-[99999] min-w-[210px] max-w-[280px] p-2.5 rounded-xl bg-popover text-popover-foreground border border-border shadow-2xl backdrop-blur-md text-left [&_.rotate-45]:hidden"
-        >
-          <div className="flex items-center justify-between gap-1 pb-1.5 mb-1.5 border-b border-border/50 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-            <span className="flex items-center gap-1.5">
-              <Eye className="h-3 w-3 text-blue-500" />
-              Seen by ({readers.length})
-            </span>
-          </div>
-          <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-            {readers.map((r, idx) => (
-              <div key={r.user_id || idx} className="flex items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold text-muted-foreground shrink-0 border border-border">
-                    {r.name ? r.name.charAt(0).toUpperCase() : "U"}
-                  </div>
-                  <div className="min-w-0">
-                    <span className="font-semibold text-[11px] text-foreground block truncate">
-                      {r.name}
-                    </span>
-                    {r.role && (
-                      <span className="text-[9px] text-muted-foreground block truncate -mt-0.5">
-                        {r.role}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <span className="text-[9px] font-mono text-muted-foreground/80 shrink-0 text-right">
-                  {formatSeenTime(r.read_at)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-};
-
-const isSystemMessage = (msg: any) => {
-  if (!msg) return false;
-  if (msg.pending) return false;
-  if (msg.is_client || (msg.sender_role || "").toUpperCase() === "CLIENT") return false;
-  const role = (msg.sender_role || "").toUpperCase();
-  if (role === "MILESTONE" || role === "SYSTEM") return true;
-  const name = (msg.sender_name || "").toUpperCase();
-  if (name === "SYSTEM" || name === "MILESTONE") return true;
-  if (!msg.user_id && !msg.sender_name) return true;
-  const txt = (msg.message || "").toLowerCase().trim();
-  if (!txt) return false;
-  return (
-    txt.startsWith("order execution status") ||
-    txt.includes("order placed on hold") ||
-    txt.includes("⏸️") ||
-    txt.startsWith("pipeline order") ||
-    txt.startsWith("order moved") ||
-    txt.startsWith("proforma payment") ||
-    txt.startsWith("final invoice payment") ||
-    txt.startsWith("additional payment") ||
-    txt.startsWith("amount received") ||
-    txt.includes("invoice has been generated") ||
-    txt.includes("proforma invoice (") ||
-    txt.includes("final documents") ||
-    txt.includes("uploaded to dropbox") ||
-    txt.includes("emailed to client") ||
-    txt.includes("assigned to review") ||
-    txt.includes("consultant is actively") ||
-    txt.includes("has been reopened") ||
-    txt.includes("reopened and moved back") ||
-    txt.includes("marked as cancelled") ||
-    txt.includes("has been cancelled")
-  );
-};
-
-const getMilestoneIcon = (message: string) => {
-  const txt = (message || "").toLowerCase();
-  if (txt.includes("on hold") || txt.includes("⏸️") || txt.includes("pause")) {
-    return <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />;
-  }
-  if (txt.includes("reopened")) {
-    return <RotateCw className="h-3.5 w-3.5 text-blue-500 shrink-0" />;
-  }
-  if (txt.includes("cancelled")) {
-    return <Ban className="h-3.5 w-3.5 text-rose-500 shrink-0" />;
-  }
-  if (txt.includes("payment") || txt.includes("amount received") || txt.includes("paid")) {
-    return <CreditCard className="h-3.5 w-3.5 text-emerald-500 shrink-0" />;
-  }
-  if (txt.includes("invoice")) {
-    return <FileText className="h-3.5 w-3.5 text-amber-500 shrink-0" />;
-  }
-  if (txt.includes("final document") || txt.includes("dropbox")) {
-    return <FileCheck className="h-3.5 w-3.5 text-indigo-500 shrink-0" />;
-  }
-  if (txt.includes("status") || txt.includes("active orders")) {
-    return <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />;
-  }
-  return <Clock className="h-3.5 w-3.5 text-primary shrink-0" />;
-};
-
-export const formatExternalTeamName = (name?: string | null) => {
-  if (!name) return "Consultant MCS";
-  const trimmed = name.trim();
-  if (!trimmed) return "Consultant MCS";
-  const lower = trimmed.toLowerCase();
-  if (lower === "client" || lower === "you (client)" || lower === "you" || lower === "member" || lower === "system" || lower === "milestone") {
-    return trimmed;
-  }
-  if (trimmed.toUpperCase().endsWith(" MCS")) {
-    return trimmed;
-  }
-  const first = trimmed.split(/\s+/)[0];
-  return `${first} MCS`;
-};
-
-const isEmojiOnlyText = (str?: string | null) => {
-  if (!str) return false;
-  const trimmed = str.trim();
-  if (!trimmed) return false;
-  const emojiRegex = /^(\p{Extended_Pictographic}|\p{Emoji_Presentation}|\p{Emoji_Modifier}|\p{Emoji_Component}|\s)+$/u;
-  return emojiRegex.test(trimmed) && trimmed.length <= 32;
-};
-
-const EMAIL_REGEX = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
-const EMAIL_PATTERN_STR = "@?[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)+";
-
-const renderMessageContent = (
-  text?: string,
-  isInternal: boolean = false,
-  taggableList: any[] = []
-) => {
-  if (!text) return null;
-
-  if (isEmojiOnlyText(text)) {
-    return (
-      <div className="text-[32px] sm:text-[38px] leading-none select-none py-1 px-1 tracking-wide inline-block">
-        {text}
-      </div>
-    );
-  }
-
-  if (text.includes("@")) {
-    let regex: RegExp;
-
-    if (isInternal) {
-      const names = taggableList
-        .map(u => u.displayName || (u.first_name ? `${u.first_name} ${u.last_name || ""}`.trim() : null) || u.name)
-        .filter(Boolean)
-        .sort((a: string, b: string) => b.length - a.length)
-        .map((name: string) => name.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"));
-
-      if (!names.some((n: string) => n.toLowerCase() === "team")) {
-        names.unshift("Team");
-      }
-
-      if (names.length > 0) {
-        const namesPattern = names.join("|");
-        regex = new RegExp(
-          `(@\\[[^\\]]+\\]|${EMAIL_PATTERN_STR}|@(?:${namesPattern})|@[A-Za-z0-9_.-]+(?:\\s+[A-Z][a-z0-9_.-]+)*)`,
-          "g"
-        );
-      } else {
-        regex = new RegExp(
-          `(@\\[[^\\]]+\\]|${EMAIL_PATTERN_STR}|@[A-Za-z0-9_.-]+(?:\\s+[A-Z][a-z0-9_.-]+)*)`,
-          "g"
-        );
-      }
-    } else {
-      regex = new RegExp(`(${EMAIL_PATTERN_STR})`, "g");
-    }
-
-    const parts = text.split(regex);
-    return (
-      <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-relaxed text-foreground">
-        {parts.map((part, i) => {
-          if (!part) return null;
-
-          const isEmail = EMAIL_REGEX.test(part.startsWith("@") ? part.slice(1) : part);
-          const isMention = isInternal && part.startsWith("@");
-
-          if (isEmail || isMention) {
-            const isOrderTeam = isMention && (part.toLowerCase() === "@team" || part.toLowerCase() === "@[team]");
-            if (isOrderTeam) {
-              return (
-                <span
-                  key={i}
-                  className="font-bold text-amber-700 dark:text-amber-300 bg-amber-500/20 dark:bg-amber-950/60 border border-amber-500/35 px-1.5 py-0.5 rounded-md text-[11px] sm:text-xs inline-flex items-center gap-1 align-baseline mr-0.5 select-text shadow-2xs"
-                  title="Assigned Order Members (Consultants & Reviewers)"
-                >
-                  <Users className="h-3 w-3 inline shrink-0 text-amber-600 dark:text-amber-400" />
-                  {part}
-                </span>
-              );
-            }
-            return (
-              <span
-                key={i}
-                className="font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/15 dark:bg-amber-950/40 border border-amber-500/20 px-1.5 py-0.5 rounded-md text-[11px] sm:text-xs inline-block align-baseline mr-0.5 break-all select-text"
-              >
-                {part}
-              </span>
-            );
-          }
-
-          return <span key={i} className="break-words [overflow-wrap:anywhere]">{part}</span>;
-        })}
-      </span>
-    );
-  }
-
-  return <span className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-relaxed">{text}</span>;
-};
+import {
+  TopBar,
+  OrderDetailsPanel,
+  ChatPanel,
+  ChatMessage,
+  TaggableUser,
+  OrderSummaryData,
+  formatFileSize,
+  formatExternalTeamName,
+  isSystemMessage
+} from "./order-chat";
 
 interface DualOrderChatDialogProps {
   isOpen: boolean;
@@ -398,6 +40,20 @@ interface DualOrderChatDialogProps {
   orderStatus?: string;
 }
 
+const deduplicateMessages = (msgs: any[]): ChatMessage[] => {
+  if (!Array.isArray(msgs)) return [];
+  const map = new Map<string | number, any>();
+  for (const m of msgs) {
+    if (!m) continue;
+    const key =
+      m.id !== undefined && m.id !== null
+        ? `id-${m.id}`
+        : `msg-${m.created_at || ""}-${m.message || ""}`;
+    map.set(key, m);
+  }
+  return Array.from(map.values());
+};
+
 export function DualOrderChatDialog({
   isOpen,
   onClose,
@@ -408,8 +64,8 @@ export function DualOrderChatDialog({
   orderStatus
 }: DualOrderChatDialogProps) {
   const [mounted, setMounted] = useState(false);
-  const [clientMessages, setClientMessages] = useState<any[]>([]);
-  const [internalMessages, setInternalMessages] = useState<any[]>([]);
+  const [clientMessages, setClientMessages] = useState<ChatMessage[]>([]);
+  const [internalMessages, setInternalMessages] = useState<ChatMessage[]>([]);
   const [loadingClient, setLoadingClient] = useState(false);
   const [loadingInternal, setLoadingInternal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -417,22 +73,150 @@ export function DualOrderChatDialog({
   const [downloadingTranscript, setDownloadingTranscript] = useState(false);
 
   // Order Details Summary State
-  const [orderSummary, setOrderSummary] = useState<any | null>(null);
+  const [orderSummary, setOrderSummary] = useState<OrderSummaryData | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
 
-  // Document Preview State (Preview Only - No Download)
+  // Mobile channel tab selector (<1024px)
+  const [activeMobileTab, setActiveMobileTab] = useState<"CLIENT" | "INTERNAL">("INTERNAL");
+
+  // Document Preview State (Lightbox)
   const [previewAttachment, setPreviewAttachment] = useState<any | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Composer Inputs & States
+  const [clientInput, setClientInput] = useState("");
+  const [internalInput, setInternalInput] = useState("");
+  const [sendingClient, setSendingClient] = useState(false);
+  const [sendingInternal, setSendingInternal] = useState(false);
+
+  // Quote / Reply State
+  const [quotedClientMessage, setQuotedClientMessage] = useState<ChatMessage | null>(null);
+  const [quotedInternalMessage, setQuotedInternalMessage] = useState<ChatMessage | null>(null);
+
+  // Input refs
+  const clientInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const internalInputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Attachment States
+  const [clientAttachment, setClientAttachment] = useState<File | null>(null);
+  const [clientAttachmentPreview, setClientAttachmentPreview] = useState<string | null>(null);
+
+  const [internalAttachment, setInternalAttachment] = useState<File | null>(null);
+  const [internalAttachmentPreview, setInternalAttachmentPreview] = useState<string | null>(null);
+
+  // Client Confirmation Dialog State
+  const [isConfirmClientOpen, setIsConfirmClientOpen] = useState(false);
+  const [pendingClientMessage, setPendingClientMessage] = useState("");
+
+  // Taggable users for @mentions
+  const [taggableUsers, setTaggableUsers] = useState<TaggableUser[]>([]);
+
+  // Current logged in user (for permission check on edit/delete)
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
+
+  // Edit / Delete State
+  const [editingMessage, setEditingMessage] = useState<{
+    msg: ChatMessage;
+    channel: "CLIENT" | "INTERNAL";
+  } | null>(null);
+  const [editingMessageText, setEditingMessageText] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    msgId: number;
+    channel: "CLIENT" | "INTERNAL";
+  } | null>(null);
+  const [deletingMessageId, setDeletingMessageId] = useState<number | null>(null);
+
+  const lastMarkedClientMsgIdRef = useRef<number>(0);
+  const lastMarkedInternalMsgIdRef = useRef<number>(0);
+
+  // Client attachment handlers
+  const handleClientAttachmentSelect = (file: File) => {
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("File exceeds 50MB maximum size limit.");
+      return;
+    }
+    setClientAttachment(file);
+    if (file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setClientAttachmentPreview(url);
+    } else {
+      setClientAttachmentPreview(null);
+    }
+    clientInputRef.current?.focus();
+  };
+
+  const handleRemoveClientAttachment = () => {
+    if (clientAttachmentPreview) {
+      URL.revokeObjectURL(clientAttachmentPreview);
+    }
+    setClientAttachment(null);
+    setClientAttachmentPreview(null);
+  };
+
+  // Internal attachment handlers
+  const handleInternalAttachmentSelect = (file: File) => {
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("File exceeds 50MB maximum size limit.");
+      return;
+    }
+    setInternalAttachment(file);
+    if (file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setInternalAttachmentPreview(url);
+    } else {
+      setInternalAttachmentPreview(null);
+    }
+    internalInputRef.current?.focus();
+  };
+
+  const handleRemoveInternalAttachment = () => {
+    if (internalAttachmentPreview) {
+      URL.revokeObjectURL(internalAttachmentPreview);
+    }
+    setInternalAttachment(null);
+    setInternalAttachmentPreview(null);
+  };
 
   const handlePreviewAttachment = (msg: any) => {
     if (!msg.attachment_url || msg.attachment_url === "uploading...") return;
     setPreviewAttachment(msg);
-    const url = `/api-proxy/api/clients/orders/${orderNumber}/attachments/preview?path=${encodeURIComponent(msg.attachment_url)}`;
+    const url = `/api-proxy/api/clients/orders/${orderNumber}/attachments/preview?path=${encodeURIComponent(
+      msg.attachment_url
+    )}`;
     setPreviewUrl(url);
   };
 
+  const roleName = (currentUser?.role?.name || "").trim().toUpperCase();
+  const deptName = (currentUser?.department?.name || "").trim().toUpperCase();
+
+  const isSuperAdmin = Boolean(
+    currentUser?.is_super_admin ||
+    currentUser?.role_id === 1 ||
+    currentUser?.email === "admin@mcs-consulting.com" ||
+    ["SUPER ADMIN", "SUPERADMIN", "SUPER_ADMIN", "SYSTEM ADMIN"].includes(roleName)
+  );
+
+  const isUserAdmin = Boolean(
+    isSuperAdmin ||
+    roleName === "ADMIN" ||
+    roleName === "HR" ||
+    roleName.includes("ADMIN") ||
+    roleName.includes("HR") ||
+    roleName.includes("DIRECTOR") ||
+    deptName.includes("HR") ||
+    deptName.includes("ADMIN")
+  );
+
   const handleSaveToDropbox = async () => {
+    if (!isUserAdmin) {
+      toast.error("Only administrators can archive chats to Dropbox.");
+      return;
+    }
     if (!orderNumber || savingToDropbox) return;
     try {
       setSavingToDropbox(true);
@@ -463,6 +247,10 @@ export function DualOrderChatDialog({
   };
 
   const handleDownloadTranscript = async () => {
+    if (!isUserAdmin) {
+      toast.error("Only administrators can download chat transcripts.");
+      return;
+    }
     if (!orderNumber || downloadingTranscript) return;
     try {
       setDownloadingTranscript(true);
@@ -496,291 +284,7 @@ export function DualOrderChatDialog({
     }
   };
 
-  // Inputs
-  const [clientInput, setClientInput] = useState("");
-  const [internalInput, setInternalInput] = useState("");
-  const [sendingClient, setSendingClient] = useState(false);
-  const [sendingInternal, setSendingInternal] = useState(false);
-
-  // Quote / Reply State
-  const [quotedClientMessage, setQuotedClientMessage] = useState<any | null>(null);
-  const [quotedInternalMessage, setQuotedInternalMessage] = useState<any | null>(null);
-
-  // Input refs
-  const clientInputRef = useRef<HTMLTextAreaElement | null>(null);
-  const internalInputRef = useRef<HTMLTextAreaElement | null>(null);
-
-  // Attachment & Snippet States
-  const [clientAttachment, setClientAttachment] = useState<File | null>(null);
-  const [clientAttachmentPreview, setClientAttachmentPreview] = useState<string | null>(null);
-  const clientFileInputRef = useRef<HTMLInputElement | null>(null);
-
-  const [internalAttachment, setInternalAttachment] = useState<File | null>(null);
-  const [internalAttachmentPreview, setInternalAttachmentPreview] = useState<string | null>(null);
-  const internalFileInputRef = useRef<HTMLInputElement | null>(null);
-
-  const handleClientAttachmentSelect = (file: File) => {
-    if (!file) return;
-    if (file.size > 50 * 1024 * 1024) {
-      toast.error("File exceeds 50MB maximum size limit.");
-      return;
-    }
-    setClientAttachment(file);
-    if (file.type.startsWith("image/")) {
-      const url = URL.createObjectURL(file);
-      setClientAttachmentPreview(url);
-    } else {
-      setClientAttachmentPreview(null);
-    }
-    clientInputRef.current?.focus();
-  };
-
-  const handleRemoveClientAttachment = () => {
-    if (clientAttachmentPreview) {
-      URL.revokeObjectURL(clientAttachmentPreview);
-    }
-    setClientAttachment(null);
-    setClientAttachmentPreview(null);
-    if (clientFileInputRef.current) {
-      clientFileInputRef.current.value = "";
-    }
-  };
-
-  const handleInternalAttachmentSelect = (file: File) => {
-    if (!file) return;
-    if (file.size > 50 * 1024 * 1024) {
-      toast.error("File exceeds 50MB maximum size limit.");
-      return;
-    }
-    setInternalAttachment(file);
-    if (file.type.startsWith("image/")) {
-      const url = URL.createObjectURL(file);
-      setInternalAttachmentPreview(url);
-    } else {
-      setInternalAttachmentPreview(null);
-    }
-    internalInputRef.current?.focus();
-  };
-
-  const handleRemoveInternalAttachment = () => {
-    if (internalAttachmentPreview) {
-      URL.revokeObjectURL(internalAttachmentPreview);
-    }
-    setInternalAttachment(null);
-    setInternalAttachmentPreview(null);
-    if (internalFileInputRef.current) {
-      internalFileInputRef.current.value = "";
-    }
-  };
-
-  const handlePasteSnippet = (
-    e: React.ClipboardEvent,
-    onAttach: (file: File) => void,
-    channelName: string
-  ) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (item.type.indexOf("image") !== -1 || (item.kind === "file" && item.type.startsWith("image/"))) {
-        const file = item.getAsFile();
-        if (file) {
-          e.preventDefault();
-          const ext = file.name && file.name.includes(".") ? file.name.split(".").pop() : (item.type.split("/")[1] || "png");
-          const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(11, 19);
-          const snippetName = file.name && file.name !== "image.png" && file.name.length > 5
-            ? file.name
-            : `snippet_${timestamp}.${ext}`;
-          const snippetFile = new File([file], snippetName, { type: file.type || "image/png" });
-          onAttach(snippetFile);
-          toast.success(`Image snippet attached to ${channelName}! Press Send to post.`);
-          return;
-        }
-      }
-    }
-  };
-
-  // Client Confirmation Dialog State
-  const [isConfirmClientOpen, setIsConfirmClientOpen] = useState(false);
-  const [pendingClientMessage, setPendingClientMessage] = useState("");
-  const [activeMobileTab, setActiveMobileTab] = useState<"CLIENT" | "INTERNAL">("INTERNAL");
-
-  // Tagging in Internal Chat
-  const [taggableUsers, setTaggableUsers] = useState<any[]>([]);
-  const [filteredSuggestions, setFilteredSuggestions] = useState<any[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [cursorPosition, setCursorPosition] = useState<number | null>(null);
-
-  // Current logged in user (for permission check on edit/delete)
-  const [currentUser, setCurrentUser] = useState<any | null>(null);
-
-  // Edit / Delete State
-  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
-  const [editingMessageText, setEditingMessageText] = useState("");
-  const [savingEdit, setSavingEdit] = useState(false);
-  const [deletingMessageId, setDeletingMessageId] = useState<number | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
-
-  const clientMessagesContainerRef = useRef<HTMLDivElement | null>(null);
-  const internalMessagesContainerRef = useRef<HTMLDivElement | null>(null);
-
-  const handleQuoteClientMessage = (msg: any) => {
-    setQuotedClientMessage(msg);
-    setTimeout(() => {
-      clientInputRef.current?.focus();
-    }, 50);
-  };
-
-  const handleQuoteInternalMessage = (msg: any) => {
-    setQuotedInternalMessage(msg);
-    setTimeout(() => {
-      internalInputRef.current?.focus();
-    }, 50);
-  };
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-      try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
-          credentials: "include"
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setCurrentUser(data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch current user:", err);
-      }
-    };
-    if (isOpen) {
-      fetchCurrentUser();
-    }
-  }, [isOpen]);
-
-  const canModifyMessage = (msg: any) => {
-    if (!msg || !msg.id || isSystemMessage(msg)) return false;
-    if (!currentUser) return false;
-    const isSuperAdmin = currentUser.role?.name?.toUpperCase() === "SUPER_ADMIN" || currentUser.is_super_admin;
-    const isAdmin = currentUser.role?.name?.toUpperCase() === "ADMIN" || currentUser.role?.name?.toUpperCase() === "HR" || currentUser.department?.name === "HR";
-    const isAuthor = msg.user_id && msg.user_id === currentUser.id;
-    return Boolean(isAuthor || isSuperAdmin || isAdmin);
-  };
-
-  const handleStartEdit = (msg: any) => {
-    setEditingMessageId(msg.id);
-    setEditingMessageText(msg.message || "");
-    setConfirmDeleteId(null);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingMessageId(null);
-    setEditingMessageText("");
-  };
-
-  const handleSaveEdit = async (msgId: number, channel: "CLIENT" | "INTERNAL") => {
-    if (!orderNumber || !editingMessageText.trim() || savingEdit) return;
-    try {
-      setSavingEdit(true);
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(orderNumber)}/progress/${msgId}`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            message: editingMessageText.trim()
-          })
-        }
-      );
-
-      if (res.ok) {
-        const updated = await res.json();
-        if (channel === "CLIENT") {
-          setClientMessages(prev => prev.map(m => (m.id === msgId ? updated : m)));
-        } else {
-          setInternalMessages(prev => prev.map(m => (m.id === msgId ? updated : m)));
-        }
-        setEditingMessageId(null);
-        setEditingMessageText("");
-        toast.success("Message updated successfully");
-      } else {
-        const err = await res.json();
-        toast.error(err.detail || "Failed to update message");
-      }
-    } catch (err) {
-      console.error("Error updating message:", err);
-      toast.error("Error updating message");
-    } finally {
-      setSavingEdit(false);
-    }
-  };
-
-  const handleDeleteMessage = async (msgId: number, channel: "CLIENT" | "INTERNAL") => {
-    if (!orderNumber || deletingMessageId) return;
-    try {
-      setDeletingMessageId(msgId);
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(orderNumber)}/progress/${msgId}`,
-        {
-          method: "DELETE",
-          credentials: "include"
-        }
-      );
-
-      if (res.ok) {
-        const data = await res.json().catch(() => null);
-        const deletedRecord = (data && data.id) ? data : {
-          is_deleted: true,
-          message: "This message was deleted",
-          attachment_url: null,
-          attachment_name: null,
-          reactions: []
-        };
-
-        if (channel === "CLIENT") {
-          setClientMessages(prev => prev.map(m => (m.id === msgId ? { ...m, ...deletedRecord, is_deleted: true } : m)));
-        } else {
-          setInternalMessages(prev => prev.map(m => (m.id === msgId ? { ...m, ...deletedRecord, is_deleted: true } : m)));
-        }
-        setConfirmDeleteId(null);
-        toast.success("Message deleted");
-      } else {
-        const err = await res.json().catch(() => ({}));
-        toast.error(err.detail || "Failed to delete message");
-      }
-    } catch (err) {
-      console.error("Error deleting message:", err);
-      toast.error("Error deleting message");
-    } finally {
-      setDeletingMessageId(null);
-    }
-  };
-
-  const formatCurrency = (amount?: number | null) => {
-    if (amount === undefined || amount === null) return "Rp 0";
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
-  const copyToClipboard = (text: string, label: string) => {
-    if (!text) return;
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied to clipboard`);
-  };
-
-  const lastMarkedClientMsgIdRef = useRef<number>(0);
-  const lastMarkedInternalMsgIdRef = useRef<number>(0);
-
+  // Mark chat as read
   const markOrderChatRead = async (orderNo: string, channel: string, lastMsgId: number) => {
     if (!orderNo || !lastMsgId) return;
     try {
@@ -798,11 +302,14 @@ export function DualOrderChatDialog({
     }
   };
 
+  // Reaction toggle
   const handleToggleReaction = async (msgId: number, emoji: string, isInternal: boolean) => {
     if (!orderNumber || !msgId || !emoji) return;
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(orderNumber)}/progress/${msgId}/reactions`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(
+          orderNumber
+        )}/progress/${msgId}/reactions`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -813,8 +320,8 @@ export function DualOrderChatDialog({
       if (res.ok) {
         const data = await res.json();
         if (data.reactions) {
-          const syncUpdater = (prevMsgs: any[]) =>
-            prevMsgs.map(m => (m.id === msgId ? { ...m, reactions: data.reactions } : m));
+          const syncUpdater = (prevMsgs: ChatMessage[]) =>
+            prevMsgs.map((m) => (m.id === msgId ? { ...m, reactions: data.reactions } : m));
           if (isInternal) setInternalMessages(syncUpdater);
           else setClientMessages(syncUpdater);
         }
@@ -824,13 +331,15 @@ export function DualOrderChatDialog({
     }
   };
 
-  // 1. Fetch Order Summary
+  // Fetch Order Summary
   const fetchOrderSummary = async (isInitial = false) => {
     if (!orderNumber) return;
     if (isInitial) setLoadingSummary(true);
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(orderNumber)}/summary`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(
+          orderNumber
+        )}/summary`,
         { credentials: "include" }
       );
       if (res.ok) {
@@ -844,7 +353,7 @@ export function DualOrderChatDialog({
     }
   };
 
-  // 2. Fetch Client Messages
+  // Fetch Client Messages
   const fetchClientMessages = async (isInitial = false) => {
     if (!orderNumber) return;
     if (isInitial) setLoadingClient(true);
@@ -876,7 +385,7 @@ export function DualOrderChatDialog({
     }
   };
 
-  // 3. Fetch Internal Messages
+  // Fetch Internal Messages
   const fetchInternalMessages = async (isInitial = false) => {
     if (!orderNumber) return;
     if (isInitial) setLoadingInternal(true);
@@ -908,7 +417,7 @@ export function DualOrderChatDialog({
     }
   };
 
-  // 4. Fetch Taggable Users (for Internal Chat @mentions)
+  // Fetch Taggable Users
   const fetchTaggableUsers = async () => {
     if (!orderNumber) return;
     try {
@@ -924,19 +433,22 @@ export function DualOrderChatDialog({
       const employees = tagRes && tagRes.ok ? await tagRes.json().catch(() => []) : [];
       const teams = teamRes && teamRes.ok ? await teamRes.json().catch(() => []) : [];
 
-      const formattedEmployees = (employees || []).map((e: any) => ({
-        ...e,
-        type: "employee",
-        displayName: e.displayName || `${e.first_name} ${e.last_name}`.trim() || e.email
-      }));
-      const formattedTeams = (teams || []).map((t: any) => ({
-        ...t,
-        type: "team",
-        displayName: t.name
+      const formattedEmployees: TaggableUser[] = (employees || []).map((e: any) => ({
+        id: e.id,
+        type: "user",
+        displayName: e.displayName || `${e.first_name || ""} ${e.last_name || ""}`.trim() || e.email,
+        job_title: e.job_title || e.position,
+        avatar: e.profile_photo
       }));
 
-      // Order Team tag specifically for members assigned to this order
-      const orderTeamItem = {
+      const formattedTeams: TaggableUser[] = (teams || []).map((t: any) => ({
+        id: t.id,
+        type: "team",
+        displayName: t.name,
+        subtitle: "Team channel"
+      }));
+
+      const orderTeamItem: TaggableUser = {
         id: "order_team_mention",
         type: "order_team",
         displayName: "Team",
@@ -949,7 +461,7 @@ export function DualOrderChatDialog({
     }
   };
 
-  // Refresh all messages
+  // Refresh all data
   const handleRefresh = async () => {
     setRefreshing(true);
     await Promise.all([
@@ -960,7 +472,31 @@ export function DualOrderChatDialog({
     setRefreshing(false);
   };
 
-  // Prevent background scrolling when dialog is open
+  // Fetch Current User
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
+          credentials: "include"
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setCurrentUser(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch current user:", err);
+      }
+    };
+    if (isOpen) {
+      fetchCurrentUser();
+    }
+  }, [isOpen]);
+
+  // Lock background scroll
   useEffect(() => {
     if (isOpen) {
       const prevBodyOverflow = document.body.style.overflow;
@@ -974,6 +510,7 @@ export function DualOrderChatDialog({
     }
   }, [isOpen]);
 
+  // Initialize data & periodic polling
   useEffect(() => {
     if (isOpen && orderNumber) {
       lastMarkedClientMsgIdRef.current = 0;
@@ -983,7 +520,6 @@ export function DualOrderChatDialog({
       fetchInternalMessages(true);
       fetchTaggableUsers();
 
-      // Background sync every 15 seconds
       const interval = setInterval(() => {
         if (typeof document !== "undefined" && document.visibilityState === "visible") {
           fetchClientMessages(false);
@@ -993,27 +529,21 @@ export function DualOrderChatDialog({
 
       return () => clearInterval(interval);
     }
-  }, [isOpen, orderNumber]);
+  }, [isOpen, orderNumber]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Scroll strictly inside the message stream container (NEVER scroll the browser window or parent)
-  useEffect(() => {
-    if (clientMessagesContainerRef.current) {
-      clientMessagesContainerRef.current.scrollTop = clientMessagesContainerRef.current.scrollHeight;
-    }
-  }, [clientMessages.length]);
-
-  useEffect(() => {
-    if (internalMessagesContainerRef.current) {
-      internalMessagesContainerRef.current.scrollTop = internalMessagesContainerRef.current.scrollHeight;
-    }
-  }, [internalMessages.length]);
-
-  // Close on Escape key
+  // Keyboard Escape listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (isConfirmClientOpen) {
+        if (previewAttachment) {
+          setPreviewAttachment(null);
+          setPreviewUrl(null);
+        } else if (isConfirmClientOpen) {
           setIsConfirmClientOpen(false);
+        } else if (editingMessage) {
+          setEditingMessage(null);
+        } else if (deleteConfirm) {
+          setDeleteConfirm(null);
         } else if (isOpen) {
           onClose();
         }
@@ -1023,39 +553,162 @@ export function DualOrderChatDialog({
       window.addEventListener("keydown", handleKeyDown);
       return () => window.removeEventListener("keydown", handleKeyDown);
     }
-  }, [isOpen, isConfirmClientOpen, onClose]);
+  }, [isOpen, isConfirmClientOpen, previewAttachment, editingMessage, deleteConfirm, onClose]);
 
-  // 5. Handle Client Message Confirmation
-  const handleClientSendClick = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  // Permission check for edit / delete
+  const canModifyMessage = (msg: ChatMessage) => {
+    if (!msg || !msg.id || isSystemMessage(msg)) return false;
+    if (!currentUser) return false;
+    const isAuthor = msg.user_id && msg.user_id === currentUser.id;
+    return Boolean(isAuthor || isUserAdmin);
+  };
+
+  // Edit Message Handlers
+  const handleStartEdit = (msg: ChatMessage, channel: "CLIENT" | "INTERNAL") => {
+    if (!canModifyMessage(msg)) {
+      toast.error("You do not have permission to edit this message");
+      return;
+    }
+    setEditingMessage({ msg, channel });
+    setEditingMessageText(msg.message || "");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingMessage || !orderNumber || !editingMessageText.trim() || savingEdit) return;
+    const { msg, channel } = editingMessage;
+
+    try {
+      setSavingEdit(true);
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(
+          orderNumber
+        )}/progress/${msg.id}`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: editingMessageText.trim() })
+        }
+      );
+
+      if (res.ok) {
+        const updated = await res.json();
+        if (channel === "CLIENT") {
+          setClientMessages((prev) => prev.map((m) => (m.id === msg.id ? updated : m)));
+        } else {
+          setInternalMessages((prev) => prev.map((m) => (m.id === msg.id ? updated : m)));
+        }
+        setEditingMessage(null);
+        setEditingMessageText("");
+        toast.success("Message updated successfully");
+      } else {
+        const err = await res.json();
+        toast.error(err.detail || "Failed to update message");
+      }
+    } catch (err) {
+      console.error("Error updating message:", err);
+      toast.error("Error updating message");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // Delete Message Handlers
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm || !orderNumber || deletingMessageId) return;
+    const { msgId, channel } = deleteConfirm;
+
+    try {
+      setDeletingMessageId(msgId);
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${encodeURIComponent(
+          orderNumber
+        )}/progress/${msgId}`,
+        {
+          method: "DELETE",
+          credentials: "include"
+        }
+      );
+
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        const deletedRecord =
+          data && data.id
+            ? data
+            : {
+                is_deleted: true,
+                message: "This message was deleted",
+                attachment_url: null,
+                attachment_name: null,
+                reactions: []
+              };
+
+        if (channel === "CLIENT") {
+          setClientMessages((prev) =>
+            prev.map((m) => (m.id === msgId ? { ...m, ...deletedRecord, is_deleted: true } : m))
+          );
+        } else {
+          setInternalMessages((prev) =>
+            prev.map((m) => (m.id === msgId ? { ...m, ...deletedRecord, is_deleted: true } : m))
+          );
+        }
+        setDeleteConfirm(null);
+        toast.success("Message deleted");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.detail || "Failed to delete message");
+      }
+    } catch (err) {
+      console.error("Error deleting message:", err);
+      toast.error("Error deleting message");
+    } finally {
+      setDeletingMessageId(null);
+    }
+  };
+
+  // Client Send Trigger (Opens Confirmation Modal)
+  const handleClientSendClick = () => {
     if (!clientInput.trim() && !clientAttachment) return;
     setPendingClientMessage(clientInput.trim());
     setIsConfirmClientOpen(true);
   };
 
+  // Confirmed Client Send
   const handleConfirmSendClientMessage = async () => {
     if ((!pendingClientMessage && !clientAttachment) || !orderNumber || sendingClient) return;
     try {
       setSendingClient(true);
       setIsConfirmClientOpen(false);
-      const quotePayload = quotedClientMessage ? {
-        quoted_message_id: quotedClientMessage.id,
-        quoted_message_text: quotedClientMessage.message || quotedClientMessage.attachment_name || "Attachment",
-        quoted_sender_name: quotedClientMessage.is_client
-          ? (quotedClientMessage.sender_name || "Client")
-          : formatExternalTeamName(quotedClientMessage.sender_name)
-      } : {};
+
+      const quotePayload = quotedClientMessage
+        ? {
+            quoted_message_id: quotedClientMessage.id,
+            quoted_message_text:
+              quotedClientMessage.message || quotedClientMessage.attachment_name || "Attachment",
+            quoted_sender_name: quotedClientMessage.is_client
+              ? quotedClientMessage.sender_name || "Client"
+              : formatExternalTeamName(quotedClientMessage.sender_name)
+          }
+        : {};
 
       if (clientAttachment) {
         const formData = new FormData();
         formData.append("file", clientAttachment);
         if (pendingClientMessage) formData.append("message", pendingClientMessage);
         formData.append("channel", "CLIENT");
-        const isSnippet = clientAttachment.name.startsWith("snippet_") || clientAttachment.type.startsWith("image/");
+        const isSnippet =
+          clientAttachment.name.startsWith("snippet_") ||
+          clientAttachment.type.startsWith("image/");
         formData.append("is_snippet", isSnippet ? "true" : "false");
-        if (quotePayload.quoted_message_id) formData.append("quoted_message_id", String(quotePayload.quoted_message_id));
-        if (quotePayload.quoted_message_text) formData.append("quoted_message_text", quotePayload.quoted_message_text);
-        if (quotePayload.quoted_sender_name) formData.append("quoted_sender_name", quotePayload.quoted_sender_name);
+        if (quotePayload.quoted_message_id) {
+          formData.append("quoted_message_id", String(quotePayload.quoted_message_id));
+        }
+        if (quotePayload.quoted_message_text) {
+          formData.append("quoted_message_text", quotePayload.quoted_message_text);
+        }
+        if (quotePayload.quoted_sender_name) {
+          formData.append("quoted_sender_name", quotePayload.quoted_sender_name);
+        }
 
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/upload-attachment`,
@@ -1067,15 +720,12 @@ export function DualOrderChatDialog({
         );
         if (res.ok) {
           const newMsg = await res.json();
-          setClientMessages(prev => deduplicateMessages([...prev, newMsg]));
+          setClientMessages((prev) => deduplicateMessages([...prev, newMsg]));
           setClientInput("");
-          if (clientInputRef.current) {
-            clientInputRef.current.style.height = "auto";
-          }
           setPendingClientMessage("");
           setQuotedClientMessage(null);
           handleRemoveClientAttachment();
-          toast.success("Attachment and message sent to Client successfully!");
+          toast.success("Attachment and message sent to Client!");
         } else {
           const err = await res.json();
           toast.error(err.detail || "Failed to upload attachment to client");
@@ -1086,9 +736,7 @@ export function DualOrderChatDialog({
           {
             method: "POST",
             credentials: "include",
-            headers: {
-              "Content-Type": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               message: pendingClientMessage,
               channel: "CLIENT",
@@ -1098,14 +746,11 @@ export function DualOrderChatDialog({
         );
         if (res.ok) {
           const newMsg = await res.json();
-          setClientMessages(prev => deduplicateMessages([...prev, newMsg]));
+          setClientMessages((prev) => deduplicateMessages([...prev, newMsg]));
           setClientInput("");
-          if (clientInputRef.current) {
-            clientInputRef.current.style.height = "auto";
-          }
           setPendingClientMessage("");
           setQuotedClientMessage(null);
-          toast.success("Message sent to Client successfully!");
+          toast.success("Message sent to Client!");
         } else {
           const err = await res.json();
           toast.error(err.detail || "Failed to send message to client");
@@ -1119,35 +764,43 @@ export function DualOrderChatDialog({
     }
   };
 
-  // 6. Handle Internal Message Send (Instant, No Confirmation)
-  const handleInternalSend = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  // Internal Send (Instant)
+  const handleInternalSend = async () => {
     if ((!internalInput.trim() && !internalAttachment) || !orderNumber || sendingInternal) return;
     const msgToSend = internalInput.trim();
-    const quotePayload = quotedInternalMessage ? {
-      quoted_message_id: quotedInternalMessage.id,
-      quoted_message_text: quotedInternalMessage.message || quotedInternalMessage.attachment_name || "Attachment",
-      quoted_sender_name: quotedInternalMessage.sender_name || "Team Member"
-    } : {};
+    const quotePayload = quotedInternalMessage
+      ? {
+          quoted_message_id: quotedInternalMessage.id,
+          quoted_message_text:
+            quotedInternalMessage.message ||
+            quotedInternalMessage.attachment_name ||
+            "Attachment",
+          quoted_sender_name: quotedInternalMessage.sender_name || "Team Member"
+        }
+      : {};
 
     try {
       setSendingInternal(true);
       setInternalInput("");
-      if (internalInputRef.current) {
-        internalInputRef.current.style.height = "auto";
-      }
-      setShowSuggestions(false);
 
       if (internalAttachment) {
         const formData = new FormData();
         formData.append("file", internalAttachment);
         if (msgToSend) formData.append("message", msgToSend);
         formData.append("channel", "INTERNAL");
-        const isSnippet = internalAttachment.name.startsWith("snippet_") || internalAttachment.type.startsWith("image/");
+        const isSnippet =
+          internalAttachment.name.startsWith("snippet_") ||
+          internalAttachment.type.startsWith("image/");
         formData.append("is_snippet", isSnippet ? "true" : "false");
-        if (quotePayload.quoted_message_id) formData.append("quoted_message_id", String(quotePayload.quoted_message_id));
-        if (quotePayload.quoted_message_text) formData.append("quoted_message_text", quotePayload.quoted_message_text);
-        if (quotePayload.quoted_sender_name) formData.append("quoted_sender_name", quotePayload.quoted_sender_name);
+        if (quotePayload.quoted_message_id) {
+          formData.append("quoted_message_id", String(quotePayload.quoted_message_id));
+        }
+        if (quotePayload.quoted_message_text) {
+          formData.append("quoted_message_text", quotePayload.quoted_message_text);
+        }
+        if (quotePayload.quoted_sender_name) {
+          formData.append("quoted_sender_name", quotePayload.quoted_sender_name);
+        }
 
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders/${orderNumber}/upload-attachment`,
@@ -1159,10 +812,10 @@ export function DualOrderChatDialog({
         );
         if (res.ok) {
           const newMsg = await res.json();
-          setInternalMessages(prev => deduplicateMessages([...prev, newMsg]));
+          setInternalMessages((prev) => deduplicateMessages([...prev, newMsg]));
           setQuotedInternalMessage(null);
           handleRemoveInternalAttachment();
-          toast.success("Internal note and attachment posted!");
+          toast.success("Internal note posted!");
         } else {
           const err = await res.json();
           toast.error(err.detail || "Failed to upload internal attachment");
@@ -1174,9 +827,7 @@ export function DualOrderChatDialog({
           {
             method: "POST",
             credentials: "include",
-            headers: {
-              "Content-Type": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               message: msgToSend,
               channel: "INTERNAL",
@@ -1186,7 +837,7 @@ export function DualOrderChatDialog({
         );
         if (res.ok) {
           const newMsg = await res.json();
-          setInternalMessages(prev => deduplicateMessages([...prev, newMsg]));
+          setInternalMessages((prev) => deduplicateMessages([...prev, newMsg]));
           setQuotedInternalMessage(null);
         } else {
           const err = await res.json();
@@ -1203,1700 +854,199 @@ export function DualOrderChatDialog({
     }
   };
 
-  // Handle @ Tagging in Internal Chat
-  const handleInternalTextChange = (value: string, pos: number) => {
-    setInternalInput(value);
-    setCursorPosition(pos);
-
-    const textBeforeCursor = value.slice(0, pos);
-    const match = textBeforeCursor.match(/@([a-zA-Z0-9_\s]*)$/);
-
-    if (match) {
-      const query = match[1].toLowerCase();
-      const filtered = taggableUsers.filter(u =>
-        u.displayName.toLowerCase().includes(query) ||
-        (u.subtitle && u.subtitle.toLowerCase().includes(query))
-      );
-      setFilteredSuggestions(filtered.slice(0, 6));
-      setShowSuggestions(filtered.length > 0);
-    } else {
-      setShowSuggestions(false);
-    }
-  };
-
-  const selectSuggestion = (item: any) => {
-    if (cursorPosition === null) return;
-    const textBeforeCursor = internalInput.slice(0, cursorPosition);
-    const textAfterCursor = internalInput.slice(cursorPosition);
-    const atIndex = textBeforeCursor.lastIndexOf("@");
-
-    const newText =
-      textBeforeCursor.slice(0, atIndex) +
-      `@${item.displayName} ` +
-      textAfterCursor;
-
-    setInternalInput(newText);
-    setShowSuggestions(false);
-    requestAnimationFrame(() => {
-      if (internalInputRef.current) {
-        internalInputRef.current.style.height = "auto";
-        internalInputRef.current.style.height = `${Math.min(internalInputRef.current.scrollHeight, 160)}px`;
-        const newPos = atIndex + item.displayName.length + 2;
-        internalInputRef.current.selectionStart = internalInputRef.current.selectionEnd = newPos;
-        internalInputRef.current.focus();
-      }
-    });
-  };
-
-  // Helper to render internal messages with clean inline colored tags (single unified bubble background)
-  const renderInternalMessageText = (text: string) => {
-    if (!text) return null;
-
-    // Collect all taggable user & team names to match precisely
-    const names = (taggableUsers || [])
-      .map(u => u.displayName || `${u.first_name || ""} ${u.last_name || ""}`.trim())
-      .filter(Boolean)
-      .sort((a, b) => b.length - a.length);
-
-    const escapedNames = names.map(n => n.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
-    const mentionPattern = escapedNames.length > 0
-      ? new RegExp(`(@(?:${escapedNames.join('|')}|[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+|[a-zA-Z0-9_]+))`, 'gi')
-      : /(@[a-zA-Z0-9_.-]+)/g;
-
-    const parts = text.split(mentionPattern);
-    return parts.map((part, idx) => {
-      if (part.startsWith("@")) {
-        return (
-          <span
-            key={idx}
-            className="font-bold text-amber-600 dark:text-amber-400"
-          >
-            {part}
-          </span>
-        );
-      }
-      return part;
-    });
-  };
-
   if (!mounted) return null;
+
+  const currentUserName = currentUser
+    ? `${currentUser.first_name || ""} ${currentUser.last_name || ""}`.trim() || currentUser.email
+    : null;
 
   const content = (
     <>
-      {/* SLIDING PANEL CONTAINER */}
       <AnimatePresence>
-        {isOpen && orderNumber && (
-          <>
-            {/* Backdrop Overlay */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={onClose}
-              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[70]"
+        {isOpen && (
+          <motion.div
+            key="order-chat-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.28, ease: "easeInOut" }}
+            onClick={onClose}
+            className="fixed inset-0 z-[74] bg-black/40 backdrop-blur-2xs"
+          />
+        )}
+        {isOpen && (
+          <motion.div
+            key="order-chat-sheet"
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "tween", ease: [0.16, 1, 0.3, 1], duration: 0.32 }}
+            className="fixed inset-0 z-[75] h-screen h-[100dvh] w-screen flex flex-col bg-[var(--oc-bg-app)] text-[var(--oc-text-primary)] overflow-hidden shadow-2xl"
+          >
+            {/* Top Navigation Bar */}
+            <TopBar
+              orderNumber={orderNumber}
+              companyName={orderSummary?.company?.company_name || companyName}
+              clientName={orderSummary?.client?.name || clientName}
+              orderStatus={orderSummary?.status || orderStatus}
+              showDetails={showDetails}
+              isAdmin={isUserAdmin}
+              onToggleDetails={() => setShowDetails(!showDetails)}
+              onRefresh={handleRefresh}
+              refreshing={refreshing}
+              onSaveToDropbox={isUserAdmin ? handleSaveToDropbox : undefined}
+              savingToDropbox={savingToDropbox}
+              onDownloadTranscript={isUserAdmin ? handleDownloadTranscript : undefined}
+              downloadingTranscript={downloadingTranscript}
+              onClose={onClose}
             />
 
-            {/* Fullscreen Dynamic Order Chat Dialog Flier */}
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "tween", ease: "easeInOut", duration: 0.3 }}
-              className="fixed inset-0 z-[75] h-screen h-[100dvh] max-h-screen max-h-[100dvh] w-screen w-[100vw] max-w-[100vw] bg-background text-foreground shadow-2xl flex flex-col overflow-hidden"
-            >
-              {/* Top Header Bar - Fixed & Pinned */}
-              <div className="p-2.5 sm:p-4 border-b border-border/80 bg-background/95 backdrop-blur-md flex flex-row items-center justify-between shrink-0 gap-2 sm:gap-4 sticky top-0 z-30 shadow-xs pt-safe">
-                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onClose}
-                    className="gap-1.5 sm:gap-2 font-bold shadow-xs bg-muted/60 hover:bg-muted text-foreground border-border transition-colors h-8.5 shrink-0 px-2.5 sm:px-3"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    <span className="hidden sm:inline">Back to Orders</span>
-                    <span className="sm:hidden text-xs">Back</span>
-                  </Button>
-
-                  <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shrink-0">
-                    <Package className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
-                  </div>
-
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                      <h3 className="text-sm sm:text-base md:text-lg font-extrabold font-mono text-foreground truncate max-w-[120px] xs:max-w-none">
-                        #{orderNumber}
-                      </h3>
-                      {(orderSummary?.status || orderStatus) && (
-                        <Badge variant="outline" className="text-[10px] sm:text-xs font-semibold px-1.5 sm:px-2 py-0.5">
-                          {orderSummary?.status || orderStatus}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowDetails(!showDetails)}
-                    className={`text-xs gap-1.5 h-8.5 font-medium border-border transition-colors ${
-                      showDetails ? "bg-primary/10 text-primary border-primary/30 font-semibold" : "bg-muted/60 text-muted-foreground hover:text-foreground"
-                    }`}
-                    title={showDetails ? "Hide Order Details" : "Show Order Details"}
-                  >
-                    {showDetails ? (
-                      <>
-                        <PanelLeftClose className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Hide Details</span>
-                      </>
-                    ) : (
-                      <>
-                        <PanelLeftOpen className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Show Details</span>
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleRefresh}
-                    disabled={refreshing}
-                    className="text-xs gap-1.5 h-8.5 font-medium border-border"
-                  >
-                    <RotateCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin text-primary" : ""}`} />
-                    <span className="hidden sm:inline">Refresh</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onClose}
-                    className="h-8.5 w-8.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
-                  >
-                    <X className="h-4.5 w-4.5" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* 3-PANEL BODY: LEFT ORDER DETAILS + DUAL CHAT SPLIT PANE */}
-              <div className="flex-1 flex flex-col lg:flex-row min-h-0 h-full max-h-full overflow-hidden divide-y lg:divide-y-0 lg:divide-x divide-border/80 bg-muted/5">
-                {/* ============================================================ */}
-                {/* LEFT SIDEBAR: ORDER DETAILS & CLIENT OVERVIEW                */}
-                {/* ============================================================ */}
-                {showDetails && (
-                  <div className="w-full lg:w-[320px] xl:w-[350px] 2xl:w-[380px] shrink-0 flex flex-col h-full min-h-0 max-h-full bg-card/60 dark:bg-zinc-950/40 border-r border-border/80 overflow-hidden">
-                    {/* Sidebar Header */}
-                    <div className="px-4 py-2.5 border-b border-border/40 bg-muted/40 flex items-center justify-between shrink-0">
-                      <div className="flex items-center gap-2">
-                        <div className="h-6 w-6 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                          <FileText className="h-3.5 w-3.5" />
-                        </div>
-                        <span className="text-xs font-bold text-foreground uppercase tracking-wider">
-                          Order Details
-                        </span>
-                      </div>
-                      {orderSummary?.status && (
-                        <Badge variant="outline" className="text-[10px] font-semibold px-2 py-0.5">
-                          {orderSummary.status}
-                        </Badge>
-                      )}
-                    </div>
-
-                    {/* Sidebar Scrollable Body */}
-                    <div
-                      className="flex-1 min-h-0 overflow-y-auto p-3.5 sm:p-4 space-y-3.5 overscroll-contain"
-                      style={{
-                        scrollbarWidth: "thin",
-                        scrollbarColor: "rgba(125, 125, 125, 0.4) transparent"
-                      }}
-                    >
-                      {loadingSummary ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
-                          <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                          <span className="text-xs font-medium">Loading order details...</span>
-                        </div>
-                      ) : (
-                        <>
-                          {/* Card 1: Company Profile */}
-                          <div className="p-3.5 rounded-xl bg-background/90 border border-border/80 shadow-2xs">
-                            <div className="flex items-start gap-2.5">
-                              <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20 mt-0.5">
-                                <Building className="h-4 w-4" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <h5 className="text-xs sm:text-sm font-bold text-foreground leading-snug">
-                                  {orderSummary?.company?.company_name || companyName || "Company Profile"}
-                                </h5>
-                                {orderSummary?.company?.company_code && (
-                                  <div className="flex items-center gap-1.5 mt-1.5">
-                                    <span className="text-[10px] font-mono text-primary font-semibold bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
-                                      {orderSummary.company.company_code}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => copyToClipboard(orderSummary.company.company_code, "Company ID")}
-                                      className="text-muted-foreground hover:text-foreground transition-colors"
-                                      title="Copy Company ID"
-                                    >
-                                      <Copy className="h-2.5 w-2.5" />
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Card 2: Scope & Deliverables */}
-                          <div className="p-3.5 rounded-xl bg-background/90 border border-border/80 shadow-2xs space-y-3">
-                            <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
-                              <div className="flex items-center gap-1.5">
-                                <Layers className="h-3.5 w-3.5 text-primary shrink-0" />
-                                <span className="text-xs font-bold text-foreground">Scope & Deliverables</span>
-                              </div>
-                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-mono">
-                                {orderSummary?.items?.length || 1}
-                              </Badge>
-                            </div>
-
-                            <div className="space-y-2.5">
-                              {orderSummary?.items && orderSummary.items.length > 0 ? (
-                                orderSummary.items.map((item: any, i: number) => (
-                                  <div key={item.id || i} className="p-3 rounded-lg bg-muted/40 border border-border/60 space-y-1.5">
-                                    <div className="flex items-start justify-between gap-1.5">
-                                      <span className="text-xs font-bold text-foreground leading-snug">
-                                        {item.job_title}
-                                      </span>
-                                      {item.job_id && (
-                                        <span className="text-[9px] font-mono font-bold bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded shrink-0">
-                                          {item.job_id}
-                                        </span>
-                                      )}
-                                    </div>
-
-                                    {item.description ? (
-                                      <p className="text-[11px] text-muted-foreground leading-relaxed bg-background/70 p-2 rounded-md border border-border/40 whitespace-pre-line">
-                                        {item.description}
-                                      </p>
-                                    ) : (
-                                      <p className="text-[10px] text-muted-foreground/70 italic">
-                                        Standard scope deliverable
-                                      </p>
-                                    )}
-
-                                    {(item.service_instructions || item.notes) && (
-                                      <div className="p-2 rounded-md bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 space-y-0.5">
-                                        <div className="flex items-center gap-1 font-bold text-[10px] text-amber-700 dark:text-amber-400">
-                                          <FileText className="h-3 w-3 shrink-0" />
-                                          <span>Service Instructions:</span>
-                                        </div>
-                                        <p className="text-[11px] text-foreground/90 font-medium leading-relaxed whitespace-pre-wrap">
-                                          {item.service_instructions || item.notes}
-                                        </p>
-                                      </div>
-                                    )}
-
-                                    {(item.needs_notary || item.needs_gov_officer || item.needs_other_vendors || item.notary_name) && (
-                                      <div className="flex items-center gap-1 flex-wrap pt-0.5">
-                                        {item.notary_name ? (
-                                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/25 font-bold inline-flex items-center gap-1">
-                                            <Scale className="h-2.5 w-2.5 shrink-0" />
-                                            Notary: {item.notary_name}
-                                          </span>
-                                        ) : item.needs_notary ? (
-                                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 font-medium">
-                                            Notary
-                                          </span>
-                                        ) : null}
-                                        {item.needs_gov_officer && (
-                                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-medium">
-                                            Gov Approval
-                                          </span>
-                                        )}
-                                        {item.needs_other_vendors && (
-                                          <span className="text-[9px] px-1.5 py-0 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-medium">
-                                            Vendor
-                                          </span>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="p-2.5 rounded-lg bg-muted/40 border border-border/60">
-                                  <span className="text-xs font-semibold text-foreground block">
-                                    {orderTitle || "Corporate Consulting Service"}
-                                  </span>
-                                  <p className="text-[11px] text-muted-foreground mt-1">
-                                    Consulting and execution for corporate deliverables.
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Card 3: Assigned Consultants */}
-                          <div className="p-3.5 rounded-xl bg-background/90 border border-border/80 shadow-2xs space-y-2.5">
-                            <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
-                              <div className="flex items-center gap-1.5">
-                                <Users className="h-3.5 w-3.5 text-primary shrink-0" />
-                                <span className="text-xs font-bold text-foreground">Assigned Consultants</span>
-                              </div>
-                              {orderSummary?.consultants?.length > 0 && (
-                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-mono">
-                                  {orderSummary.consultants.length}
-                                </Badge>
-                              )}
-                            </div>
-
-                            {orderSummary?.consultants && orderSummary.consultants.length > 0 ? (
-                              <div className="space-y-2">
-                                {orderSummary.consultants.map((c: any, idx: number) => (
-                                  <div key={c.id || idx} className="flex items-center gap-2.5 p-2 rounded-lg bg-muted/40 border border-border/60">
-                                    {c.profile_photo ? (
-                                      <img
-                                        src={resolveImageUrl(c.profile_photo)}
-                                        alt={c.name}
-                                        className="h-7 w-7 rounded-full object-cover border border-border shrink-0"
-                                      />
-                                    ) : (
-                                      <div className="h-7 w-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs border border-primary/20 shrink-0">
-                                        {c.name?.charAt(0) || "C"}
-                                      </div>
-                                    )}
-                                    <div className="min-w-0 flex-1">
-                                      <span className="text-xs font-bold text-foreground truncate block">
-                                        {c.name}
-                                      </span>
-                                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground truncate">
-                                        <span>{c.job_title || c.position || "Consultant"}</span>
-                                        {c.department && <span>• {c.department}</span>}
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-[11px] text-muted-foreground italic p-2.5 rounded-lg bg-muted/30 text-center">
-                                No specific consultant assigned yet
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Card 4: Assigned Notary */}
-                          {orderSummary?.notaries && orderSummary.notaries.length > 0 && (
-                            <div className="p-3.5 rounded-xl bg-background/90 border border-border/80 shadow-2xs space-y-2.5">
-                              <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
-                                <div className="flex items-center gap-1.5">
-                                  <Scale className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                                  <span className="text-xs font-bold text-foreground">Assigned Notary</span>
-                                </div>
-                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-mono">
-                                  {orderSummary.notaries.length}
-                                </Badge>
-                              </div>
-                              <div className="space-y-2">
-                                {orderSummary.notaries.map((n: any, idx: number) => (
-                                  <div key={n.id || idx} className="flex items-center gap-2.5 p-2 rounded-lg bg-muted/40 border border-border/60">
-                                    <div className="h-7 w-7 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs border border-indigo-500/20 shrink-0">
-                                      <Scale className="h-3.5 w-3.5" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <span className="text-xs font-bold text-foreground truncate block">
-                                        {n.name}
-                                      </span>
-                                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground truncate">
-                                        <span>
-                                          {n.vendor_type === "GOVERNMENT_OFFICER" || n.is_gov_officer
-                                            ? "Government Official"
-                                            : n.vendor_type === "OTHER_VENDORS" || n.is_other_vendor
-                                              ? "External Vendor"
-                                              : "Appointed Notary"}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
+            {/* Mobile Tab Selector (< 1024px) */}
+            <div className="lg:hidden flex items-center border-b border-[var(--oc-border)] bg-[var(--oc-bg-panel)] shrink-0 px-2 py-1.5 gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveMobileTab("CLIENT")}
+                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
+                  activeMobileTab === "CLIENT"
+                    ? "bg-[var(--oc-brand-50)] text-[var(--oc-brand-700)] border border-[var(--oc-brand-200)] shadow-2xs"
+                    : "text-[var(--oc-text-secondary)] hover:bg-[var(--oc-bg-subtle)]"
+                }`}
+              >
+                <span>Client & Consultant</span>
+                {clientMessages.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-[var(--oc-brand-600)] text-white">
+                    {clientMessages.length}
+                  </span>
                 )}
+              </button>
 
-                {/* Mobile Channel Segmented Tabs (< lg screens) */}
-                <div className="flex lg:hidden items-center justify-between p-2 border-b border-border/80 bg-muted/30 shrink-0 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setActiveMobileTab("CLIENT")}
-                    className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
-                      activeMobileTab === "CLIENT"
-                        ? "bg-sky-600 text-white border-sky-600 shadow-xs"
-                        : "bg-background/80 text-muted-foreground border-border/60 hover:text-foreground"
-                    }`}
-                  >
-                    <Globe className="h-3.5 w-3.5 shrink-0" />
-                    <span>Client Chat</span>
-                    {clientMessages.length > 0 && (
-                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-white/20">
-                        {clientMessages.length}
-                      </span>
-                    )}
-                  </button>
+              <button
+                type="button"
+                onClick={() => setActiveMobileTab("INTERNAL")}
+                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
+                  activeMobileTab === "INTERNAL"
+                    ? "bg-[var(--oc-internal-50)] text-[var(--oc-internal-700)] border border-[var(--oc-internal-200)] shadow-2xs"
+                    : "text-[var(--oc-text-secondary)] hover:bg-[var(--oc-bg-subtle)]"
+                }`}
+              >
+                <span>Internal Team</span>
+                {internalMessages.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-[var(--oc-internal-600)] text-white">
+                    {internalMessages.length}
+                  </span>
+                )}
+              </button>
+            </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setActiveMobileTab("INTERNAL")}
-                    className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
-                      activeMobileTab === "INTERNAL"
-                        ? "bg-amber-600 text-white border-amber-600 shadow-xs"
-                        : "bg-background/80 text-muted-foreground border-border/60 hover:text-foreground"
-                    }`}
-                  >
-                    <Lock className="h-3.5 w-3.5 shrink-0" />
-                    <span>Internal Notes</span>
-                    {internalMessages.length > 0 && (
-                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-white/20">
-                        {internalMessages.length}
-                      </span>
-                    )}
-                  </button>
-                </div>
+            {/* 3-Column Workspace Layout */}
+            <div className="flex-1 flex min-h-0 h-full overflow-hidden">
+              {/* Left Column: Order Details Panel */}
+              <OrderDetailsPanel
+                orderSummary={orderSummary}
+                loading={loadingSummary}
+                orderTitle={orderTitle}
+                companyName={companyName}
+                clientName={clientName}
+                orderStatus={orderStatus}
+                isOpen={showDetails}
+                clientMessages={clientMessages}
+                internalMessages={internalMessages}
+              />
 
-                {/* ============================================================ */}
-                {/* DUAL CHAT SPLIT PANE (EXTERNAL CLIENT & INTERNAL NOTES)      */}
-                {/* ============================================================ */}
-                <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-border/80 min-h-0 h-full max-h-full overflow-hidden bg-muted/5">
-                {/* ============================================================ */}
-                {/* PANE 1 (LEFT): CLIENT & CONSULTANT CHAT (EXTERNAL)           */}
-                {/* ============================================================ */}
+              {/* Middle & Right: Dual Chat Columns */}
+              <div className="flex-1 flex min-h-0 h-full overflow-hidden divide-x divide-[var(--oc-border)] bg-[var(--oc-bg-panel)]">
+                {/* Column 2: Client & Consultant Chat */}
                 <div
-                  className={`flex-col h-full min-h-0 max-h-full bg-background/50 overflow-hidden outline-none ${
+                  className={`flex-1 min-w-0 h-full ${
                     activeMobileTab === "CLIENT" ? "flex" : "hidden lg:flex"
-                  }`}
-                  onPaste={e => handlePasteSnippet(e, handleClientAttachmentSelect, "Client Channel")}
-                  onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
-                  onDrop={e => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (e.dataTransfer.files?.[0]) {
-                      handleClientAttachmentSelect(e.dataTransfer.files[0]);
-                    }
-                  }}
+                  } flex-col`}
                 >
-                  {/* Client Pane Subheader */}
-                  <div className="px-4 py-2.5 border-b border-border/40 bg-sky-500/5 dark:bg-sky-950/20 flex items-center justify-between shrink-0">
-                    <div className="flex items-center gap-2.5">
-                      <div className="h-7 w-7 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-500/20 shrink-0">
-                        <Globe className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-bold text-foreground flex items-center gap-1.5">
-                          Client & Consultant Chat
-                        </h4>
-                        <span className="text-[10px] text-sky-600 dark:text-sky-400 font-medium">
-                          External channel visible to client in their portal
-                        </span>
-                      </div>
-                    </div>
-
-                    <Badge
-                      variant="outline"
-                      className="bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30 text-[10px] font-semibold px-2 py-0.5"
-                    >
-                      Visible to Client
-                    </Badge>
-                  </div>
-
-                  {/* Client Messages Stream */}
-                  <div
-                    ref={clientMessagesContainerRef}
-                    className="flex-1 min-h-0 max-h-full overflow-y-auto overflow-x-hidden p-4 space-y-3.5 bg-background/30 overscroll-contain w-full min-w-0"
-                    style={{
-                      scrollbarWidth: "thin",
-                      scrollbarColor: "rgba(125, 125, 125, 0.4) transparent"
+                  <ChatPanel
+                    channel="CLIENT"
+                    orderNumber={orderNumber}
+                    orderStatus={orderSummary?.status || orderStatus}
+                    title="Client & Consultant Chat"
+                    description="Messages visible to client in portal"
+                    unreadCount={0}
+                    messages={clientMessages}
+                    loading={loadingClient}
+                    currentUserId={currentUser?.id}
+                    currentUserName={currentUserName}
+                    composerValue={clientInput}
+                    onComposerChange={setClientInput}
+                    onSend={handleClientSendClick}
+                    sending={sendingClient}
+                    quotedMessage={quotedClientMessage}
+                    onCancelQuote={() => setQuotedClientMessage(null)}
+                    attachment={clientAttachment}
+                    attachmentPreview={clientAttachmentPreview}
+                    onSelectAttachment={handleClientAttachmentSelect}
+                    onRemoveAttachment={handleRemoveClientAttachment}
+                    taggableUsers={taggableUsers}
+                    inputRef={clientInputRef}
+                    onReply={(msg) => {
+                      setQuotedClientMessage(msg);
+                      clientInputRef.current?.focus();
                     }}
-                  >
-                    {loadingClient ? (
-                      <div className="flex h-full items-center justify-center py-12">
-                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                      </div>
-                    ) : clientMessages.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center h-full text-center p-6 text-muted-foreground">
-                        <Globe className="h-9 w-9 text-muted-foreground/30 mb-2" />
-                        <p className="text-xs font-bold text-foreground">No client messages yet</p>
-                        <p className="text-[11px] text-muted-foreground max-w-xs mt-1">
-                          Send a message to update the client on progress, deliverables, or document requests.
-                        </p>
-                      </div>
-                    ) : (
-                      clientMessages
-                        .filter(msg => isSystemMessage(msg) || msg.channel === "CLIENT" || msg.is_client || (msg.sender_role || "").toUpperCase() === "CLIENT")
-                        .map((msg, idx, arr) => {
-                        const isSystem = isSystemMessage(msg);
-
-                        if (isSystem) {
-                          return (
-                            <div key={`client-sys-${msg.id ?? 'sys'}-${idx}`} className="flex justify-center my-3 px-2">
-                              <div className="bg-muted/70 dark:bg-zinc-900/80 border border-border/80 dark:border-zinc-800 rounded-full px-3.5 py-1.5 text-xs text-muted-foreground dark:text-zinc-400 flex items-center gap-2 shadow-2xs backdrop-blur-md max-w-[92%] text-center">
-                                <div className="h-5 w-5 rounded-full bg-muted dark:bg-zinc-800 flex items-center justify-center shrink-0">
-                                  {getMilestoneIcon(msg.message)}
-                                </div>
-                                <span className="font-medium text-[11px] sm:text-xs leading-snug">{msg.message}</span>
-                                <span className="text-[10px] text-muted-foreground/60 dark:text-zinc-500 shrink-0 font-mono ml-0.5" title={msg.created_at ? new Date(msg.created_at).toLocaleString() : undefined}>
-                                  {formatMessageDateTime(msg.created_at)}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        const isClientSender = msg.is_client || (msg.sender_role || "").toUpperCase() === "CLIENT";
-                        const prevMsg = idx > 0 ? arr[idx - 1] : null;
-                        const isPrevClientSender = prevMsg ? (prevMsg.is_client || (prevMsg.sender_role || "").toUpperCase() === "CLIENT") : null;
-                        const isSameSenderAsPrev = !isSystemMessage(prevMsg) && !!prevMsg && (
-                          (Boolean(msg.user_id || msg.sender_id) && (msg.user_id || msg.sender_id) === (prevMsg.user_id || prevMsg.sender_id)) ||
-                          (isClientSender === isPrevClientSender && Boolean(msg.sender_name) && msg.sender_name === prevMsg.sender_name)
-                        );
-
-                        const isEditing = editingMessageId === msg.id;
-                        const isDeleting = confirmDeleteId === msg.id;
-                        const canModify = canModifyMessage(msg);
-                        const isDeleted = Boolean(msg.is_deleted || msg.message === "This message was deleted");
-                        const emojiOnly = !isDeleted && isEmojiOnlyText(msg.message) && !msg.quoted_message_text && !msg.attachment_name && (!msg.attachment_url || msg.attachment_url === "uploading...");
-
-                        return (
-                          <div
-                            key={`client-msg-${msg.id ?? 'item'}-${idx}`}
-                            className={`group flex flex-col ${isClientSender ? "items-start" : "items-end"} max-w-[85%] sm:max-w-[80%] min-w-0 w-fit ${
-                              isClientSender ? "mr-auto" : "ml-auto"
-                            } ${isSameSenderAsPrev ? "mt-1" : "mt-3.5"}`}
-                          >
-                            {!isSameSenderAsPrev && (
-                              <div className="flex items-center gap-1.5 mb-1 px-1">
-                                {isClientSender ? (
-                                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 font-semibold border border-emerald-500/20">
-                                    Client
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-sky-500/10 text-sky-600 dark:text-sky-400 font-semibold border border-sky-500/20">
-                                    Staff / Team
-                                  </Badge>
-                                )}
-                                <span className="text-[11px] font-bold text-foreground">
-                                  {isClientSender ? (msg.sender_name || "Client") : formatExternalTeamName(msg.sender_name)}
-                                </span>
-                                {msg.sender_role && !isClientSender && (
-                                  <span className="text-[10px] text-muted-foreground">
-                                    ({msg.sender_role})
-                                  </span>
-                                )}
-                              </div>
-                            )}
-
-                            {isEditing ? (
-                              <div className="w-full max-w-full min-w-0 space-y-2 p-2.5 rounded-xl bg-background border border-sky-500/40 shadow-md">
-                                <textarea
-                                  value={editingMessageText}
-                                  onChange={e => setEditingMessageText(e.target.value)}
-                                  onKeyDown={e => {
-                                    if (e.key === "Enter" && e.shiftKey) {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      const target = e.currentTarget;
-                                      const start = target.selectionStart;
-                                      const end = target.selectionEnd;
-                                      const val = target.value;
-                                      setEditingMessageText(val.substring(0, start) + "\n" + val.substring(end));
-                                      requestAnimationFrame(() => {
-                                        target.selectionStart = target.selectionEnd = start + 1;
-                                      });
-                                    } else if (e.key === "Enter" && !e.shiftKey) {
-                                      e.preventDefault();
-                                      handleSaveEdit(msg.id, "CLIENT");
-                                    }
-                                  }}
-                                  className="w-full text-xs sm:text-[13px] bg-muted/40 border border-border rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-sky-500 min-h-[60px] text-foreground resize-y"
-                                  autoFocus
-                                  placeholder="Edit message (Enter to save, Shift + Enter for new line)..."
-                                />
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={handleCancelEdit}
-                                    disabled={savingEdit}
-                                    className="h-7 text-xs px-2.5 gap-1 text-muted-foreground hover:text-foreground"
-                                  >
-                                    <X className="h-3 w-3" /> Cancel
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={() => handleSaveEdit(msg.id, "CLIENT")}
-                                    disabled={!editingMessageText.trim() || savingEdit}
-                                    className="h-7 text-xs px-2.5 gap-1 bg-sky-600 hover:bg-sky-700 text-white font-semibold shadow-xs"
-                                  >
-                                    {savingEdit ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                                    Save
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : isDeleting ? (
-                              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs space-y-2">
-                                <p className="text-rose-600 dark:text-rose-400 font-semibold text-[11px]">
-                                  Delete this message?
-                                </p>
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setConfirmDeleteId(null)}
-                                    disabled={deletingMessageId === msg.id}
-                                    className="h-6.5 text-[11px] px-2"
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={() => handleDeleteMessage(msg.id, "CLIENT")}
-                                    disabled={deletingMessageId === msg.id}
-                                    className="h-6.5 text-[11px] px-2.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold gap-1"
-                                  >
-                                    {deletingMessageId === msg.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                                    Delete
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : isDeleted ? (
-                              /* Empty / Deleted Message Box */
-                              <div className={`flex flex-col max-w-full ${isClientSender ? "self-start" : "self-end"}`}>
-                                <div className="flex items-center gap-1.5 max-w-full">
-                                  <div
-                                    className={`rounded-2xl shadow-xs px-3.5 py-2 text-xs sm:text-[13px] italic flex items-center gap-2 border border-dashed border-border/70 dark:border-border/60 bg-muted/20 dark:bg-muted/10 text-muted-foreground/80 select-none ${
-                                      isClientSender ? "rounded-tl-sm" : "rounded-tr-sm"
-                                    }`}
-                                  >
-                                    <Ban className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
-                                    <span>This message was deleted</span>
-                                  </div>
-                                </div>
-                                <div
-                                  className={`flex items-center gap-1 mt-0.5 px-1 select-none text-[10px] text-muted-foreground/75 font-medium ${
-                                    isClientSender ? "justify-start" : "justify-end"
-                                  }`}
-                                >
-                                  <span title={msg.created_at ? new Date(msg.created_at).toLocaleString() : undefined}>
-                                    {formatMessageDateTime(msg.created_at)}
-                                  </span>
-                                  <SeenReceiptsIndicator
-                                    seenBy={msg.seen_by}
-                                    isSelf={!isClientSender}
-                                    sentAt={msg.created_at}
-                                  />
-                                </div>
-                              </div>
-                            ) : (
-                              <div className={`flex flex-col max-w-full min-w-0 ${isClientSender ? "self-start" : "self-end"}`}>
-                                <div className="flex items-center gap-1.5 max-w-full min-w-0">
-                                  {/* For outgoing (staff) message, show WhatsApp reaction trigger + actions on left */}
-                                  {!isClientSender && (
-                                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                      {canModify && (
-                                        <>
-                                          {/* Edit button hidden for now - can be re-enabled later */}
-                                          {/* <button
-                                            type="button"
-                                            onClick={() => handleStartEdit(msg)}
-                                            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
-                                            title="Edit message"
-                                          >
-                                            <Pencil className="h-3 w-3" />
-                                          </button> */}
-                                          <button
-                                            type="button"
-                                            onClick={() => setConfirmDeleteId(msg.id)}
-                                            className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 transition-colors"
-                                            title="Delete message"
-                                          >
-                                            <Trash2 className="h-3 w-3" />
-                                          </button>
-                                        </>
-                                      )}
-                                      <button
-                                        type="button"
-                                        onClick={() => handleQuoteClientMessage(msg)}
-                                        className="p-1 rounded-md text-muted-foreground hover:text-sky-600 hover:bg-sky-500/10 transition-colors"
-                                        title="Quote / Reply"
-                                      >
-                                        <Reply className="h-3 w-3" />
-                                      </button>
-                                      <WhatsAppReactionHoverBar
-                                        onToggleReaction={emoji => handleToggleReaction(msg.id, emoji, false)}
-                                        align="end"
-                                        side="top"
-                                      />
-                                    </div>
-                                  )}
-
-                                  <div
-                                    className={`rounded-2xl leading-relaxed shadow-xs max-w-full min-w-0 break-words [overflow-wrap:anywhere] ${
-                                      emojiOnly
-                                        ? "px-2.5 py-1"
-                                        : "px-3.5 py-2 text-xs sm:text-[13px]"
-                                    } ${
-                                      isClientSender
-                                        ? "bg-emerald-500/10 dark:bg-emerald-950/30 text-foreground border border-emerald-500/25 dark:border-emerald-500/30 rounded-tl-sm"
-                                        : "bg-sky-600 dark:bg-sky-600 text-white rounded-tr-sm shadow-sm"
-                                    }`}
-                                  >
-                                    {/* Quoted / Replied Message Header */}
-                                    {msg.quoted_message_text && (
-                                      <div
-                                        className={`mb-2 p-2 rounded-lg border-l-2 text-left text-xs select-none max-w-full min-w-0 overflow-hidden ${
-                                          isClientSender
-                                            ? "bg-emerald-500/15 dark:bg-emerald-950/50 border-l-emerald-600 text-foreground"
-                                            : "bg-sky-700/80 border-l-white text-sky-100"
-                                        }`}
-                                      >
-                                        <div className="flex items-center gap-1 font-bold text-[10px] opacity-90 min-w-0">
-                                          <Reply className="h-2.5 w-2.5 shrink-0" />
-                                          <span className="truncate">{msg.quoted_sender_name ? (msg.quoted_sender_name.toLowerCase().includes("client") ? msg.quoted_sender_name : formatExternalTeamName(msg.quoted_sender_name)) : "Quoted Message"}</span>
-                                        </div>
-                                        <p className="text-[11px] opacity-80 line-clamp-2 break-words italic mt-0.5">
-                                          "{msg.quoted_message_text}"
-                                        </p>
-                                      </div>
-                                    )}
-
-                                    <div className="break-words [overflow-wrap:anywhere] min-w-0 max-w-full">{renderMessageContent(msg.message, false)}</div>
-
-                                    {/* Client Uploaded Document or Image Snippet Preview */}
-                                    {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
-                                      isImageFile(msg.attachment_name || msg.attachment_url) ? (
-                                        <div className="mt-2 rounded-xl overflow-hidden border border-border/60 shadow-xs max-w-sm">
-                                          <div
-                                            className="relative cursor-pointer group/img overflow-hidden bg-muted/30 flex items-center justify-center max-h-60"
-                                            onClick={() => handlePreviewAttachment(msg)}
-                                          >
-                                            <img
-                                              src={`/api-proxy/api/clients/orders/${orderNumber}/attachments/preview?path=${encodeURIComponent(msg.attachment_url)}`}
-                                              alt={msg.attachment_name || "Snippet"}
-                                              loading="lazy"
-                                              className="w-full h-auto max-h-60 object-contain transition-transform duration-200 group-hover/img:scale-[1.02]"
-                                            />
-                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-xs font-semibold backdrop-blur-[2px]">
-                                              <Eye className="h-4 w-4" />
-                                              <span>Click to Enlarge</span>
-                                            </div>
-                                          </div>
-                                          <div
-                                            className={`p-2 border-t flex items-center justify-between gap-2 text-xs ${
-                                              isClientSender ? "bg-background/95 border-border/40 text-foreground" : "bg-sky-700/90 border-sky-500/30 text-white"
-                                            }`}
-                                          >
-                                            <span className="truncate font-semibold text-[11px] block min-w-0">
-                                              {msg.attachment_name || "Image Snippet"}
-                                            </span>
-                                            <Button
-                                              type="button"
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() => handlePreviewAttachment(msg)}
-                                              className={`h-6 px-2 text-[10px] font-bold gap-1 shrink-0 ${
-                                                isClientSender ? "text-sky-600 hover:text-sky-700" : "text-white hover:bg-white/20"
-                                              }`}
-                                            >
-                                              <Eye className="h-3 w-3" /> Full View
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <div
-                                          className={`mt-2 p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs shadow-2xs ${
-                                            isClientSender
-                                              ? "bg-background/90 border-border/60 text-foreground"
-                                              : "bg-sky-700/80 border-sky-500/30 text-white"
-                                          }`}
-                                        >
-                                          <div className="flex items-center gap-2 min-w-0">
-                                            <div
-                                              className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 border ${
-                                                isClientSender
-                                                  ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20"
-                                                  : "bg-white/10 text-white border-white/20"
-                                              }`}
-                                            >
-                                              <FileText className="h-3.5 w-3.5" />
-                                            </div>
-                                            <div className="min-w-0">
-                                              <span className="font-bold truncate block text-xs">
-                                                {msg.attachment_name || "Client Document"}
-                                              </span>
-                                              <span
-                                                className={`text-[10px] block truncate ${
-                                                  isClientSender ? "text-muted-foreground" : "text-sky-200"
-                                                }`}
-                                              >
-                                                Stored in Company Vault (Client Shared Docs)
-                                              </span>
-                                            </div>
-                                          </div>
-
-                                          <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handlePreviewAttachment(msg)}
-                                            className={`h-7 text-[11px] font-bold gap-1 px-2.5 shrink-0 shadow-2xs ${
-                                              isClientSender
-                                                ? "text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 border-sky-500/30"
-                                                : "text-white bg-white/10 hover:bg-white/20 border-white/30"
-                                            }`}
-                                          >
-                                            <Eye className="h-3 w-3" />
-                                            Preview
-                                          </Button>
-                                        </div>
-                                      )
-                                    )}
-                                  </div>
-
-                                  {/* For incoming (client) message, show WhatsApp reaction trigger + actions on right */}
-                                  {isClientSender && (
-                                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                      <WhatsAppReactionHoverBar
-                                        onToggleReaction={emoji => handleToggleReaction(msg.id, emoji, false)}
-                                        align="start"
-                                        side="top"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => handleQuoteClientMessage(msg)}
-                                        className="p-1 rounded-md text-muted-foreground hover:text-sky-600 hover:bg-sky-500/10 transition-colors"
-                                        title="Quote / Reply"
-                                      >
-                                        <Reply className="h-3 w-3" />
-                                      </button>
-                                      {canModify && (
-                                        <>
-                                          {/* Edit button hidden for now - can be re-enabled later */}
-                                          {/* <button
-                                            type="button"
-                                            onClick={() => handleStartEdit(msg)}
-                                            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
-                                            title="Edit message"
-                                          >
-                                            <Pencil className="h-3 w-3" />
-                                          </button> */}
-                                          <button
-                                            type="button"
-                                            onClick={() => setConfirmDeleteId(msg.id)}
-                                            className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 transition-colors"
-                                            title="Delete message"
-                                          >
-                                            <Trash2 className="h-3 w-3" />
-                                          </button>
-                                        </>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* WhatsApp style reaction badges at the bottom of the message */}
-                                <ChatMessageReactions
-                                  reactions={msg.reactions}
-                                  onToggleReaction={emoji => handleToggleReaction(msg.id, emoji, false)}
-                                  isSelf={!isClientSender}
-                                />
-
-                                {/* Sent Date and Time & Seen indicator */}
-                                <div
-                                  className={`flex items-center gap-1 mt-0.5 px-1 select-none text-[10px] text-muted-foreground/75 font-medium ${
-                                    isClientSender ? "justify-start" : "justify-end"
-                                  }`}
-                                >
-                                  <span title={msg.created_at ? new Date(msg.created_at).toLocaleString() : undefined}>
-                                    {formatMessageDateTime(msg.created_at)}
-                                  </span>
-                                  <SeenReceiptsIndicator
-                                    seenBy={msg.seen_by}
-                                    isSelf={!isClientSender}
-                                    sentAt={msg.created_at}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-
-                  {/* Client Chat Input Bar (With Confirmation Trigger & Quote Preview Banner) */}
-                  <div className="p-3 border-t border-border/60 bg-muted/20 space-y-2 shrink-0">
-                    {quotedClientMessage && (
-                      <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-sky-500/10 border-l-4 border-l-sky-500 border-t border-r border-b border-sky-500/20 rounded-lg text-xs shadow-xs animate-in fade-in slide-in-from-bottom-1">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Reply className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
-                          <div className="min-w-0">
-                            <span className="font-bold text-sky-700 dark:text-sky-300 block text-[10px] sm:text-[11px]">
-                              Replying to {quotedClientMessage.is_client ? (quotedClientMessage.sender_name || "Client") : formatExternalTeamName(quotedClientMessage.sender_name)}
-                            </span>
-                            <p className="text-muted-foreground text-[11px] truncate max-w-sm italic">
-                              "{quotedClientMessage.message || quotedClientMessage.attachment_name || "Attachment"}"
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setQuotedClientMessage(null)}
-                          className="h-5 w-5 rounded-full text-muted-foreground hover:text-foreground"
-                          title="Cancel reply"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Client Attachment / Snippet Staged Preview Chip */}
-                    {clientAttachment && (
-                      <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-sky-500/30 bg-sky-500/10 dark:bg-sky-950/30 text-xs shadow-xs animate-in fade-in slide-in-from-bottom-2 duration-150">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          {clientAttachmentPreview ? (
-                            <img
-                              src={clientAttachmentPreview}
-                              alt="Snippet preview"
-                              className="h-10 w-10 object-cover rounded-lg border border-sky-500/30 shrink-0 bg-background"
-                            />
-                          ) : (
-                            <div className="h-10 w-10 rounded-lg bg-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-500/30">
-                              <FileText className="h-5 w-5" />
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold truncate text-xs text-foreground block">
-                                {clientAttachment.name}
-                              </span>
-                              <Badge variant="outline" className="text-[10px] py-0 px-1.5 bg-sky-500/15 border-sky-500/30 text-sky-700 dark:text-sky-300 shrink-0">
-                                {clientAttachment.type.startsWith("image/") ? "Snippet / Image" : "Document"}
-                              </Badge>
-                            </div>
-                            <span className="text-[11px] text-muted-foreground block truncate">
-                              {formatFileSize(clientAttachment.size)} • Storing in Client Shared Docs
-                            </span>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={handleRemoveClientAttachment}
-                          className="h-7 w-7 rounded-full text-muted-foreground hover:text-foreground hover:bg-background/60 shrink-0"
-                          title="Remove attachment"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-
-                    <form
-                      onSubmit={handleClientSendClick}
-                      className="flex items-end gap-2"
-                    >
-                      <input
-                        type="file"
-                        ref={clientFileInputRef}
-                        className="hidden"
-                        onChange={e => {
-                          if (e.target.files?.[0]) {
-                            handleClientAttachmentSelect(e.target.files[0]);
-                          }
-                        }}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => clientFileInputRef.current?.click()}
-                        title="Attach file or screenshot snippet"
-                        className={`h-[40px] w-[40px] rounded-xl shrink-0 transition-colors ${
-                          clientAttachment
-                            ? "border-sky-500 text-sky-600 bg-sky-500/10 shadow-xs"
-                            : "border-input bg-background text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        <Paperclip className="h-4 w-4" />
-                      </Button>
-
-                      <ChatEmojiPicker
-                        onSelectEmoji={emoji => {
-                          setClientInput(prev => {
-                            const next = prev + emoji;
-                            requestAnimationFrame(() => {
-                              if (clientInputRef.current) {
-                                clientInputRef.current.style.height = "auto";
-                                clientInputRef.current.style.height = `${Math.min(clientInputRef.current.scrollHeight, 160)}px`;
-                              }
-                            });
-                            return next;
-                          });
-                          clientInputRef.current?.focus();
-                        }}
-                        side="top"
-                        align="start"
-                      />
-                      <textarea
-                        ref={clientInputRef}
-                        rows={1}
-                        placeholder={
-                          clientAttachment
-                            ? "Add a note with this attachment (Enter to send, Shift + Enter for new line)..."
-                            : "Message the Client (Paste screenshot snippet directly here, Enter to send)..."
-                        }
-                        value={clientInput}
-                        onPaste={e => handlePasteSnippet(e, handleClientAttachmentSelect, "Client Channel")}
-                        onChange={e => {
-                          setClientInput(e.target.value);
-                          e.target.style.height = "auto";
-                          e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
-                        }}
-                        onKeyDown={e => {
-                          if (e.key === "Enter" && e.shiftKey) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const target = e.currentTarget;
-                            const start = target.selectionStart;
-                            const end = target.selectionEnd;
-                            const val = target.value;
-                            const newVal = val.substring(0, start) + "\n" + val.substring(end);
-                            setClientInput(newVal);
-                            requestAnimationFrame(() => {
-                              target.selectionStart = target.selectionEnd = start + 1;
-                              target.style.height = "auto";
-                              target.style.height = `${Math.min(target.scrollHeight, 160)}px`;
-                            });
-                          } else if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            handleClientSendClick();
-                          }
-                        }}
-                        className="flex-1 min-w-0 text-xs sm:text-sm bg-background border border-input rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-1 focus:ring-sky-500 resize-none min-h-[40px] max-h-40 leading-relaxed overflow-y-auto break-words [overflow-wrap:anywhere]"
-                        disabled={sendingClient}
-                      />
-                      <Button
-                        type="submit"
-                        size="sm"
-                        disabled={(!clientInput.trim() && !clientAttachment) || sendingClient}
-                        className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold gap-1.5 px-3.5 h-9 shrink-0 shadow-xs"
-                      >
-                        {sendingClient ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Send className="h-3.5 w-3.5" />
-                        )}
-                        <span>Send to Client</span>
-                      </Button>
-                    </form>
-                  </div>
+                    onReact={(id, emoji) => handleToggleReaction(id, emoji, false)}
+                    onCopy={(txt) => toast.success("Message copied to clipboard")}
+                    onEdit={(msg) => handleStartEdit(msg, "CLIENT")}
+                    onDelete={(id) => setDeleteConfirm({ msgId: id, channel: "CLIENT" })}
+                    onOpenImagePreview={(url, name) =>
+                      handlePreviewAttachment({ attachment_url: url, attachment_name: name })
+                    }
+                  />
                 </div>
 
-                {/* ============================================================ */}
-                {/* PANE 2 (RIGHT): INTERNAL TEAM CHAT (PRIVATE)                */}
-                {/* ============================================================ */}
+                {/* Column 3: Internal Team Chat */}
                 <div
-                  className={`flex-col h-full min-h-0 max-h-full bg-background/50 overflow-hidden outline-none ${
+                  className={`flex-1 min-w-0 h-full ${
                     activeMobileTab === "INTERNAL" ? "flex" : "hidden lg:flex"
-                  }`}
-                  onPaste={e => handlePasteSnippet(e, handleInternalAttachmentSelect, "Internal Notes")}
-                  onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
-                  onDrop={e => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (e.dataTransfer.files?.[0]) {
-                      handleInternalAttachmentSelect(e.dataTransfer.files[0]);
-                    }
-                  }}
+                  } flex-col`}
                 >
-                  {/* Internal Pane Subheader */}
-                  <div className="px-4 py-2.5 border-b border-border/40 bg-amber-500/5 dark:bg-amber-950/20 flex items-center justify-between shrink-0">
-                    <div className="flex items-center gap-2.5">
-                      <div className="h-7 w-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
-                        <Lock className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-bold text-foreground flex items-center gap-1.5">
-                          Internal Team Chat
-                        </h4>
-                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                          Private notes amongst staff & assigned team members
-                        </span>
-                      </div>
-                    </div>
-
-                    <Badge
-                      variant="outline"
-                      className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[10px] font-semibold px-2 py-0.5"
-                    >
-                      Team Only • Hidden from Client
-                    </Badge>
-                  </div>
-
-                  {/* Internal Messages Stream */}
-                  <div
-                    ref={internalMessagesContainerRef}
-                    className="flex-1 min-h-0 max-h-full overflow-y-auto overflow-x-hidden p-4 space-y-3.5 bg-background/30 overscroll-contain w-full min-w-0"
-                    style={{
-                      scrollbarWidth: "thin",
-                      scrollbarColor: "rgba(125, 125, 125, 0.4) transparent"
+                  <ChatPanel
+                    channel="INTERNAL"
+                    orderNumber={orderNumber}
+                    orderStatus={orderSummary?.status || orderStatus}
+                    title="Internal Team Chat"
+                    description="Private discussion · Processing staff only"
+                    unreadCount={0}
+                    messages={internalMessages}
+                    loading={loadingInternal}
+                    currentUserId={currentUser?.id}
+                    currentUserName={currentUserName}
+                    composerValue={internalInput}
+                    onComposerChange={setInternalInput}
+                    onSend={handleInternalSend}
+                    sending={sendingInternal}
+                    quotedMessage={quotedInternalMessage}
+                    onCancelQuote={() => setQuotedInternalMessage(null)}
+                    attachment={internalAttachment}
+                    attachmentPreview={internalAttachmentPreview}
+                    onSelectAttachment={handleInternalAttachmentSelect}
+                    onRemoveAttachment={handleRemoveInternalAttachment}
+                    taggableUsers={taggableUsers}
+                    inputRef={internalInputRef}
+                    onReply={(msg) => {
+                      setQuotedInternalMessage(msg);
+                      internalInputRef.current?.focus();
                     }}
-                  >
-                    {loadingInternal ? (
-                      <div className="flex h-full items-center justify-center py-12">
-                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                      </div>
-                    ) : internalMessages.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center h-full text-center p-6 text-muted-foreground">
-                        <Lock className="h-9 w-9 text-muted-foreground/30 mb-2" />
-                        <p className="text-xs font-bold text-foreground">No internal notes yet</p>
-                        <p className="text-[11px] text-muted-foreground max-w-xs mt-1">
-                          Collaborate privately with teammates, tag consultants (@name), or discuss blockers without client visibility.
-                        </p>
-                      </div>
-                    ) : (
-                      internalMessages
-                        .filter(msg => isSystemMessage(msg) || (!msg.is_client && (msg.sender_role || "").toUpperCase() !== "CLIENT"))
-                        .map((msg, idx, arr) => {
-                        const isSystem = isSystemMessage(msg);
-
-                        if (isSystem) {
-                          return (
-                            <div key={`internal-sys-${msg.id ?? 'sys'}-${idx}`} className="flex justify-center my-3 px-2">
-                              <div className="bg-muted/70 dark:bg-zinc-900/80 border border-border/80 dark:border-zinc-800 rounded-full px-3.5 py-1.5 text-xs text-muted-foreground dark:text-zinc-400 flex items-center gap-2 shadow-2xs backdrop-blur-md max-w-[92%] text-center">
-                                <div className="h-5 w-5 rounded-full bg-muted dark:bg-zinc-800 flex items-center justify-center shrink-0">
-                                  {getMilestoneIcon(msg.message)}
-                                </div>
-                                <span className="font-medium text-[11px] sm:text-xs leading-snug">{msg.message}</span>
-                                <span className="text-[10px] text-muted-foreground/60 dark:text-zinc-500 shrink-0 font-mono ml-0.5" title={msg.created_at ? new Date(msg.created_at).toLocaleString() : undefined}>
-                                  {formatMessageDateTime(msg.created_at)}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        const prevMsg = idx > 0 ? arr[idx - 1] : null;
-                        const isSameSenderAsPrev = !isSystemMessage(prevMsg) && !!prevMsg && (
-                          (Boolean(msg.user_id || msg.sender_id) && (msg.user_id || msg.sender_id) === (prevMsg.user_id || prevMsg.sender_id)) ||
-                          (Boolean(msg.sender_name) && msg.sender_name === prevMsg.sender_name)
-                        );
-
-                        const isEditing = editingMessageId === msg.id;
-                        const isDeleting = confirmDeleteId === msg.id;
-                        const canModify = canModifyMessage(msg);
-                        const isDeleted = Boolean(msg.is_deleted || msg.message === "This message was deleted");
-                        const emojiOnly = !isDeleted && isEmojiOnlyText(msg.message) && !msg.quoted_message_text && !msg.attachment_name && (!msg.attachment_url || msg.attachment_url === "uploading...");
-
-                        return (
-                          <div
-                            key={`internal-msg-${msg.id ?? 'item'}-${idx}`}
-                            className={`group flex flex-col items-start max-w-[85%] sm:max-w-[80%] min-w-0 w-fit mr-auto ${isSameSenderAsPrev ? "mt-1" : "mt-3.5"}`}
-                          >
-                            {!isSameSenderAsPrev && (
-                              <div className="flex items-center gap-1.5 mb-1 px-1">
-                                <span className="text-[11px] font-bold text-foreground">
-                                  {msg.sender_name || "Team Member"}
-                                </span>
-                                {msg.sender_role && (
-                                  <span className="text-[10px] text-muted-foreground">
-                                    ({msg.sender_role})
-                                  </span>
-                                )}
-                              </div>
-                            )}
-
-                            {isEditing ? (
-                              <div className="w-full max-w-full min-w-0 space-y-2 p-2.5 rounded-xl bg-background border border-amber-500/40 shadow-md">
-                                <textarea
-                                  value={editingMessageText}
-                                  onChange={e => setEditingMessageText(e.target.value)}
-                                  onKeyDown={e => {
-                                    if (e.key === "Enter" && e.shiftKey) {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      const target = e.currentTarget;
-                                      const start = target.selectionStart;
-                                      const end = target.selectionEnd;
-                                      const val = target.value;
-                                      setEditingMessageText(val.substring(0, start) + "\n" + val.substring(end));
-                                      requestAnimationFrame(() => {
-                                        target.selectionStart = target.selectionEnd = start + 1;
-                                      });
-                                    } else if (e.key === "Enter" && !e.shiftKey) {
-                                      e.preventDefault();
-                                      handleSaveEdit(msg.id, "INTERNAL");
-                                    }
-                                  }}
-                                  className="w-full text-xs sm:text-[13px] bg-muted/40 border border-border rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-amber-500 min-h-[60px] text-foreground resize-y"
-                                  autoFocus
-                                  placeholder="Edit note (Enter to save, Shift + Enter for new line)..."
-                                />
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={handleCancelEdit}
-                                    disabled={savingEdit}
-                                    className="h-7 text-xs px-2.5 gap-1 text-muted-foreground hover:text-foreground"
-                                  >
-                                    <X className="h-3 w-3" /> Cancel
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={() => handleSaveEdit(msg.id, "INTERNAL")}
-                                    disabled={!editingMessageText.trim() || savingEdit}
-                                    className="h-7 text-xs px-2.5 gap-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-xs"
-                                  >
-                                    {savingEdit ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                                    Save
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : isDeleting ? (
-                              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs space-y-2">
-                                <p className="text-rose-600 dark:text-rose-400 font-semibold text-[11px]">
-                                  Delete this internal note permanently?
-                                </p>
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setConfirmDeleteId(null)}
-                                    disabled={deletingMessageId === msg.id}
-                                    className="h-6.5 text-[11px] px-2"
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={() => handleDeleteMessage(msg.id, "INTERNAL")}
-                                    disabled={deletingMessageId === msg.id}
-                                    className="h-6.5 text-[11px] px-2.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold gap-1"
-                                  >
-                                    {deletingMessageId === msg.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                                    Delete
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : isDeleted ? (
-                              /* Empty / Deleted Note Box */
-                              <div className="flex flex-col max-w-full self-start">
-                                <div className="flex items-center gap-1.5 max-w-full">
-                                  <div className="rounded-2xl shadow-xs px-3.5 py-2 text-xs sm:text-[13px] italic flex items-center gap-2 border border-dashed border-amber-500/30 bg-amber-500/5 text-amber-800/70 dark:text-amber-300/70 rounded-tl-sm select-none">
-                                    <Ban className="h-3.5 w-3.5 text-amber-600/60 dark:text-amber-400/60 shrink-0" />
-                                    <span>This note was deleted</span>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-1 mt-0.5 px-1 select-none text-[10px] text-muted-foreground/75 font-medium justify-start">
-                                  <span title={msg.created_at ? new Date(msg.created_at).toLocaleString() : undefined}>
-                                    {formatMessageDateTime(msg.created_at)}
-                                  </span>
-                                  <SeenReceiptsIndicator
-                                    seenBy={msg.seen_by}
-                                    isSelf={true}
-                                    sentAt={msg.created_at}
-                                  />
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col max-w-full min-w-0 self-start">
-                                <div className="flex items-center gap-1.5 max-w-full min-w-0">
-                                  <div
-                                    className={`rounded-2xl leading-relaxed shadow-xs bg-muted/40 dark:bg-zinc-900/60 text-foreground border border-border/60 dark:border-zinc-800 rounded-tl-sm max-w-full min-w-0 break-words [overflow-wrap:anywhere] ${
-                                      emojiOnly
-                                        ? "px-2.5 py-1"
-                                        : "px-3.5 py-2 text-xs sm:text-[13px]"
-                                    }`}
-                                  >
-                                    {/* Quoted Message Header */}
-                                    {msg.quoted_message_text && (
-                                      <div className="mb-2 p-2 rounded-lg border-l-2 border-l-amber-600 bg-amber-500/15 dark:bg-amber-950/50 text-foreground text-left text-xs select-none max-w-full min-w-0 overflow-hidden">
-                                        <div className="flex items-center gap-1 font-bold text-[10px] text-amber-700 dark:text-amber-400 min-w-0">
-                                          <Reply className="h-2.5 w-2.5 shrink-0" />
-                                          <span className="truncate">{msg.quoted_sender_name || "Quoted Message"}</span>
-                                        </div>
-                                        <p className="text-[11px] text-muted-foreground line-clamp-2 break-words italic mt-0.5">
-                                          "{msg.quoted_message_text}"
-                                        </p>
-                                      </div>
-                                    )}
-
-                                    <div className="break-words [overflow-wrap:anywhere] min-w-0 max-w-full">{renderMessageContent(msg.message, true, taggableUsers)}</div>
-
-                                    {/* Attached Document or Image Snippet Card (Preview Only) */}
-                                    {(msg.attachment_name || (msg.attachment_url && msg.attachment_url !== "uploading...")) && (
-                                      isImageFile(msg.attachment_name || msg.attachment_url) ? (
-                                        <div className="mt-2 rounded-xl overflow-hidden border border-border/60 shadow-xs max-w-sm">
-                                          <div
-                                            className="relative cursor-pointer group/img overflow-hidden bg-muted/30 flex items-center justify-center max-h-60"
-                                            onClick={() => handlePreviewAttachment(msg)}
-                                          >
-                                            <img
-                                              src={`/api-proxy/api/clients/orders/${orderNumber}/attachments/preview?path=${encodeURIComponent(msg.attachment_url)}`}
-                                              alt={msg.attachment_name || "Snippet"}
-                                              loading="lazy"
-                                              className="w-full h-auto max-h-60 object-contain transition-transform duration-200 group-hover/img:scale-[1.02]"
-                                            />
-                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-xs font-semibold backdrop-blur-[2px]">
-                                              <Eye className="h-4 w-4" />
-                                              <span>Click to Enlarge</span>
-                                            </div>
-                                          </div>
-                                          <div className="p-2 border-t bg-background/95 border-border/40 text-foreground flex items-center justify-between gap-2 text-xs">
-                                            <span className="truncate font-semibold text-[11px] block min-w-0">
-                                              {msg.attachment_name || "Internal Snippet Image"}
-                                            </span>
-                                            <Button
-                                              type="button"
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={() => handlePreviewAttachment(msg)}
-                                              className="h-6 px-2 text-[10px] font-bold gap-1 shrink-0 text-amber-600 hover:text-amber-700"
-                                            >
-                                              <Eye className="h-3 w-3" /> Full View
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <div className="mt-2 p-2.5 rounded-xl bg-background/90 border border-border/60 flex items-center justify-between gap-3 text-xs shadow-2xs">
-                                          <div className="flex items-center gap-2 min-w-0">
-                                            <div className="h-7 w-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
-                                              <FileText className="h-3.5 w-3.5" />
-                                            </div>
-                                            <div className="min-w-0">
-                                              <span className="font-bold text-foreground truncate block text-xs">
-                                                {msg.attachment_name || "Document"}
-                                              </span>
-                                              <span className="text-[10px] text-muted-foreground block">
-                                                Stored in Company Vault
-                                              </span>
-                                            </div>
-                                          </div>
-
-                                          <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handlePreviewAttachment(msg)}
-                                            className="h-7 text-[11px] font-bold gap-1 px-2.5 shrink-0 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 border-amber-500/30 shadow-2xs"
-                                          >
-                                            <Eye className="h-3 w-3" />
-                                            Preview
-                                          </Button>
-                                        </div>
-                                      )
-                                    )}
-                                  </div>
-
-                                  {/* Actions & WhatsApp Reaction Hover Trigger right next to bubble */}
-                                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                    <WhatsAppReactionHoverBar
-                                      onToggleReaction={emoji => handleToggleReaction(msg.id, emoji, true)}
-                                      align="start"
-                                      side="top"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => handleQuoteInternalMessage(msg)}
-                                      className="p-1 rounded-md text-muted-foreground hover:text-amber-600 hover:bg-amber-500/10 transition-colors"
-                                      title="Quote / Reply"
-                                    >
-                                      <Reply className="h-3 w-3" />
-                                    </button>
-                                    {canModify && (
-                                      <>
-                                        {/* Edit button hidden for now - can be re-enabled later */}
-                                        {/* <button
-                                          type="button"
-                                          onClick={() => handleStartEdit(msg)}
-                                          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
-                                          title="Edit note"
-                                        >
-                                          <Pencil className="h-3 w-3" />
-                                        </button> */}
-                                        <button
-                                          type="button"
-                                          onClick={() => setConfirmDeleteId(msg.id)}
-                                          className="p-1 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 transition-colors"
-                                          title="Delete note"
-                                        >
-                                          <Trash2 className="h-3 w-3" />
-                                        </button>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Reactions Badges at the Bottom of Message */}
-                                <ChatMessageReactions
-                                  reactions={msg.reactions}
-                                  onToggleReaction={emoji => handleToggleReaction(msg.id, emoji, true)}
-                                  isSelf={false}
-                                />
-
-                                {/* Sent Date and Time & Seen indicator */}
-                                <div className="flex items-center gap-1 mt-0.5 px-1 select-none text-[10px] text-muted-foreground/75 font-medium justify-start">
-                                  <span title={msg.created_at ? new Date(msg.created_at).toLocaleString() : undefined}>
-                                    {formatMessageDateTime(msg.created_at)}
-                                  </span>
-                                  <SeenReceiptsIndicator
-                                    seenBy={msg.seen_by}
-                                    isSelf={true}
-                                    sentAt={msg.created_at}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-
-                  {/* Internal Chat Input Bar (With @Tagging Support & Quote Banner) */}
-                  <div className="p-3 border-t border-border/60 bg-muted/20 relative space-y-2 shrink-0">
-                    {/* Quoted Internal Note Banner */}
-                    {quotedInternalMessage && (
-                      <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-amber-500/10 border-l-4 border-l-amber-500 border-t border-r border-b border-amber-500/20 rounded-lg text-xs shadow-xs animate-in fade-in slide-in-from-bottom-1">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Reply className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                          <div className="min-w-0">
-                            <span className="font-bold text-amber-700 dark:text-amber-300 block text-[10px] sm:text-[11px]">
-                              Replying to {quotedInternalMessage.sender_name || "Team Member"}
-                            </span>
-                            <p className="text-muted-foreground text-[11px] truncate max-w-sm italic">
-                              "{quotedInternalMessage.message || quotedInternalMessage.attachment_name || "Attachment"}"
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setQuotedInternalMessage(null)}
-                          className="h-5 w-5 rounded-full text-muted-foreground hover:text-foreground"
-                          title="Cancel reply"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Suggestions Popover for @mentions */}
-                    {showSuggestions && (
-                      <div className="absolute bottom-full left-3 right-3 mb-2 bg-popover border border-border rounded-xl shadow-xl p-1 z-50 max-h-52 overflow-y-auto">
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2 py-1 flex items-center justify-between">
-                          <span>Suggested Mentions</span>
-                          <span className="text-[9px] font-normal text-muted-foreground lowercase">type or click</span>
-                        </div>
-                        {filteredSuggestions.map((item, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => selectSuggestion(item)}
-                            className={`w-full text-left px-2.5 py-1.5 text-xs hover:bg-muted/80 rounded-lg flex items-center justify-between transition-colors ${
-                              item.type === "order_team" ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-950 dark:text-amber-100" : ""
-                            }`}
-                          >
-                            <span className="font-semibold text-foreground flex items-center gap-1.5 min-w-0">
-                              {item.type === "order_team" ? (
-                                <>
-                                  <Users className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                                  <span className="text-amber-700 dark:text-amber-300 font-bold truncate">@{item.displayName}</span>
-                                </>
-                              ) : item.type === "team" ? (
-                                <>
-                                  <Users className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                                  <span className="truncate">{item.displayName}</span>
-                                </>
-                              ) : (
-                                <>
-                                  <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                                  <span className="truncate">{item.displayName}</span>
-                                </>
-                              )}
-                            </span>
-                            <span className={`text-[10px] shrink-0 ml-2 ${item.type === "order_team" ? "text-amber-700 dark:text-amber-300 font-bold" : "text-muted-foreground"}`}>
-                              {item.type === "order_team" ? (item.subtitle || "Assigned Order Team") : (item.type === "team" ? "Team" : item.department?.name || item.job_title || "Staff")}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Internal Attachment / Snippet Staged Preview Chip */}
-                    {internalAttachment && (
-                      <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 dark:bg-amber-950/30 text-xs shadow-xs animate-in fade-in slide-in-from-bottom-2 duration-150">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          {internalAttachmentPreview ? (
-                            <img
-                              src={internalAttachmentPreview}
-                              alt="Snippet preview"
-                              className="h-10 w-10 object-cover rounded-lg border border-amber-500/30 shrink-0 bg-background"
-                            />
-                          ) : (
-                            <div className="h-10 w-10 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
-                              <FileText className="h-5 w-5" />
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold truncate text-xs text-foreground block">
-                                {internalAttachment.name}
-                              </span>
-                              <Badge variant="outline" className="text-[10px] py-0 px-1.5 bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300 shrink-0">
-                                {internalAttachment.type.startsWith("image/") ? "Snippet / Image" : "Document"}
-                              </Badge>
-                            </div>
-                            <span className="text-[11px] text-muted-foreground block truncate">
-                              {formatFileSize(internalAttachment.size)} • Internal chat only (not stored in Vault or Dropbox)
-                            </span>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={handleRemoveInternalAttachment}
-                          className="h-7 w-7 rounded-full text-muted-foreground hover:text-foreground hover:bg-background/60 shrink-0"
-                          title="Remove attachment"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-
-                    <form onSubmit={handleInternalSend} className="flex items-end gap-2">
-                      <input
-                        type="file"
-                        ref={internalFileInputRef}
-                        className="hidden"
-                        onChange={e => {
-                          if (e.target.files?.[0]) {
-                            handleInternalAttachmentSelect(e.target.files[0]);
-                          }
-                        }}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => internalFileInputRef.current?.click()}
-                        title="Attach file or screenshot snippet"
-                        className={`h-[40px] w-[40px] rounded-xl shrink-0 transition-colors ${
-                          internalAttachment
-                            ? "border-amber-500 text-amber-600 bg-amber-500/10 shadow-xs"
-                            : "border-input bg-background text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        <Paperclip className="h-4 w-4" />
-                      </Button>
-
-                      <ChatEmojiPicker
-                        onSelectEmoji={emoji => {
-                          setInternalInput(prev => {
-                            const next = prev + emoji;
-                            requestAnimationFrame(() => {
-                              if (internalInputRef.current) {
-                                internalInputRef.current.style.height = "auto";
-                                internalInputRef.current.style.height = `${Math.min(internalInputRef.current.scrollHeight, 160)}px`;
-                              }
-                            });
-                            return next;
-                          });
-                          internalInputRef.current?.focus();
-                        }}
-                        side="top"
-                        align="start"
-                      />
-                      <textarea
-                        ref={internalInputRef}
-                        rows={1}
-                        placeholder={
-                          internalAttachment
-                            ? "Add an internal note with this attachment..."
-                            : "Internal team note (use @ to tag teammates, paste snippet directly)..."
-                        }
-                        value={internalInput}
-                        onPaste={e => handlePasteSnippet(e, handleInternalAttachmentSelect, "Internal Notes")}
-                        onChange={e => {
-                          handleInternalTextChange(e.target.value, e.target.selectionStart || 0);
-                          e.target.style.height = "auto";
-                          e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
-                        }}
-                        onKeyDown={e => {
-                          if (e.key === "Enter" && showSuggestions && filteredSuggestions.length > 0) {
-                            e.preventDefault();
-                            selectSuggestion(filteredSuggestions[0]);
-                          } else if (e.key === "Enter" && e.shiftKey) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const target = e.currentTarget;
-                            const start = target.selectionStart;
-                            const end = target.selectionEnd;
-                            const val = target.value;
-                            const newVal = val.substring(0, start) + "\n" + val.substring(end);
-                            handleInternalTextChange(newVal, start + 1);
-                            requestAnimationFrame(() => {
-                              target.selectionStart = target.selectionEnd = start + 1;
-                              target.style.height = "auto";
-                              target.style.height = `${Math.min(target.scrollHeight, 160)}px`;
-                            });
-                          } else if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            handleInternalSend();
-                          }
-                        }}
-                        className="flex-1 min-w-0 text-xs sm:text-sm bg-background border border-input rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-1 focus:ring-amber-500 resize-none min-h-[40px] max-h-40 leading-relaxed overflow-y-auto break-words [overflow-wrap:anywhere]"
-                        disabled={sendingInternal}
-                      />
-                      <Button
-                        type="submit"
-                        size="sm"
-                        disabled={(!internalInput.trim() && !internalAttachment) || sendingInternal}
-                        className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold gap-1.5 px-3.5 h-9 shrink-0 shadow-xs"
-                      >
-                        {sendingInternal ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Send className="h-3.5 w-3.5" />
-                        )}
-                        <span>Send</span>
-                      </Button>
-                    </form>
-                  </div>
+                    onReact={(id, emoji) => handleToggleReaction(id, emoji, true)}
+                    onCopy={(txt) => toast.success("Note copied to clipboard")}
+                    onEdit={(msg) => handleStartEdit(msg, "INTERNAL")}
+                    onDelete={(id) => setDeleteConfirm({ msgId: id, channel: "INTERNAL" })}
+                    onOpenImagePreview={(url, name) =>
+                      handlePreviewAttachment({ attachment_url: url, attachment_name: name })
+                    }
+                  />
                 </div>
               </div>
             </div>
           </motion.div>
-          </>
         )}
       </AnimatePresence>
 
-      {/* CONFIRMATION MODAL BEFORE SENDING TO CLIENT */}
+      {/* Confirmation Modal Before Sending to Client */}
       <AnimatePresence>
         {isConfirmClientOpen && (
           <div className="fixed inset-0 z-[85] flex items-center justify-center p-4">
@@ -2908,95 +1058,199 @@ export function DualOrderChatDialog({
               className="fixed inset-0 bg-black/60 backdrop-blur-xs"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="relative w-full max-w-md bg-background border border-border rounded-2xl shadow-2xl p-6 z-[90] space-y-4"
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              className="relative w-full max-w-md bg-[var(--oc-bg-panel)] border border-[var(--oc-border)] rounded-2xl shadow-xl p-5 z-[90] space-y-4"
             >
-              <div className="flex items-center gap-3 pb-3 border-b border-border/50">
-                <div className="h-10 w-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
-                  <AlertTriangle className="h-5 w-5" />
+              <div className="flex items-center gap-3 pb-3 border-b border-[var(--oc-border)]">
+                <div className="w-10 h-10 rounded-xl bg-[var(--oc-brand-50)] text-[var(--oc-brand-600)] border border-[var(--oc-brand-200)] flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-foreground">
-                    Confirm Message to Client
+                  <h3 className="text-sm font-semibold text-[var(--oc-text-primary)]">
+                    Send Message to Client?
                   </h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Please verify the content before sending it directly to the client.
+                  <p className="text-xs text-[var(--oc-text-tertiary)]">
+                    This message will be immediately visible to the client in their portal.
                   </p>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <p className="text-xs font-medium text-foreground">
-                  Are you sure you want to send this {clientAttachment ? "attachment and note" : "message"} to the Client?
-                </p>
-
                 {clientAttachment && (
-                  <div className="p-3 rounded-xl border border-sky-500/30 bg-sky-500/10 flex items-center gap-3">
+                  <div className="p-3 rounded-xl border border-[var(--oc-brand-200)] bg-[var(--oc-brand-50)]/40 flex items-center gap-3">
                     {clientAttachmentPreview ? (
                       <img
                         src={clientAttachmentPreview}
-                        alt="Snippet preview"
-                        className="h-11 w-11 object-cover rounded-lg border border-sky-500/30 shrink-0 bg-background"
+                        alt="Preview"
+                        className="w-11 h-11 object-cover rounded-lg border border-[var(--oc-brand-200)] shrink-0"
                       />
                     ) : (
-                      <div className="h-11 w-11 rounded-lg bg-sky-500/20 text-sky-600 flex items-center justify-center shrink-0">
-                        <FileText className="h-5 w-5" />
+                      <div className="w-11 h-11 rounded-lg bg-[var(--oc-brand-100)] text-[var(--oc-brand-600)] flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5" />
                       </div>
                     )}
                     <div className="min-w-0">
-                      <span className="text-xs font-bold block truncate text-foreground">{clientAttachment.name}</span>
-                      <span className="text-[10px] text-muted-foreground block">{formatFileSize(clientAttachment.size)} • Storing in Client Shared Docs</span>
+                      <span className="text-xs font-semibold block truncate text-[var(--oc-text-primary)]">
+                        {clientAttachment.name}
+                      </span>
+                      <span className="text-[11px] text-[var(--oc-text-tertiary)] block">
+                        {formatFileSize(clientAttachment.size)}
+                      </span>
                     </div>
                   </div>
                 )}
 
                 {pendingClientMessage ? (
-                  <div className="p-3.5 rounded-xl border border-sky-500/20 bg-sky-500/5 text-xs text-foreground leading-relaxed">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 block mb-1">
-                      Message Note:
-                    </span>
-                    <p className="italic font-medium">"{pendingClientMessage}"</p>
+                  <div className="p-3 rounded-xl border border-[var(--oc-border)] bg-[var(--oc-bg-subtle)] text-xs text-[var(--oc-text-primary)] leading-relaxed">
+                    <p className="italic">&ldquo;{pendingClientMessage}&rdquo;</p>
                   </div>
                 ) : null}
-
-                <p className="text-[11px] text-muted-foreground">
-                  This will be instantly delivered to the client portal and notify their primary representative.
-                </p>
               </div>
 
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-border/50">
-                <Button
+              <div className="flex justify-end gap-2.5 pt-2 border-t border-[var(--oc-border)]">
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
                   onClick={() => setIsConfirmClientOpen(false)}
-                  className="text-xs font-semibold h-9"
+                  className="h-8.5 text-xs font-medium px-3.5 rounded-lg border border-[var(--oc-border)] bg-[var(--oc-bg-panel)] text-[var(--oc-text-secondary)] hover:bg-[var(--oc-bg-subtle)] transition-colors cursor-pointer"
                 >
                   Cancel
-                </Button>
-                <Button
+                </button>
+                <button
                   type="button"
-                  size="sm"
                   onClick={handleConfirmSendClientMessage}
                   disabled={sendingClient}
-                  className="bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs gap-1.5 h-9 shadow-xs"
+                  className="h-8.5 text-xs font-semibold px-4 rounded-lg bg-[var(--oc-brand-600)] hover:bg-[var(--oc-brand-700)] text-white transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-xs cursor-pointer"
                 >
                   {sendingClient ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
-                    <Send className="h-3.5 w-3.5" />
+                    <Send className="w-3.5 h-3.5" />
                   )}
-                  Confirm & Send to Client
-                </Button>
+                  <span>Send to Client</span>
+                </button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* ATTACHMENT PREVIEW MODAL FOR STAFF (PREVIEW ONLY - NO DOWNLOAD) */}
+      {/* Edit Message Modal */}
+      <AnimatePresence>
+        {editingMessage && (
+          <div className="fixed inset-0 z-[85] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setEditingMessage(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              className="relative w-full max-w-lg bg-[var(--oc-bg-panel)] border border-[var(--oc-border)] rounded-2xl shadow-xl p-5 z-[90] space-y-3"
+            >
+              <div className="flex items-center gap-2 pb-2 border-b border-[var(--oc-border)]">
+                <Edit2 className="w-4 h-4 text-[var(--oc-brand-600)]" />
+                <h3 className="text-sm font-semibold text-[var(--oc-text-primary)]">
+                  Edit Message
+                </h3>
+              </div>
+
+              <textarea
+                value={editingMessageText}
+                onChange={(e) => setEditingMessageText(e.target.value)}
+                rows={4}
+                className="w-full text-sm bg-[var(--oc-bg-subtle)] border border-[var(--oc-border)] rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-[var(--oc-brand-500)] text-[var(--oc-text-primary)] resize-y leading-relaxed"
+                placeholder="Edit message..."
+                autoFocus
+              />
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--oc-border)]">
+                <button
+                  type="button"
+                  onClick={() => setEditingMessage(null)}
+                  disabled={savingEdit}
+                  className="h-8.5 text-xs font-medium px-3.5 rounded-lg border border-[var(--oc-border)] bg-[var(--oc-bg-panel)] text-[var(--oc-text-secondary)] hover:bg-[var(--oc-bg-subtle)] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  disabled={!editingMessageText.trim() || savingEdit}
+                  className="h-8.5 text-xs font-semibold px-4 rounded-lg bg-[var(--oc-brand-600)] hover:bg-[var(--oc-brand-700)] text-white transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
+                >
+                  {savingEdit ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Check className="w-3.5 h-3.5" />
+                  )}
+                  <span>Save Changes</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deleteConfirm && (
+          <div className="fixed inset-0 z-[85] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDeleteConfirm(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              className="relative w-full max-w-sm bg-[var(--oc-bg-panel)] border border-[var(--oc-border)] rounded-2xl shadow-xl p-5 z-[90] space-y-3"
+            >
+              <div className="flex items-center gap-2.5 pb-2 text-[var(--oc-danger-600)]">
+                <Trash2 className="w-5 h-5 shrink-0" />
+                <h3 className="text-sm font-semibold text-[var(--oc-text-primary)]">
+                  Delete Message?
+                </h3>
+              </div>
+              <p className="text-xs text-[var(--oc-text-secondary)] leading-relaxed">
+                Are you sure you want to delete this message? This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-2 pt-2 border-t border-[var(--oc-border)]">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirm(null)}
+                  className="h-8.5 text-xs font-medium px-3.5 rounded-lg border border-[var(--oc-border)] bg-[var(--oc-bg-panel)] text-[var(--oc-text-secondary)] hover:bg-[var(--oc-bg-subtle)] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  disabled={Boolean(deletingMessageId)}
+                  className="h-8.5 text-xs font-semibold px-4 rounded-lg bg-[var(--oc-danger-600)] hover:bg-[var(--oc-danger-700)] text-white transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
+                >
+                  {deletingMessageId ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-3.5 h-3.5" />
+                  )}
+                  <span>Delete</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Attachment Preview Modal (Preview Only - No Download) */}
       <AnimatePresence>
         {previewAttachment && previewUrl && (
           <div className="fixed inset-0 z-[95] flex items-center justify-center p-4">
@@ -3008,32 +1262,32 @@ export function DualOrderChatDialog({
                 setPreviewAttachment(null);
                 setPreviewUrl(null);
               }}
-              className="fixed inset-0 bg-black/70 backdrop-blur-xs"
+              className="fixed inset-0 bg-black/75 backdrop-blur-xs"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="relative w-full max-w-4xl h-[85vh] bg-background border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden z-[100]"
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              className="relative w-full max-w-4xl h-[85vh] bg-[var(--oc-bg-panel)] border border-[var(--oc-border)] rounded-2xl shadow-2xl flex flex-col overflow-hidden z-[100]"
             >
               {/* Preview Header */}
-              <div className="px-5 py-3.5 border-b border-border/60 bg-muted/20 flex items-center justify-between shrink-0">
+              <div className="px-5 py-3 border-b border-[var(--oc-border)] bg-[var(--oc-bg-subtle)] flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                    <Eye className="h-4 w-4" />
+                  <div className="w-8 h-8 rounded-lg bg-[var(--oc-brand-50)] text-[var(--oc-brand-600)] flex items-center justify-center shrink-0">
+                    <Eye className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="text-sm font-bold text-foreground truncate">
+                    <h3 className="text-sm font-semibold text-[var(--oc-text-primary)] truncate">
                       {previewAttachment.attachment_name || "Document Preview"}
                     </h3>
-                    <p className="text-[10px] text-muted-foreground truncate">
-                      Order #{orderNumber} • Client Shared Document (Preview Only)
+                    <p className="text-[11px] text-[var(--oc-text-tertiary)] truncate">
+                      Order #{orderNumber} · Shared Document
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[11px] text-muted-foreground italic mr-2 hidden sm:inline">
+                  <span className="text-[11px] text-[var(--oc-text-tertiary)] italic mr-2 hidden sm:inline">
                     File download available via Company Documents
                   </span>
                   <Button
@@ -3043,15 +1297,15 @@ export function DualOrderChatDialog({
                       setPreviewAttachment(null);
                       setPreviewUrl(null);
                     }}
-                    className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground"
+                    className="h-8 w-8 rounded-full text-[var(--oc-text-tertiary)] hover:text-[var(--oc-text-primary)]"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
 
               {/* Preview Body */}
-              <div className="flex-1 bg-muted/10 p-2 overflow-hidden flex items-center justify-center">
+              <div className="flex-1 bg-[var(--oc-bg-app)] p-2 overflow-hidden flex items-center justify-center">
                 {previewAttachment?.attachment_name?.match(/\.(xlsx|xls|csv)$/i) ? (
                   <ExcelPreview
                     fileUrl={previewUrl}
@@ -3061,7 +1315,7 @@ export function DualOrderChatDialog({
                 ) : (
                   <iframe
                     src={previewUrl}
-                    className="w-full h-full rounded-xl border border-border/40 bg-background"
+                    className="w-full h-full rounded-xl border border-[var(--oc-border)] bg-[var(--oc-bg-panel)]"
                     title="Document Preview"
                   />
                 )}

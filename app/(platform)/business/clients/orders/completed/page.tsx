@@ -419,7 +419,7 @@ export default function ClientOrdersPage() {
   const [proformaPercent, setProformaPercent] = useState<number>(70);
   const [tempPercent, setTempPercent] = useState<string>("70");
   const [tempAmount, setTempAmount] = useState<string>("");
-  const [isPph21, setIsPph21] = useState<boolean>(false);
+  const [isPph23, setIsPph23] = useState<boolean>(false);
 
   // On Hold Modal State for Edit Form
   const [isOnHoldDialogOpen, setIsOnHoldDialogOpen] = useState(false);
@@ -521,7 +521,7 @@ export default function ClientOrdersPage() {
 
   const [highlightedOrderNum, setHighlightedOrderNum] = useState<string | null>(null);
 
-  const openOrderDirectly = (orderNum: string, openChat: boolean = true) => {
+  const openOrderDirectly = (orderNum: string, openChat: boolean = false) => {
     if (!orderNum) return;
 
     const matched = groupedOrdersMap.get(orderNum) || Array.from(groupedOrdersMap.values()).find(g => g.order_number?.toUpperCase() === orderNum.toUpperCase());
@@ -594,14 +594,16 @@ export default function ClientOrdersPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
+    const autoOpen = !!sessionStorage.getItem("auto_open_order_chat");
     const orderNum = params.get("order") || sessionStorage.getItem("auto_open_order_chat");
     const openChat = params.get("chat");
+    const shouldOpenChat = openChat === "true" || autoOpen;
 
     if (!orderNum) return;
 
     if (orders.length > 0) {
       hasProcessedCompletedUrlRef.current = true;
-      openOrderDirectly(orderNum, openChat !== "false");
+      openOrderDirectly(orderNum, shouldOpenChat);
       sessionStorage.removeItem("auto_open_order_chat");
       const url = new URL(window.location.href);
       if (url.searchParams.has("order") || url.searchParams.has("chat")) {
@@ -611,7 +613,7 @@ export default function ClientOrdersPage() {
       }
     } else if (!hasProcessedCompletedUrlRef.current) {
       hasProcessedCompletedUrlRef.current = true;
-      openOrderDirectly(orderNum, openChat !== "false");
+      openOrderDirectly(orderNum, shouldOpenChat);
     }
   }, [orders]);
 
@@ -673,6 +675,7 @@ export default function ClientOrdersPage() {
         deliverables_sent_to: ord.deliverables_sent_to || null,
         accurate_so_no: ord.accurate_so_no || null,
         accurate_so_id: ord.accurate_so_id || null,
+        accurate_dp_inv_no: ord.accurate_dp_inv_no || null,
         accurate_inv_no: ord.accurate_inv_no || null,
         accurate_inv_id: ord.accurate_inv_id || null,
         accurate_receipt_no: ord.accurate_receipt_no || null,
@@ -729,6 +732,7 @@ export default function ClientOrdersPage() {
 
     if (ord.accurate_so_no) group.accurate_so_no = ord.accurate_so_no;
     if (ord.accurate_so_id) group.accurate_so_id = ord.accurate_so_id;
+    if (ord.accurate_dp_inv_no) group.accurate_dp_inv_no = ord.accurate_dp_inv_no;
     if (ord.accurate_inv_no) group.accurate_inv_no = ord.accurate_inv_no;
     if (ord.accurate_inv_id) group.accurate_inv_id = ord.accurate_inv_id;
     if (ord.accurate_receipt_no) group.accurate_receipt_no = ord.accurate_receipt_no;
@@ -1952,12 +1956,16 @@ export default function ClientOrdersPage() {
                           <tr
                             key={ord.order_number || index}
                             id={`order-row-${ord.order_number}`}
-                            className={`transition-all duration-300 border-b border-border/30 last:border-0 ${isHighlighted
-                                ? "bg-emerald-500/20 dark:bg-emerald-500/25 ring-2 ring-emerald-500 ring-inset shadow-md"
+                            className={`transition-colors duration-200 border-b border-border/30 last:border-0 ${isHighlighted
+                                ? "bg-emerald-500/15 dark:bg-emerald-500/25 border-y-2 border-emerald-500"
                                 : "hover:bg-muted/40"
                               }`}
                           >
-                            <td className="py-2 px-2 text-center font-mono font-medium text-muted-foreground align-top pt-2.5 text-xs">
+                            <td className={`py-2 px-2 text-center font-mono align-top pt-2.5 text-xs transition-colors ${
+                              isHighlighted
+                                ? "border-l-4 border-l-emerald-500 font-bold text-emerald-950 dark:text-emerald-100"
+                                : "font-medium text-muted-foreground"
+                            }`}>
                               #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + index))}
                             </td>
                             <td className="py-2 px-2 align-top pt-2.5 whitespace-nowrap">
@@ -2194,7 +2202,9 @@ export default function ClientOrdersPage() {
                                 {ord.status || "COMPLETED"}
                               </Badge>
                             </td>
-                            <td className="py-2 px-2 text-right align-top pt-2.5 whitespace-nowrap">
+                            <td className={`py-2 px-2 text-right align-top pt-2.5 whitespace-nowrap transition-colors ${
+                              isHighlighted ? "border-r-2 border-r-emerald-500" : ""
+                            }`}>
                               <div className="flex items-center justify-end gap-1">
                                 <Button
                                   size="sm"
@@ -2229,7 +2239,7 @@ export default function ClientOrdersPage() {
                                     } else {
                                       setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
                                     }
-                                    setIsPph21(false);
+                                    setIsPph23(false);
                                     setIsViewOpen(true);
                                     fetchProgressUpdates(ord.order_number);
                                   }}
@@ -2414,7 +2424,7 @@ export default function ClientOrdersPage() {
                                 } else {
                                   setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
                                 }
-                                setIsPph21(false);
+                                setIsPph23(false);
                                 setIsViewOpen(true);
                                 fetchProgressUpdates(ord.order_number);
                               }}
@@ -3160,14 +3170,14 @@ export default function ClientOrdersPage() {
                           <div className="flex items-center gap-2 pt-1.5">
                             <input
                               type="checkbox"
-                              id="pph21-checkbox"
-                              checked={isPph21}
+                              id="pph23-checkbox"
+                              checked={isPph23}
                               disabled={selectedOrderGroup.is_proforma_finalized}
-                              onChange={(e) => setIsPph21(e.target.checked)}
+                              onChange={(e) => setIsPph23(e.target.checked)}
                               className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 cursor-pointer accent-zinc-900 disabled:cursor-not-allowed"
                             />
-                            <label htmlFor="pph21-checkbox" className="text-xs font-semibold text-zinc-700 cursor-pointer select-none">
-                              Add PPH 21 (2% Tax WHT)
+                            <label htmlFor="pph23-checkbox" className="text-xs font-semibold text-zinc-700 cursor-pointer select-none">
+                              Add PPH 23 (2% Tax WHT)
                             </label>
                           </div>
                         </div>
@@ -3203,9 +3213,9 @@ export default function ClientOrdersPage() {
                               {formatCurrency((selectedOrderGroup.total_amount * proformaPercent) / 100)}
                             </span>
                           </div>
-                          {isPph21 && (
+                          {isPph23 && (
                             <div className="flex justify-between items-center text-red-600 font-semibold">
-                              <span>WHT PPh 21 (2%):</span>
+                              <span>WHT PPh 23 (2%):</span>
                               <span className="font-mono">
                                 -{formatCurrency(((selectedOrderGroup.total_amount * proformaPercent) / 100) * 0.02)}
                               </span>
@@ -3215,7 +3225,7 @@ export default function ClientOrdersPage() {
                             <span className="text-zinc-900 font-bold">Proforma Amount Due:</span>
                             <span className="font-extrabold font-mono text-zinc-950 text-base">
                               {formatCurrency(
-                                isPph21
+                                isPph23
                                   ? ((selectedOrderGroup.total_amount * proformaPercent) / 100) * 0.98
                                   : (selectedOrderGroup.total_amount * proformaPercent) / 100
                               )}
@@ -3658,9 +3668,9 @@ export default function ClientOrdersPage() {
                           <span>Proforma Subtotal:</span>
                           <span className="font-bold text-slate-900">{formatCurrency((selectedOrderGroup.total_amount * proformaPercent) / 100)}</span>
                         </div>
-                        {isPph21 && (
+                        {isPph23 && (
                           <div className="flex justify-between py-1 border-b border-slate-200 text-red-600 font-semibold">
-                            <span>WHT PPh 21 (2% Deduction):</span>
+                            <span>WHT PPh 23 (2% Deduction):</span>
                             <span>-{formatCurrency(((selectedOrderGroup.total_amount * proformaPercent) / 100) * 0.02)}</span>
                           </div>
                         )}
@@ -3668,7 +3678,7 @@ export default function ClientOrdersPage() {
                           <span>Total Amount Due:</span>
                           <span>
                             {formatCurrency(
-                              isPph21
+                              isPph23
                                 ? ((selectedOrderGroup.total_amount * proformaPercent) / 100) * 0.98
                                 : (selectedOrderGroup.total_amount * proformaPercent) / 100
                             )}
@@ -3921,8 +3931,8 @@ export default function ClientOrdersPage() {
                           : ((selectedOrderGroup.total_amount * (selectedOrderGroup.proforma_stage_percent || proformaPercent)) / 100);
                         const isCustomProforma = (selectedOrderGroup.proforma_paid_amount !== undefined && selectedOrderGroup.proforma_paid_amount !== null && selectedOrderGroup.proforma_paid_amount > 0);
                         const subtotalAfterDeduction = Math.max(0, selectedOrderGroup.total_amount - proformaDeduction);
-                        const pph21Val = isPph21 ? subtotalAfterDeduction * 0.02 : 0;
-                        const finalDue = subtotalAfterDeduction - pph21Val;
+                        const pph23Val = isPph23 ? subtotalAfterDeduction * 0.02 : 0;
+                        const finalDue = subtotalAfterDeduction - pph23Val;
 
                         return (
                           <div className="w-full sm:w-96 space-y-1.5 text-xs font-mono">
@@ -3934,10 +3944,10 @@ export default function ClientOrdersPage() {
                               <span>Less: Proforma Paid {isCustomProforma ? "(Custom Received)" : `(${selectedOrderGroup.proforma_stage_percent || proformaPercent}%)`}:</span>
                               <span className="font-bold text-amber-600">-{formatCurrency(proformaDeduction)}</span>
                             </div>
-                            {isPph21 && (
+                            {isPph23 && (
                               <div className="flex justify-between py-1 border-b border-slate-200 text-red-600 font-bold">
-                                <span>WHT PPh 21 (2% Deduction):</span>
-                                <span>-{formatCurrency(pph21Val)}</span>
+                                <span>WHT PPh 23 (2% Deduction):</span>
+                                <span>-{formatCurrency(pph23Val)}</span>
                               </div>
                             )}
                             <div className="flex justify-between py-2.5 px-3 rounded-lg bg-blue-600 text-white text-sm font-bold shadow-sm">

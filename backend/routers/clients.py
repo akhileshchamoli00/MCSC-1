@@ -161,13 +161,6 @@ def update_order_group_status(
         
     with status_lock:
         first_order = orders[0]
-        
-        # Ensure we have fresh status from database
-        try:
-            db.refresh(first_order)
-        except Exception:
-            pass
-            
         old_status = first_order.status
         
         # Update status for all orders in group
@@ -177,7 +170,13 @@ def update_order_group_status(
         # If the status actually changed, log a single progress message in the order chat
         if old_status != new_status or (new_status == "ON_HOLD" and hold_reason):
             status_label = new_status.replace("_", " ").upper()
-            if new_status == "ON_HOLD" and hold_reason:
+            if new_status == "UNDER_INITIAL_CHECK":
+                msg = "🔍 Inquiry pre-order initial check started."
+            elif new_status == "NEED_MORE_INFO":
+                msg = "⚠️ Inquiry pre-order: More information / clarification required from client."
+            elif new_status == "CHECK_COMPLETED":
+                msg = "✅ Inquiry initial check completed and verified. Ready to activate."
+            elif new_status == "ON_HOLD" and hold_reason:
                 msg = f"⏸️ Order placed ON HOLD. Reason: {hold_reason.strip()}"
             else:
                 msg = f"Order execution status has been updated to {status_label}."
@@ -753,7 +752,7 @@ def send_order_assignment_notifications(
                 message=message,
                 type=notif_type,
                 module="orders",
-                system_area="shared",
+                system_area="business",
                 reference_id=order_id,
                 action_url=f"/business/assigned-orders?order={order_number}&chat=false"
             )
@@ -782,7 +781,7 @@ def send_order_assignment_notifications(
                 message=message,
                 type=notif_type,
                 module="orders",
-                system_area="shared",
+                system_area="business",
                 reference_id=order_id,
                 action_url=f"/business/assigned-orders?order={order_number}&chat=false"
             )
@@ -822,7 +821,14 @@ def get_my_assigned_orders(db: Session = Depends(database.get_db), current_user:
         "FINAL_PAYMENT_COMPLETED",
         "SOFT_COPY_DELIVERED",
         "HARD_COPY_DELIVERED",
-        "COMPLETED"
+        "COMPLETED",
+        "PIPELINE",
+        "PROSPECT",
+        "UNDER_INITIAL_CHECK",
+        "NEED_MORE_INFO",
+        "CHECK_COMPLETED",
+        "BEING_CHECKED",
+        "ENQUIRY"
     ]
 
     is_admin = is_admin_or_hr(current_user) or auth.is_super_admin(current_user)
@@ -1320,8 +1326,9 @@ def get_client_orders(
                 r_ids.append(ord_obj.reviewer_id)
             is_assigned = emp_id is not None and (emp_id in c_ids or emp_id in r_ids or ord_obj.reviewer_id == emp_id)
             
+            ENQUIRY_STATUSES = ["PROSPECT", "PIPELINE", "UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED", "BEING_CHECKED", "ENQUIRY"]
             # If user has access to active orders and order is active
-            if can_view_active and ord_obj.status not in ["COMPLETED", "CANCELLED", "PROSPECT", "PIPELINE"]:
+            if can_view_active and ord_obj.status not in ["COMPLETED", "CANCELLED", *ENQUIRY_STATUSES]:
                 filtered.append(ord_obj)
             # If user has access to completed orders and order is completed
             elif can_view_completed and ord_obj.status == "COMPLETED":
@@ -1329,8 +1336,8 @@ def get_client_orders(
             # If user has access to cancelled orders and order is cancelled
             elif can_view_cancelled and ord_obj.status == "CANCELLED":
                 filtered.append(ord_obj)
-            # If user has access to pipeline orders and order is pipeline
-            elif can_view_pipeline and ord_obj.status in ["PROSPECT", "PIPELINE"]:
+            # If user has access to pipeline/enquiry orders and order is enquiry
+            elif can_view_pipeline and ord_obj.status in ENQUIRY_STATUSES:
                 filtered.append(ord_obj)
             # If user has access to notary payments and order has notary
             elif can_view_notary_payments and ord_obj.notary_id:
@@ -1679,20 +1686,43 @@ def get_order_group_by_number(
 @router.post("/orders/group/{order_number}/move-to-active")
 @router.post("/orders/{order_number}/move-to-active")
 def move_pipeline_order_to_active(order_number: str, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
-    if not (auth.is_super_admin(current_user) or auth.has_permission(current_user, "clients_orders_pipeline", "edit", db) or auth.has_permission(current_user, "clients_orders_active", "create", db) or auth.has_permission(current_user, "clients_orders", "edit", db) or is_admin_or_hr(current_user) or is_employee_role(current_user)):
-        raise HTTPException(status_code=403, detail="Not authorized to move pipeline orders to active")
-        
     orders = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
     if not orders:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    emp_id = current_user.employee.id if current_user.employee else None
+    is_assigned = any(
+        emp_id and (
+            emp_id in parse_consultant_ids(o.consultant_ids) 
+            or emp_id in parse_consultant_ids(getattr(o, "reviewer_ids", None))
+            or emp_id == o.reviewer_id
+        ) 
+        for o in orders
+    )
+    is_admin = is_admin_or_hr(current_user) or auth.is_super_admin(current_user)
+    has_perm = (
+        auth.has_permission(current_user, "clients_orders_pipeline", "edit", db) 
+        or auth.has_permission(current_user, "clients_orders_active", "create", db) 
+        or auth.has_permission(current_user, "clients_orders", "edit", db)
+        or is_employee_role(current_user)
+    )
+    if not (is_admin or is_assigned or has_perm):
+        raise HTTPException(status_code=403, detail="Not authorized to move inquiry orders to active")
+
+    # Moving inquiry manually to active: lifecycle status is DRAFT, and payment status is UNPAID if unpaid
+    target_status = "DRAFT"
         
     for ord_obj in orders:
-        ord_obj.status = "DRAFT"
+        ord_obj.status = target_status
+        if (ord_obj.payment_status or "").upper() not in ["PAID", "SETTLED"]:
+            ord_obj.payment_status = "UNPAID"
         
+    update_order_group_status(db, orders, target_status, current_user.id)
     db.commit()
     
+    curr_payment_status = orders[0].payment_status or "UNPAID"
     # Log progress message
-    msg = "Pipeline order has been moved to Active Orders (DRAFT)."
+    msg = f"Inquiry order has been moved to Active Orders (Draft). Payment Status: {curr_payment_status}."
     five_sec_ago = datetime.utcnow() - timedelta(seconds=5)
     recent_prog = db.query(models.ClientOrderProgress).filter(
         models.ClientOrderProgress.order_number == order_number,
@@ -1704,13 +1734,13 @@ def move_pipeline_order_to_active(order_number: str, db: Session = Depends(datab
             order_number=order_number,
             message=msg,
             user_id=None,
-            channel="CLIENT"
+            channel="INTERNAL"
         )
         db.add(progress)
     db.commit()
     
-    log_activity(db, "ORDER_MOVED_TO_ACTIVE", f"Pipeline order {order_number} moved to Active Orders (DRAFT)", user_id=current_user.id)
-    return {"message": "Order moved to active successfully", "order_number": order_number}
+    log_activity(db, "ORDER_MOVED_TO_ACTIVE", f"Inquiry order {order_number} moved to Active Orders (Draft, Payment: {curr_payment_status})", user_id=current_user.id)
+    return {"message": "Inquiry order moved to active successfully", "order_number": order_number, "status": target_status, "payment_status": curr_payment_status}
 
 @router.post("/orders/group/{order_number}/cancel")
 @router.post("/orders/{order_number}/cancel")
@@ -3308,6 +3338,33 @@ def upload_client_document(
     for doc in created_docs:
         log_activity(db, "DOCUMENT_UPLOADED", f"Uploaded document {doc.file_name} ({document_type or 'General'}) for order {order_number or 'N/A'}", client_id=company.client_id, company_id=company_id, user_id=current_user.id)
 
+    # Notify assigned consultants (Person in Charge / PIC) for each uploaded document linked to an order
+    effective_order_no = (order_number or "").strip()
+    if effective_order_no:
+        try:
+            consultant_uids = get_assigned_consultant_user_ids(effective_order_no, db)
+            if consultant_uids:
+                from notification_manager import manager
+                clean_order_upper = effective_order_no.upper()
+                action_url = f"/business/clients/documents/{company_id}?order={clean_order_upper}&from=assigned-orders"
+                for doc in created_docs:
+                    doc_label = doc.file_name or "Document"
+                    doc_type_str = f" ({doc.document_type})" if doc.document_type else ""
+                    for uid in consultant_uids:
+                        manager.notify_user_sync(
+                            db=db,
+                            user_id=uid,
+                            title=f"New Document Uploaded - #{clean_order_upper}",
+                            message=f"{doc_label}{doc_type_str} uploaded for Order #{clean_order_upper}.",
+                            type="document",
+                            module="clients_documents",
+                            reference_id=doc.id,
+                            action_url=action_url,
+                            system_area="business"
+                        )
+        except Exception as notif_err:
+            print(f"Warning: Failed to dispatch document upload notifications: {notif_err}")
+
     if files is not None:
         return created_docs
     elif created_docs:
@@ -3866,7 +3923,7 @@ def get_client_documents(company_id: int, db: Session = Depends(database.get_db)
             or_(models.ClientDocument.file_name == None, ~models.ClientDocument.file_name.ilike("%invoice%"))
         )
         
-    return query.all()
+    return query.order_by(models.ClientDocument.uploaded_at.desc().nullslast(), models.ClientDocument.id.desc()).all()
 
 
 def check_order_authorization_for_chat(user: models.User, order_number: str, db: Session) -> bool:
@@ -3910,7 +3967,7 @@ def check_order_authorization_for_chat(user: models.User, order_number: str, db:
     if is_employee_role(user) and user.employee:
         emp_id = user.employee.id
         is_completed = any(o.status == "COMPLETED" for o in orders_in_group)
-        is_pipeline = any(o.status in ["PROSPECT", "PIPELINE"] for o in orders_in_group)
+        is_pipeline = any(o.status in ["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED", "PROSPECT", "PIPELINE", "ENQUIRY", "BEING_CHECKED"] for o in orders_in_group)
         
         # Check module permission based on order stage
         if is_completed and auth.has_permission(user, "clients_orders_completed", "view", db):
@@ -5069,6 +5126,9 @@ def export_order_chat_to_dropbox(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
+    if not (auth.is_super_admin(current_user) or is_admin_or_hr(current_user)):
+        raise HTTPException(status_code=403, detail="Only administrators can archive chats to Dropbox")
+
     if not check_order_authorization_for_chat(current_user, order_number, db):
         raise HTTPException(status_code=403, detail="Not authorized to export chat for this order")
 
@@ -5093,6 +5153,9 @@ def download_order_chat_transcript(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
+    if not (auth.is_super_admin(current_user) or is_admin_or_hr(current_user)):
+        raise HTTPException(status_code=403, detail="Only administrators can download chat transcripts")
+
     if not check_order_authorization_for_chat(current_user, order_number, db):
         raise HTTPException(status_code=403, detail="Not authorized to download chat transcript for this order")
 
@@ -5119,7 +5182,7 @@ def get_taggable_users_for_order(order_number: str, db: Session) -> List[models.
         return []
         
     is_completed = any(o.status == "COMPLETED" for o in orders_in_group)
-    is_pipeline = any(o.status in ["PROSPECT", "PIPELINE"] for o in orders_in_group)
+    is_pipeline = any(o.status in ["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED", "PROSPECT", "PIPELINE", "ENQUIRY", "BEING_CHECKED"] for o in orders_in_group)
     
     # Consultant and reviewer employee IDs
     consultant_employee_ids = set()
@@ -5169,7 +5232,7 @@ def get_order_action_url_for_user(user: models.User, order_status: str, order_nu
     """
     clean_no = (order_number or "").strip()
     is_completed = order_status == "COMPLETED"
-    is_pipeline = order_status in ["PROSPECT", "PIPELINE"]
+    is_pipeline = order_status in ["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED", "PROSPECT", "PIPELINE", "ENQUIRY", "BEING_CHECKED"]
     is_cancelled = order_status == "CANCELLED"
 
     can_view_full_orders = auth.is_super_admin(user) or is_admin_or_hr(user)
@@ -6468,6 +6531,236 @@ def send_order_invoice_email(
     return [format_order_response(ord_obj, consultants_cache) for ord_obj in orders_in_group]
 
 
+@router.post("/orders/{order_number}/send-quotation-email", response_model=List[schemas.ClientOrderResponse])
+async def send_order_quotation_email(
+    order_number: str,
+    file: Optional[UploadFile] = File(None),
+    recipient_email: Optional[str] = Form(None),
+    recipient_phone: Optional[str] = Form(None),
+    send_email: bool = Form(True),
+    send_whatsapp: bool = Form(False),
+    additional_recipients: Optional[str] = Form(None),
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    eff_send_email = send_email
+    eff_send_whatsapp = send_whatsapp
+
+    if not eff_send_email and not eff_send_whatsapp:
+        raise HTTPException(status_code=400, detail="Please select at least one delivery channel (Email or WhatsApp).")
+
+    cleaned_additional = parse_additional_recipients(additional_recipients)
+
+    orders_in_group = db.query(models.ClientOrder).filter(models.ClientOrder.order_number == order_number).all()
+    if not orders_in_group:
+        raise HTTPException(status_code=404, detail="Order group not found")
+    first_order = orders_in_group[0]
+
+    company = db.query(models.ClientCompany).filter(models.ClientCompany.id == (first_order.billing_company_id or first_order.company_id)).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Billing company not found associated with this order")
+
+    # Read PDF content
+    pdf_content = b""
+    pdf_filename = f"Quotation_{order_number}.pdf"
+    if file and file.filename:
+        pdf_content = await file.read()
+        pdf_filename = file.filename
+    else:
+        doc = db.query(models.ClientDocument).filter(
+            models.ClientDocument.order_number == order_number,
+            models.ClientDocument.document_type == "Quotation"
+        ).order_by(models.ClientDocument.id.desc()).first()
+        if doc:
+            pdf_filename = doc.file_name or pdf_filename
+            if doc.file_url.startswith("/Clients/"):
+                from utils.dropbox_client import get_temporary_link
+                link_res = get_temporary_link(doc.file_url)
+                if link_res.get("success"):
+                    import httpx
+                    with httpx.Client(timeout=30.0) as client:
+                        resp = client.get(link_res["link"])
+                        if resp.status_code == 200:
+                            pdf_content = resp.content
+            elif doc.file_url.startswith("/uploads/"):
+                local_path = os.path.join("uploads", doc.file_url.replace("/uploads/", "", 1))
+                if os.path.exists(local_path):
+                    with open(local_path, "rb") as f:
+                        pdf_content = f.read()
+
+    if not pdf_content:
+        raise HTTPException(status_code=400, detail="Quotation PDF content could not be located. Please provide or open quotation document first.")
+
+    final_recipient_email = recipient_email or company.key_contact_email or (company.client.email if company.client else None) or (first_order.client.email if first_order.client else "")
+    final_recipient_phone = recipient_phone or company.key_contact_phone or (company.client.phone_number if company.client else None) or (first_order.client.phone_number if first_order.client else "")
+    recipient_name = company.key_contact_person or (company.client.contact_person if company.client else None) or (first_order.client.contact_person if first_order.client else "")
+
+    if eff_send_email:
+        if not final_recipient_email or not str(final_recipient_email).strip():
+            raise HTTPException(status_code=400, detail="Recipient email address is required when sending quotation.")
+        final_recipient_email = validate_and_clean_email(final_recipient_email, "Recipient Email", required=True)
+
+    if eff_send_whatsapp and final_recipient_phone:
+        final_recipient_phone = validate_and_clean_phone(final_recipient_phone, "Recipient Phone", required=True)
+
+    # Automatically generate Xendit payment link for the quotation total if not exists
+    total_amount = sum(float(item.unit_price if (item.unit_price is not None and item.unit_price > 0) else (item.total_amount or 0.0)) for item in orders_in_group)
+    if total_amount == 0 and first_order.total_amount:
+        total_amount = float(first_order.total_amount or 0.0)
+    payment_url = first_order.payment_link
+    if not payment_url and total_amount > 0:
+        from utils.xendit_client import XenditClient
+        xendit = XenditClient()
+        try:
+            res = xendit.create_invoice(
+                external_id=order_number,
+                amount=total_amount,
+                payer_email=final_recipient_email or company.key_contact_email or "billing@example.com",
+                description=f"Payment for Service Quotation {order_number}"
+            )
+            payment_url = res.get("invoice_url")
+            inv_id = res.get("id")
+            for item in orders_in_group:
+                item.payment_link = payment_url
+                item.xendit_invoice_id = inv_id
+                item.payment_link_created_at = datetime.now()
+            db.commit()
+        except Exception as e:
+            print("Failed to auto-generate Xendit link for quotation:", e)
+
+    # Save quotation document to client documents if file was uploaded
+    if file and file.filename and pdf_content:
+        try:
+            os.makedirs("uploads/quotations", exist_ok=True)
+            safe_fname = f"Quotation_{order_number}_{int(datetime.now().timestamp())}.pdf"
+            local_path = os.path.join("uploads", "quotations", safe_fname)
+            with open(local_path, "wb") as f:
+                f.write(pdf_content)
+
+            file_url = f"/uploads/quotations/{safe_fname}"
+            try:
+                from utils.dropbox_client import upload_file_bytes
+                folder_path = f"/Clients/{company.company_code or company.id}/{order_number}"
+                dbx_path = f"{folder_path}/{pdf_filename}"
+                dbx_res = upload_file_bytes(pdf_content, dbx_path)
+                if dbx_res.get("success"):
+                    file_url = dbx_path
+            except Exception as dbx_err:
+                print("Dropbox quotation upload note:", dbx_err)
+
+            existing_doc = db.query(models.ClientDocument).filter(
+                models.ClientDocument.order_number == order_number,
+                models.ClientDocument.document_type == "Quotation"
+            ).first()
+            if existing_doc:
+                existing_doc.file_url = file_url
+                existing_doc.file_name = pdf_filename
+                existing_doc.file_size = len(pdf_content)
+            else:
+                new_doc = models.ClientDocument(
+                    client_id=company.client_id,
+                    company_id=company.id,
+                    order_number=order_number,
+                    document_type="Quotation",
+                    file_name=pdf_filename,
+                    file_url=file_url,
+                    file_size=len(pdf_content),
+                    mime_type="application/pdf",
+                    description=f"Official Service Quotation for {order_number}"
+                )
+                db.add(new_doc)
+            db.commit()
+        except Exception as doc_err:
+            print("Warning saving quotation doc:", doc_err)
+
+    # Send Email with PDF Attachment
+    if eff_send_email and final_recipient_email:
+        from utils.email_service import send_quotation_attachment_email
+        try:
+            email_sent = send_quotation_attachment_email(
+                recipient_email=final_recipient_email,
+                recipient_name=recipient_name or "Valued Client",
+                order_number=order_number,
+                company_name=company.company_name or "Client",
+                pdf_content=pdf_content,
+                pdf_filename=pdf_filename,
+                payment_url=payment_url,
+                total_amount=total_amount,
+                cc_emails=cleaned_additional
+            )
+            if not email_sent:
+                print(f"Warning: send_quotation_attachment_email returned False for {final_recipient_email}")
+        except Exception as email_err:
+            print("Warning: Failed to send quotation email:", email_err)
+
+    # Optional WhatsApp
+    if eff_send_whatsapp and final_recipient_phone:
+        try:
+            from utils.whatsapp_service import send_whatsapp_invoice_notification
+            formatted_charge = f"IDR {int(total_amount):,}".replace(",", ".")
+            send_whatsapp_invoice_notification(
+                recipient_phone=final_recipient_phone,
+                recipient_name=recipient_name or "Valued Client",
+                company_name=company.company_name,
+                order_number=order_number,
+                invoice_type="Quotation",
+                amount_formatted=formatted_charge,
+                payment_url=payment_url,
+                pdf_content=pdf_content,
+                pdf_filename=pdf_filename
+            )
+        except Exception as wa_err:
+            print("Warning: Failed to send WhatsApp quotation:", wa_err)
+
+    now = datetime.now()
+    target_dest = final_recipient_email if eff_send_email else final_recipient_phone
+    channel_code = "BOTH" if (eff_send_email and eff_send_whatsapp) else ("EMAIL" if eff_send_email else "WHATSAPP")
+
+    for item in orders_in_group:
+        item.quotation_sent_at = now
+        item.quotation_sent_to = target_dest
+
+    db.commit()
+
+    channel_desc = "Email & WhatsApp" if (eff_send_email and eff_send_whatsapp) else ("Email" if eff_send_email else "WhatsApp")
+    details_str = []
+    if eff_send_email and final_recipient_email:
+        email_str = f"Email: {final_recipient_email}"
+        if cleaned_additional:
+            email_str += f" (CC: {', '.join(cleaned_additional)})"
+        details_str.append(email_str)
+    if eff_send_whatsapp and final_recipient_phone:
+        details_str.append(f"WhatsApp: {final_recipient_phone}")
+
+    log_activity(
+        db,
+        "QUOTATION_DISPATCHED",
+        f"Dispatched official service quotation for order {order_number} via {channel_desc} ({', '.join(details_str)})",
+        client_id=company.client_id,
+        company_id=company.id,
+        user_id=current_user.id
+    )
+
+    try:
+        progress_msg = f"Official service quotation has been dispatched to the client {f'via {channel_desc}' if channel_desc else ''}".strip()
+        progress_entry = models.ClientOrderProgress(
+            order_number=order_number,
+            user_id=None,
+            message=progress_msg,
+            channel="CLIENT"
+        )
+        db.add(progress_entry)
+        db.commit()
+    except Exception as chat_err:
+        print("Warning: failed to record quotation progress entry:", chat_err)
+
+    for ord_obj in orders_in_group:
+        db.refresh(ord_obj)
+
+    consultants_cache = build_consultants_cache(db, orders_in_group)
+    return [format_order_response(ord_obj, consultants_cache) for ord_obj in orders_in_group]
+
+
 @router.post("/orders/{order_number}/payment-link")
 def generate_order_payment_link(
     order_number: str,
@@ -6566,14 +6859,25 @@ def process_xendit_invoice_payment(db: Session, payload: dict) -> dict:
         except (ValueError, TypeError):
             parsed_paid_amount = 0.0
         
-        # Determine if this payment is specifically for the Final Invoice stage
+        # Determine if this payment is specifically for the Final Invoice stage or Inquiry Quotation stage
         is_final_stage = is_final or first_order.status == "WAITING_FOR_FINAL_PAYMENT"
+
+        INQUIRY_STATUS_LIST = [
+            "UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED", 
+            "PROSPECT", "PIPELINE", "ENQUIRY", "BEING_CHECKED"
+        ]
+        is_inquiry_stage = any((item.status or "").upper() in INQUIRY_STATUS_LIST for item in orders) or ("quotation" in description) or ("inquiry" in description)
 
         existing_cash_amount = first_order.proforma_paid_amount or 0.0
         combined_paid = parsed_paid_amount
         is_additional_proforma = False
 
-        if not is_final_stage:
+        if is_inquiry_stage:
+            # Client paid quotation / inquiry link -> Automatically move order to Active (status DRAFT, payment_status PAID)
+            new_payment_status = "PAID"
+            target_lifecycle_status = "DRAFT"
+            message_text = "Quotation payment received successfully via Xendit. Order moved to Active Orders (Draft)."
+        elif not is_final_stage:
             # Proforma / early payment stage
             if existing_cash_amount > 0 and abs(existing_cash_amount - parsed_paid_amount) > 100:
                 combined_paid = existing_cash_amount + parsed_paid_amount
@@ -6606,9 +6910,23 @@ def process_xendit_invoice_payment(db: Session, payload: dict) -> dict:
                 item.proforma_paid_amount = combined_paid
             if invoice_id and not item.xendit_invoice_id:
                 item.xendit_invoice_id = invoice_id
+        db.commit()
 
-        # Update lifecycle status strictly when in final invoice stage or when kicking off from draft
-        if is_final_stage and first_order.status != "FINAL_PAYMENT_COMPLETED":
+        # Update lifecycle status strictly when in final invoice stage, inquiry stage, or when kicking off from draft
+        if is_inquiry_stage:
+            update_order_group_status(db, orders, "DRAFT", None)
+            try:
+                log_activity(
+                    db,
+                    "ORDER_MOVED_TO_ACTIVE",
+                    f"Order {external_id} automatically moved to Active (Draft) following Quotation payment receipt",
+                    client_id=first_order.client_id,
+                    company_id=first_order.company_id,
+                    user_id=None
+                )
+            except Exception as log_err:
+                print(f"Warning logging inquiry payment activity: {log_err}")
+        elif is_final_stage and first_order.status != "FINAL_PAYMENT_COMPLETED":
             update_order_group_status(db, orders, "FINAL_PAYMENT_COMPLETED", None)
         elif not is_final_stage:
             # Only transition from DRAFT/PROFORMA_GENERATED/WAITING_ON_CLIENT to ORDER_ASSIGNED/CONFIRMED
@@ -6632,12 +6950,20 @@ def process_xendit_invoice_payment(db: Session, payload: dict) -> dict:
                 db.add(progress)
             db.commit()
 
-            # On-the-fly sync payment receipt to Accurate Online (idempotent via primeOwing check)
+            # On-the-fly sync payment receipt to Accurate Online
             try:
                 from utils.accurate_client import AccurateClient
                 acc_client = AccurateClient(db)
                 if acc_client.config and acc_client.config.auto_sync_on_payment:
-                    acc_client.create_sales_receipt(first_order, payment_amount=parsed_paid_amount, payment_method="Xendit")
+                    if is_inquiry_stage:
+                        # For inquiry orders: create Sales Order, create Sales Invoice, and create Sales Receipt (marking it Paid and Processed)
+                        if not first_order.accurate_so_no:
+                            acc_client.create_sales_order_proforma(first_order)
+                        if not first_order.accurate_inv_no:
+                            acc_client.create_sales_invoice(first_order)
+                        acc_client.create_sales_receipt(first_order, payment_amount=parsed_paid_amount, payment_method="Xendit")
+                    else:
+                        acc_client.create_sales_receipt(first_order, payment_amount=parsed_paid_amount, payment_method="Xendit")
             except Exception as acc_err:
                 print(f"Warning: Accurate payment receipt sync error: {acc_err}")
 
@@ -6656,6 +6982,11 @@ def process_xendit_invoice_payment(db: Session, payload: dict) -> dict:
                     from utils.accurate_client import AccurateClient
                     acc_client = AccurateClient(db)
                     if acc_client.config and acc_client.config.auto_sync_on_payment:
+                        if is_inquiry_stage:
+                            if not first_order.accurate_so_no:
+                                acc_client.create_sales_order_proforma(first_order)
+                            if not first_order.accurate_inv_no:
+                                acc_client.create_sales_invoice(first_order)
                         acc_client.create_sales_receipt(first_order, payment_amount=parsed_paid_amount, payment_method="Xendit")
                 except Exception as acc_err:
                     print(f"Warning: Accurate payment receipt sync error: {acc_err}")

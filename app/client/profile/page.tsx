@@ -668,7 +668,7 @@ export default function ClientProfilePage() {
                                 {doc.uploaded_at && (
                                   <>
                                     <span>•</span>
-                                    <span>{format(new Date(doc.uploaded_at), "MMM d, yyyy")}</span>
+                                    <span>{format(new Date(doc.uploaded_at), "MMM d, yyyy HH:mm")}</span>
                                   </>
                                 )}
                               </div>

@@ -64,12 +64,7 @@ def get_notifications(
     
     if system_area and system_area.lower() in ["hrms", "business"]:
         area = system_area.lower()
-        query = query.filter(
-            or_(
-                models.Notification.system_area == area,
-                models.Notification.system_area == "shared"
-            )
-        )
+        query = query.filter(models.Notification.system_area == area)
 
     notifications = query.order_by(models.Notification.created_at.desc())\
         .offset(skip).limit(limit).all()
@@ -86,12 +81,7 @@ def get_unread_count(
     
     if system_area and system_area.lower() in ["hrms", "business"]:
         area = system_area.lower()
-        query = query.filter(
-            or_(
-                models.Notification.system_area == area,
-                models.Notification.system_area == "shared"
-            )
-        )
+        query = query.filter(models.Notification.system_area == area)
 
     count = query.count()
     return {"unread_count": count}
@@ -115,6 +105,34 @@ def mark_as_read(
     db.refresh(notif)
     return notif
 
+@router.put("/{notification_id}/unread", response_model=schemas.NotificationResponse)
+def mark_as_unread(
+    notification_id: int,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    notif = db.query(models.Notification).filter(
+        models.Notification.id == notification_id,
+        models.Notification.user_id == current_user.id
+    ).first()
+    
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+        
+    notif.is_read = False
+    db.commit()
+    db.refresh(notif)
+    
+    if hasattr(manager, 'loop') and manager.loop:
+        import asyncio
+        asyncio.run_coroutine_threadsafe(manager.send_personal_message({
+            "action": "REFRESH_NOTIFICATIONS",
+            "notification_id": notification_id,
+            "is_read": False
+        }, current_user.id), manager.loop)
+        
+    return notif
+
 @router.put("/read-all")
 def mark_all_as_read(
     system_area: Optional[str] = None,
@@ -128,12 +146,7 @@ def mark_all_as_read(
 
     if system_area and system_area.lower() in ["hrms", "business"]:
         area = system_area.lower()
-        query = query.filter(
-            or_(
-                models.Notification.system_area == area,
-                models.Notification.system_area == "shared"
-            )
-        )
+        query = query.filter(models.Notification.system_area == area)
 
     query.update({"is_read": True}, synchronize_session=False)
     db.commit()

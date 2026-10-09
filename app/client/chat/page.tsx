@@ -95,14 +95,26 @@ const formatMessageDateTime = (dateStr?: string | null) => {
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return "";
-    const dateFormatted = d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric"
-    });
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isYesterday = d.toDateString() === yesterday.toDateString();
+
     const timeFormatted = d.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit"
+    });
+
+    if (isToday) return `Today, ${timeFormatted}`;
+    if (isYesterday) return `Yesterday, ${timeFormatted}`;
+
+    const isCurrentYear = d.getFullYear() === now.getFullYear();
+    const dateFormatted = d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      ...(isCurrentYear ? {} : { year: "numeric" })
     });
     return `${dateFormatted}, ${timeFormatted}`;
   } catch {
@@ -360,7 +372,7 @@ const renderMessageContent = (text?: string) => {
             return (
               <span
                 key={i}
-                className="font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/15 dark:bg-amber-950/40 border border-amber-500/20 px-1.5 py-0.5 rounded-md text-[11px] sm:text-xs inline-block align-baseline mr-0.5 break-all select-text"
+                className="font-semibold text-sky-700 dark:text-sky-300 bg-sky-500/10 dark:bg-sky-950/40 border border-sky-500/20 px-1.5 py-0.5 rounded-md text-[11px] sm:text-xs inline-block align-baseline mr-0.5 break-all select-text"
               >
                 {part}
               </span>
@@ -1331,26 +1343,24 @@ export default function ClientOrderChatPage() {
                                   placeholder="Edit message (Enter to save, Shift + Enter for new line)..."
                                 />
                                 <div className="flex items-center justify-end gap-1.5">
-                                  <Button
+                                  <button
                                     type="button"
-                                    variant="ghost"
-                                    size="sm"
                                     onClick={handleCancelEdit}
                                     disabled={savingEdit}
-                                    className="h-7 text-xs px-2.5 gap-1 text-muted-foreground hover:text-foreground"
+                                    className="h-7 text-xs px-2.5 rounded-lg border border-border/80 bg-background text-foreground hover:bg-muted font-medium transition-colors cursor-pointer inline-flex items-center gap-1"
                                   >
-                                    <X className="h-3 w-3" /> Cancel
-                                  </Button>
-                                  <Button
+                                    <X className="h-3 w-3 text-foreground" />
+                                    <span className="text-foreground">Cancel</span>
+                                  </button>
+                                  <button
                                     type="button"
-                                    size="sm"
                                     onClick={() => handleSaveEdit(msg.id)}
                                     disabled={!editingMessageText.trim() || savingEdit}
-                                    className="h-7 text-xs px-2.5 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
+                                    className="h-7 text-xs px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs transition-colors disabled:opacity-50 cursor-pointer inline-flex items-center gap-1"
                                   >
-                                    {savingEdit ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                                    Save
-                                  </Button>
+                                    {savingEdit ? <Loader2 className="h-3 w-3 animate-spin text-white" /> : <Check className="h-3 w-3 text-white" />}
+                                    <span className="text-white">Save</span>
+                                  </button>
                                 </div>
                               </div>
                             ) : isDeleting ? (
@@ -1359,26 +1369,23 @@ export default function ClientOrderChatPage() {
                                   Delete this message?
                                 </p>
                                 <div className="flex items-center justify-end gap-1.5">
-                                  <Button
+                                  <button
                                     type="button"
-                                    variant="ghost"
-                                    size="sm"
                                     onClick={() => setConfirmDeleteId(null)}
                                     disabled={deletingMessageId === msg.id}
-                                    className="h-6.5 text-[11px] px-2"
+                                    className="h-6.5 text-[11px] px-2.5 rounded-lg border border-border/80 bg-background text-foreground hover:bg-muted font-medium cursor-pointer"
                                   >
-                                    Cancel
-                                  </Button>
-                                  <Button
+                                    <span className="text-foreground">Cancel</span>
+                                  </button>
+                                  <button
                                     type="button"
-                                    size="sm"
                                     onClick={() => handleDeleteMessage(msg.id)}
                                     disabled={deletingMessageId === msg.id}
-                                    className="h-6.5 text-[11px] px-2.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold gap-1"
+                                    className="h-6.5 text-[11px] px-2.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold gap-1 inline-flex items-center cursor-pointer shadow-xs disabled:opacity-50"
                                   >
-                                    {deletingMessageId === msg.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                                    Delete
-                                  </Button>
+                                    {deletingMessageId === msg.id ? <Loader2 className="h-3 w-3 animate-spin text-white" /> : <Trash2 className="h-3 w-3 text-white" />}
+                                    <span className="text-white">Delete</span>
+                                  </button>
                                 </div>
                               </div>
                             ) : isDeleted ? (
@@ -1466,18 +1473,20 @@ export default function ClientOrderChatPage() {
                                     {/* Quoted Message Header Preview */}
                                     {(msg.quoted_message_text || msg.quoted_sender_name) && (
                                       <div
-                                        className={`mb-2 p-2 rounded-lg border-l-2 text-xs flex flex-col gap-0.5 max-w-full min-w-0 overflow-hidden ${
+                                        className={`mb-2 p-2.5 rounded-xl border-l-2 text-left text-xs select-none max-w-full min-w-0 overflow-hidden shadow-2xs ${
                                           isSelf
-                                            ? "bg-black/20 border-white/80 text-white/90"
-                                            : "bg-muted/50 border-emerald-500 text-muted-foreground"
+                                            ? "bg-black/25 border-l-white text-white"
+                                            : "bg-muted/60 dark:bg-zinc-800/80 border-l-emerald-500 text-foreground"
                                         }`}
                                       >
-                                        <div className="flex items-center gap-1 font-semibold text-[11px] opacity-90 min-w-0">
-                                          <Quote className="h-3 w-3 shrink-0" />
-                                          <span className="truncate">{msg.quoted_sender_name ? (msg.quoted_sender_name.toLowerCase().includes("client") ? msg.quoted_sender_name : formatExternalTeamName(msg.quoted_sender_name)) : "Original Message"}</span>
+                                        <div className="flex items-center gap-1.5 font-bold text-[11px] min-w-0">
+                                          <Quote className={`h-3 w-3 shrink-0 ${isSelf ? "text-emerald-200" : "text-emerald-600 dark:text-emerald-400"}`} />
+                                          <span className={`truncate font-bold ${isSelf ? "text-white" : "text-emerald-700 dark:text-emerald-300"}`}>
+                                            {msg.quoted_sender_name ? (msg.quoted_sender_name.toLowerCase().includes("client") ? msg.quoted_sender_name : formatExternalTeamName(msg.quoted_sender_name)) : "Original Message"}
+                                          </span>
                                         </div>
-                                        <div className="text-[11px] line-clamp-2 break-words italic">
-                                          {msg.quoted_message_text}
+                                        <div className={`text-[11px] line-clamp-2 break-words italic mt-1 font-normal ${isSelf ? "text-white/85" : "text-foreground/80 dark:text-zinc-300"}`}>
+                                          "{msg.quoted_message_text}"
                                         </div>
                                       </div>
                                     )}
@@ -1797,18 +1806,18 @@ export default function ClientOrderChatPage() {
                     className="flex-1 min-w-0 text-xs sm:text-sm bg-background/70 border border-border/50 rounded-xl px-3.5 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 resize-none placeholder:text-muted-foreground min-h-[46px] max-h-40 leading-relaxed overflow-y-auto break-words [overflow-wrap:anywhere]"
                   />
 
-                  <Button
+                  <button
                     type="submit"
                     disabled={(!inputText.trim() && !selectedFile) || sending}
-                    className="flex items-center gap-1.5 text-xs sm:text-sm font-bold px-4 h-[46px] shrink-0 rounded-xl shadow-md"
+                    className="inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold px-5 h-[46px] shrink-0 rounded-xl shadow-md bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer border border-emerald-600"
                   >
                     {sending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin text-white" />
                     ) : (
-                      <Send className="h-4 w-4" />
+                      <Send className="h-4 w-4 text-white" />
                     )}
-                    <span>{sending ? "Sending..." : "Send"}</span>
-                  </Button>
+                    <span className="text-white font-bold">{sending ? "Sending..." : "Send"}</span>
+                  </button>
                 </form>
               </div>
             </>

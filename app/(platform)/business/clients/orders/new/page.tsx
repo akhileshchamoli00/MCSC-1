@@ -422,7 +422,7 @@ function NewClientOrderContent() {
         reviewer_ids: selectedReviewerIds,
         reviewer_id: selectedReviewerIds[0] || null,
         notes: notes || null,
-        status: isPipeline ? "PIPELINE" : undefined
+        status: isPipeline ? "UNDER_INITIAL_CHECK" : undefined
       };
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/orders`, {
@@ -435,7 +435,7 @@ function NewClientOrderContent() {
       });
 
       if (res.ok) {
-        toast.success(isPipeline ? "Pipeline order created successfully!" : "Client service order issued successfully!");
+        toast.success(isPipeline ? "Inquiry order created successfully!" : "Client service order issued successfully!");
         router.push(isPipeline ? "/business/clients/orders/pipeline" : "/business/clients/orders");
       } else {
         const err = await res.json();
@@ -480,10 +480,10 @@ function NewClientOrderContent() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-base sm:text-lg font-bold tracking-tight text-foreground truncate">
-                {isPipeline ? "Create Pipeline Prospect Order" : "Issue New Client Order"}
+                {isPipeline ? "Create Inquiry Order (Pre-Order Initial Check)" : "Issue New Client Order"}
               </h1>
               <Badge variant="outline" className="font-mono text-[10px] uppercase px-1.5 py-0.5 bg-primary/10 border-primary/20 text-primary shrink-0">
-                {isPipeline ? "Pipeline" : "Active Workflow"}
+                {isPipeline ? "Inquiry Order" : "Active Workflow"}
               </Badge>
             </div>
             <p className="text-[11px] text-muted-foreground mt-0.5 truncate sm:whitespace-normal">
@@ -515,7 +515,7 @@ function NewClientOrderContent() {
             ) : (
               <>
                 <Check className="h-3 w-3" />
-                <span>{isPipeline ? "Save to Pipeline" : "Create & Issue Order"}</span>
+                <span>{isPipeline ? "Save Inquiry Order" : "Create & Issue Order"}</span>
               </>
             )}
           </Button>
@@ -1082,14 +1082,13 @@ function NewClientOrderContent() {
           <div className="xl:col-span-5 2xl:col-span-4 space-y-3 min-w-0">
 
             {/* Licensing Roster Allocation */}
-            {!isPipeline && (
-              <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
-                <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <Users className="h-3.5 w-3.5 text-primary shrink-0" />
-                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
-                      3. Consultant Roster ({selectedConsultantIds.length})
-                    </CardTitle>
+            <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
+              <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Users className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
+                    3. {isPipeline ? "Initial Check Consultants" : "Consultant Roster"} ({selectedConsultantIds.length})
+                  </CardTitle>
                   </div>
                   {selectedConsultantIds.length > 0 && (
                     <Button
@@ -1153,17 +1152,15 @@ function NewClientOrderContent() {
                   </div>
                 </CardContent>
               </Card>
-            )}
 
             {/* Designated Order Reviewer Selection */}
-            {!isPipeline && (
-              <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
-                <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
-                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
-                      4. Designated Reviewers ({selectedReviewerIds.length > 0 ? `${selectedReviewerIds.length} Selected` : "Optional"})
-                    </CardTitle>
+            <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
+              <CardHeader className="py-2.5 px-3.5 border-b border-border/40 bg-muted/20 flex flex-row items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
+                    4. {isPipeline ? "Designated Reviewers (Initial Verification)" : "Designated Reviewers"} ({selectedReviewerIds.length > 0 ? `${selectedReviewerIds.length} Selected` : "Optional"})
+                  </CardTitle>
                   </div>
                   {selectedReviewerIds.length > 0 && (
                     <Button
@@ -1227,7 +1224,6 @@ function NewClientOrderContent() {
                   </div>
                 </CardContent>
               </Card>
-            )}
 
             {/* Internal Delivery Notes */}
             <Card className="border-border/60 shadow-2xs rounded-xl bg-card/60 backdrop-blur-md">
@@ -1235,7 +1231,7 @@ function NewClientOrderContent() {
                 <div className="flex items-center gap-1.5 min-w-0">
                   <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
                   <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground truncate">
-                    {isPipeline ? "3. Pipeline Lead Notes" : "5. Internal Delivery Notes"}
+                    {isPipeline ? "5. Inquiry Feasibility & Notes" : "5. Internal Delivery Notes"}
                   </CardTitle>
                 </div>
                 <span className="text-[9px] text-muted-foreground font-mono italic shrink-0">For Delivery Manager</span>
@@ -1280,7 +1276,7 @@ function NewClientOrderContent() {
               className="font-bold shadow-xs gap-1.5 rounded-lg h-8 px-4 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
             >
               {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-              {saving ? "Saving..." : isPipeline ? "Create Pipeline Order" : "Issue Client Order"}
+              {saving ? "Saving..." : isPipeline ? "Create Inquiry Order" : "Issue Client Order"}
             </Button>
           </div>
         </div>

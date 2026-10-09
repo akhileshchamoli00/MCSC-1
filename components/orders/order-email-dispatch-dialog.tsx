@@ -31,8 +31,8 @@ import {
 export interface OrderEmailDispatchDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  emailConfirmType: 'proforma' | 'final' | null
-  setEmailConfirmType: (val: 'proforma' | 'final' | null) => void
+  emailConfirmType: 'proforma' | 'final' | 'quotation' | null
+  setEmailConfirmType: (val: any) => void
   selectedOrderGroup: any | null
   companies: any[]
   proformaPercent?: number
@@ -65,51 +65,70 @@ export function OrderEmailDispatchDialog({
   onSend,
   onCancel,
 }: OrderEmailDispatchDialogProps) {
+  const isQuotation = emailConfirmType === 'quotation'
+  const isFinal = emailConfirmType === 'final'
+
   return (
-<Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-5xl md:max-w-6xl lg:max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1500px] w-[96vw] max-h-[95vh] h-auto p-0 !gap-0 bg-background border border-border text-foreground rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-          {/* Header */}
-          <div className={`p-4 sm:px-6 sm:py-3.5 border-b border-border/60 shrink-0 ${
-            emailConfirmType === 'final'
-              ? 'bg-gradient-to-r from-emerald-500/15 via-emerald-500/5 to-transparent dark:from-emerald-950/50 dark:via-emerald-950/20'
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-5xl md:max-w-6xl lg:max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1500px] w-[96vw] max-h-[95vh] h-auto p-0 !gap-0 bg-background border border-border text-foreground rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className={`p-4 sm:px-6 sm:py-3.5 border-b border-border/60 shrink-0 ${
+          isFinal
+            ? 'bg-gradient-to-r from-emerald-500/15 via-emerald-500/5 to-transparent dark:from-emerald-950/50 dark:via-emerald-950/20'
+            : isQuotation
+              ? 'bg-gradient-to-r from-blue-500/15 via-blue-500/5 to-transparent dark:from-blue-950/50 dark:via-blue-950/20'
               : 'bg-gradient-to-r from-sky-500/15 via-sky-500/5 to-transparent dark:from-sky-950/50 dark:via-sky-950/20'
-          }`}>
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-              <DialogTitle className={`text-base sm:text-lg font-bold flex items-center gap-2.5 ${
-                emailConfirmType === 'final' ? 'text-emerald-600 dark:text-emerald-400' : 'text-sky-600 dark:text-sky-400'
-              }`}>
-                <div className={`h-7 w-7 sm:h-8 sm:w-8 rounded-xl border shadow-xs flex items-center justify-center shrink-0 ${
-                  emailConfirmType === 'final'
-                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+        }`}>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+            <DialogTitle className={`text-base sm:text-lg font-bold flex items-center gap-2.5 ${
+              isFinal
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : isQuotation
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-sky-600 dark:text-sky-400'
+            }`}>
+              <div className={`h-7 w-7 sm:h-8 sm:w-8 rounded-xl border shadow-xs flex items-center justify-center shrink-0 ${
+                isFinal
+                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                  : isQuotation
+                    ? 'bg-blue-500/15 border-blue-500/30 text-blue-600 dark:text-blue-400'
                     : 'bg-sky-500/15 border-sky-500/30 text-sky-600 dark:text-sky-400'
-                }`}>
+              }`}>
+                {isQuotation ? (
+                  <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                ) : (
                   <Receipt className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                </div>
-                <span>Dispatch {emailConfirmType === 'final' ? 'Final Tax Invoice' : 'Proforma Invoice'}</span>
-              </DialogTitle>
-              {selectedOrderGroup && (
-                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                  <Badge variant="outline" className={`font-mono text-xs font-bold px-2.5 py-0.5 ${
-                    emailConfirmType === 'final'
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                )}
+              </div>
+              <span>Dispatch {isFinal ? 'Final Tax Invoice' : isQuotation ? 'Official Service Quotation' : 'Proforma Invoice'}</span>
+            </DialogTitle>
+            {selectedOrderGroup && (
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <Badge variant="outline" className={`font-mono text-xs font-bold px-2.5 py-0.5 ${
+                  isFinal
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                    : isQuotation
+                      ? 'bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400'
                       : 'bg-sky-500/10 border-sky-500/30 text-sky-600 dark:text-sky-400'
-                  }`}>
-                    {selectedOrderGroup.order_number}
-                  </Badge>
-                  <Badge variant="secondary" className="text-xs font-semibold px-2 py-0.5">
-                    {emailConfirmType === 'final' ? '100% Full Total' : `Proforma Stage (${selectedOrderGroup.proforma_stage_percent || proformaPercent || 70}%)`}
-                  </Badge>
-                  <span className="text-xs font-bold text-foreground flex items-center gap-1 bg-background/80 px-2.5 py-0.5 rounded-lg border border-border/70 truncate max-w-[240px]">
-                    <Building2 className={`h-3 w-3 shrink-0 ${emailConfirmType === 'final' ? 'text-emerald-600' : 'text-sky-600'}`} />
-                    <span className="truncate">{selectedOrderGroup.company_name || selectedOrderGroup.client_name || "Client"}</span>
-                  </span>
-                </div>
-              )}
-            </div>
-            <DialogDescription className="text-xs text-muted-foreground leading-normal">
-              Dispatches official invoice document and payment notification directly to the client's registered contacts.
-            </DialogDescription>
+                }`}>
+                  {selectedOrderGroup.order_number}
+                </Badge>
+                <Badge variant="secondary" className="text-xs font-semibold px-2 py-0.5">
+                  {isFinal ? '100% Full Total' : isQuotation ? '100% Quotation Total' : `Proforma Stage (${selectedOrderGroup.proforma_stage_percent || proformaPercent || 70}%)`}
+                </Badge>
+                <span className="text-xs font-bold text-foreground flex items-center gap-1 bg-background/80 px-2.5 py-0.5 rounded-lg border border-border/70 truncate max-w-[240px]">
+                  <Building2 className={`h-3 w-3 shrink-0 ${isFinal ? 'text-emerald-600' : isQuotation ? 'text-blue-600' : 'text-sky-600'}`} />
+                  <span className="truncate">{selectedOrderGroup.company_name || selectedOrderGroup.client_name || "Client"}</span>
+                </span>
+              </div>
+            )}
           </div>
+          <DialogDescription className="text-xs text-muted-foreground leading-normal">
+            {isQuotation
+              ? "Dispatches official service quotation document and online payment link directly to the client's registered contacts."
+              : "Dispatches official invoice document and payment notification directly to the client's registered contacts."}
+          </DialogDescription>
+        </div>
 
           {/* Body: 2-Column Horizontal Layout */}
           <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:px-6 sm:py-4">
@@ -205,9 +224,9 @@ export function OrderEmailDispatchDialog({
                       phone: companies.find((c: any) => c.id === (selectedOrderGroup.billing_company_id || selectedOrderGroup.company_id))?.key_contact_phone,
                       role: "Primary Contact"
                     }}
-                    accentColor={emailConfirmType === 'final' ? 'emerald' : 'sky'}
-                    title="Invoice Email Recipients"
-                    subtitle="The official PDF invoice will be emailed directly to the selected registered company contacts."
+                    accentColor={isFinal ? 'emerald' : isQuotation ? 'indigo' : 'sky'}
+                    title={isQuotation ? "Quotation Email Recipients" : "Invoice Email Recipients"}
+                    subtitle={isQuotation ? "The official PDF quotation will be emailed directly to the selected registered company contacts." : "The official PDF invoice will be emailed directly to the selected registered company contacts."}
                     compact={true}
                   />
                 )}
@@ -231,18 +250,24 @@ export function OrderEmailDispatchDialog({
                       onChange={(val) => setEmailConfirmPhone(val)}
                     />
                     <p className="text-[11px] text-muted-foreground">
-                      The client will receive an automated WhatsApp notification with invoice PDF attachment and payment link.
+                      {isQuotation
+                        ? "The client will receive an automated WhatsApp notification with quotation PDF attachment and payment link."
+                        : "The client will receive an automated WhatsApp notification with invoice PDF attachment and payment link."}
                     </p>
                   </div>
                 )}
 
                 {/* Channel Info Card */}
                 <div className={`p-2.5 rounded-xl border text-xs transition-colors ${invoiceDeliveryChannel === 'both'
-                  ? (emailConfirmType === 'final'
+                  ? (isFinal
                       ? 'border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-200'
-                      : 'border-sky-500/30 bg-sky-500/10 dark:bg-sky-950/20 text-sky-950 dark:text-sky-200')
+                      : isQuotation
+                        ? 'border-blue-500/30 bg-blue-500/10 dark:bg-blue-950/20 text-blue-950 dark:text-blue-200'
+                        : 'border-sky-500/30 bg-sky-500/10 dark:bg-sky-950/20 text-sky-950 dark:text-sky-200')
                   : invoiceDeliveryChannel === 'email'
-                    ? 'border-sky-500/30 bg-sky-500/10 dark:bg-sky-950/20 text-sky-950 dark:text-sky-200'
+                    ? (isQuotation
+                        ? 'border-blue-500/30 bg-blue-500/10 dark:bg-blue-950/20 text-blue-950 dark:text-blue-200'
+                        : 'border-sky-500/30 bg-sky-500/10 dark:bg-sky-950/20 text-sky-950 dark:text-sky-200')
                     : 'border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-200'
                   }`}>
                   <div className="flex items-center gap-2 font-bold text-xs mb-0.5">
@@ -253,8 +278,8 @@ export function OrderEmailDispatchDialog({
                       </>
                     ) : invoiceDeliveryChannel === 'email' ? (
                       <>
-                        <Mail className="h-3.5 w-3.5 text-sky-600 shrink-0" />
-                        <span>Dispatches PDF invoice attachment to client's email</span>
+                        <Mail className={`h-3.5 w-3.5 shrink-0 ${isQuotation ? 'text-blue-600' : 'text-sky-600'}`} />
+                        <span>Dispatches PDF {isQuotation ? 'quotation' : 'invoice'} attachment to client's email</span>
                       </>
                     ) : (
                       <>
@@ -265,10 +290,10 @@ export function OrderEmailDispatchDialog({
                   </div>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
                     {invoiceDeliveryChannel === 'both'
-                      ? 'Client will receive the PDF invoice attachment by email and an interactive WhatsApp notification with secure payment link.'
+                      ? `Client will receive the PDF ${isQuotation ? 'quotation' : 'invoice'} attachment by email and an interactive WhatsApp notification with secure payment link.`
                       : invoiceDeliveryChannel === 'email'
-                        ? 'Official PDF invoice with itemized breakdown and bank details will be delivered straight to client inbox.'
-                        : 'Official WhatsApp direct message with attached PDF invoice and instant payment link will be sent.'}
+                        ? `Official PDF ${isQuotation ? 'quotation' : 'invoice'} with itemized breakdown and payment details will be delivered straight to client inbox.`
+                        : `Official WhatsApp direct message with attached PDF ${isQuotation ? 'quotation' : 'invoice'} and instant payment link will be sent.`}
                   </p>
                 </div>
               </div>
@@ -277,11 +302,15 @@ export function OrderEmailDispatchDialog({
               <div className="md:col-span-6 lg:col-span-5 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Receipt className={`h-3.5 w-3.5 ${emailConfirmType === 'final' ? 'text-emerald-600' : 'text-sky-600'}`} />
-                    Invoice Summary & Breakdown
+                    {isQuotation ? (
+                      <FileText className="h-3.5 w-3.5 text-blue-600" />
+                    ) : (
+                      <Receipt className={`h-3.5 w-3.5 ${isFinal ? 'text-emerald-600' : 'text-sky-600'}`} />
+                    )}
+                    {isQuotation ? "Quotation Summary & Breakdown" : "Invoice Summary & Breakdown"}
                   </label>
                   <span className="text-[11px] text-muted-foreground font-mono bg-muted/60 px-2 py-0.5 rounded">
-                    {emailConfirmType === 'final' ? 'Final Tax' : 'Proforma'}
+                    {isFinal ? 'Final Tax' : isQuotation ? 'Quotation' : 'Proforma'}
                   </span>
                 </div>
 
@@ -290,13 +319,15 @@ export function OrderEmailDispatchDialog({
                   const effStagePct = selectedOrderGroup.proforma_stage_percent || proformaPercent || 70;
                   const rawTotal = selectedOrderGroup.total_amount || 0;
                   const proformaAmount = (rawTotal * effStagePct) / 100;
-                  const payableAmount = emailConfirmType === 'final' ? rawTotal : proformaAmount;
+                  const payableAmount = (isFinal || isQuotation) ? rawTotal : proformaAmount;
 
                   return (
                     <div className={`p-3 rounded-xl border text-xs space-y-1.5 ${
-                      emailConfirmType === 'final'
+                      isFinal
                         ? 'bg-emerald-500/10 border-emerald-500/30 dark:bg-emerald-950/20'
-                        : 'bg-sky-500/10 border-sky-500/30 dark:bg-sky-950/20'
+                        : isQuotation
+                          ? 'bg-blue-500/10 border-blue-500/30 dark:bg-blue-950/20'
+                          : 'bg-sky-500/10 border-sky-500/30 dark:bg-sky-950/20'
                     }`}>
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-muted-foreground font-medium">Billing Entity:</span>
@@ -305,7 +336,7 @@ export function OrderEmailDispatchDialog({
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-xs">
-                        <span className="text-muted-foreground font-medium">Contract Total:</span>
+                        <span className="text-muted-foreground font-medium">{isQuotation ? "Quotation Value:" : "Contract Total:"}</span>
                         <span className="font-mono font-semibold text-foreground">
                           Rp {rawTotal.toLocaleString("id-ID")}
                         </span>
@@ -320,10 +351,10 @@ export function OrderEmailDispatchDialog({
                       )}
                       <div className="pt-1.5 border-t border-border/60 flex justify-between items-center">
                         <span className="font-bold text-foreground text-xs">
-                          {emailConfirmType === 'final' ? 'Final Amount Due:' : `Proforma Due (${effStagePct}%):`}
+                          {isFinal ? 'Final Amount Due:' : isQuotation ? 'Quotation Payable Total:' : `Proforma Due (${effStagePct}%):`}
                         </span>
                         <span className={`font-mono font-black text-sm sm:text-base ${
-                          emailConfirmType === 'final' ? 'text-emerald-700 dark:text-emerald-300' : 'text-sky-700 dark:text-sky-300'
+                          isFinal ? 'text-emerald-700 dark:text-emerald-300' : isQuotation ? 'text-blue-700 dark:text-blue-300' : 'text-sky-700 dark:text-sky-300'
                         }`}>
                           Rp {Math.round(payableAmount).toLocaleString("id-ID")}
                         </span>
@@ -335,8 +366,8 @@ export function OrderEmailDispatchDialog({
                 {/* Line Items List Preview */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
-                    <span>Billed Service Items ({selectedOrderGroup?.items?.length || 0})</span>
-                    <span className="text-[10px] text-muted-foreground font-mono">/PDF Invoice</span>
+                    <span>{isQuotation ? "Quotation Service Items" : "Billed Service Items"} ({selectedOrderGroup?.items?.length || 0})</span>
+                    <span className="text-[10px] text-muted-foreground font-mono">{isQuotation ? "/Quotation PDF" : "/PDF Invoice"}</span>
                   </div>
                   {(!selectedOrderGroup?.items || selectedOrderGroup.items.length === 0) ? (
                     <div className="p-3 rounded-xl border border-dashed border-border text-center text-muted-foreground text-xs">
@@ -347,15 +378,17 @@ export function OrderEmailDispatchDialog({
                       {selectedOrderGroup.items.map((item: any, idx: number) => {
                         const linePrice = item.unit_price || item.total_price || item.price || 0;
                         const effStagePct = selectedOrderGroup.proforma_stage_percent || proformaPercent || 70;
-                        const itemDue = emailConfirmType === 'final' ? linePrice : (linePrice * effStagePct) / 100;
+                        const itemDue = (isFinal || isQuotation) ? linePrice : (linePrice * effStagePct) / 100;
 
                         return (
                           <div key={item.id || idx} className="p-2 flex items-center justify-between hover:bg-muted/30 transition-colors">
                             <div className="flex items-center gap-2 min-w-0">
                               <div className={`h-5 w-5 rounded-md flex items-center justify-center shrink-0 ${
-                                emailConfirmType === 'final'
+                                isFinal
                                   ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-600'
-                                  : 'bg-sky-500/10 border border-sky-500/20 text-sky-600'
+                                  : isQuotation
+                                    ? 'bg-blue-500/10 border border-blue-500/20 text-blue-600'
+                                    : 'bg-sky-500/10 border border-sky-500/20 text-sky-600'
                               }`}>
                                 <FileText className="h-3 w-3" />
                               </div>
@@ -373,11 +406,13 @@ export function OrderEmailDispatchDialog({
                                 Rp {Math.round(itemDue).toLocaleString("id-ID")}
                               </span>
                               <Badge variant="outline" className={`text-[9px] font-mono px-1 py-0 ${
-                                emailConfirmType === 'final'
+                                isFinal
                                   ? 'text-emerald-700 bg-emerald-500/10 border-emerald-500/20'
-                                  : 'text-sky-700 bg-sky-500/10 border-sky-500/20'
+                                  : isQuotation
+                                    ? 'text-blue-700 bg-blue-500/10 border-blue-500/20'
+                                    : 'text-sky-700 bg-sky-500/10 border-sky-500/20'
                               }`}>
-                                {emailConfirmType === 'final' ? '100%' : `${effStagePct}%`}
+                                {(isFinal || isQuotation) ? '100%' : `${effStagePct}%`}
                               </Badge>
                             </div>
                           </div>
@@ -415,9 +450,11 @@ export function OrderEmailDispatchDialog({
                 ((invoiceDeliveryChannel === 'both' || invoiceDeliveryChannel === 'whatsapp') && (!emailConfirmPhone.trim() || !isValidPhoneNumber(emailConfirmPhone)))
               }
               className={`text-xs font-bold h-8 sm:h-9 px-4 sm:px-5 text-white shadow-sm gap-1.5 rounded-lg disabled:opacity-40 transition-all ${
-                emailConfirmType === 'final'
+                isFinal
                   ? 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500'
-                  : 'bg-sky-600 hover:bg-sky-700 active:bg-sky-800 dark:bg-sky-600 dark:hover:bg-sky-500'
+                  : isQuotation
+                    ? 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500'
+                    : 'bg-sky-600 hover:bg-sky-700 active:bg-sky-800 dark:bg-sky-600 dark:hover:bg-sky-500'
               }`}
             >
               {sendingEmail ? (

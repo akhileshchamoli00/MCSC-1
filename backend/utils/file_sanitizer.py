@@ -257,10 +257,28 @@ def validate_file_security(
                 detail="Security violation: File claims to be PDF but valid %PDF- signature was not found."
             )
     elif ext in ["docx", "xlsx", "pptx", "zip"]:
-        if not (file_bytes.startswith(b"PK\x03\x04") or file_bytes.startswith(b"PK\x05\x06") or file_bytes.startswith(b"PK\x07\x08")):
+        is_openxml_zip = (
+            file_bytes.startswith(b"PK\x03\x04") or
+            file_bytes.startswith(b"PK\x05\x06") or
+            file_bytes.startswith(b"PK\x07\x08")
+        )
+        # Password-protected / encrypted modern Office files (.docx, .xlsx, .pptx) are wrapped by Microsoft Office
+        # in an OLE Compound Document container holding an EncryptedPackage or EncryptionInfo stream.
+        is_encrypted_office = False
+        if ext in ["docx", "xlsx", "pptx"] and file_bytes.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+            encrypted_markers = [
+                b"E\x00n\x00c\x00r\x00y\x00p\x00t\x00e\x00d\x00P\x00a\x00c\x00k\x00a\x00g\x00e", # UTF-16LE
+                b"E\x00n\x00c\x00r\x00y\x00p\x00t\x00i\x00o\x00n\x00I\x00n\x00f\x00o",           # UTF-16LE
+                b"EncryptedPackage",
+                b"EncryptionInfo",
+            ]
+            if any(marker in file_bytes for marker in encrypted_markers):
+                is_encrypted_office = True
+
+        if not (is_openxml_zip or is_encrypted_office):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Security violation: File claims to be .{ext} but OpenXML/ZIP archive header is missing."
+                detail=f"Security violation: File claims to be .{ext} but valid OpenXML or password-encrypted Office archive header is missing."
             )
         # Deep inspection for ZIP archives
         if ext == "zip":

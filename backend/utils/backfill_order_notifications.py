@@ -79,7 +79,7 @@ def run_backfill():
                     message=f"You have been assigned as an executing consultant on Order #{order_number}{company_info}{services_info}.",
                     type="order_assignment",
                     module="orders",
-                    system_area="shared",
+                    system_area="business",
                     reference_id=first_order.id,
                     action_url=f"/business/assigned-orders?order={order_number}&chat=false"
                 )
@@ -108,7 +108,7 @@ def run_backfill():
                     message=f"You have been assigned as a designated reviewer on Order #{order_number}{company_info}{services_info}.",
                     type="order_review_assignment",
                     module="orders",
-                    system_area="shared",
+                    system_area="business",
                     reference_id=first_order.id,
                     action_url=f"/business/assigned-orders?order={order_number}&chat=false"
                 )

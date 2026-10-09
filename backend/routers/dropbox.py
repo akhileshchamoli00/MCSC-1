@@ -270,6 +270,29 @@ async def upload_file(
         user_id=current_user.id
     )
 
+    if order_num:
+        try:
+            from routers.clients import get_assigned_consultant_user_ids
+            consultant_uids = get_assigned_consultant_user_ids(order_num, db)
+            if consultant_uids:
+                from notification_manager import manager
+                clean_order_upper = order_num.upper()
+                action_url = f"/business/clients/documents/{comp_id}?order={clean_order_upper}&from=assigned-orders" if comp_id else f"/business/assigned-orders?order={clean_order_upper}"
+                for uid in consultant_uids:
+                    manager.notify_user_sync(
+                        db=db,
+                        user_id=uid,
+                        title=f"New Document Uploaded - #{clean_order_upper}",
+                        message=f"{safe_filename} uploaded for Order #{clean_order_upper}.",
+                        type="document",
+                        module="clients_documents",
+                        reference_id=None,
+                        action_url=action_url,
+                        system_area="business"
+                    )
+        except Exception as notif_err:
+            print(f"Warning: Failed to dispatch Dropbox upload notification: {notif_err}")
+
     return res
 
 @router.post("/folder")

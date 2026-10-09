@@ -713,8 +713,14 @@ class AccurateClient:
                 "projectName": project_code
             })
 
+        INQUIRY_STATUSES = ["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED", "PROSPECT", "PIPELINE", "ENQUIRY", "BEING_CHECKED"]
+        is_inquiry = any((o.status or "").upper() in INQUIRY_STATUSES for o in target_orders)
+
         desc_services = ", ".join(item_titles) if item_titles else (order.job_title or "")
-        description_text = f"Proforma Invoice ({proforma_pct}% DP) for Order {order_num} - {desc_services}"
+        if is_inquiry:
+            description_text = f"Sales Order for Quotation {order_num} - {desc_services}"
+        else:
+            description_text = f"Proforma Invoice ({proforma_pct}% DP) for Order {order_num} - {desc_services}"
 
         payload = {
             "customerNo": customer_no,
@@ -858,15 +864,27 @@ class AccurateClient:
         token = self.get_valid_access_token()
         db_id = self.config.database_id if self.config else None
 
+        INQUIRY_STATUSES = ["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED", "PROSPECT", "PIPELINE", "ENQUIRY", "BEING_CHECKED"]
+        is_inquiry = any((o.status or "").upper() in INQUIRY_STATUSES for o in target_orders)
+
         # Check if Proforma DP was already billed / invoiced
         proforma_pct = order.proforma_stage_percent or 50
-        has_proforma_dp = bool(
-            order.accurate_sync_status in ["PROFORMA_PAID", "PAID"] or 
+        has_proforma_dp = (not is_inquiry) and bool(
+            order.accurate_sync_status in ["PROFORMA_PAID"] or 
             any(o.accurate_sync_status == "PROFORMA_PAID" for o in target_orders) or 
-            (order.payment_status in ["PARTIALLY_PAID", "PAID"]) or
-            (order.proforma_paid_amount and float(order.proforma_paid_amount) > 0)
+            (order.payment_status in ["PARTIALLY_PAID"]) or
+            (order.proforma_paid_amount and float(order.proforma_paid_amount) > 0 and float(order.proforma_paid_amount) < float(order.total_amount or 0.0))
         )
-        final_pct_ratio = (100.0 - float(proforma_pct)) / 100.0 if has_proforma_dp else 1.0
+
+        # Check if native Sales Down Payment invoice exists
+        dp_inv_no = order.accurate_dp_inv_no
+        if not dp_inv_no:
+            for o in target_orders:
+                if o.accurate_dp_inv_no:
+                    dp_inv_no = o.accurate_dp_inv_no
+                    break
+
+        final_pct_ratio = (100.0 - float(proforma_pct)) / 100.0 if (has_proforma_dp and not dp_inv_no) else 1.0
 
         detail_items = []
         item_titles = []
@@ -895,10 +913,12 @@ class AccurateClient:
             detail_items.append(item_entry)
 
         desc_services = ", ".join(item_titles) if item_titles else (order.job_title or "")
-        if has_proforma_dp:
+        if is_inquiry:
+            description_text = f"Sales Invoice for Order {order_num} - {desc_services}"
+        elif has_proforma_dp:
             description_text = f"Final Invoice (Balance {100 - proforma_pct}%) for Order {order_num} - {desc_services}"
         else:
-            description_text = f"Final Invoice for Order {order_num} - {desc_services}"
+            description_text = f"Sales Invoice for Order {order_num} - {desc_services}"
 
         payload = {
             "customerNo": customer_no,
@@ -910,6 +930,18 @@ class AccurateClient:
         # If SO exists, link to Sales Order at root
         if order.accurate_so_no:
             payload["salesOrderNumber"] = order.accurate_so_no
+
+        # If native Sales Down Payment exists, apply it via detailDownPayment
+        if has_proforma_dp and dp_inv_no:
+            dp_amount = sum(float(o.proforma_paid_amount or 0.0) for o in target_orders)
+            if dp_amount <= 0:
+                dp_amount = round(sum(float(o.unit_price if o.unit_price is not None else (o.total_amount or 0.0)) for o in target_orders) * (proforma_pct / 100.0), 2)
+            payload["detailDownPayment"] = [
+                {
+                    "invoiceNumber": dp_inv_no,
+                    "paymentAmount": float(dp_amount)
+                }
+            ]
 
         if token and db_id:
             url = f"{ACCURATE_API_HOST}/api/sales-invoice/save.do"
@@ -1026,7 +1058,7 @@ class AccurateClient:
         order_num = order.order_number or f"ORD-{order.id}"
         bank_no = self._resolve_bank_no()
 
-        is_final_invoice_phase = bool(order.is_final_invoice_finalized or order.invoice_number or order.payment_status in ["FINAL_PAID", "FULLY_PAID"])
+        is_final_invoice_phase = bool(order.accurate_inv_no or order.is_final_invoice_finalized or order.invoice_number or order.payment_status in ["FINAL_PAID", "FULLY_PAID", "PAID"])
 
         token = self.get_valid_access_token()
         db_id = self.config.database_id if self.config else None
@@ -1207,42 +1239,69 @@ class AccurateClient:
             if token and db_id:
                 headers = self._get_headers()
                 
-                # 1. Create a Proforma DP Invoice in Accurate Online (isolated DP line so SO stays in progress)
-                inv_payload = {
-                    "customerNo": customer_no,
-                    "transDate": today_str,
-                    "description": f"Proforma Invoice ({order.proforma_stage_percent or 50}% DP) for Order {order_num}",
-                    "detailItem": [
-                        {
-                            "itemNo": "Jasa",
-                            "unitPrice": float(payment_amount),
-                            "quantity": 1,
-                            "detailNotes": f"Down Payment ({order.proforma_stage_percent or 50}%) for Order {order_num}",
-                            "tax1Name": self.config.default_tax_ppn_no if self.config else "PPN 11%",
-                            "projectNo": order_num,
-                            "projectName": order_num
-                        }
-                    ]
-                }
-                
-                dp_inv_no = None
-                try:
-                    inv_url = f"{ACCURATE_API_HOST}/api/sales-invoice/save.do"
-                    inv_resp = requests.post(inv_url, json=inv_payload, headers=headers, timeout=25)
-                    inv_data = inv_resp.json()
-                    if inv_data.get("s"):
-                        _, dp_inv_no = self._extract_doc_info(inv_data, f"INV-DP.{order.id:04d}")
-                except Exception as inv_err:
-                    print(f"Warning: Proforma DP invoice creation error: {inv_err}")
+                # Check if Down Payment was already created previously
+                dp_inv_no = order.accurate_dp_inv_no
+                if not dp_inv_no:
+                    for o in target_orders:
+                        if o.accurate_dp_inv_no:
+                            dp_inv_no = o.accurate_dp_inv_no
+                            break
 
-                # 2. If Proforma DP invoice was created, generate Sales Receipt against it
+                # 1. Create native Sales Down Payment (Uang Muka Penjualan) linked to Sales Order
+                if not dp_inv_no:
+                    dp_payload = {
+                        "customerNo": customer_no,
+                        "dpAmount": float(payment_amount),
+                        "soNumber": order.accurate_so_no,
+                        "transDate": today_str,
+                        "description": f"Uang Muka Penjualan ({order.proforma_stage_percent or 50}% DP) for Order {order_num}"
+                    }
+                    if self.config and self.config.default_tax_ppn_no:
+                        dp_payload["tax1Name"] = self.config.default_tax_ppn_no
+
+                    try:
+                        dp_url = f"{ACCURATE_API_HOST}/api/sales-invoice/create-down-payment.do"
+                        dp_resp = requests.post(dp_url, json=dp_payload, headers=headers, timeout=25)
+                        dp_data = dp_resp.json()
+                        if dp_data.get("s"):
+                            fallback_sid = f"SID.{datetime.now().strftime('%y%m')}.{order.id:04d}"
+                            _, dp_inv_no = self._extract_doc_info(dp_data, fallback_sid)
+                            for ord_item in target_orders:
+                                ord_item.accurate_dp_inv_no = dp_inv_no
+                            self.db.commit()
+
+                            self.log_sync(
+                                event_type="SALES_DOWN_PAYMENT",
+                                status="SUCCESS",
+                                reference_id=str(order.id),
+                                reference_number=order_num,
+                                accurate_doc_no=dp_inv_no,
+                                request_payload=dp_payload,
+                                response_payload=dp_data
+                            )
+                        else:
+                            err = str(dp_data.get("d") or "Accurate Sales Down Payment creation failed")
+                            print(f"Warning: Accurate Sales Down Payment error: {err}")
+                            self.log_sync(
+                                event_type="SALES_DOWN_PAYMENT",
+                                status="FAILED",
+                                reference_id=str(order.id),
+                                reference_number=order_num,
+                                request_payload=dp_payload,
+                                error_message=err,
+                                response_payload=dp_data
+                            )
+                    except Exception as dp_err:
+                        print(f"Warning: Proforma Sales Down Payment creation error: {dp_err}")
+
+                # 2. If Proforma Sales Down Payment was created, generate Sales Receipt against it
                 if dp_inv_no:
                     rcpt_payload = {
                         "customerNo": customer_no,
                         "transDate": today_str,
                         "bankNo": bank_no,
                         "chequeAmount": float(payment_amount),
-                        "description": f"Proforma DP ({order.proforma_stage_percent or 50}%) for Order {order_num} via {payment_method}",
+                        "description": f"Penerimaan Uang Muka Penjualan ({order.proforma_stage_percent or 50}% DP) for Order {order_num} via {payment_method}",
                         "detailInvoice": [
                             {
                                 "invoiceNo": dp_inv_no,
@@ -1258,6 +1317,7 @@ class AccurateClient:
                             fallback_no = f"CR.{datetime.now().strftime('%y%m')}.{order.id:04d}"
                             doc_id, doc_no = self._extract_doc_info(rcpt_data, fallback_no)
                             for ord_item in target_orders:
+                                ord_item.accurate_dp_inv_no = dp_inv_no
                                 ord_item.accurate_receipt_no = doc_no
                                 ord_item.accurate_sync_status = "PROFORMA_PAID"
                                 ord_item.accurate_sync_error = None
@@ -1277,12 +1337,12 @@ class AccurateClient:
                                 "success": True,
                                 "accurate_receipt_no": doc_no,
                                 "accurate_so_no": order.accurate_so_no,
-                                "proforma_inv_no": dp_inv_no,
-                                "message": f"Proforma Down Payment Receipt {doc_no} generated successfully in Accurate Online.",
+                                "accurate_dp_inv_no": dp_inv_no,
+                                "message": f"Uang Muka Penjualan {dp_inv_no} & Receipt {doc_no} generated successfully in Accurate Online.",
                                 "data": rcpt_data
                             }
                     except Exception as rcpt_err:
-                        print(f"Warning: Sales receipt against DP invoice error: {rcpt_err}")
+                        print(f"Warning: Sales receipt against Down Payment error: {rcpt_err}")
 
             # Simulation fallback or fallback if DP invoice creation was skipped
             mock_cr_no = existing_receipt_no or f"CR.{datetime.now().strftime('%y%m')}.{order.id:04d}"
