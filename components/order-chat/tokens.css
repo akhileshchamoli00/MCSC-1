@@ -116,8 +116,11 @@
    Deep Violet Night (Client) & Deep Warm Ember (Internal)
    Light text with high legibility and soft contrast.
    ========================================================================== */
+.dark,
+html.dark,
+.dark :root,
 .dark .order-chat-workspace,
-.dark:root {
+.order-chat-workspace.dark {
   /* Base Neutrals (Dark Charcoal) */
   --oc-bg-app: #0F0F12;
   --oc-bg-panel: #18181C;

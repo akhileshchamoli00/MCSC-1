@@ -77,7 +77,7 @@ export function TopBar({
   };
 
   return (
-    <header className="h-14 sm:h-16 px-3 sm:px-5 border-b border-[var(--oc-border)] bg-[var(--oc-bg-panel)] flex items-center justify-between shrink-0 select-none z-10 transition-colors">
+    <header className="h-14 sm:h-16 px-3 sm:px-5 border-b border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] flex items-center justify-between shrink-0 select-none z-10 transition-colors">
       {/* Left: Back button + Full Order Number + Status Badge + Subtitle */}
       <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
         <TooltipProvider delayDuration={100}>

@@ -96,11 +96,11 @@ export function OrderDetailsPanel({
 
   return (
     <aside
-      className="w-full lg:w-[310px] xl:w-[320px] shrink-0 flex flex-col h-full min-h-0 bg-[var(--oc-bg-app)] border-r border-[var(--oc-border)] overflow-hidden select-none transition-colors"
+      className="w-full lg:w-[310px] xl:w-[320px] shrink-0 flex flex-col h-full min-h-0 bg-[#F8F9FA] dark:bg-[#0F0F12] bg-[var(--oc-bg-app)] border-r border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] overflow-hidden select-none transition-colors"
       aria-label="Order Details Panel"
     >
       {/* Header */}
-      <div className="h-12 px-4 border-b border-[var(--oc-border)] bg-[var(--oc-bg-panel)] flex items-center justify-between shrink-0">
+      <div className="h-12 px-4 border-b border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] flex items-center justify-between shrink-0">
         <span className="text-xs font-semibold uppercase tracking-wider text-[var(--oc-text-secondary)]">
           Order Details
         </span>
@@ -133,7 +133,7 @@ export function OrderDetailsPanel({
         ) : (
           <>
             {/* CARD 1: Client & Company */}
-            <div className="p-3.5 rounded-[var(--oc-radius-md)] bg-[var(--oc-bg-panel)] border border-[var(--oc-border)] shadow-[var(--oc-shadow-xs)] space-y-2.5">
+            <div className="p-3.5 rounded-[var(--oc-radius-md)] bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] border border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] shadow-[var(--oc-shadow-xs)] space-y-2.5">
               <div className="flex items-start gap-2.5">
                 <div className="h-8 w-8 rounded-[var(--oc-radius-sm)] bg-[var(--oc-brand-50)] text-[var(--oc-brand-600)] flex items-center justify-center border border-[var(--oc-brand-100)] shrink-0 mt-0.5">
                   <Building2 className="h-4 w-4" />
@@ -185,7 +185,7 @@ export function OrderDetailsPanel({
         </div>
 
         {/* CARD 2: Scope & Deliverables (Checklist style) */}
-        <div className="p-3.5 rounded-[var(--oc-radius-md)] bg-[var(--oc-bg-panel)] border border-[var(--oc-border)] shadow-[var(--oc-shadow-xs)] space-y-3">
+        <div className="p-3.5 rounded-[var(--oc-radius-md)] bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] border border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] shadow-[var(--oc-shadow-xs)] space-y-3">
           <div className="flex items-center justify-between pb-1.5 border-b border-[var(--oc-border)]">
             <div className="flex items-center gap-1.5">
               <Layers className="h-3.5 w-3.5 text-[var(--oc-brand-600)]" />
@@ -224,7 +224,7 @@ export function OrderDetailsPanel({
                   )}
 
                   {(item.service_instructions || item.notes) && (
-                    <div className="mt-1.5 p-2 rounded-[var(--oc-radius-xs)] bg-[var(--oc-bg-panel)] border border-[var(--oc-border)] text-[11px] text-[var(--oc-text-secondary)] space-y-0.5">
+                    <div className="mt-1.5 p-2 rounded-[var(--oc-radius-xs)] bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] border border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] text-[11px] text-[var(--oc-text-secondary)] space-y-0.5">
                       <div className="flex items-center gap-1 font-medium text-[var(--oc-text-primary)] text-[10px]">
                         <FileText className="h-3 w-3 text-[var(--oc-text-tertiary)]" />
                         <span>Instructions:</span>
@@ -276,7 +276,7 @@ export function OrderDetailsPanel({
         </div>
 
         {/* CARD 3: Assigned Consultants & Team */}
-        <div className="p-3.5 rounded-[var(--oc-radius-md)] bg-[var(--oc-bg-panel)] border border-[var(--oc-border)] shadow-[var(--oc-shadow-xs)] space-y-2.5">
+        <div className="p-3.5 rounded-[var(--oc-radius-md)] bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] border border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] shadow-[var(--oc-shadow-xs)] space-y-2.5">
           <div className="flex items-center justify-between pb-1.5 border-b border-[var(--oc-border)]">
             <div className="flex items-center gap-1.5">
               <Users className="h-3.5 w-3.5 text-[var(--oc-brand-600)]" />
@@ -353,7 +353,7 @@ export function OrderDetailsPanel({
         </div>
 
         {/* CARD 4: Status Timeline (Status history lives here!) */}
-        <div className="p-3.5 rounded-[var(--oc-radius-md)] bg-[var(--oc-bg-panel)] border border-[var(--oc-border)] shadow-[var(--oc-shadow-xs)] space-y-2.5">
+        <div className="p-3.5 rounded-[var(--oc-radius-md)] bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] border border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] shadow-[var(--oc-shadow-xs)] space-y-2.5">
           <div className="flex items-center justify-between pb-1.5 border-b border-[var(--oc-border)]">
             <div className="flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5 text-[var(--oc-brand-600)]" />

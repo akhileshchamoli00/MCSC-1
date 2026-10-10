@@ -70,7 +70,7 @@ export function EmptyState({ channel, onSelectSuggestion, orderNumber, orderStat
                 key={idx}
                 type="button"
                 onClick={() => onSelectSuggestion(text)}
-                className="group w-full px-3.5 py-2 rounded-lg text-xs text-left bg-[var(--oc-bg-panel)] hover:bg-[var(--oc-bg-subtle)] border border-[var(--oc-border)] hover:border-[var(--oc-border-strong)] text-[var(--oc-text-secondary)] hover:text-[var(--oc-text-primary)] transition-all flex items-center justify-between shadow-2xs"
+                className="group w-full px-3.5 py-2 rounded-lg text-xs text-left bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] hover:bg-zinc-100 dark:hover:bg-[#222228] hover:bg-[var(--oc-bg-subtle)] border border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] hover:border-zinc-300 dark:hover:border-zinc-700 hover:border-[var(--oc-border-strong)] text-[var(--oc-text-secondary)] hover:text-[var(--oc-text-primary)] transition-all flex items-center justify-between shadow-2xs"
               >
                 <span className="truncate pr-2 font-medium">{text}</span>
                 <ArrowRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-[var(--oc-brand-600)] shrink-0" />

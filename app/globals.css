@@ -39,6 +39,65 @@
   --sidebar-accent-foreground: oklch(0.15 0.02 240);
   --sidebar-border: oklch(0.85 0.02 240);
   --sidebar-ring: oklch(0.12 0.01 240);
+
+  /* Order Chat Workspace Tokens (Light Mode) */
+  --oc-bg-app: #F8F9FA;
+  --oc-bg-panel: #FFFFFF;
+  --oc-bg-subtle: #F3F4F6;
+  --oc-bg-surface: #FFFFFF;
+  --oc-border: #E5E7EB;
+  --oc-border-strong: #D1D5DB;
+  --oc-text-primary: #111827;
+  --oc-text-secondary: #4B5563;
+  --oc-text-tertiary: #9CA3AF;
+  --oc-brand-700: #5B21B6;
+  --oc-brand-600: #6D28D9;
+  --oc-brand-500: #7C3AED;
+  --oc-brand-400: #A78BFA;
+  --oc-brand-200: #DDD6FE;
+  --oc-brand-100: #EDE9FE;
+  --oc-brand-50: #FAF5FF;
+  --oc-brand-contrast: #FFFFFF;
+  --oc-internal-700: #9A3412;
+  --oc-internal-600: #C2410C;
+  --oc-internal-500: #EA580C;
+  --oc-internal-400: #FB923C;
+  --oc-internal-200: #FED7AA;
+  --oc-internal-100: #FFEDD5;
+  --oc-internal-50: #FFF8F0;
+  --oc-internal-contrast: #FFFFFF;
+  --oc-bubble-client-bg: #FAF5FF;
+  --oc-bubble-client-border: #E9D5FF;
+  --oc-bubble-client-text: #2E1065;
+  --oc-bubble-client-meta: #7E22CE;
+  --oc-bubble-internal-bg: #FFF8F0;
+  --oc-bubble-internal-border: #FED7AA;
+  --oc-bubble-internal-text: #431407;
+  --oc-bubble-internal-meta: #9A3412;
+  --oc-bubble-other-bg: #FFFFFF;
+  --oc-bubble-other-border: #E5E7EB;
+  --oc-bubble-other-text: #111827;
+  --oc-bubble-other-meta: #6B7280;
+  --oc-status-success-text: #065F46;
+  --oc-status-success-bg: #ECFDF5;
+  --oc-status-success-border: #A7F3D0;
+  --oc-status-warning-text: #9A3412;
+  --oc-status-warning-bg: #FFF7ED;
+  --oc-status-warning-border: #FED7AA;
+  --oc-status-danger-text: #991B1B;
+  --oc-status-danger-bg: #FEF2F2;
+  --oc-status-danger-border: #FECACA;
+  --oc-status-info-text: #5B21B6;
+  --oc-status-info-bg: #FAF5FF;
+  --oc-status-info-border: #DDD6FE;
+  --oc-status-neutral-text: #374151;
+  --oc-status-neutral-bg: #F3F4F6;
+  --oc-status-neutral-border: #E5E7EB;
+  --oc-radius-xs: 4px;
+  --oc-radius-sm: 6px;
+  --oc-radius-md: 10px;
+  --oc-radius-lg: 14px;
+  --oc-radius-full: 9999px;
 }
 
 .dark {
@@ -74,6 +133,60 @@
   --sidebar-accent-foreground: oklch(0.98 0 0);
   --sidebar-border: oklch(0.25 0.02 240);
   --sidebar-ring: oklch(0.98 0 0);
+
+  /* Order Chat Workspace Tokens (Dark Mode) */
+  --oc-bg-app: #0F0F12;
+  --oc-bg-panel: #18181C;
+  --oc-bg-subtle: #222228;
+  --oc-bg-surface: #1E1E24;
+  --oc-border: #2E2E38;
+  --oc-border-strong: #3F3F4C;
+  --oc-text-primary: #F4F4F8;
+  --oc-text-secondary: #D1D1DE;
+  --oc-text-tertiary: #8E8EA0;
+  --oc-brand-700: #C4B5FD;
+  --oc-brand-600: #8B5CF6;
+  --oc-brand-500: #A78BFA;
+  --oc-brand-400: #C4B5FD;
+  --oc-brand-200: #3B2766;
+  --oc-brand-100: #281A46;
+  --oc-brand-50: #170F28;
+  --oc-brand-contrast: #FFFFFF;
+  --oc-internal-700: #FDBA74;
+  --oc-internal-600: #FB923C;
+  --oc-internal-500: #F97316;
+  --oc-internal-400: #FB923C;
+  --oc-internal-200: #4D2912;
+  --oc-internal-100: #331C0E;
+  --oc-internal-50: #1F1109;
+  --oc-internal-contrast: #FFFFFF;
+  --oc-bubble-client-bg: #1E1433;
+  --oc-bubble-client-border: #3B2766;
+  --oc-bubble-client-text: #F3E8FF;
+  --oc-bubble-client-meta: #C4B5FD;
+  --oc-bubble-internal-bg: #261409;
+  --oc-bubble-internal-border: #4D2912;
+  --oc-bubble-internal-text: #FFEDD5;
+  --oc-bubble-internal-meta: #FDBA74;
+  --oc-bubble-other-bg: #202026;
+  --oc-bubble-other-border: #2F2F3B;
+  --oc-bubble-other-text: #F4F4F8;
+  --oc-bubble-other-meta: #8E8EA0;
+  --oc-status-success-text: #34D399;
+  --oc-status-success-bg: #064E3B;
+  --oc-status-success-border: #047857;
+  --oc-status-warning-text: #FB923C;
+  --oc-status-warning-bg: #431407;
+  --oc-status-warning-border: #7C2D12;
+  --oc-status-danger-text: #F87171;
+  --oc-status-danger-bg: #450A0A;
+  --oc-status-danger-border: #7F1D1D;
+  --oc-status-info-text: #C4B5FD;
+  --oc-status-info-bg: #281A46;
+  --oc-status-info-border: #4C1D95;
+  --oc-status-neutral-text: #9CA3AF;
+  --oc-status-neutral-bg: #222228;
+  --oc-status-neutral-border: #374151;
 }
 
 @theme inline {

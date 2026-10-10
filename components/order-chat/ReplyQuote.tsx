@@ -32,7 +32,7 @@ export function ReplyQuote({
       onClick={!isDraftPreview && onClick ? onClick : undefined}
       className={`relative flex items-start justify-between gap-2 p-2 rounded-md transition-all text-left ${
         isDraftPreview
-          ? "bg-[var(--oc-bg-subtle)] border-l-2 border-l-[var(--oc-brand-500)] text-[var(--oc-text-primary)] mb-2"
+          ? "bg-zinc-100 dark:bg-zinc-800 bg-[var(--oc-bg-subtle)] border-l-2 border-l-[var(--oc-brand-500)] text-[var(--oc-text-primary)] mb-2"
           : "bg-black/5 dark:bg-white/5 border-l-2 border-l-current cursor-pointer hover:bg-black/10 dark:hover:bg-white/10 mb-1.5"
       } ${
         isInternal && isDraftPreview ? "border-l-[var(--oc-internal-500)]" : ""

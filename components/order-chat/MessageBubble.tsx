@@ -93,18 +93,18 @@ export function MessageBubble({
   let bubbleClasses = "";
   if (isSelf) {
     if (isInternal) {
-      // Internal own message: Calming Eucalyptus / Sage (Professional workspace green)
+      // Internal own message: Soft Apricot-Orange
       bubbleClasses =
-        "bg-[var(--oc-bubble-internal-bg)] text-[var(--oc-bubble-internal-text)] border border-[var(--oc-bubble-internal-border)] shadow-2xs";
+        "bg-orange-50 dark:bg-[#261409] text-orange-950 dark:text-orange-100 border-orange-200 dark:border-[#4D2912] bg-[var(--oc-bubble-internal-bg)] text-[var(--oc-bubble-internal-text)] border border-[var(--oc-bubble-internal-border)] shadow-2xs";
     } else {
-      // Client external own message: Executive Slate-Indigo (Calm, trustworthy, professional)
+      // Client external own message: Soft Lavender-Purple
       bubbleClasses =
-        "bg-[var(--oc-bubble-client-bg)] text-[var(--oc-bubble-client-text)] border border-[var(--oc-bubble-client-border)] shadow-2xs";
+        "bg-purple-50 dark:bg-[#1E1433] text-purple-950 dark:text-purple-100 border-purple-200 dark:border-[#3B2766] bg-[var(--oc-bubble-client-bg)] text-[var(--oc-bubble-client-text)] border border-[var(--oc-bubble-client-border)] shadow-2xs";
     }
   } else {
     // Other person's message: Crisp subtle neutral white with clean border
     bubbleClasses =
-      "bg-[var(--oc-bubble-other-bg)] text-[var(--oc-bubble-other-text)] border border-[var(--oc-bubble-other-border)] shadow-2xs";
+      "bg-white dark:bg-[#202026] text-zinc-900 dark:text-[#F4F4F8] border-zinc-200 dark:border-[#2F2F3B] bg-[var(--oc-bubble-other-bg)] text-[var(--oc-bubble-other-text)] border border-[var(--oc-bubble-other-border)] shadow-2xs";
   }
 
   const handleCopy = () => {

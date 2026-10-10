@@ -32,10 +32,10 @@ export function ChannelHeader({
 
   return (
     <header
-      className={`h-14 px-4 flex items-center justify-between border-b shrink-0 select-none transition-colors ${
+      className={`h-14 px-4 flex items-center justify-between border-b shrink-0 select-none transition-colors bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] ${
         isInternal
-          ? "border-[var(--oc-border)] bg-[var(--oc-bg-panel)] border-t-2 border-t-[var(--oc-internal-500)]"
-          : "border-[var(--oc-border)] bg-[var(--oc-bg-panel)] border-t-2 border-t-[var(--oc-brand-500)]"
+          ? "border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] border-t-2 border-t-[var(--oc-internal-500)]"
+          : "border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] border-t-2 border-t-[var(--oc-brand-500)]"
       }`}
     >
       <div className="flex items-center gap-3 min-w-0">

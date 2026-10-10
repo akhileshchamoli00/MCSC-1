@@ -36,7 +36,7 @@ export function MentionPicker({
   return (
     <div
       ref={listRef}
-      className="absolute bottom-full left-0 mb-2 w-72 max-h-56 overflow-y-auto rounded-lg bg-[var(--oc-bg-panel)] border border-[var(--oc-border)] shadow-md z-50 py-1"
+      className="absolute bottom-full left-0 mb-2 w-72 max-h-56 overflow-y-auto rounded-lg bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] border border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] shadow-md z-50 py-1"
       role="listbox"
       aria-label="Mention candidates"
     >

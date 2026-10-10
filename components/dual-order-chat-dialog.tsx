@@ -871,7 +871,7 @@ export function DualOrderChatDialog({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.28, ease: "easeInOut" }}
             onClick={onClose}
-            className="fixed inset-0 z-[74] bg-black/40 backdrop-blur-2xs"
+            className="fixed inset-0 z-[74] bg-black/60 dark:bg-black/80 backdrop-blur-sm"
           />
         )}
         {isOpen && (
@@ -881,7 +881,7 @@ export function DualOrderChatDialog({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "tween", ease: [0.16, 1, 0.3, 1], duration: 0.32 }}
-            className="fixed inset-0 z-[75] h-screen h-[100dvh] w-screen flex flex-col bg-[var(--oc-bg-app)] text-[var(--oc-text-primary)] overflow-hidden shadow-2xl"
+            className="order-chat-workspace fixed inset-0 z-[75] h-screen h-[100dvh] w-screen flex flex-col bg-[#F8F9FA] dark:bg-[#0F0F12] bg-[var(--oc-bg-app)] text-[#111827] dark:text-[#F4F4F8] text-[var(--oc-text-primary)] overflow-hidden shadow-2xl"
           >
             {/* Top Navigation Bar */}
             <TopBar
@@ -902,7 +902,7 @@ export function DualOrderChatDialog({
             />
 
             {/* Mobile Tab Selector (< 1024px) */}
-            <div className="lg:hidden flex items-center border-b border-[var(--oc-border)] bg-[var(--oc-bg-panel)] shrink-0 px-2 py-1.5 gap-2">
+            <div className="lg:hidden flex items-center border-b border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] shrink-0 px-2 py-1.5 gap-2">
               <button
                 type="button"
                 onClick={() => setActiveMobileTab("CLIENT")}
@@ -954,7 +954,7 @@ export function DualOrderChatDialog({
               />
 
               {/* Middle & Right: Dual Chat Columns */}
-              <div className="flex-1 flex min-h-0 h-full overflow-hidden divide-x divide-[var(--oc-border)] bg-[var(--oc-bg-panel)]">
+              <div className="flex-1 flex min-h-0 h-full overflow-hidden divide-x divide-zinc-200 dark:divide-zinc-800 divide-[var(--oc-border)] bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)]">
                 {/* Column 2: Client & Consultant Chat */}
                 <div
                   className={`flex-1 min-w-0 h-full ${

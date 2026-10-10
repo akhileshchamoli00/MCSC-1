@@ -186,7 +186,7 @@ export function ChatPanel({
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[var(--oc-bg-panel)] relative overflow-hidden">
+    <div className="flex flex-col h-full min-h-0 bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] relative overflow-hidden">
       {/* 56px Channel Header */}
       <ChannelHeader
         channel={channel}

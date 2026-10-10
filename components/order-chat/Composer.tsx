@@ -217,7 +217,7 @@ export function Composer({
   const canSend = Boolean(value.trim() || attachment) && !sending;
 
   return (
-    <div className="p-3 border-t border-[var(--oc-border)] bg-[var(--oc-bg-panel)] shrink-0 transition-colors">
+    <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] shrink-0 transition-colors">
       {/* Hidden File Input */}
       <input
         type="file"
@@ -288,8 +288,8 @@ export function Composer({
             ? isInternal
               ? "border-[var(--oc-internal-500)] ring-2 ring-[var(--oc-internal-500)]/20 shadow-xs"
               : "border-[var(--oc-brand-500)] ring-2 ring-[var(--oc-brand-500)]/20 shadow-xs"
-            : "border-[var(--oc-border)] hover:border-[var(--oc-border-strong)]"
-        } bg-[var(--oc-bg-panel)]`}
+            : "border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] hover:border-[var(--oc-border-strong)]"
+        } bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)]`}
       >
         {/* Audience Banner / Mode Tag */}
         <div
