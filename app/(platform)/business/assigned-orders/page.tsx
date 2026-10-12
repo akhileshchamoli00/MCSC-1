@@ -27,8 +27,11 @@ import {
   AlertTriangle,
   ShieldCheck,
   Scale,
-  GitBranch
+  GitBranch,
+  Printer,
+  CheckSquare
 } from "lucide-react";
+import { JobDetailsPrintDialog, PreSignatureReviewDialog } from "@/components/orders";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +39,13 @@ import { TablePagination } from "@/components/ui/pagination";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -104,6 +114,10 @@ export default function AssignedOrdersPage() {
   const [selectedGroup, setSelectedGroup] = useState<any>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isJobPrintOpen, setIsJobPrintOpen] = useState(false);
+  const [jobPrintOrder, setJobPrintOrder] = useState<any>(null);
+  const [isReviewDocsOpen, setIsReviewDocsOpen] = useState(false);
+  const [reviewOrder, setReviewOrder] = useState<any>(null);
   const [progressUpdates, setProgressUpdates] = useState<any[]>([]);
   const [loadingProgress, setLoadingProgress] = useState(false);
   const [newProgressMessage, setNewProgressMessage] = useState("");
@@ -1021,41 +1035,123 @@ export default function AssignedOrdersPage() {
     return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
 
+  const getStatusDisplayLabel = (status: string) => {
+    if (!status) return "Assigned";
+    const map: Record<string, string> = {
+      UNDER_INITIAL_CHECK: "Under initial check",
+      PIPELINE: "Pipeline inquiry",
+      BEING_CHECKED: "Being checked",
+      PROSPECT: "Prospect",
+      NEED_MORE_INFO: "Need more info",
+      CHECK_COMPLETED: "Initial check passed",
+      ORDER_ASSIGNED: "Order assigned",
+      IN_PROGRESS: "In progress",
+      REVIEW_DOCS: "Review docs",
+      DOCUMENTS_REVIEWED: "Docs reviewed",
+      PRE_DOC_SENT_FOR_SIGNATURE: "Pre-doc for signature",
+      PRE_DOCS_SENT: "Pre-docs sent",
+      AWAITING_SIGNING_NOTARIZATION: "Awaiting signing",
+      AWAITING_DOCUMENT_RETURN: "Awaiting doc return",
+      AWAITING_THIRD_PARTY_RESPONSE: "Third-party response",
+      FINAL_DOCUMENT_PREPARATION: "Final doc prep",
+      FINAL_DOC_READY: "Final doc ready",
+      WAITING_ON_CLIENT: "Waiting on client",
+      WAITING_FOR_FINAL_PAYMENT: "Waiting final payment",
+      FINAL_PAYMENT_COMPLETED: "Final payment done",
+      SOFT_COPY_DELIVERED: "Soft copy delivered",
+      HARD_COPY_DELIVERED: "Hard copy delivered",
+      ON_HOLD: "On hold",
+      CONFIRMED: "Confirmed",
+      DRAFT: "Draft",
+      PROFORMA_GENERATED: "Proforma generated",
+      INVOICE_GENERATED: "Invoice generated",
+      COMPLETED: "Completed",
+      CANCELLED: "Cancelled",
+    };
+    if (map[status]) return map[status];
+    return status
+      .toLowerCase()
+      .split("_")
+      .map((word, i) => (i === 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word))
+      .join(" ");
+  };
+
   const getOrderStatusColor = (status: string) => {
     switch (status) {
+      case "COMPLETED":
+      case "CHECK_COMPLETED":
+      case "FINAL_DOC_READY":
+      case "FINAL_PAYMENT_COMPLETED":
+        return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25 dark:border-emerald-500/30 orders-badge-success font-medium";
       case "UNDER_INITIAL_CHECK":
       case "PIPELINE":
       case "BEING_CHECKED":
       case "PROSPECT":
-        return "bg-amber-500/10 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 font-bold";
+        return "bg-background dark:bg-[#16191F] text-foreground dark:text-zinc-200 border-zinc-300 dark:border-white/20 orders-badge-neutral font-medium";
+      case "WAITING_ON_CLIENT":
+      case "WAITING_FOR_FINAL_PAYMENT":
+      case "AWAITING_DOCUMENT_RETURN":
+      case "AWAITING_THIRD_PARTY_RESPONSE":
+      case "AWAITING_SIGNING_NOTARIZATION":
+      case "ON_HOLD":
+        return "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/25 dark:border-amber-500/30 orders-badge-warning font-medium";
       case "NEED_MORE_INFO":
-        return "bg-rose-500/10 dark:bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30 font-bold";
+      case "CANCELLED":
+        return "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/25 dark:border-rose-500/30 orders-badge-danger font-medium";
+      case "ORDER_ASSIGNED":
+      case "IN_PROGRESS":
+      case "REVIEW_DOCS":
+      case "DOCUMENTS_REVIEWED":
+      case "FINAL_DOCUMENT_PREPARATION":
+      case "CONFIRMED":
+        return "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/25 dark:border-sky-500/30 orders-badge-info font-medium";
+      case "PRE_DOC_SENT_FOR_SIGNATURE":
+      case "PRE_DOCS_SENT":
+      case "SOFT_COPY_DELIVERED":
+      case "HARD_COPY_DELIVERED":
+        return "bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/25 dark:border-violet-500/30 orders-badge-purple font-medium";
+      case "DRAFT":
+      case "PROFORMA_GENERATED":
+      case "INVOICE_GENERATED":
+        return "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-500/25 dark:border-zinc-500/30 orders-badge-neutral font-medium";
+      default:
+        return "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/25 dark:border-sky-500/30 orders-badge-info font-medium";
+    }
+  };
+
+  const getOrderStatusTriggerStyles = (_status?: string) => {
+    return "bg-background dark:bg-[#16191F] text-foreground dark:text-zinc-200 border-zinc-300 dark:border-white/20 hover:border-zinc-400 dark:hover:border-white/35 hover:bg-muted/30 dark:hover:bg-white/5";
+  };
+
+  const getOrderStatusDot = (status: string) => {
+    switch (status) {
+      case "COMPLETED":
       case "CHECK_COMPLETED":
-        return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 font-bold";
-      case "COMPLETED": return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold";
-      case "CONFIRMED": return "bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20 font-bold";
-      case "DRAFT": return "bg-zinc-500/10 dark:bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border-zinc-500/20 font-bold";
-      case "CANCELLED": return "bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/20 font-bold";
-      case "PROFORMA_GENERATED": return "bg-cyan-500/10 dark:bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/20 font-bold";
-      case "WAITING_ON_CLIENT": return "bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20 font-bold";
-      case "ORDER_ASSIGNED": return "bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 font-bold";
-      case "IN_PROGRESS": return "bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/20 font-bold";
-      case "ON_HOLD": return "bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 font-bold";
-      case "REVIEW_DOCS": return "bg-teal-500/10 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400 border-teal-500/20 font-bold";
-      case "DOCUMENTS_REVIEWED": return "bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 font-bold";
-      case "PRE_DOC_SENT_FOR_SIGNATURE": return "bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20 font-bold";
-      case "PRE_DOCS_SENT": return "bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20 font-bold";
-      case "AWAITING_SIGNING_NOTARIZATION": return "bg-violet-500/10 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/20 font-bold";
-      case "AWAITING_DOCUMENT_RETURN": return "bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20 font-bold";
-      case "AWAITING_THIRD_PARTY_RESPONSE": return "bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20 font-bold";
-      case "FINAL_DOCUMENT_PREPARATION": return "bg-orange-500/10 dark:bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/20 font-bold";
-      case "FINAL_DOC_READY": return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold";
-      case "INVOICE_GENERATED": return "bg-pink-500/10 dark:bg-pink-500/15 text-pink-600 dark:text-pink-400 border-pink-500/20 font-bold";
-      case "WAITING_FOR_FINAL_PAYMENT": return "bg-pink-500/10 dark:bg-pink-500/15 text-pink-600 dark:text-pink-400 border-pink-500/20 font-bold";
-      case "FINAL_PAYMENT_COMPLETED": return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold";
-      case "SOFT_COPY_DELIVERED": return "bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/20 font-bold";
-      case "HARD_COPY_DELIVERED": return "bg-violet-500/10 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/20 font-bold";
-      default: return "bg-primary/10 text-primary border-primary/20 font-bold";
+      case "FINAL_DOC_READY":
+      case "FINAL_PAYMENT_COMPLETED":
+        return "bg-emerald-500 dark:bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.5)]";
+      case "UNDER_INITIAL_CHECK":
+      case "PIPELINE":
+      case "BEING_CHECKED":
+      case "PROSPECT":
+        return "bg-zinc-400 dark:bg-zinc-400 shadow-[0_0_6px_rgba(161,161,170,0.5)]";
+      case "WAITING_ON_CLIENT":
+      case "WAITING_FOR_FINAL_PAYMENT":
+      case "AWAITING_DOCUMENT_RETURN":
+      case "AWAITING_THIRD_PARTY_RESPONSE":
+      case "AWAITING_SIGNING_NOTARIZATION":
+      case "ON_HOLD":
+        return "bg-amber-500 dark:bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.5)]";
+      case "NEED_MORE_INFO":
+      case "CANCELLED":
+        return "bg-rose-500 dark:bg-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.5)]";
+      case "PRE_DOC_SENT_FOR_SIGNATURE":
+      case "PRE_DOCS_SENT":
+      case "SOFT_COPY_DELIVERED":
+      case "HARD_COPY_DELIVERED":
+        return "bg-violet-500 dark:bg-violet-400 shadow-[0_0_6px_rgba(139,92,246,0.5)]";
+      default:
+        return "bg-sky-500 dark:bg-sky-400 shadow-[0_0_6px_rgba(14,165,233,0.5)]";
     }
   };
 
@@ -1068,15 +1164,15 @@ export default function AssignedOrdersPage() {
 
     const prefix = isGov ? "Govt Body" : isOther ? "Vendor" : "Notary";
     const baseColor = isGov
-      ? "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/25"
+      ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20 orders-badge-info"
       : isOther
-        ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25"
-        : "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/25";
+        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 orders-badge-teal"
+        : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 orders-badge-indigo";
 
     return (
       <Badge
         variant="outline"
-        className={`text-[9.5px] font-bold py-0.5 px-2 ${baseColor} shrink-0 inline-flex items-center gap-1 shadow-2xs`}
+        className={`text-[9.5px] font-medium py-0.5 px-2 ${baseColor} shrink-0 inline-flex items-center gap-1 shadow-none`}
         title={`Assigned ${prefix}: ${notary.name}`}
       >
         <Scale className="h-2.5 w-2.5 shrink-0" />
@@ -1165,7 +1261,7 @@ export default function AssignedOrdersPage() {
 
   return (
     <>
-      <div className="space-y-6 animate-in fade-in duration-500 w-full max-w-none pb-12">
+      <div className="space-y-6 animate-in fade-in duration-500 w-full max-w-none pb-12 orders-page-shell">
 
         {/* 📁 WORKSPACE FOLDERS OVERVIEW (ABOVE SEARCH) */}
         <div className="space-y-4">
@@ -1590,12 +1686,12 @@ export default function AssignedOrdersPage() {
         </div>
 
         {/* Orders List Card with Folder Breadcrumbs & Search Toolbar */}
-        <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
-          <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl orders-table-card">
+          <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between orders-table-toolbar">
 
             {/* Active Folder Directory Breadcrumb */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground w-full sm:w-auto">
-              <div className="flex items-center gap-2 font-semibold text-foreground bg-card/90 dark:bg-zinc-900/90 px-3 py-1.5 rounded-xl border border-border/60 shadow-2xs">
+              <div className="flex items-center gap-2 font-semibold text-foreground bg-card/90 dark:bg-zinc-900/90 px-3 py-1.5 rounded-xl border border-border/60 shadow-2xs orders-table-card">
                 {activeTab === "ALL" && (
                   <>
                     <FolderKanban className="h-4 w-4 text-blue-500 shrink-0" />
@@ -1640,7 +1736,7 @@ export default function AssignedOrdersPage() {
                 )}
               </div>
               <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
-              <span className="text-[11px] font-mono text-muted-foreground font-medium">
+              <span className="text-xs font-normal text-muted-foreground orders-text-secondary">
                 {filteredOrders.length} {filteredOrders.length === 1 ? "order" : "orders"} listed
               </span>
             </div>
@@ -1651,7 +1747,7 @@ export default function AssignedOrdersPage() {
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder={`Search inside ${activeTab === "ALL" ? "all orders" : activeTab === "INQUIRY" ? "inquiry orders" : activeTab === "ASSIGNED" ? "assigned orders" : activeTab === "IN_PROGRESS" ? "in-progress orders" : activeTab === "REVIEW_ORDER" ? "review orders" : activeTab === "ON_HOLD" ? "on-hold orders" : "completed orders"}...`}
-                  className="pl-8 h-9 text-xs rounded-lg bg-background/80"
+                  className="pl-8 h-9 text-xs rounded-lg orders-control"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -1700,17 +1796,16 @@ export default function AssignedOrdersPage() {
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                        <th className="p-4 w-10 text-center">No.</th>
-                        <th className="p-4 w-28 whitespace-nowrap">Order ID</th>
-                        <th className="p-4 min-w-[170px]">Client & Company</th>
-                        <th className="p-4 min-w-[260px] lg:min-w-[320px]">Service Scope</th>
-                        <th className="p-4 w-48 min-w-[160px]">Team & Notary</th>
-                        <th className="p-4 w-32 whitespace-nowrap">Created Date</th>
-                        <th className="p-4 w-40 text-center whitespace-nowrap">Execution Stage</th>
-                        <th className="p-4 w-28 text-right whitespace-nowrap">Actions</th>
+                        <th className="py-2.5 px-2 w-8 min-w-[30px] max-w-[36px] text-center orders-th">No.</th>
+                        <th className="py-2.5 px-2 w-28 min-w-[100px] max-w-[125px] whitespace-nowrap orders-th">Order ID</th>
+                        <th className="py-2.5 px-2 min-w-[130px] max-w-[170px] orders-th">Client & Company</th>
+                        <th className="py-2.5 px-2.5 min-w-[180px] orders-th">Service Scope</th>
+                        <th className="py-2.5 px-2 w-36 min-w-[120px] max-w-[145px] orders-th">Team & Notary</th>
+                        <th className="py-2.5 px-2 w-60 min-w-[220px] max-w-[260px] text-center whitespace-nowrap orders-th">Execution Stage</th>
+                        <th className="py-2.5 px-2 w-20 min-w-[75px] max-w-[85px] text-right whitespace-nowrap orders-th orders-col-actions">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y">
+                    <tbody className="divide-y divide-border/30">
                       {paginatedOrders.map((ord, idx) => {
                         const isHighlighted = highlightedOrderNum === ord.order_number;
                         return (
@@ -1723,23 +1818,30 @@ export default function AssignedOrdersPage() {
                                 sessionStorage.setItem("assigned_orders_highlighted_order", ord.order_number);
                               }
                             }}
-                            className={`transition-colors duration-200 border-b last:border-0 ${isHighlighted
-                                ? "bg-blue-500/15 dark:bg-blue-500/25 border-y-2 border-blue-500"
-                                : "hover:bg-muted/30 cursor-pointer"
-                              }`}
-                          >
-                            <td className={`p-4 text-center font-mono align-top pt-5 transition-colors ${
+                            className={cn(
+                              "transition-colors duration-150 cursor-pointer orders-row",
                               isHighlighted
-                                ? "border-l-4 border-l-blue-500 font-bold text-blue-950 dark:text-blue-100"
+                                ? "is-highlighted bg-emerald-500/10 dark:bg-emerald-950/40"
+                                : "hover:bg-muted/40 dark:hover:bg-zinc-800/30"
+                            )}
+                          >
+                            <td className={cn(
+                              "py-2 px-1.5 text-center font-mono align-top pt-2.5 transition-colors text-xs orders-text-secondary w-8 min-w-[30px] max-w-[36px]",
+                              isHighlighted
+                                ? "border-l-4 border-l-emerald-500 border-y-2 border-emerald-500 font-bold text-emerald-900 dark:text-emerald-200 shadow-[inset_4px_0_0_0_#10b981,inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
                                 : "font-medium text-muted-foreground"
-                            }`}>
+                            )}>
                               #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + idx))}
                             </td>
-                            <td className="p-4 align-top pt-5">
+                            <td className={cn(
+                              "py-2 px-2 align-top pt-2.5 whitespace-nowrap w-28 min-w-[100px] max-w-[125px]",
+                              isHighlighted && "border-y-2 border-emerald-500 shadow-[inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
+                            )}>
                               {ord.company_id ? (
                                 <Link
                                   href={`/business/clients/documents/${ord.company_id}?order=${ord.order_number}&from=assigned-orders&tab=${activeTab}`}
-                                  onClick={() => {
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     setHighlightedOrderNum(ord.order_number);
                                     if (typeof window !== "undefined") {
                                       sessionStorage.setItem("assigned_orders_highlighted_order", ord.order_number);
@@ -1748,83 +1850,93 @@ export default function AssignedOrdersPage() {
                                 >
                                   <Badge
                                     variant="outline"
-                                    className="font-mono font-bold text-xs bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary cursor-pointer transition-colors"
+                                    className="font-mono font-medium text-xs orders-badge-neutral cursor-pointer transition-colors px-1.5 py-0.5 rounded"
                                     title="Navigate to Company Documents Folder for this Order"
                                   >
                                     {ord.order_number}
                                   </Badge>
                                 </Link>
                               ) : (
-                                <Badge variant="outline" className="font-mono font-bold text-xs bg-primary/10 border-primary/30 text-primary">
+                                <Badge variant="outline" className="font-mono font-medium text-xs orders-badge-neutral px-1.5 py-0.5 rounded">
                                   {ord.order_number}
                                 </Badge>
                               )}
+                              <div className="text-[11px] font-mono text-muted-foreground orders-text-secondary mt-1 flex items-center gap-1">
+                                <Clock className="h-3 w-3 shrink-0 opacity-70" />
+                                <span>{formatDate(ord.created_at)}</span>
+                              </div>
                             </td>
-                            <td className="p-4 text-muted-foreground space-y-1 align-top pt-5">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-foreground font-semibold text-sm">{ord.company_name || "Personal Client"}</span>
+                            <td className={cn(
+                              "py-2 px-2 text-muted-foreground space-y-0.5 align-top pt-2.5 min-w-[120px] max-w-[160px]",
+                              isHighlighted && "border-y-2 border-emerald-500 shadow-[inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
+                            )}>
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <span className="text-foreground orders-text-primary font-semibold text-xs leading-snug break-words">{ord.company_name || "Personal Client"}</span>
                                 {(() => {
                                   const vStatus = ord.company?.validation_status;
                                   if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
                                     return (
-                                      <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 flex items-center gap-0.5" title="Company pending admin validation">
-                                        <Clock className="h-2.5 w-2.5" /> Pending Company
+                                      <Badge variant="outline" className="text-[8.5px] font-medium px-1 py-0 orders-badge-warning flex items-center gap-0.5" title="Company pending admin validation">
+                                        <Clock className="h-2 w-2" /> Pending
                                       </Badge>
                                     );
                                   }
                                   if (vStatus === "NEEDS_REVISION") {
                                     return (
-                                      <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 flex items-center gap-0.5" title="Company needs revision">
-                                        <AlertCircle className="h-2.5 w-2.5" /> Revision Required
+                                      <Badge variant="outline" className="text-[8.5px] font-medium px-1 py-0 orders-badge-danger flex items-center gap-0.5" title="Company needs revision">
+                                        <AlertCircle className="h-2 w-2" /> Revision
                                       </Badge>
                                     );
                                   }
                                   return null;
                                 })()}
                               </div>
-                              <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
-                                <Building className="h-3.5 w-3.5 shrink-0" />
-                                <span>{ord.client_name || "Representative"}</span>
+                              <div className="text-[11px] text-muted-foreground orders-text-secondary flex items-center gap-1 mt-0.5 truncate">
+                                <Building className="h-3 w-3 shrink-0" />
+                                <span className="truncate">{ord.client_name || "Representative"}</span>
                               </div>
                             </td>
-                            <td className="p-4 text-muted-foreground align-top">
+                            <td className={cn(
+                              "py-2 px-2.5 text-muted-foreground align-top pt-2.5 min-w-[180px]",
+                              isHighlighted && "border-y-2 border-emerald-500 shadow-[inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
+                            )}>
                               {ord.items && ord.items.length > 0 ? (
-                                <div className="space-y-2.5 max-w-md my-1">
+                                <div className="space-y-1.5 w-full my-0.5">
                                   {ord.items.map((item: any, idx: number) => {
                                     const itemKey = `${ord.order_number}-${idx}`;
                                     const isExpanded = !!expandedItems[itemKey];
                                     return (
                                       <div
                                         key={idx}
-                                        className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-950/20 shadow-none space-y-1.5 transition-all duration-200"
+                                        className="p-1.5 rounded-md orders-service-card space-y-1 transition-all duration-200"
                                       >
-                                        <div className="flex flex-wrap items-center gap-1.5">
-                                          <span className="font-bold text-foreground text-xs leading-normal break-words">
+                                        <div className="flex flex-wrap items-center gap-1">
+                                          <span className="font-medium text-foreground orders-text-primary text-xs leading-tight break-words">
                                             {item.job_title}
                                           </span>
                                           {item.job_id && (
-                                            <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                            <Badge variant="outline" className="text-[8.5px] font-mono py-0 px-1 orders-badge-info shrink-0">
                                               {item.job_id}
                                             </Badge>
                                           )}
                                           {item.pricing_tier && (
-                                            <Badge variant="secondary" className="text-[9px] py-0 px-1.5 font-medium capitalize shrink-0">
+                                            <Badge variant="secondary" className="text-[8.5px] py-0 px-1 font-medium orders-badge-neutral capitalize shrink-0">
                                               {item.pricing_tier.toLowerCase().replace('_', ' ')}
                                             </Badge>
                                           )}
                                           {renderVendorBadge(item)}
                                         </div>
                                         {item.description && (
-                                          <div className="space-y-1">
+                                          <div className="space-y-0.5">
                                             {isExpanded && (
-                                              <div className="text-[10px] text-muted-foreground leading-relaxed whitespace-pre-wrap transition-all duration-200 mt-1 border-l-2 border-zinc-300 dark:border-zinc-700 pl-2 py-0.5">
+                                              <div className="text-[10px] text-muted-foreground orders-text-secondary leading-relaxed whitespace-pre-wrap transition-all duration-200 mt-0.5 border-l-2 border-border pl-1.5 py-0.5">
                                                 {item.description}
                                               </div>
                                             )}
                                             <button
                                               type="button"
                                               onClick={() => toggleItemExpansion(itemKey)}
-                                              className="text-[9.5px] text-primary hover:text-primary/80 font-bold hover:underline block"
+                                              className="text-[9px] text-primary hover:text-primary/80 font-semibold hover:underline block"
                                             >
                                               {isExpanded ? "Hide details" : "Show details"}
                                             </button>
@@ -1832,12 +1944,12 @@ export default function AssignedOrdersPage() {
                                         )}
 
                                         {item.service_instructions && (
-                                          <div className="mt-1.5 p-2 rounded-md bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-0.5">
-                                            <div className="flex items-center gap-1.5 font-bold text-[10px] text-amber-700 dark:text-amber-400">
-                                              <FileText className="h-3 w-3 shrink-0" />
-                                              <span>Service Instructions:</span>
+                                          <div className="mt-1 p-1.5 rounded bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-0.5">
+                                            <div className="flex items-center gap-1 font-semibold text-[9.5px] text-amber-700 dark:text-amber-400">
+                                              <FileText className="h-2.5 w-2.5 shrink-0" />
+                                              <span>Instructions:</span>
                                             </div>
-                                            <p className="text-[11px] font-medium leading-relaxed whitespace-pre-wrap text-foreground/90">
+                                            <p className="text-[10px] font-medium leading-relaxed whitespace-pre-wrap text-foreground/90">
                                               {item.service_instructions}
                                             </p>
                                           </div>
@@ -1850,22 +1962,25 @@ export default function AssignedOrdersPage() {
                                 <span className="text-muted-foreground italic text-xs">-</span>
                               )}
                             </td>
-                            <td className="p-4 align-top pt-5 w-48 min-w-[160px]">
-                              <div className="flex flex-col items-start gap-1.5 w-full">
+                            <td className={cn(
+                              "py-2 px-2 align-top pt-2.5 w-36 min-w-[120px] max-w-[145px]",
+                              isHighlighted && "border-y-2 border-emerald-500 shadow-[inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
+                            )}>
+                              <div className="flex flex-col items-start gap-1 w-full">
                                 {ord.consultants && ord.consultants.length > 0 ? (
                                   ord.consultants.map((c: any) => (
                                     <Badge
                                       key={c.id}
                                       variant="outline"
-                                      className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-semibold flex items-center gap-1.5 py-0.5 px-2 max-w-full truncate shadow-none"
+                                      className="text-[9px] orders-badge-neutral font-medium flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none"
                                       title={`Assigned Consultant: ${c.name}`}
                                     >
-                                      <UserCheck className="h-3 w-3 text-emerald-600 shrink-0" />
+                                      <UserCheck className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
                                       <span className="truncate">{c.name}</span>
                                     </Badge>
                                   ))
                                 ) : (
-                                  <span className="text-muted-foreground italic text-[11px]">Unassigned</span>
+                                  <span className="text-muted-foreground italic text-[10px]">Unassigned</span>
                                 )}
                                 {(() => {
                                   const revs = ord.reviewers && ord.reviewers.length > 0 ? ord.reviewers : (ord.reviewer ? [ord.reviewer] : []);
@@ -1873,10 +1988,10 @@ export default function AssignedOrdersPage() {
                                     <Badge
                                       key={r.id}
                                       variant="outline"
-                                      className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/25 font-semibold flex items-center gap-1.5 py-0.5 px-2 max-w-full truncate shadow-none"
+                                      className="text-[9px] orders-badge-purple font-medium flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none"
                                       title={`Designated Reviewer: ${r.name}`}
                                     >
-                                      <ShieldCheck className="h-3 w-3 text-purple-600 dark:text-purple-400 shrink-0" />
+                                      <ShieldCheck className="h-2.5 w-2.5 text-purple-600 dark:text-purple-400 shrink-0" />
                                       <span className="truncate">Rev: {r.name}</span>
                                     </Badge>
                                   ));
@@ -1886,82 +2001,137 @@ export default function AssignedOrdersPage() {
                                     <Badge
                                       key={notary.id}
                                       variant="outline"
-                                      className="text-[10px] bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/25 font-semibold flex items-center gap-1.5 py-0.5 px-2 max-w-full truncate shadow-none"
+                                      className="text-[9px] orders-badge-indigo font-medium flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none"
                                       title={`Assigned Notary: ${notary.name}`}
                                     >
-                                      <Scale className="h-3 w-3 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                      <Scale className="h-2.5 w-2.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
                                       <span className="truncate">Notary: {notary.name}</span>
                                     </Badge>
                                   ))
                                 )}
                               </div>
                             </td>
-                            <td className="p-4 font-mono font-medium text-muted-foreground align-top pt-5">
-                              {formatDate(ord.created_at)}
-                            </td>
-                            <td className="p-4 text-center align-top pt-5">
+                            <td className={cn(
+                              "py-2 px-2 text-center align-top pt-2.5 w-60 min-w-[220px] max-w-[260px]",
+                              isHighlighted && "border-y-2 border-emerald-500 shadow-[inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
+                            )}>
                               {checkIsEnquiry(ord) ? (
-                                <select
-                                  value={["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED"].includes((ord.status || "").toUpperCase()) ? ord.status.toUpperCase() : "UNDER_INITIAL_CHECK"}
-                                  disabled={savingStatus}
-                                  onChange={(e) => handleUpdateStatus(ord, e.target.value)}
-                                  className={`h-8 px-2.5 py-1 text-xs font-bold rounded-md border shadow-xs bg-background transition-colors cursor-pointer ${
-                                    ord.status === "CHECK_COMPLETED"
-                                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-                                      : ord.status === "NEED_MORE_INFO"
-                                      ? "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30"
-                                      : "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
-                                  }`}
-                                >
-                                  <option value="UNDER_INITIAL_CHECK">UNDER INITIAL CHECK</option>
-                                  <option value="NEED_MORE_INFO">NEED MORE INFO</option>
-                                  <option value="CHECK_COMPLETED">INITIAL CHECK PASSED</option>
-                                </select>
+                                <div onClick={(e) => e.stopPropagation()} className="w-full">
+                                  <Select
+                                    value={["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED"].includes((ord.status || "").toUpperCase()) ? ord.status.toUpperCase() : "UNDER_INITIAL_CHECK"}
+                                    disabled={savingStatus}
+                                    onValueChange={(val) => handleUpdateStatus(ord, val)}
+                                  >
+                                    <SelectTrigger className={cn("h-8 w-full text-xs font-semibold rounded-md shadow-xs transition-colors cursor-pointer justify-between", getOrderStatusTriggerStyles(ord.status))}>
+                                      <div className="flex items-center gap-1.5 truncate">
+                                        <span className={cn("h-2 w-2 rounded-full shrink-0", getOrderStatusDot(ord.status))} />
+                                        <span className="truncate">{getStatusDisplayLabel(ord.status)}</span>
+                                      </div>
+                                    </SelectTrigger>
+                                    <SelectContent align="center" className="min-w-[220px] bg-card dark:bg-[#16191F] border border-zinc-300 dark:border-white/20 shadow-xl z-50">
+                                      <SelectItem value="UNDER_INITIAL_CHECK" className="text-xs cursor-pointer">
+                                        <span className="flex items-center gap-2">
+                                          <span className="h-2 w-2 rounded-full bg-zinc-400 shrink-0" />
+                                          Under Initial Check
+                                        </span>
+                                      </SelectItem>
+                                      <SelectItem value="NEED_MORE_INFO" className="text-xs cursor-pointer">
+                                        <span className="flex items-center gap-2">
+                                          <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
+                                          Need More Info
+                                        </span>
+                                      </SelectItem>
+                                      <SelectItem value="CHECK_COMPLETED" className="text-xs cursor-pointer">
+                                        <span className="flex items-center gap-2">
+                                          <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                                          Initial Check Passed
+                                        </span>
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
                               ) : CONSULTANT_EDITABLE_STATUSES.includes((ord.status || "").toUpperCase()) ? (
-                                <select
-                                  value={ord.status}
-                                  disabled={savingStatus}
-                                  onChange={(e) => handleUpdateStatus(ord, e.target.value)}
-                                  className={`h-8 px-2.5 py-1 text-xs font-bold rounded-md border shadow-xs bg-background transition-colors cursor-pointer ${getOrderStatusColor(ord.status)}`}
-                                >
-                                  <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
-                                  <option value="IN_PROGRESS">IN PROGRESS</option>
-                                  <option value="REVIEW_DOCS">REVIEW DOCS</option>
-                                  <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
-                                  <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
-                                  <option value="AWAITING_SIGNING_NOTARIZATION">AWAITING SIGNING / NOTARIZATION</option>
-                                  <option value="AWAITING_DOCUMENT_RETURN">AWAITING DOCUMENT RETURN FROM CLIENT</option>
-                                  <option value="AWAITING_THIRD_PARTY_RESPONSE">AWAITING THIRD-PARTY RESPONSE (VENDOR)</option>
-                                  <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
-                                  <option value="FINAL_DOC_READY">FINAL DOC READY</option>
-                                  <option value="ON_HOLD">ON HOLD</option>
-                                </select>
+                                <div onClick={(e) => e.stopPropagation()} className="w-full">
+                                  <Select
+                                    value={ord.status}
+                                    disabled={savingStatus}
+                                    onValueChange={(val) => handleUpdateStatus(ord, val)}
+                                  >
+                                    <SelectTrigger className={cn("h-8 w-full text-xs font-semibold rounded-md shadow-xs transition-colors cursor-pointer justify-between", getOrderStatusTriggerStyles(ord.status))}>
+                                      <div className="flex items-center gap-1.5 truncate">
+                                        <span className={cn("h-2 w-2 rounded-full shrink-0", getOrderStatusDot(ord.status))} />
+                                        <span className="truncate">{getStatusDisplayLabel(ord.status)}</span>
+                                      </div>
+                                    </SelectTrigger>
+                                    <SelectContent align="center" className="min-w-[230px] max-h-64 bg-card dark:bg-[#16191F] border border-zinc-300 dark:border-white/20 shadow-xl z-50">
+                                      <SelectItem value="ORDER_ASSIGNED" className="text-xs cursor-pointer">
+                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Order Assigned</span>
+                                      </SelectItem>
+                                      <SelectItem value="IN_PROGRESS" className="text-xs cursor-pointer">
+                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />In Progress</span>
+                                      </SelectItem>
+                                      <SelectItem value="REVIEW_DOCS" className="text-xs cursor-pointer">
+                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Review Docs</span>
+                                      </SelectItem>
+                                      <SelectItem value="DOCUMENTS_REVIEWED" className="text-xs cursor-pointer">
+                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Documents Reviewed</span>
+                                      </SelectItem>
+                                      <SelectItem value="PRE_DOC_SENT_FOR_SIGNATURE" className="text-xs cursor-pointer">
+                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />Pre Doc Sent for Signature</span>
+                                      </SelectItem>
+                                      <SelectItem value="AWAITING_SIGNING_NOTARIZATION" className="text-xs cursor-pointer">
+                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Signing / Notarization</span>
+                                      </SelectItem>
+                                      <SelectItem value="AWAITING_DOCUMENT_RETURN" className="text-xs cursor-pointer">
+                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Document Return</span>
+                                      </SelectItem>
+                                      <SelectItem value="AWAITING_THIRD_PARTY_RESPONSE" className="text-xs cursor-pointer">
+                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Third-Party Response</span>
+                                      </SelectItem>
+                                      <SelectItem value="FINAL_DOCUMENT_PREPARATION" className="text-xs cursor-pointer">
+                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Final Document Preparation</span>
+                                      </SelectItem>
+                                      <SelectItem value="FINAL_DOC_READY" className="text-xs cursor-pointer">
+                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />Final Doc Ready</span>
+                                      </SelectItem>
+                                      <SelectItem value="ON_HOLD" className="text-xs cursor-pointer">
+                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />On Hold</span>
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
                               ) : ord.status === "COMPLETED" ? (
-                                <Badge variant="outline" className="text-xs font-bold py-1 px-2.5 uppercase shadow-xs whitespace-nowrap bg-emerald-500/15 text-emerald-600 border-emerald-500/30 flex items-center justify-center gap-1 mx-auto">
-                                  <Lock className="h-3 w-3 text-emerald-600 shrink-0" />
-                                  COMPLETED
+                                <Badge variant="outline" className={cn("text-xs font-semibold py-1 px-2.5 whitespace-nowrap inline-flex items-center justify-center gap-1.5 mx-auto rounded font-sans", getOrderStatusTriggerStyles(ord.status))}>
+                                  <Lock className="h-3 w-3 shrink-0" />
+                                  Completed
                                 </Badge>
                               ) : (
-                                <Badge variant="outline" className={`text-xs font-bold py-1 px-2.5 uppercase shadow-xs whitespace-nowrap ${getOrderStatusColor(ord.status)}`}>
-                                  {(ord.status || "").replace(/_/g, " ")}
+                                <Badge variant="outline" className={cn("text-xs font-semibold py-1 px-2.5 whitespace-nowrap inline-flex items-center justify-center gap-1.5 mx-auto rounded font-sans", getOrderStatusTriggerStyles(ord.status))}>
+                                  <span className={cn("h-2 w-2 rounded-full shrink-0", getOrderStatusDot(ord.status))} />
+                                  {getStatusDisplayLabel(ord.status)}
                                 </Badge>
                               )}
                             </td>
-                            <td className={`p-4 text-right align-top pt-5 transition-colors ${
-                              isHighlighted ? "border-r-2 border-r-blue-500" : ""
-                            }`}>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="gap-1.5 font-bold border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30 shadow-sm"
-                                onClick={() => {
-                                  setSelectedGroup(ord);
-                                  setIsChatOpen(true);
-                                  fetchProgressUpdates(ord.order_number);
-                                }}
-                              >
-                                <MessageSquare className="h-3.5 w-3.5" /> Chat
-                              </Button>
+                            <td className={cn(
+                              "py-2 px-2 text-right align-top pt-2.5 whitespace-nowrap orders-col-actions w-20 min-w-[75px] max-w-[85px]",
+                              isHighlighted && "border-r-2 border-r-emerald-500 border-y-2 border-emerald-500 shadow-[inset_-2px_0_0_0_#10b981,inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
+                            )}>
+                              <div className="flex items-center justify-end">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-6 px-1.5 text-[9.5px] font-semibold gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/40 shadow-none inline-flex items-center rounded"
+                                  title="Order Chat"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedGroup(ord);
+                                    setIsChatOpen(true);
+                                    fetchProgressUpdates(ord.order_number);
+                                  }}
+                                >
+                                  <MessageSquare className="h-3 w-3" /> Chat
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1988,16 +2158,16 @@ export default function AssignedOrdersPage() {
                           }
                         }}
                         className={cn(
-                          "p-4 transition-all duration-200 space-y-3 cursor-pointer",
+                          "p-4 transition-all duration-200 space-y-3 cursor-pointer orders-row",
                           isHighlighted
-                            ? "bg-blue-500/10 dark:bg-blue-500/15 border-l-4 border-l-blue-500"
+                            ? "is-highlighted bg-emerald-500/10 dark:bg-emerald-500/15 border-l-4 border-l-emerald-500 border-y border-r border-emerald-500/40 shadow-sm"
                             : "hover:bg-muted/30"
                         )}
                       >
                         {/* Top Header: Index, Order ID, Date */}
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs font-semibold text-muted-foreground">
+                            <span className="font-mono text-xs font-medium text-muted-foreground orders-text-secondary">
                               #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + idx))}
                             </span>
                             {ord.company_id ? (
@@ -2013,18 +2183,18 @@ export default function AssignedOrdersPage() {
                               >
                                 <Badge
                                   variant="outline"
-                                  className="font-mono font-bold text-xs bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary cursor-pointer transition-colors"
+                                  className="font-mono font-medium text-xs orders-badge-neutral cursor-pointer transition-colors px-2 py-0.5 rounded"
                                 >
                                   {ord.order_number}
                                 </Badge>
                               </Link>
                             ) : (
-                              <Badge variant="outline" className="font-mono font-bold text-xs bg-primary/10 border-primary/30 text-primary">
+                              <Badge variant="outline" className="font-mono font-medium text-xs orders-badge-neutral px-2 py-0.5 rounded">
                                 {ord.order_number}
                               </Badge>
                             )}
                           </div>
-                          <span className="text-[11px] font-mono text-muted-foreground flex items-center gap-1">
+                          <span className="text-xs font-mono text-muted-foreground orders-text-secondary flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             {formatDate(ord.created_at)}
                           </span>
@@ -2033,19 +2203,19 @@ export default function AssignedOrdersPage() {
                         {/* Client & Company */}
                         <div className="space-y-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-foreground font-bold text-sm">{ord.company_name || "Personal Client"}</span>
+                            <span className="text-foreground orders-text-primary font-semibold text-sm">{ord.company_name || "Personal Client"}</span>
                             {(() => {
                               const vStatus = ord.company?.validation_status;
                               if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
                                 return (
-                                  <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 flex items-center gap-0.5">
+                                  <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0 orders-badge-warning flex items-center gap-0.5">
                                     <Clock className="h-2.5 w-2.5" /> Pending Company
                                   </Badge>
                                 );
                               }
                               if (vStatus === "NEEDS_REVISION") {
                                 return (
-                                  <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 flex items-center gap-0.5">
+                                  <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0 orders-badge-danger flex items-center gap-0.5">
                                     <AlertCircle className="h-2.5 w-2.5" /> Revision Required
                                   </Badge>
                                 );
@@ -2053,7 +2223,7 @@ export default function AssignedOrdersPage() {
                               return null;
                             })()}
                           </div>
-                          <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                          <div className="text-xs text-muted-foreground orders-text-secondary flex items-center gap-1.5">
                             <Building className="h-3.5 w-3.5 shrink-0" />
                             <span>{ord.client_name || "Representative"}</span>
                           </div>
@@ -2061,8 +2231,8 @@ export default function AssignedOrdersPage() {
 
                         {/* Deliverables / Scope */}
                         {ord.items && ord.items.length > 0 && (
-                          <div className="space-y-2 bg-muted/20 rounded-xl p-2.5 border border-border/50">
-                            <div className="text-[11px] font-semibold text-muted-foreground flex items-center justify-between">
+                          <div className="space-y-2 orders-service-card rounded-xl p-2.5">
+                            <div className="text-xs font-medium text-muted-foreground orders-text-secondary flex items-center justify-between">
                               <span>Deliverables ({ord.items.length})</span>
                               <button
                                 type="button"
@@ -2071,7 +2241,7 @@ export default function AssignedOrdersPage() {
                                   setSelectedGroup(ord);
                                   setIsViewOpen(true);
                                 }}
-                                className="text-primary hover:underline text-[11px] font-bold"
+                                className="text-primary hover:underline text-[11px] font-semibold"
                               >
                                 View Scope
                               </button>
@@ -2082,9 +2252,9 @@ export default function AssignedOrdersPage() {
                               return (
                                 <div key={iIdx} className="text-xs space-y-1">
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-medium text-foreground">{item.job_title}</span>
+                                    <span className="font-medium text-foreground orders-text-primary">{item.job_title}</span>
                                     {item.job_id && (
-                                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 bg-primary/5 text-primary border-primary/20">
+                                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 orders-badge-info">
                                         {item.job_id}
                                       </Badge>
                                     )}
@@ -2093,7 +2263,7 @@ export default function AssignedOrdersPage() {
                                   {item.description && (
                                     <div>
                                       {isExpanded && (
-                                        <p className="text-[11px] text-muted-foreground leading-relaxed whitespace-pre-wrap pl-2 border-l-2 border-border my-1">
+                                        <p className="text-[11px] text-muted-foreground orders-text-secondary leading-relaxed whitespace-pre-wrap pl-2 border-l-2 border-border my-1">
                                           {item.description}
                                         </p>
                                       )}
@@ -2122,14 +2292,14 @@ export default function AssignedOrdersPage() {
                               <Badge
                                 key={c.id}
                                 variant="outline"
-                                className="text-[10px] bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/25 font-semibold flex items-center gap-1 py-0.5 px-2"
+                                className="text-[10px] orders-badge-neutral font-medium flex items-center gap-1 py-0.5 px-2"
                               >
-                                <UserCheck className="h-3 w-3 text-blue-600 shrink-0" />
-                                <span className="truncate">{c.first_name} {c.last_name}</span>
+                                <UserCheck className="h-3 w-3 text-emerald-600 shrink-0" />
+                                <span className="truncate">{c.first_name || c.name} {c.last_name || ""}</span>
                               </Badge>
                             ))
                           ) : (
-                            <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/25 font-semibold py-0.5 px-2">
+                            <Badge variant="outline" className="text-[10px] orders-badge-neutral font-medium py-0.5 px-2">
                               Unassigned
                             </Badge>
                           )}
@@ -2144,7 +2314,7 @@ export default function AssignedOrdersPage() {
                               <Badge
                                 key={r.id || r.name}
                                 variant="outline"
-                                className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/25 font-semibold flex items-center gap-1 py-0.5 px-2"
+                                className="text-[10px] orders-badge-purple font-medium flex items-center gap-1 py-0.5 px-2"
                               >
                                 <ShieldCheck className="h-3 w-3 text-purple-600 shrink-0" />
                                 <span className="truncate">Rev: {r.name}</span>
@@ -2157,7 +2327,7 @@ export default function AssignedOrdersPage() {
                               <Badge
                                 key={notary.id}
                                 variant="outline"
-                                className="text-[10px] bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/25 font-semibold flex items-center gap-1 py-0.5 px-2"
+                                className="text-[10px] orders-badge-indigo font-medium flex items-center gap-1 py-0.5 px-2"
                                 title={`Assigned Notary: ${notary.name}`}
                               >
                                 <Scale className="h-3 w-3 text-indigo-600 dark:text-indigo-400 shrink-0" />
@@ -2169,68 +2339,151 @@ export default function AssignedOrdersPage() {
 
                         {/* Bottom Actions Row: Status Selector & Chat Button */}
                         <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/50">
-                          <div className="flex-1 max-w-[200px]" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex-1 max-w-[210px]" onClick={(e) => e.stopPropagation()}>
                             {checkIsEnquiry(ord) ? (
-                              <select
+                              <Select
                                 value={["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED"].includes((ord.status || "").toUpperCase()) ? ord.status.toUpperCase() : "UNDER_INITIAL_CHECK"}
                                 disabled={savingStatus}
-                                onChange={(e) => handleUpdateStatus(ord, e.target.value)}
-                                className={`w-full h-9 px-2 text-xs font-bold rounded-lg border shadow-xs bg-background transition-colors cursor-pointer ${
-                                  ord.status === "CHECK_COMPLETED"
-                                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-                                    : ord.status === "NEED_MORE_INFO"
-                                    ? "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30"
-                                    : "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
-                                }`}
+                                onValueChange={(val) => handleUpdateStatus(ord, val)}
                               >
-                                <option value="UNDER_INITIAL_CHECK">UNDER INITIAL CHECK</option>
-                                <option value="NEED_MORE_INFO">NEED MORE INFO</option>
-                                <option value="CHECK_COMPLETED">INITIAL CHECK PASSED</option>
-                              </select>
+                                <SelectTrigger className={cn("h-8 w-full text-xs font-semibold rounded-md shadow-xs transition-colors cursor-pointer justify-between", getOrderStatusTriggerStyles(ord.status))}>
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    <span className={cn("h-2 w-2 rounded-full shrink-0", getOrderStatusDot(ord.status))} />
+                                    <span className="truncate">{getStatusDisplayLabel(ord.status)}</span>
+                                  </div>
+                                </SelectTrigger>
+                                <SelectContent align="start" className="min-w-[210px] bg-card dark:bg-[#16191F] border border-zinc-300 dark:border-white/20 shadow-xl z-50">
+                                  <SelectItem value="UNDER_INITIAL_CHECK" className="text-xs cursor-pointer">
+                                    <span className="flex items-center gap-2">
+                                      <span className="h-2 w-2 rounded-full bg-zinc-400 shrink-0" />
+                                      Under Initial Check
+                                    </span>
+                                  </SelectItem>
+                                  <SelectItem value="NEED_MORE_INFO" className="text-xs cursor-pointer">
+                                    <span className="flex items-center gap-2">
+                                      <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
+                                      Need More Info
+                                    </span>
+                                  </SelectItem>
+                                  <SelectItem value="CHECK_COMPLETED" className="text-xs cursor-pointer">
+                                    <span className="flex items-center gap-2">
+                                      <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                                      Initial Check Passed
+                                    </span>
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
                             ) : canSelectStatus ? (
-                              <select
+                              <Select
                                 value={ord.status}
                                 disabled={savingStatus}
-                                onChange={(e) => handleUpdateStatus(ord, e.target.value)}
-                                className={`w-full h-9 px-2 text-xs font-bold rounded-lg border shadow-xs bg-background transition-colors cursor-pointer ${getOrderStatusColor(ord.status)}`}
+                                onValueChange={(val) => handleUpdateStatus(ord, val)}
                               >
-                                <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
-                                <option value="IN_PROGRESS">IN PROGRESS</option>
-                                <option value="REVIEW_DOCS">REVIEW DOCS</option>
-                                <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
-                                <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
-                                <option value="AWAITING_SIGNING_NOTARIZATION">AWAITING SIGNING / NOTARIZATION</option>
-                                <option value="AWAITING_DOCUMENT_RETURN">AWAITING DOCUMENT RETURN FROM CLIENT</option>
-                                <option value="AWAITING_THIRD_PARTY_RESPONSE">AWAITING THIRD-PARTY RESPONSE (VENDOR)</option>
-                                <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOCUMENT PREPARATION</option>
-                                <option value="FINAL_DOC_READY">FINAL DOC READY</option>
-                                <option value="ON_HOLD">ON HOLD</option>
-                              </select>
+                                <SelectTrigger className={cn("h-8 w-full text-xs font-semibold rounded-md shadow-xs transition-colors cursor-pointer justify-between", getOrderStatusTriggerStyles(ord.status))}>
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    <span className={cn("h-2 w-2 rounded-full shrink-0", getOrderStatusDot(ord.status))} />
+                                    <span className="truncate">{getStatusDisplayLabel(ord.status)}</span>
+                                  </div>
+                                </SelectTrigger>
+                                <SelectContent align="start" className="min-w-[220px] max-h-64 bg-card dark:bg-[#16191F] border border-zinc-300 dark:border-white/20 shadow-xl z-50">
+                                  <SelectItem value="ORDER_ASSIGNED" className="text-xs cursor-pointer">
+                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Order Assigned</span>
+                                  </SelectItem>
+                                  <SelectItem value="IN_PROGRESS" className="text-xs cursor-pointer">
+                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />In Progress</span>
+                                  </SelectItem>
+                                  <SelectItem value="REVIEW_DOCS" className="text-xs cursor-pointer">
+                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Review Docs</span>
+                                  </SelectItem>
+                                  <SelectItem value="DOCUMENTS_REVIEWED" className="text-xs cursor-pointer">
+                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Documents Reviewed</span>
+                                  </SelectItem>
+                                  <SelectItem value="PRE_DOC_SENT_FOR_SIGNATURE" className="text-xs cursor-pointer">
+                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />Pre Doc Sent for Signature</span>
+                                  </SelectItem>
+                                  <SelectItem value="AWAITING_SIGNING_NOTARIZATION" className="text-xs cursor-pointer">
+                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Signing / Notarization</span>
+                                  </SelectItem>
+                                  <SelectItem value="AWAITING_DOCUMENT_RETURN" className="text-xs cursor-pointer">
+                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Document Return</span>
+                                  </SelectItem>
+                                  <SelectItem value="AWAITING_THIRD_PARTY_RESPONSE" className="text-xs cursor-pointer">
+                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Third-Party Response</span>
+                                  </SelectItem>
+                                  <SelectItem value="FINAL_DOCUMENT_PREPARATION" className="text-xs cursor-pointer">
+                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Final Document Preparation</span>
+                                  </SelectItem>
+                                  <SelectItem value="FINAL_DOC_READY" className="text-xs cursor-pointer">
+                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />Final Doc Ready</span>
+                                  </SelectItem>
+                                  <SelectItem value="ON_HOLD" className="text-xs cursor-pointer">
+                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />On Hold</span>
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
                             ) : isCompleted ? (
-                              <Badge variant="outline" className="text-xs font-bold py-1 px-2.5 uppercase shadow-xs whitespace-nowrap bg-emerald-500/15 text-emerald-600 border-emerald-500/30 flex items-center gap-1">
-                                <Lock className="h-3 w-3 text-emerald-600 shrink-0" />
-                                COMPLETED
+                              <Badge variant="outline" className={cn("text-xs font-semibold py-1 px-2.5 whitespace-nowrap inline-flex items-center gap-1.5 rounded font-sans", getOrderStatusTriggerStyles(ord.status))}>
+                                <Lock className="h-3 w-3 shrink-0" />
+                                Completed
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className={`text-xs font-bold py-1 px-2.5 uppercase shadow-xs whitespace-nowrap ${getOrderStatusColor(ord.status)}`}>
-                                {(ord.status || "").replace(/_/g, " ")}
+                              <Badge variant="outline" className={cn("text-xs font-semibold py-1 px-2.5 whitespace-nowrap inline-flex items-center gap-1.5 rounded font-sans", getOrderStatusTriggerStyles(ord.status))}>
+                                <span className={cn("h-2 w-2 rounded-full shrink-0", getOrderStatusDot(ord.status))} />
+                                {getStatusDisplayLabel(ord.status)}
                               </Badge>
                             )}
                           </div>
 
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-1.5 font-bold h-9 px-3.5 border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30 shadow-xs shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedGroup(ord);
-                              setIsChatOpen(true);
-                              fetchProgressUpdates(ord.order_number);
-                            }}
-                          >
-                            <MessageSquare className="h-4 w-4" /> Chat
-                          </Button>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {['SOFT_COPY_DELIVERED', 'HARD_COPY_DELIVERED', 'COMPLETED'].includes(ord.status) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1.5 font-semibold h-9 px-3 text-xs border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/20 dark:text-sky-300 dark:border-sky-500/40 shadow-xs shrink-0 rounded"
+                                title="Print Job Details & Checklist for Hard Copy Handover"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setJobPrintOrder(ord);
+                                  setIsJobPrintOpen(true);
+                                }}
+                              >
+                                <Printer className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+                                <span className="hidden sm:inline">Print Job Details</span>
+                              </Button>
+                            )}
+
+                            {ord.status === "REVIEW_DOCS" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1.5 font-semibold h-9 px-3 text-xs border-teal-500/30 bg-teal-500/10 text-teal-700 hover:bg-teal-500/20 dark:text-teal-300 dark:border-teal-500/40 shadow-xs shrink-0 rounded cursor-pointer"
+                                title="Review Pre-Signature Documents Checklist"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReviewOrder(ord);
+                                  setIsReviewDocsOpen(true);
+                                }}
+                              >
+                                <CheckSquare className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
+                                <span>Review Docs</span>
+                              </Button>
+                            )}
+
+                            <Button
+
+                              size="sm"
+                              variant="outline"
+                              className="gap-1.5 font-semibold h-9 px-3.5 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/40 shadow-xs shrink-0 rounded"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedGroup(ord);
+                                setIsChatOpen(true);
+                                fetchProgressUpdates(ord.order_number);
+                              }}
+                            >
+                              <MessageSquare className="h-4 w-4" /> Chat
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -3001,6 +3254,35 @@ export default function AssignedOrdersPage() {
         </DialogContent>
       </Dialog>
 
+      {/* JOB DETAILS & CHECKLIST PRINT DIALOG */}
+      <JobDetailsPrintDialog
+        open={isJobPrintOpen}
+        onOpenChange={setIsJobPrintOpen}
+        order={jobPrintOrder}
+      />
+
+      {/* PRE-SIGNATURE REVIEW CHECKLIST DIALOG */}
+      {reviewOrder && (
+        <PreSignatureReviewDialog
+          open={isReviewDocsOpen}
+          onOpenChange={setIsReviewDocsOpen}
+          orderNumber={reviewOrder.order_number}
+          companyName={reviewOrder.company_name}
+          companyCode={reviewOrder.company?.company_code}
+          companyId={reviewOrder.company_id || reviewOrder.company?.id}
+          currentLifecycleStatus={reviewOrder.status}
+          onStatusUpdated={() => {
+            fetchAssignedOrders();
+          }}
+          onOpenChat={() => {
+            setSelectedGroup(reviewOrder);
+            setIsChatOpen(true);
+            fetchProgressUpdates(reviewOrder.order_number);
+          }}
+        />
+      )}
+
     </>
   );
 }
+

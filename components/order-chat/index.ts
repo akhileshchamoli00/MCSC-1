@@ -14,3 +14,5 @@ export * from "./MessageBubble";
 export * from "./MessageGroup";
 export * from "./Composer";
 export * from "./ChatPanel";
+export * from "./wallpaper";
+export * from "./WallpaperDialog";

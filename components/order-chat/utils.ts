@@ -395,3 +395,36 @@ export function formatAttachmentDisplayName(filename?: string | null): string {
   return basename;
 }
 
+export function formatSeenTime(dateStr?: string | null): string {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isYesterday = d.toDateString() === yesterday.toDateString();
+
+    const timeFormatted = d.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true
+    });
+
+    if (isToday) return `Today, ${timeFormatted}`;
+    if (isYesterday) return `Yesterday, ${timeFormatted}`;
+
+    const isCurrentYear = d.getFullYear() === now.getFullYear();
+    const dateFormatted = d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      ...(isCurrentYear ? {} : { year: "numeric" })
+    });
+    return `${dateFormatted}, ${timeFormatted}`;
+  } catch {
+    return "";
+  }
+}
+
+

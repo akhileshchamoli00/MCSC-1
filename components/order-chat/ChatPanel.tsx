@@ -10,6 +10,13 @@ import { SystemEventGroup } from "./SystemEvent";
 import { MessageGroup } from "./MessageGroup";
 import { EmptyState } from "./EmptyState";
 import { Composer } from "./Composer";
+import {
+  WallpaperSettings,
+  WALLPAPER_PRESETS,
+  DEFAULT_WALLPAPER_SETTINGS,
+  DEFAULT_THEME_PALETTE,
+  getSavedWallpaperSettings
+} from "./wallpaper";
 
 interface ChatPanelProps {
   channel: ChannelType;
@@ -55,6 +62,7 @@ interface ChatPanelProps {
   onSelectSuggestion?: (text: string) => void;
   orderStatus?: string;
   hideSuggestions?: boolean;
+  hasExternalWallpaper?: boolean;
 }
 
 export function ChatPanel({
@@ -96,12 +104,55 @@ export function ChatPanel({
   onOpenImagePreview,
   onSelectSuggestion,
   orderStatus,
-  hideSuggestions
+  hideSuggestions,
+  hasExternalWallpaper = false
 }: ChatPanelProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [isScrolledUp, setIsScrolledUp] = useState(false);
   const [hasNewMessagesWhileScrolledUp, setHasNewMessagesWhileScrolledUp] = useState(false);
   const prevMessagesLengthRef = useRef(messages.length);
+
+  // Wallpaper settings state & listener
+  const [wallpaperSettings, setWallpaperSettings] = useState<WallpaperSettings>(DEFAULT_WALLPAPER_SETTINGS);
+
+  useEffect(() => {
+    setWallpaperSettings(getSavedWallpaperSettings());
+
+    const handleWallpaperChange = (e: any) => {
+      if (e?.detail) {
+        setWallpaperSettings(e.detail);
+      } else {
+        setWallpaperSettings(getSavedWallpaperSettings());
+      }
+    };
+
+    window.addEventListener("mcsc-chat-wallpaper-change", handleWallpaperChange as EventListener);
+    return () => {
+      window.removeEventListener("mcsc-chat-wallpaper-change", handleWallpaperChange as EventListener);
+    };
+  }, []);
+
+  const activeWallpaperPreset = useMemo(() => {
+    return WALLPAPER_PRESETS.find((p) => p.id === wallpaperSettings.id) || WALLPAPER_PRESETS[0];
+  }, [wallpaperSettings.id]);
+
+  const themeStyles: React.CSSProperties = useMemo(() => {
+    const p = activeWallpaperPreset?.palette || DEFAULT_THEME_PALETTE;
+    return {
+      "--oc-bubble-client-bg": p.clientBubbleBg,
+      "--oc-bubble-client-border": p.clientBubbleBorder,
+      "--oc-bubble-client-text": p.clientText,
+      "--oc-bubble-client-meta": p.clientMeta,
+      "--oc-bubble-internal-bg": p.internalBubbleBg,
+      "--oc-bubble-internal-border": p.internalBubbleBorder,
+      "--oc-bubble-internal-text": p.internalText,
+      "--oc-bubble-internal-meta": p.internalMeta,
+      "--oc-bubble-other-bg": p.otherBubbleBg,
+      "--oc-bubble-other-border": p.otherBubbleBorder,
+      "--oc-bubble-other-text": p.otherText,
+      "--oc-bubble-other-meta": p.otherMeta,
+    } as React.CSSProperties;
+  }, [activeWallpaperPreset]);
 
   // Group messages into stream items (date separators, system groups, 5-min sender batches)
   const isSelfPredicate = useCallback(
@@ -186,23 +237,48 @@ export function ChatPanel({
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] relative overflow-hidden">
+    <div
+      style={themeStyles}
+      className={`flex flex-col h-full min-h-0 ${
+        hasExternalWallpaper
+          ? "bg-transparent"
+          : "bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)]"
+      } relative overflow-hidden`}
+    >
+      {/* Active Wallpaper Backdrop Layer (only rendered if no external continuous wallpaper) */}
+      {!hasExternalWallpaper && wallpaperSettings.id !== "matte_studio" && (
+        <div
+          className="absolute inset-0 pointer-events-none transition-all duration-300 z-0"
+          style={{
+            ...activeWallpaperPreset?.style,
+            opacity: wallpaperSettings.opacity
+          }}
+        />
+      )}
+
+      {/* Subtle Readability Dimmer / Soft Tint */}
+      {!hasExternalWallpaper && wallpaperSettings.id !== "matte_studio" && (
+        <div className="absolute inset-0 bg-black/5 dark:bg-black/30 pointer-events-none z-0" />
+      )}
+
       {/* 56px Channel Header */}
-      <ChannelHeader
-        channel={channel}
-        title={title}
-        description={description}
-        unreadCount={unreadCount}
-        isClientOnline={isClientOnline}
-        participantCount={participantCount}
-        rightAction={headerRightAction}
-      />
+      <div className="relative z-10 shrink-0">
+        <ChannelHeader
+          channel={channel}
+          title={title}
+          description={description}
+          unreadCount={unreadCount}
+          isClientOnline={isClientOnline}
+          participantCount={participantCount}
+          rightAction={headerRightAction}
+        />
+      </div>
 
       {/* Main Stream Area */}
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="flex-1 min-h-0 overflow-y-auto px-4 py-3 relative overscroll-contain select-text"
+        className="flex-1 min-h-0 overflow-y-auto px-4 py-3 relative z-10 overscroll-contain select-text"
         style={{
           scrollbarWidth: "thin",
           scrollbarColor: "rgba(125, 125, 125, 0.35) transparent"
@@ -310,22 +386,24 @@ export function ChatPanel({
       )}
 
       {/* Unified Composer */}
-      <Composer
-        channel={channel}
-        value={composerValue}
-        onChange={onComposerChange}
-        onSend={onSend}
-        sending={sending}
-        placeholder={composerPlaceholder}
-        quotedMessage={quotedMessage}
-        onCancelQuote={onCancelQuote}
-        attachment={attachment}
-        attachmentPreview={attachmentPreview}
-        onSelectAttachment={onSelectAttachment}
-        onRemoveAttachment={onRemoveAttachment}
-        taggableUsers={taggableUsers}
-        inputRef={inputRef}
-      />
+      <div className="relative z-10 shrink-0">
+        <Composer
+          channel={channel}
+          value={composerValue}
+          onChange={onComposerChange}
+          onSend={onSend}
+          sending={sending}
+          placeholder={composerPlaceholder}
+          quotedMessage={quotedMessage}
+          onCancelQuote={onCancelQuote}
+          attachment={attachment}
+          attachmentPreview={attachmentPreview}
+          onSelectAttachment={onSelectAttachment}
+          onRemoveAttachment={onRemoveAttachment}
+          taggableUsers={taggableUsers}
+          inputRef={inputRef}
+        />
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Lock, Globe, MessageSquare, ShieldAlert, Sparkles } from "lucide-react";
+import { Lock, MessageSquare } from "lucide-react";
 import { ChannelType } from "./types";
 
 interface ChannelHeaderProps {
@@ -20,7 +20,6 @@ export function ChannelHeader({
   description,
   unreadCount = 0,
   isClientOnline,
-  participantCount,
   rightAction
 }: ChannelHeaderProps) {
   const isInternal = channel === "INTERNAL";
@@ -32,20 +31,29 @@ export function ChannelHeader({
 
   return (
     <header
-      className={`h-14 px-4 flex items-center justify-between border-b shrink-0 select-none transition-colors bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] ${
-        isInternal
-          ? "border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] border-t-2 border-t-[var(--oc-internal-500)]"
-          : "border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] border-t-2 border-t-[var(--oc-brand-500)]"
-      }`}
+      className="h-14 px-4 flex items-center justify-between border-b border-white/10 shrink-0 select-none transition-colors bg-black/35 backdrop-blur-md relative z-10"
+      style={{
+        borderTop: "2px solid",
+        borderTopColor: isInternal
+          ? "var(--oc-bubble-internal-border)"
+          : "var(--oc-bubble-client-border)"
+      }}
     >
       <div className="flex items-center gap-3 min-w-0">
-        {/* Channel Icon Badge */}
+        {/* Channel Icon Badge (Theme-synchronized frosted glass) */}
         <div
-          className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-            isInternal
-              ? "bg-[var(--oc-internal-50)] text-[var(--oc-internal-600)] border border-[var(--oc-internal-200)]"
-              : "bg-[var(--oc-brand-50)] text-[var(--oc-brand-600)] border border-[var(--oc-brand-200)]"
-          }`}
+          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all border shadow-xs backdrop-blur-xs"
+          style={{
+            backgroundColor: isInternal
+              ? "var(--oc-bubble-internal-bg)"
+              : "var(--oc-bubble-client-bg)",
+            borderColor: isInternal
+              ? "var(--oc-bubble-internal-border)"
+              : "var(--oc-bubble-client-border)",
+            color: isInternal
+              ? "var(--oc-bubble-internal-text)"
+              : "var(--oc-bubble-client-text)"
+          }}
           aria-hidden="true"
         >
           {isInternal ? <Lock className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
@@ -54,31 +62,56 @@ export function ChannelHeader({
         {/* Title & Description */}
         <div className="min-w-0 flex flex-col justify-center">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-[var(--oc-text-primary)] truncate leading-tight">
+            <h2
+              className="text-sm font-semibold text-white truncate leading-tight"
+              style={{ textShadow: "0 1px 2px rgba(0, 0, 0, 0.70)" }}
+            >
               {title || defaultTitle}
             </h2>
 
-            {/* Audience Badge */}
+            {/* Audience Badge (Theme-synchronized frosted pill) */}
             {isInternal ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--oc-internal-50)] text-[var(--oc-internal-700)] border border-[var(--oc-internal-200)] shrink-0">
-                <Lock className="w-3 h-3 text-[var(--oc-internal-600)]" />
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border shrink-0 backdrop-blur-xs shadow-xs"
+                style={{
+                  backgroundColor: "var(--oc-bubble-internal-bg)",
+                  borderColor: "var(--oc-bubble-internal-border)",
+                  color: "var(--oc-bubble-internal-text)",
+                  textShadow: "0 1px 2px rgba(0, 0, 0, 0.65)"
+                }}
+              >
+                <Lock className="w-3 h-3 opacity-80" />
                 Internal only
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--oc-brand-50)] text-[var(--oc-brand-700)] border border-[var(--oc-brand-200)] shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--oc-brand-500)] animate-pulse" />
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border shrink-0 backdrop-blur-xs shadow-xs"
+                style={{
+                  backgroundColor: "var(--oc-bubble-client-bg)",
+                  borderColor: "var(--oc-bubble-client-border)",
+                  color: "var(--oc-bubble-client-text)",
+                  textShadow: "0 1px 2px rgba(0, 0, 0, 0.65)"
+                }}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full animate-pulse"
+                  style={{ backgroundColor: "var(--oc-bubble-client-text)" }}
+                />
                 Visible to client
               </span>
             )}
 
             {unreadCount > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-[var(--oc-brand-600)] text-white tabular-nums">
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-purple-600 text-white tabular-nums shadow-xs">
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
           </div>
 
-          <p className="text-[11px] text-[var(--oc-text-tertiary)] truncate leading-normal">
+          <p
+            className="text-[11px] text-zinc-300 truncate leading-normal"
+            style={{ textShadow: "0 1px 1px rgba(0, 0, 0, 0.50)" }}
+          >
             {description || defaultDesc}
           </p>
         </div>
@@ -88,12 +121,12 @@ export function ChannelHeader({
       <div className="flex items-center gap-2 shrink-0">
         {!isInternal && isClientOnline !== undefined && (
           <div
-            className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-[var(--oc-text-secondary)] bg-[var(--oc-bg-subtle)] border border-[var(--oc-border)]"
+            className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-zinc-200 bg-white/5 border border-white/10 backdrop-blur-xs shadow-xs"
             title={isClientOnline ? "Client is currently online" : "Client is currently offline"}
           >
             <span
               className={`w-2 h-2 rounded-full ${
-                isClientOnline ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"
+                isClientOnline ? "bg-emerald-400 animate-pulse" : "bg-zinc-500"
               }`}
             />
             <span>{isClientOnline ? "Client online" : "Client offline"}</span>

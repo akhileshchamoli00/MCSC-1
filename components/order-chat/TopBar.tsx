@@ -10,7 +10,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Cloud,
-  FileDown
+  FileDown,
+  Sparkles
 } from "lucide-react";
 import { formatHumanStatus } from "./utils";
 import { toast } from "sonner";
@@ -39,6 +40,7 @@ interface TopBarProps {
   onDownloadTranscript?: () => void;
   isDownloadingTranscript?: boolean;
   downloadingTranscript?: boolean;
+  onOpenWallpaper?: () => void;
 }
 
 export function TopBar({
@@ -58,7 +60,8 @@ export function TopBar({
   savingToDropbox,
   onDownloadTranscript,
   isDownloadingTranscript,
-  downloadingTranscript
+  downloadingTranscript,
+  onOpenWallpaper
 }: TopBarProps) {
   const activeRefreshing = Boolean(isRefreshing || refreshing);
   const activeSavingDropbox = Boolean(isSavingToDropbox || savingToDropbox);
@@ -77,7 +80,7 @@ export function TopBar({
   };
 
   return (
-    <header className="h-14 sm:h-16 px-3 sm:px-5 border-b border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] flex items-center justify-between shrink-0 select-none z-10 transition-colors">
+    <header className="h-14 sm:h-16 px-3 sm:px-5 border-b border-white/10 bg-black/40 backdrop-blur-md flex items-center justify-between shrink-0 select-none z-10 transition-colors">
       {/* Left: Back button + Full Order Number + Status Badge + Subtitle */}
       <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
         <TooltipProvider delayDuration={100}>
@@ -177,6 +180,27 @@ export function TopBar({
         </button>
 
         <TooltipProvider delayDuration={100}>
+          {/* Wallpaper & Theme Picker */}
+          {onOpenWallpaper && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenWallpaper();
+                  }}
+                  title="Chat wallpaper & backdrop"
+                  aria-label="Chat wallpaper & backdrop"
+                  className="h-8 w-8 sm:h-8.5 sm:w-8.5 rounded-[var(--oc-radius-sm)] flex items-center justify-center text-[var(--oc-text-secondary)] hover:text-purple-600 dark:hover:text-purple-400 hover:bg-[var(--oc-bg-subtle)] border border-[var(--oc-border)] transition-colors cursor-pointer"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="z-[100]">Chat wallpaper & theme</TooltipContent>
+            </Tooltip>
+          )}
+
           {/* Refresh Button */}
           <Tooltip>
             <TooltipTrigger asChild>

@@ -27,7 +27,13 @@ import {
   OrderSummaryData,
   formatFileSize,
   formatExternalTeamName,
-  isSystemMessage
+  isSystemMessage,
+  WallpaperDialog,
+  WallpaperSettings,
+  WALLPAPER_PRESETS,
+  DEFAULT_WALLPAPER_SETTINGS,
+  DEFAULT_THEME_PALETTE,
+  getSavedWallpaperSettings
 } from "./order-chat";
 
 interface DualOrderChatDialogProps {
@@ -79,6 +85,49 @@ export function DualOrderChatDialog({
 
   // Mobile channel tab selector (<1024px)
   const [activeMobileTab, setActiveMobileTab] = useState<"CLIENT" | "INTERNAL">("INTERNAL");
+
+  // Wallpaper Picker Dialog State & Continuous Panoramic Settings
+  const [isWallpaperOpen, setIsWallpaperOpen] = useState(false);
+  const [wallpaperSettings, setWallpaperSettings] = useState<WallpaperSettings>(DEFAULT_WALLPAPER_SETTINGS);
+
+  useEffect(() => {
+    setWallpaperSettings(getSavedWallpaperSettings());
+
+    const handleWallpaperChange = (e: any) => {
+      if (e?.detail) {
+        setWallpaperSettings(e.detail);
+      } else {
+        setWallpaperSettings(getSavedWallpaperSettings());
+      }
+    };
+
+    window.addEventListener("mcsc-chat-wallpaper-change", handleWallpaperChange as EventListener);
+    return () => {
+      window.removeEventListener("mcsc-chat-wallpaper-change", handleWallpaperChange as EventListener);
+    };
+  }, []);
+
+  const activeWallpaperPreset = React.useMemo(() => {
+    return WALLPAPER_PRESETS.find((p) => p.id === wallpaperSettings.id) || WALLPAPER_PRESETS[0];
+  }, [wallpaperSettings.id]);
+
+  const themeStyles: React.CSSProperties = React.useMemo(() => {
+    const p = activeWallpaperPreset?.palette || DEFAULT_THEME_PALETTE;
+    return {
+      "--oc-bubble-client-bg": p.clientBubbleBg,
+      "--oc-bubble-client-border": p.clientBubbleBorder,
+      "--oc-bubble-client-text": p.clientText,
+      "--oc-bubble-client-meta": p.clientMeta,
+      "--oc-bubble-internal-bg": p.internalBubbleBg,
+      "--oc-bubble-internal-border": p.internalBubbleBorder,
+      "--oc-bubble-internal-text": p.internalText,
+      "--oc-bubble-internal-meta": p.internalMeta,
+      "--oc-bubble-other-bg": p.otherBubbleBg,
+      "--oc-bubble-other-border": p.otherBubbleBorder,
+      "--oc-bubble-other-text": p.otherText,
+      "--oc-bubble-other-meta": p.otherMeta,
+    } as React.CSSProperties;
+  }, [activeWallpaperPreset]);
 
   // Document Preview State (Lightbox)
   const [previewAttachment, setPreviewAttachment] = useState<any | null>(null);
@@ -493,6 +542,8 @@ export function DualOrderChatDialog({
     };
     if (isOpen) {
       fetchCurrentUser();
+    } else {
+      setIsWallpaperOpen(false);
     }
   }, [isOpen]);
 
@@ -880,8 +931,8 @@ export function DualOrderChatDialog({
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
-            transition={{ type: "tween", ease: [0.16, 1, 0.3, 1], duration: 0.32 }}
-            className="order-chat-workspace fixed inset-0 z-[75] h-screen h-[100dvh] w-screen flex flex-col bg-[#F8F9FA] dark:bg-[#0F0F12] bg-[var(--oc-bg-app)] text-[#111827] dark:text-[#F4F4F8] text-[var(--oc-text-primary)] overflow-hidden shadow-2xl"
+            className="dark order-chat-workspace fixed inset-0 z-[75] h-screen h-[100dvh] w-screen flex flex-col bg-[#0F0F12] text-[#F4F4F8] text-[var(--oc-text-primary)] overflow-hidden shadow-2xl"
+            style={{ colorScheme: "dark", ...themeStyles }}
           >
             {/* Top Navigation Bar */}
             <TopBar
@@ -898,6 +949,7 @@ export function DualOrderChatDialog({
               savingToDropbox={savingToDropbox}
               onDownloadTranscript={isUserAdmin ? handleDownloadTranscript : undefined}
               downloadingTranscript={downloadingTranscript}
+              onOpenWallpaper={() => setIsWallpaperOpen(true)}
               onClose={onClose}
             />
 
@@ -953,16 +1005,36 @@ export function DualOrderChatDialog({
                 internalMessages={internalMessages}
               />
 
-              {/* Middle & Right: Dual Chat Columns */}
-              <div className="flex-1 flex min-h-0 h-full overflow-hidden divide-x divide-zinc-200 dark:divide-zinc-800 divide-[var(--oc-border)] bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)]">
+              {/* Middle & Right: Dual Chat Columns (Unified Continuous Panoramic Wallpaper) */}
+              <div
+                style={themeStyles}
+                className="flex-1 flex min-h-0 h-full overflow-hidden divide-x divide-zinc-200/70 dark:divide-white/10 bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] relative"
+              >
+                {/* Single Continuous Panoramic Wallpaper Layer spanning both columns */}
+                {wallpaperSettings.id !== "matte_studio" && (
+                  <div
+                    className="absolute inset-0 pointer-events-none transition-all duration-300 z-0"
+                    style={{
+                      ...activeWallpaperPreset?.style,
+                      opacity: wallpaperSettings.opacity
+                    }}
+                  />
+                )}
+
+                {/* Subtle Readability Dimmer / Soft Tint */}
+                {wallpaperSettings.id !== "matte_studio" && (
+                  <div className="absolute inset-0 bg-black/5 dark:bg-black/30 pointer-events-none z-0" />
+                )}
+
                 {/* Column 2: Client & Consultant Chat */}
                 <div
                   className={`flex-1 min-w-0 h-full ${
                     activeMobileTab === "CLIENT" ? "flex" : "hidden lg:flex"
-                  } flex-col`}
+                  } flex-col relative z-10`}
                 >
                   <ChatPanel
                     channel="CLIENT"
+                    hasExternalWallpaper
                     orderNumber={orderNumber}
                     orderStatus={orderSummary?.status || orderStatus}
                     title="Client & Consultant Chat"
@@ -1002,10 +1074,11 @@ export function DualOrderChatDialog({
                 <div
                   className={`flex-1 min-w-0 h-full ${
                     activeMobileTab === "INTERNAL" ? "flex" : "hidden lg:flex"
-                  } flex-col`}
+                  } flex-col relative z-10`}
                 >
                   <ChatPanel
                     channel="INTERNAL"
+                    hasExternalWallpaper
                     orderNumber={orderNumber}
                     orderStatus={orderSummary?.status || orderStatus}
                     title="Internal Team Chat"
@@ -1324,6 +1397,12 @@ export function DualOrderChatDialog({
           </div>
         )}
       </AnimatePresence>
+
+      {/* Chat Wallpaper & Visual Backdrop Dialog */}
+      <WallpaperDialog
+        isOpen={isWallpaperOpen}
+        onClose={() => setIsWallpaperOpen(false)}
+      />
     </>
   );
 

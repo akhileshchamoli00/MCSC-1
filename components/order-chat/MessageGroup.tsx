@@ -105,7 +105,10 @@ export function MessageGroup({
 
         {/* Sender Name & Role */}
         <div className="flex items-center gap-1.5">
-          <span className="font-semibold text-[13px] text-[var(--oc-text-primary)]">
+          <span
+            className="font-semibold text-[13px] text-white"
+            style={{ textShadow: "0 1px 3px rgba(0, 0, 0, 0.85)" }}
+          >
             {isSelf ? "You" : displayName}
           </span>
 
@@ -113,18 +116,20 @@ export function MessageGroup({
             <span
               className={`px-1.5 py-0.2 rounded text-[10px] font-medium border ${
                 isClient
-                  ? "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
+                  ? "bg-slate-900/60 text-slate-200 border-white/20 backdrop-blur-xs"
                   : isExternal
-                  ? "bg-[var(--oc-brand-50)] text-[var(--oc-brand-700)] border-[var(--oc-brand-200)] dark:bg-[var(--oc-brand-50)] dark:text-[var(--oc-brand-400)]"
-                  : "bg-[var(--oc-internal-50)] text-[var(--oc-internal-700)] border-[var(--oc-internal-200)] dark:bg-[var(--oc-internal-50)] dark:text-[var(--oc-internal-700)]"
+                  ? "bg-purple-950/60 text-purple-200 border-purple-400/30 backdrop-blur-xs"
+                  : "bg-orange-950/60 text-orange-200 border-amber-400/30 backdrop-blur-xs"
               }`}
+              style={{ textShadow: "0 1px 2px rgba(0, 0, 0, 0.75)" }}
             >
               {senderRole}
             </span>
           )}
 
           <span
-            className="text-[11px] text-[var(--oc-text-tertiary)] tabular-nums"
+            className="text-[11px] text-zinc-300 tabular-nums"
+            style={{ textShadow: "0 1px 2px rgba(0, 0, 0, 0.80)" }}
             title={fullDateStr}
           >
             {timeStr}

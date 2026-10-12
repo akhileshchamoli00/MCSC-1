@@ -217,7 +217,7 @@ export function Composer({
   const canSend = Boolean(value.trim() || attachment) && !sending;
 
   return (
-    <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] shrink-0 transition-colors">
+    <div className="p-2.5 sm:p-3 border-t border-white/10 bg-black/40 backdrop-blur-md shrink-0 transition-colors">
       {/* Hidden File Input */}
       <input
         type="file"
@@ -240,23 +240,23 @@ export function Composer({
 
       {/* Staged Attachment Preview */}
       {attachment && (
-        <div className="flex items-center gap-2 mb-2 p-2 rounded-lg bg-[var(--oc-bg-subtle)] border border-[var(--oc-border)] max-w-sm">
+        <div className="flex items-center gap-2 mb-2 p-2 rounded-lg bg-black/30 border border-white/15 max-w-sm backdrop-blur-xs">
           {attachmentPreview ? (
             <img
               src={attachmentPreview}
               alt="Preview"
-              className="w-10 h-10 object-cover rounded border border-[var(--oc-border)]"
+              className="w-10 h-10 object-cover rounded border border-white/15"
             />
           ) : (
-            <div className="w-10 h-10 rounded bg-[var(--oc-brand-50)] text-[var(--oc-brand-600)] flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded bg-white/10 text-cyan-300 flex items-center justify-center shrink-0">
               <FileText className="w-5 h-5" />
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-[var(--oc-text-primary)] truncate">
+            <p className="text-xs font-medium text-white truncate">
               {attachment.name}
             </p>
-            <p className="text-[11px] text-[var(--oc-text-tertiary)] tabular-nums">
+            <p className="text-[11px] text-zinc-300 tabular-nums">
               {formatFileSize(attachment.size)}
             </p>
           </div>
@@ -264,7 +264,7 @@ export function Composer({
             <button
               type="button"
               onClick={onRemoveAttachment}
-              className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 text-[var(--oc-text-tertiary)] hover:text-[var(--oc-text-primary)]"
+              className="p-1 rounded hover:bg-white/10 text-zinc-400 hover:text-white"
               aria-label="Remove attachment"
             >
               <X className="w-3.5 h-3.5" />
@@ -275,46 +275,54 @@ export function Composer({
 
       {/* Inline Client Warning when typing @ mentions in external chat */}
       {hasMentionInClient && (
-        <div className="flex items-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-md bg-[var(--oc-warning-50)] border border-[var(--oc-warning-300)] text-[var(--oc-warning-700)] text-[12px] leading-tight">
-          <AlertCircle className="w-3.5 h-3.5 shrink-0 text-[var(--oc-warning-500)]" />
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-200 text-[12px] leading-tight backdrop-blur-xs">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-400" />
           <span>Mentions in client chat will be visible to the client.</span>
         </div>
       )}
 
-      {/* Unified Composer Container */}
+      {/* Unified Composer Container (Theme-synchronized frosted glass) */}
       <div
-        className={`relative rounded-xl border transition-all ${
-          isFocused
+        className="relative rounded-xl border transition-all shadow-md backdrop-blur-md overflow-hidden"
+        style={{
+          backgroundColor: isInternal
+            ? "var(--oc-bubble-internal-bg)"
+            : "var(--oc-bubble-client-bg)",
+          borderColor: isFocused
             ? isInternal
-              ? "border-[var(--oc-internal-500)] ring-2 ring-[var(--oc-internal-500)]/20 shadow-xs"
-              : "border-[var(--oc-brand-500)] ring-2 ring-[var(--oc-brand-500)]/20 shadow-xs"
-            : "border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] hover:border-[var(--oc-border-strong)]"
-        } bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)]`}
+              ? "var(--oc-bubble-internal-border)"
+              : "var(--oc-bubble-client-border)"
+            : "rgba(255, 255, 255, 0.14)",
+          boxShadow: isFocused
+            ? `0 0 0 1.5px ${isInternal ? "var(--oc-bubble-internal-border)" : "var(--oc-bubble-client-border)"}`
+            : "none"
+        }}
       >
         {/* Audience Banner / Mode Tag */}
         <div
-          className={`flex items-center justify-between px-3 py-1 text-[11px] font-medium border-b border-[var(--oc-border)]/60 rounded-t-xl select-none ${
-            isInternal
-              ? "bg-[var(--oc-internal-50)] text-[var(--oc-internal-700)] dark:bg-[var(--oc-internal-950)]/40 dark:text-[var(--oc-internal-300)]"
-              : "bg-[var(--oc-brand-50)] text-[var(--oc-brand-700)] dark:bg-[var(--oc-brand-950)]/40 dark:text-[var(--oc-brand-300)]"
-          }`}
+          className="flex items-center justify-between px-3 py-1.5 text-[11px] font-medium border-b border-white/10 select-none transition-colors"
+          style={{
+            backgroundColor: "rgba(255, 255, 255, 0.04)",
+            color: isInternal ? "var(--oc-bubble-internal-text)" : "var(--oc-bubble-client-text)",
+            textShadow: "0 1px 2px rgba(0, 0, 0, 0.65)"
+          }}
         >
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 font-medium">
             {isInternal ? (
               <>
-                <Lock className="w-3 h-3 text-[var(--oc-internal-600)]" />
+                <Lock className="w-3 h-3 opacity-80" />
                 <span>Internal note · Client can&apos;t see this</span>
               </>
             ) : (
               <>
-                <MessageSquare className="w-3 h-3 text-[var(--oc-brand-600)]" />
+                <MessageSquare className="w-3 h-3 opacity-80" />
                 <span>Replying to client</span>
               </>
             )}
           </div>
 
           {isFocused && (
-            <span className="text-[10px] text-[var(--oc-text-tertiary)] opacity-85 hidden sm:inline">
+            <span className="text-[10px] opacity-60 hidden sm:inline">
               Enter to send · Shift+Enter for newline
             </span>
           )}
@@ -337,7 +345,10 @@ export function Composer({
                 : "Type a message to the client...")
             }
             rows={1}
-            className="w-full resize-none bg-transparent text-[14px] leading-relaxed text-[var(--oc-text-primary)] placeholder:text-[var(--oc-text-tertiary)] focus:outline-none max-h-36 overflow-y-auto"
+            className="w-full resize-none bg-transparent text-[14px] leading-relaxed text-white placeholder:text-zinc-400 focus:outline-none max-h-36 overflow-y-auto"
+            style={{
+              textShadow: "0 1px 2px rgba(0, 0, 0, 0.65)"
+            }}
             aria-label={isInternal ? "Internal chat composer" : "Client chat composer"}
           />
 
@@ -359,7 +370,7 @@ export function Composer({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 rounded-lg text-[var(--oc-text-tertiary)] hover:text-[var(--oc-text-primary)] hover:bg-[var(--oc-bg-subtle)] transition-colors"
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               title="Attach file or document (Max 50MB)"
               aria-label="Attach file"
             >
@@ -373,7 +384,7 @@ export function Composer({
               trigger={
                 <button
                   type="button"
-                  className="p-1.5 rounded-lg text-[var(--oc-text-tertiary)] hover:text-[var(--oc-text-primary)] hover:bg-[var(--oc-bg-subtle)] transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                   title="Add emoji"
                   aria-label="Add emoji"
                 >
@@ -383,20 +394,28 @@ export function Composer({
             />
           </div>
 
-          {/* Right Action: Solid Saturated Send Button */}
+          {/* Right Action: Mellow Theme-Harmonized Send Button */}
           <button
             type="button"
             onClick={onSend}
             disabled={!canSend}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all shadow-xs ${
-              isInternal
-                ? canSend
-                  ? "bg-[var(--oc-internal-600)] hover:bg-[var(--oc-internal-700)] active:scale-[0.98] cursor-pointer"
-                  : "bg-[var(--oc-internal-600)]/40 cursor-not-allowed opacity-60"
-                : canSend
-                ? "bg-[var(--oc-brand-600)] hover:bg-[var(--oc-brand-700)] active:scale-[0.98] cursor-pointer"
-                : "bg-[var(--oc-brand-600)]/40 cursor-not-allowed opacity-60"
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white transition-all shadow-sm border ${
+              canSend
+                ? "hover:brightness-115 active:scale-[0.98] cursor-pointer"
+                : "cursor-not-allowed opacity-40"
             }`}
+            style={{
+              backgroundColor: canSend
+                ? isInternal
+                  ? "var(--oc-bubble-internal-border)"
+                  : "var(--oc-bubble-client-border)"
+                : "rgba(255, 255, 255, 0.08)",
+              borderColor: canSend
+                ? "rgba(255, 255, 255, 0.25)"
+                : "rgba(255, 255, 255, 0.10)",
+              color: "#FFFFFF",
+              textShadow: "0 1px 2px rgba(0, 0, 0, 0.70)"
+            }}
             aria-label={isInternal ? "Send internal note" : "Send message to client"}
           >
             {sending ? (

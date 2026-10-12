@@ -721,19 +721,19 @@ export default function PipelineOrdersPage() {
 
   const renderStatusBadge = (status: string) => {
     const norm = (status || "").toUpperCase();
-    let badgeStyle = "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30";
-    let label = "Under Initial Check";
+    let badgeStyle = "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 orders-badge-warning";
+    let label = "Under initial check";
 
     if (norm === "NEED_MORE_INFO") {
-      badgeStyle = "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30";
-      label = "Need More Info";
+      badgeStyle = "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30 orders-badge-danger";
+      label = "Need more info";
     } else if (norm === "CHECK_COMPLETED") {
-      badgeStyle = "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30";
-      label = "Initial Check Passed";
+      badgeStyle = "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 orders-badge-success";
+      label = "Initial check passed";
     }
 
     return (
-      <Badge className={`${badgeStyle} font-bold border text-[11px] whitespace-nowrap`}>
+      <Badge className={`${badgeStyle} font-medium border text-xs px-2 py-0.5 rounded font-sans whitespace-nowrap`}>
         {label}
       </Badge>
     );
@@ -782,12 +782,12 @@ export default function PipelineOrdersPage() {
 
   return (
     <>
-      <div className="space-y-6 animate-in fade-in duration-500 w-full max-w-none pb-12">
+      <div className="space-y-6 animate-in fade-in duration-500 w-full max-w-none pb-12 orders-page-shell">
         
         {/* Minimalist Metrics Strip & Action Button Row */}
         <div className="flex flex-col xl:flex-row items-stretch gap-3 w-full">
           {/* Minimalist Metric Strip - Expanded Horizontally */}
-          <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-xs flex-1 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-xs flex-1 gap-3 sm:gap-4 orders-table-card">
             
             {/* Inquiry Orders */}
             <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0 justify-start sm:justify-center">
@@ -844,18 +844,18 @@ export default function PipelineOrdersPage() {
 
 
         {/* Main Orders Table */}
-        <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
-          <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl orders-table-card">
+          <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between orders-table-toolbar">
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search Order ID, Company, Service, Staff..."
-                className="pl-8 h-9 text-xs rounded-lg"
+                className="pl-8 h-9 text-xs rounded-lg orders-control"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold">
+            <span className="text-xs font-normal text-muted-foreground orders-text-secondary">
               Showing {paginatedOrders.length} of {filteredOrders.length} entries
             </span>
           </div>
@@ -875,20 +875,20 @@ export default function PipelineOrdersPage() {
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                        <th className="p-4 w-12 text-center">No.</th>
-                        <th className="p-4 whitespace-nowrap">Order ID & Date</th>
-                        <th className="p-4">Company Entity</th>
-                        <th className="p-4">Service Package</th>
-                        <th className="p-4">Initial Check Team</th>
-                        <th className="p-4 text-right">Total Amount</th>
-                        <th className="p-4 text-center">Status</th>
-                        <th className="p-4 text-right">Actions</th>
+                        <th className="p-4 w-12 text-center orders-th">No.</th>
+                        <th className="p-4 whitespace-nowrap orders-th">Order ID & Date</th>
+                        <th className="p-4 orders-th">Company Entity</th>
+                        <th className="p-4 orders-th">Service Package</th>
+                        <th className="p-4 orders-th">Initial Check Team</th>
+                        <th className="p-4 text-right orders-th">Total Amount</th>
+                        <th className="p-4 text-center orders-th min-w-[130px] max-w-[155px]">Status</th>
+                        <th className="p-4 text-right whitespace-nowrap orders-th orders-col-actions w-32 min-w-[120px] max-w-[135px]">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
                       {paginatedOrders.map((ord, index) => (
-                        <tr key={ord.order_number || index} className="hover:bg-muted/30 transition-colors border-b last:border-0">
-                          <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5">
+                        <tr key={ord.order_number || index} className="hover:bg-muted/30 transition-colors border-b last:border-0 orders-row">
+                          <td className="p-4 text-center font-mono font-medium text-muted-foreground align-top pt-5 orders-text-secondary">
                             #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + index))}
                           </td>
                           <td className="p-4 align-top pt-5 whitespace-nowrap">
@@ -897,14 +897,14 @@ export default function PipelineOrdersPage() {
                                 <Link href={`/business/clients/documents/${ord.company_id}?order=${encodeURIComponent(ord.order_number)}&from=pipeline`}>
                                   <Badge
                                     variant="outline"
-                                    className="font-mono font-bold text-xs bg-indigo-500/10 hover:bg-indigo-500/20 border-indigo-500/30 text-indigo-600 dark:text-indigo-400 cursor-pointer transition-colors px-2 py-0.5 rounded"
+                                    className="font-mono font-medium text-xs bg-indigo-500/10 hover:bg-indigo-500/20 border-indigo-500/30 text-indigo-600 dark:text-indigo-400 cursor-pointer transition-colors px-2 py-0.5 rounded orders-badge-neutral"
                                     title="View Documents for this Inquiry Order"
                                   >
                                     {ord.order_number}
                                   </Badge>
                                 </Link>
                               ) : (
-                                <Badge variant="outline" className="font-mono font-bold text-xs bg-indigo-500/10 border-indigo-500/30 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded">
+                                <Badge variant="outline" className="font-mono font-medium text-xs bg-indigo-500/10 border-indigo-500/30 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded orders-badge-neutral">
                                   {ord.order_number}
                                 </Badge>
                               )}
@@ -912,7 +912,7 @@ export default function PipelineOrdersPage() {
                                 <button
                                   type="button"
                                   onClick={(e) => handleCopyOrderNumber(e, ord.order_number)}
-                                  className="h-5 w-5 inline-flex items-center justify-center rounded border border-transparent hover:border-border/60 hover:bg-muted/70 text-muted-foreground hover:text-foreground transition-all cursor-pointer opacity-50 group-hover/copy:opacity-100 hover:!opacity-100"
+                                  className="h-5 w-5 inline-flex items-center justify-center rounded border border-transparent hover:border-border/60 hover:bg-muted/70 text-muted-foreground hover:text-foreground transition-all cursor-pointer opacity-50 group-hover/copy:opacity-100 hover:!opacity-100 orders-action-btn"
                                   title="Copy Order ID"
                                   aria-label="Copy Order ID"
                                 >
@@ -926,7 +926,7 @@ export default function PipelineOrdersPage() {
                             </div>
                             {ord.created_at && (
                               <div
-                                className="text-[10.5px] text-muted-foreground font-medium flex items-center gap-1 mt-1 tracking-tight"
+                                className="text-[10.5px] text-muted-foreground font-medium flex items-center gap-1 mt-1 tracking-tight orders-text-secondary"
                                 title={`Order Created: ${new Date(ord.created_at).toLocaleString()}`}
                               >
                                 <Calendar className="h-3 w-3 text-muted-foreground/60 shrink-0" />
@@ -936,21 +936,21 @@ export default function PipelineOrdersPage() {
                           </td>
                           <td className="p-4 font-bold text-foreground text-sm align-top pt-5">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span>{ord.company_name || "Personal Client Account"}</span>
+                              <span className="orders-text-primary">{ord.company_name || "Personal Client Account"}</span>
                               {(() => {
                                 const comp = companies.find((c: any) => c.id === (ord.company_id || ord.company?.id)) || ord.company;
                                 if (!comp) return null;
                                 const vStatus = comp.validation_status;
                                 if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
                                   return (
-                                    <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 flex items-center gap-0.5" title="Company pending admin validation">
+                                    <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 flex items-center gap-0.5 orders-badge-warning" title="Company pending admin validation">
                                       <Clock className="h-2.5 w-2.5" /> Pending Company
                                     </Badge>
                                   );
                                 }
                                 if (vStatus === "NEEDS_REVISION") {
                                   return (
-                                    <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 flex items-center gap-0.5" title="Company needs revision">
+                                    <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 flex items-center gap-0.5 orders-badge-danger" title="Company needs revision">
                                       <AlertCircle className="h-2.5 w-2.5" /> Revision Required
                                     </Badge>
                                   );
@@ -958,7 +958,7 @@ export default function PipelineOrdersPage() {
                                 return null;
                               })()}
                             </div>
-                            <div className="text-xs font-normal text-muted-foreground flex items-center gap-1 mt-1">
+                            <div className="text-xs font-normal text-muted-foreground flex items-center gap-1 mt-1 orders-text-secondary">
                               <Building className="h-3 w-3 text-muted-foreground" /> {ord.client_name || "Representative"}
                             </div>
                           </td>
@@ -966,13 +966,13 @@ export default function PipelineOrdersPage() {
                             {ord.items && ord.items.length > 0 ? (
                               <div className="space-y-1.5 max-w-sm">
                                 {ord.items.map((item: any, idx: number) => (
-                                    <div key={idx} className="space-y-1 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
+                                    <div key={idx} className="space-y-1 border-b border-border/10 last:border-0 pb-1.5 last:pb-0 orders-service-card">
                                       <div className="flex flex-wrap items-center gap-1.5">
-                                        <span className="font-semibold text-foreground text-xs leading-normal break-words">
+                                        <span className="font-semibold text-foreground text-xs leading-normal break-words orders-text-primary">
                                           {item.job_title}
                                         </span>
                                         {item.job_id && (
-                                          <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                          <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 bg-primary/5 text-primary border-primary/20 shrink-0 orders-badge-info">
                                             {item.job_id}
                                           </Badge>
                                         )}
@@ -982,7 +982,7 @@ export default function PipelineOrdersPage() {
                                         <div className="flex items-center">
                                           <Badge 
                                             variant="outline" 
-                                            className="text-[9px] font-medium py-0.5 px-1.5 bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/30 max-w-[240px] inline-flex items-center gap-1 overflow-hidden"
+                                            className="text-[9px] font-medium py-0.5 px-1.5 bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/30 max-w-[240px] inline-flex items-center gap-1 overflow-hidden orders-badge-warning"
                                             title={`Memo: ${item.branch_name}`}
                                           >
                                             <span className="font-bold uppercase tracking-wider text-[8px] opacity-75 shrink-0">Memo:</span>
@@ -994,7 +994,7 @@ export default function PipelineOrdersPage() {
                                 ))}
                               </div>
                             ) : (
-                              <span className="text-muted-foreground italic text-xs">-</span>
+                              <span className="text-muted-foreground italic text-xs orders-text-secondary">-</span>
                             )}
                           </td>
                           <td className="p-4 align-top pt-5">
@@ -1006,7 +1006,7 @@ export default function PipelineOrdersPage() {
                                 return (
                                   <div className="flex flex-wrap gap-1">
                                     {revs.map((r: any) => (
-                                      <Badge key={r.id || r.name} variant="outline" className="text-[9px] font-semibold py-0.5 px-1.5 bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30 flex items-center gap-1 shadow-2xs">
+                                      <Badge key={r.id || r.name} variant="outline" className="text-[9px] font-semibold py-0.5 px-1.5 bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30 flex items-center gap-1 shadow-2xs orders-badge-purple">
                                         <ShieldCheck className="h-2.5 w-2.5 text-purple-600 shrink-0" />
                                         <span className="truncate max-w-[110px]" title={`Reviewer: ${r.name}`}>Rev: {r.name}</span>
                                       </Badge>
@@ -1019,7 +1019,7 @@ export default function PipelineOrdersPage() {
                               {ord.consultants && ord.consultants.length > 0 ? (
                                 <div className="flex flex-wrap gap-1">
                                   {ord.consultants.map((c: any) => (
-                                    <Badge key={c.id || c.name} variant="outline" className="text-[9px] font-medium py-0.5 px-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/25 flex items-center gap-1 shadow-2xs">
+                                    <Badge key={c.id || c.name} variant="outline" className="text-[9px] font-medium py-0.5 px-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/25 flex items-center gap-1 shadow-2xs orders-badge-neutral">
                                       <UserCheck className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
                                       <span className="truncate max-w-[110px]" title={`Consultant: ${c.name}`}>{c.name}</span>
                                     </Badge>
@@ -1027,15 +1027,15 @@ export default function PipelineOrdersPage() {
                                 </div>
                               ) : (
                                 (!ord.reviewers || ord.reviewers.length === 0) && !ord.reviewer && (
-                                  <span className="text-[10px] text-muted-foreground italic">Unassigned</span>
+                                  <span className="text-[10px] text-muted-foreground italic orders-text-secondary">Unassigned</span>
                                 )
                               )}
                             </div>
                           </td>
-                          <td className="p-4 text-right font-mono font-bold text-sm text-foreground align-top pt-5">
+                          <td className="p-4 text-right font-sans font-semibold text-sm tabular-nums align-top pt-5 orders-amount">
                             {formatCurrency(ord.total_amount)}
                           </td>
-                          <td className="p-4 text-center align-top pt-5">
+                          <td className="p-4 text-center align-top pt-5 min-w-[130px] max-w-[155px]">
                             <div className="flex flex-col items-center gap-1.5">
                               {renderStatusBadge(ord.status)}
                               {(ord.payment_link || ord.xendit_invoice_id || ord.quotation_sent_at) && (
@@ -1069,7 +1069,7 @@ export default function PipelineOrdersPage() {
                                       toast.error("Error generating link", { id: toastId });
                                     }
                                   }}
-                                  className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:underline cursor-pointer transition-colors"
+                                  className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:underline cursor-pointer transition-colors orders-action-btn"
                                   title="Copy Xendit payment link to clipboard"
                                 >
                                   <Link2 className="h-2.5 w-2.5" /> Copy Payment Link
@@ -1079,7 +1079,7 @@ export default function PipelineOrdersPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-5 px-1.5 text-[9.5px] font-semibold gap-1 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/15 shadow-none"
+                                  className="h-5 px-1.5 text-[9.5px] font-semibold gap-1 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/15 shadow-none orders-action-btn"
                                   title="Check payment status with Xendit"
                                   onClick={() => handleSyncPayment(ord.order_number)}
                                 >
@@ -1088,56 +1088,64 @@ export default function PipelineOrdersPage() {
                               )}
                             </div>
                           </td>
-                          <td className="p-4 text-right space-x-1.5 align-top pt-5 whitespace-nowrap">
-                            {/* Move to Active Button */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 px-2.5 text-xs font-bold gap-1.5 shadow-xs inline-flex items-center"
-                              title="Move to Active Orders"
-                              onClick={() => {
-                                setSelectedOrderGroup(ord);
-                                setIsMoveToActiveOpen(true);
-                              }}
-                            >
-                              <ArrowRightCircle className="h-3.5 w-3.5" /> Move to Active
-                            </Button>
+                          <td className="p-3 text-right align-top pt-4 whitespace-nowrap orders-col-actions w-32 min-w-[120px] max-w-[135px]">
+                            <div className="flex flex-col items-end gap-1.5">
+                              {/* Utility Icon Buttons */}
+                              <div className="flex items-center justify-end gap-1">
+                                {/* Edit Button */}
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6 rounded p-0 orders-action-btn"
+                                  title="Edit Inquiry Order"
+                                  onClick={() => router.push(`/business/clients/orders/${ord.order_number}/edit?type=pipeline`)}
+                                >
+                                  <Edit className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                </Button>
 
-                            {/* Edit Button */}
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              title="Edit Inquiry Order"
-                              onClick={() => router.push(`/business/clients/orders/${ord.order_number}/edit?type=pipeline`)}
-                            >
-                              <Edit className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                            </Button>
+                                {/* View Quotation Button (Eye Action) */}
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6 rounded p-0 orders-action-btn"
+                                  title="View Quotation"
+                                  onClick={() => {
+                                    setSelectedOrderGroup(ord);
+                                    setIsQuotationOpen(true);
+                                  }}
+                                >
+                                  <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                </Button>
 
-                            {/* View Quotation Button (Eye Action) */}
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              title="View Quotation"
-                              onClick={() => {
-                                setSelectedOrderGroup(ord);
-                                setIsQuotationOpen(true);
-                              }}
-                            >
-                              <Eye className="h-4 w-4 text-slate-500 hover:text-foreground" />
-                            </Button>
+                                {/* Delete Button */}
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6 rounded p-0 orders-action-btn is-delete"
+                                  title="Delete Inquiry Order"
+                                  onClick={() => {
+                                    setSelectedOrderGroup(ord);
+                                    setIsDeleteOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive/70 hover:text-destructive" />
+                                </Button>
+                              </div>
 
-                            {/* Delete Button */}
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              title="Delete Inquiry Order"
-                              onClick={() => {
-                                setSelectedOrderGroup(ord);
-                                setIsDeleteOpen(true);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive/70 hover:text-destructive" />
-                            </Button>
+                              {/* Stacked Workflow Action: Move to Active */}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-5 px-1.5 text-[8.5px] font-semibold gap-1 shadow-none inline-flex items-center rounded whitespace-nowrap text-indigo-600 border-indigo-500/30 hover:bg-indigo-50 dark:text-indigo-300 dark:border-indigo-500/40 dark:hover:bg-indigo-950/40"
+                                title="Move to Active Orders"
+                                onClick={() => {
+                                  setSelectedOrderGroup(ord);
+                                  setIsMoveToActiveOpen(true);
+                                }}
+                              >
+                                <ArrowRightCircle className="h-2.5 w-2.5" /> Move to Active
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))}

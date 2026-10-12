@@ -12,8 +12,8 @@ export function DateSeparator({ label }: DateSeparatorProps) {
       <div className="absolute inset-0 flex items-center" aria-hidden="true">
         <div className="w-full border-t border-[var(--oc-border)] opacity-70" />
       </div>
-      <div className="relative px-3 py-0.5 rounded-full bg-white dark:bg-[#18181C] bg-[var(--oc-bg-panel)] border border-zinc-200 dark:border-zinc-800 border-[var(--oc-border)] shadow-xs">
-        <span className="text-[11px] font-medium text-[var(--oc-text-tertiary)] tracking-wide">
+      <div className="relative px-3 py-0.5 rounded-full bg-white/90 dark:bg-[#18181C]/90 backdrop-blur-xs border border-zinc-200 dark:border-white/15 shadow-xs">
+        <span className="text-[11px] font-medium text-[var(--oc-text-secondary)] dark:text-zinc-300 tracking-wide">
           {label}
         </span>
       </div>

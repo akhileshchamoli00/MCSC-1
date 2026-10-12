@@ -21,6 +21,7 @@ import {
   formatTimeTabular,
   formatFullDateTime,
   formatFileSize,
+  formatSeenTime,
   isImageFile,
   resolveAttachmentUrl,
   formatAttachmentDisplayName
@@ -29,6 +30,12 @@ import { resolveImageUrl } from "@/lib/utils";
 import { ChatMessage, ChannelType } from "./types";
 import { renderMessageWithMentions } from "./MentionChip";
 import { ReplyQuote } from "./ReplyQuote";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from "@/components/ui/tooltip";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -46,6 +53,119 @@ interface MessageBubbleProps {
 }
 
 const COMMON_EMOJIS = ["👍", "❤️", "🙌", "👀", "✅", "🎉"];
+
+export function ReadersListPopoverContent({
+  readers
+}: {
+  readers: Array<{
+    user_id?: number;
+    name?: string;
+    role?: string;
+    read_at?: string;
+    is_client?: boolean;
+  }>;
+}) {
+  return (
+    <div className="z-[99999] min-w-[220px] max-w-[300px] p-2.5 rounded-xl bg-[#18181C]/95 text-white border border-white/20 shadow-2xl backdrop-blur-md text-left">
+      <div className="flex items-center justify-between gap-1 pb-1.5 mb-1.5 border-b border-white/10 text-[10px] font-bold text-zinc-300 uppercase tracking-wider">
+        <span className="flex items-center gap-1.5 text-blue-400">
+          <Eye className="w-3.5 h-3.5" />
+          Seen by ({readers.length})
+        </span>
+      </div>
+      <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+        {readers.map((r, idx) => (
+          <div key={r.user_id || idx} className="flex items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div className="h-5 w-5 rounded-full bg-white/10 flex items-center justify-center text-[9px] font-bold text-white shrink-0 border border-white/10">
+                {r.name ? r.name.charAt(0).toUpperCase() : "U"}
+              </div>
+              <div className="min-w-0">
+                <span className="font-semibold text-[11px] text-white block truncate">{r.name}</span>
+                {r.role && <span className="text-[9.5px] text-zinc-400 block truncate -mt-0.5">{r.role}</span>}
+              </div>
+            </div>
+            <span className="text-[9.5px] font-mono text-zinc-400 shrink-0 text-right">{formatSeenTime(r.read_at)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function SeenReceiptsIndicator({
+  seenBy,
+  isSelf,
+  sentAt
+}: {
+  seenBy?: Array<{
+    user_id?: number;
+    name?: string;
+    role?: string;
+    read_at?: string;
+    is_client?: boolean;
+  }>;
+  isSelf: boolean;
+  sentAt?: string;
+}) {
+  const readers = seenBy || [];
+  const hasSeen = readers.length > 0;
+
+  if (!isSelf && !hasSeen) return null;
+
+  if (!hasSeen) {
+    return (
+      <TooltipProvider delayDuration={100}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className="inline-flex items-center p-0.5 opacity-60 hover:opacity-100 transition-opacity cursor-default"
+              aria-label="Delivered"
+            >
+              <Check className="w-3.5 h-3.5 opacity-70" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent
+            side="top"
+            align="center"
+            sideOffset={6}
+            className="z-[99999] px-2.5 py-1 rounded-lg bg-[#18181C]/95 text-white border border-white/20 shadow-lg text-[11px] font-medium"
+          >
+            {sentAt ? `Delivered • ${formatSeenTime(sentAt)}` : "Delivered"}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex items-center gap-0.5 cursor-pointer p-0.5 rounded hover:bg-white/10 transition-colors focus:outline-none"
+            aria-label={`Seen by ${readers.map((r) => r.name).join(", ")}`}
+          >
+            {isSelf ? (
+              <CheckCheck className="w-3.5 h-3.5 text-blue-400 transition-colors" />
+            ) : (
+              <Eye className="w-3.5 h-3.5 text-zinc-300 hover:text-white transition-colors" />
+            )}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent
+          side="top"
+          align="end"
+          sideOffset={6}
+          className="p-0 bg-transparent border-0 shadow-none z-[99999]"
+        >
+          <ReadersListPopoverContent readers={readers} />
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 export function MessageBubble({
   message,
@@ -89,23 +209,29 @@ export function MessageBubble({
     message.attachment_name || (isImg ? "Image snippet" : "Attachment")
   );
 
-  // Bubble style classes based on channel and ownership
-  let bubbleClasses = "";
-  if (isSelf) {
-    if (isInternal) {
-      // Internal own message: Soft Apricot-Orange
-      bubbleClasses =
-        "bg-orange-50 dark:bg-[#261409] text-orange-950 dark:text-orange-100 border-orange-200 dark:border-[#4D2912] bg-[var(--oc-bubble-internal-bg)] text-[var(--oc-bubble-internal-text)] border border-[var(--oc-bubble-internal-border)] shadow-2xs";
-    } else {
-      // Client external own message: Soft Lavender-Purple
-      bubbleClasses =
-        "bg-purple-50 dark:bg-[#1E1433] text-purple-950 dark:text-purple-100 border-purple-200 dark:border-[#3B2766] bg-[var(--oc-bubble-client-bg)] text-[var(--oc-bubble-client-text)] border border-[var(--oc-bubble-client-border)] shadow-2xs";
-    }
-  } else {
-    // Other person's message: Crisp subtle neutral white with clean border
-    bubbleClasses =
-      "bg-white dark:bg-[#202026] text-zinc-900 dark:text-[#F4F4F8] border-zinc-200 dark:border-[#2F2F3B] bg-[var(--oc-bubble-other-bg)] text-[var(--oc-bubble-other-text)] border border-[var(--oc-bubble-other-border)] shadow-2xs";
-  }
+  // Transparent Frosted Glass Bubble Styling with Dynamic Theme Colors
+  const bubbleStyle: React.CSSProperties = {
+    overflowWrap: "anywhere",
+    wordBreak: "break-word",
+    backgroundColor: isSelf
+      ? isInternal
+        ? "var(--oc-bubble-internal-bg)"
+        : "var(--oc-bubble-client-bg)"
+      : "var(--oc-bubble-other-bg)",
+    borderColor: isSelf
+      ? isInternal
+        ? "var(--oc-bubble-internal-border)"
+        : "var(--oc-bubble-client-border)"
+      : "var(--oc-bubble-other-border)",
+    color: isSelf
+      ? isInternal
+        ? "var(--oc-bubble-internal-text)"
+        : "var(--oc-bubble-client-text)"
+      : "var(--oc-bubble-other-text)",
+    backdropFilter: "blur(14px)",
+    WebkitBackdropFilter: "blur(14px)",
+    textShadow: "0 1px 2px rgba(0, 0, 0, 0.70)"
+  };
 
   const handleCopy = () => {
     if (message.message) {
@@ -117,7 +243,7 @@ export function MessageBubble({
   return (
     <div
       id={`message-${message.id}`}
-      className={`group relative flex flex-col my-1 transition-colors ${
+      className={`group relative flex flex-col my-1 transition-colors w-full ${
         isSelf ? "items-end" : "items-start"
       } ${
         mentionsCurrentUser
@@ -127,7 +253,7 @@ export function MessageBubble({
     >
       {/* Floating Action Bar (revealed on hover) */}
       <div
-        className={`absolute top-0 -translate-y-1/2 hidden group-hover:flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-[var(--oc-bg-panel)] border border-[var(--oc-border)] shadow-md z-20 ${
+        className={`absolute top-0 -translate-y-1/2 hidden group-hover:flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-white/95 dark:bg-[#18181C]/95 backdrop-blur-md border border-zinc-200 dark:border-white/15 shadow-md z-20 ${
           isSelf ? "right-2" : "left-2"
         }`}
       >
@@ -156,7 +282,7 @@ export function MessageBubble({
             </button>
 
             {showEmojiPicker && (
-              <div className="absolute bottom-full left-0 mb-1 flex items-center gap-1 p-1 rounded-lg bg-[var(--oc-bg-panel)] border border-[var(--oc-border)] shadow-lg z-30 animate-fadeIn">
+              <div className="absolute bottom-full left-0 mb-1 flex items-center gap-1 p-1 rounded-lg bg-white/95 dark:bg-[#18181C]/95 backdrop-blur-md border border-zinc-200 dark:border-white/15 shadow-lg z-30 animate-fadeIn">
                 {COMMON_EMOJIS.map((emoji) => (
                   <button
                     key={emoji}
@@ -173,6 +299,31 @@ export function MessageBubble({
               </div>
             )}
           </div>
+        )}
+
+        {message.seen_by && message.seen_by.length > 0 && (
+          <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="p-1 rounded-full text-[var(--oc-text-tertiary)] hover:text-blue-400 hover:bg-[var(--oc-bg-subtle)] transition-colors"
+                  title="View who read this message"
+                  aria-label="View who read this message"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                align="center"
+                sideOffset={6}
+                className="p-0 bg-transparent border-0 shadow-none z-[99999]"
+              >
+                <ReadersListPopoverContent readers={message.seen_by} />
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
 
         {message.message && (
@@ -214,11 +365,8 @@ export function MessageBubble({
 
       {/* Bubble Container */}
       <div
-        className={`min-w-[76px] max-w-[85%] sm:max-w-[75%] px-3.5 py-2.5 rounded-2xl transition-all ${bubbleClasses}`}
-        style={{
-          overflowWrap: "anywhere",
-          wordBreak: "break-word"
-        }}
+        className="w-fit min-w-[72px] max-w-[88%] sm:max-w-[78%] px-3.5 py-2.5 rounded-2xl border transition-all shadow-md"
+        style={bubbleStyle}
       >
         {/* Reply Quote Block */}
         {message.quoted_message_text && (
@@ -242,16 +390,16 @@ export function MessageBubble({
               /* Image Thumbnail */
               imageLoadError ? (
                 /* Graceful fallback if image file is unreachable on disk/proxy */
-                <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-xs">
-                  <ImageIcon className="w-4 h-4 text-[var(--oc-text-tertiary)] shrink-0" />
-                  <span className="truncate flex-1 font-medium">{displayAttachmentName}</span>
+                <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-black/25 border border-white/10 text-xs">
+                  <ImageIcon className="w-4 h-4 text-zinc-300 shrink-0" />
+                  <span className="truncate flex-1 font-medium text-white">{displayAttachmentName}</span>
                   {resolvedAttachmentUrl && (
                     <a
                       href={resolvedAttachmentUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="text-[11px] font-semibold text-[var(--oc-brand-600)] hover:underline shrink-0"
+                      className="text-[11px] font-semibold text-cyan-300 hover:underline shrink-0"
                     >
                       View
                     </a>
@@ -259,7 +407,7 @@ export function MessageBubble({
                 </div>
               ) : (
                 <div
-                  className="relative rounded-lg overflow-hidden border border-black/10 dark:border-white/10 group/img cursor-pointer max-w-sm bg-black/5 dark:bg-white/5"
+                  className="relative rounded-lg overflow-hidden border border-white/15 group/img cursor-pointer max-w-sm bg-black/30"
                   onClick={() =>
                     onOpenImagePreview?.(
                       resolvedAttachmentUrl,
@@ -306,24 +454,24 @@ export function MessageBubble({
                 download={message.attachment_name || "download"}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 p-2.5 rounded-lg border transition-colors bg-[var(--oc-bg-panel)] hover:bg-[var(--oc-bg-subtle)] border-[var(--oc-border)] text-[var(--oc-text-primary)]"
+                className="flex items-center gap-3 p-2.5 rounded-lg border transition-colors bg-black/25 hover:bg-black/40 border-white/15 text-white"
               >
-                <div className="p-2 rounded-md bg-black/5 dark:bg-white/10 shrink-0">
+                <div className="p-2 rounded-md bg-white/10 shrink-0">
                   {isExcel ? (
-                    <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+                    <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
                   ) : (
-                    <FileText className="w-5 h-5 text-[var(--oc-brand-500)]" />
+                    <FileText className="w-5 h-5 text-cyan-300" />
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-semibold truncate leading-tight">
+                  <div className="text-xs font-semibold truncate leading-tight text-white">
                     {displayAttachmentName}
                   </div>
-                  <div className="text-[11px] opacity-75 mt-0.5 tabular-nums">
+                  <div className="text-[11px] opacity-80 mt-0.5 tabular-nums text-zinc-300">
                     {formatFileSize(message.attachment_size)}
                   </div>
                 </div>
-                <Download className="w-4 h-4 shrink-0 opacity-80" />
+                <Download className="w-4 h-4 shrink-0 opacity-80 text-white" />
               </a>
             )}
           </div>
@@ -331,20 +479,28 @@ export function MessageBubble({
 
         {/* Message Text with Mentions */}
         {message.message && (
-          <div className="text-[14px] leading-relaxed whitespace-pre-wrap select-text">
+          <div
+            className="text-[14px] leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] select-text font-medium"
+            style={{
+              color: "inherit",
+              textShadow: "0 1px 2px rgba(0, 0, 0, 0.70)"
+            }}
+          >
             {renderMessageWithMentions(message.message, currentUserName)}
           </div>
         )}
 
         {/* Message Meta: Time & Read Receipts */}
         <div
-          className={`flex items-center justify-end gap-1.5 mt-1 text-[11px] tabular-nums select-none whitespace-nowrap ${
-            isSelf
+          className="flex items-center justify-end gap-1.5 mt-1 text-[11px] tabular-nums select-none whitespace-nowrap opacity-90 font-medium"
+          style={{
+            color: isSelf
               ? isInternal
-                ? "text-[var(--oc-bubble-internal-meta)]"
-                : "text-[var(--oc-bubble-client-meta)]"
-              : "text-[var(--oc-bubble-other-meta)]"
-          }`}
+                ? "var(--oc-bubble-internal-meta)"
+                : "var(--oc-bubble-client-meta)"
+              : "var(--oc-bubble-other-meta)",
+            textShadow: "0 1px 1px rgba(0, 0, 0, 0.60)"
+          }}
           title={fullDateTime}
         >
           {message.is_snippet && (
@@ -357,15 +513,13 @@ export function MessageBubble({
 
           {message.pending ? (
             <Clock className="w-3 h-3 animate-spin" />
-          ) : isSelf ? (
-            message.seen_by && message.seen_by.length > 0 ? (
-              <span title={`Seen by ${message.seen_by.map((u: { name: string }) => u.name).join(", ")}`}>
-                <CheckCheck className="w-3.5 h-3.5 text-blue-400" />
-              </span>
-            ) : (
-              <Check className="w-3 h-3 opacity-70" />
-            )
-          ) : null}
+          ) : (
+            <SeenReceiptsIndicator
+              seenBy={message.seen_by}
+              isSelf={isSelf}
+              sentAt={message.created_at}
+            />
+          )}
         </div>
       </div>
 
@@ -387,10 +541,10 @@ export function MessageBubble({
                 type="button"
                 onClick={() => onReact?.(message.id, reaction.emoji)}
                 title={userNames}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-colors border ${
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-colors border backdrop-blur-xs ${
                   hasReacted
                     ? "bg-[var(--oc-brand-50)] text-[var(--oc-brand-700)] border-[var(--oc-brand-300)]"
-                    : "bg-[var(--oc-bg-panel)] text-[var(--oc-text-secondary)] border-[var(--oc-border)] hover:bg-[var(--oc-bg-subtle)]"
+                    : "bg-white/80 dark:bg-[#18181C]/80 text-[var(--oc-text-secondary)] border-zinc-200 dark:border-white/15 hover:bg-[var(--oc-bg-subtle)]"
                 }`}
               >
                 <span>{reaction.emoji}</span>

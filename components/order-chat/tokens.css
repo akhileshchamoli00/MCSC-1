@@ -4,8 +4,7 @@
    Light tones, highly legible, calm and pleasant in both light & dark themes.
    ========================================================================== */
 
-:root,
-.order-chat-workspace {
+:root {
   /* =========================================================================
      1. Canvas & Structural Neutrals (Matte Studio Slate)
      ========================================================================= */
@@ -23,10 +22,14 @@
      2. Client & Consultant Channel (Soft Lavender-Purple)
      Refined iris / lavender. Dignified, trustworthy, pleasant.
      ========================================================================= */
+  --oc-brand-950: #2E1065;
+  --oc-brand-900: #4C1D95;
+  --oc-brand-800: #5B21B6;
   --oc-brand-700: #5B21B6;
   --oc-brand-600: #6D28D9;
   --oc-brand-500: #7C3AED;
   --oc-brand-400: #A78BFA;
+  --oc-brand-300: #C4B5FD;
   --oc-brand-200: #DDD6FE;
   --oc-brand-100: #EDE9FE;
   --oc-brand-50: #FAF5FF;
@@ -36,10 +39,14 @@
      3. Internal Team Channel (Soft Apricot-Orange)
      Warm peach / apricot. Cozy, distinct, zero neon glare.
      ========================================================================= */
+  --oc-internal-950: #431407;
+  --oc-internal-900: #7C2D12;
+  --oc-internal-800: #9A3412;
   --oc-internal-700: #9A3412;
   --oc-internal-600: #C2410C;
   --oc-internal-500: #EA580C;
   --oc-internal-400: #FB923C;
+  --oc-internal-300: #FDBA74;
   --oc-internal-200: #FED7AA;
   --oc-internal-100: #FFEDD5;
   --oc-internal-50: #FFF8F0;
@@ -89,6 +96,18 @@
   --oc-status-neutral-bg: #F3F4F6;
   --oc-status-neutral-border: #E5E7EB;
 
+  --oc-warning-50: #FFFBEB;
+  --oc-warning-100: #FEF3C7;
+  --oc-warning-300: #FCD34D;
+  --oc-warning-500: #F59E0B;
+  --oc-warning-700: #B45309;
+
+  --oc-danger-50: #FEF2F2;
+  --oc-danger-100: #FEE2E2;
+  --oc-danger-500: #EF4444;
+  --oc-danger-600: #DC2626;
+  --oc-danger-700: #B91C1C;
+
   /* =========================================================================
      6. Radius Tokens
      ========================================================================= */
@@ -119,8 +138,10 @@
 .dark,
 html.dark,
 .dark :root,
+.order-chat-workspace,
 .dark .order-chat-workspace,
 .order-chat-workspace.dark {
+  color-scheme: dark;
   /* Base Neutrals (Dark Charcoal) */
   --oc-bg-app: #0F0F12;
   --oc-bg-panel: #18181C;
@@ -133,40 +154,48 @@ html.dark,
   --oc-text-tertiary: #8E8EA0;
 
   /* Brand / External Channel (Purple Dark Mode) */
-  --oc-brand-700: #C4B5FD;
-  --oc-brand-600: #8B5CF6;
+  --oc-brand-950: #140A26;
+  --oc-brand-900: #20103A;
+  --oc-brand-800: #311A54;
+  --oc-brand-700: #DDD6FE;
+  --oc-brand-600: #C4B5FD;
   --oc-brand-500: #A78BFA;
   --oc-brand-400: #C4B5FD;
-  --oc-brand-200: #3B2766;
-  --oc-brand-100: #281A46;
-  --oc-brand-50: #170F28;
+  --oc-brand-300: #DDD6FE;
+  --oc-brand-200: #3E2468;
+  --oc-brand-100: #241442;
+  --oc-brand-50: #1B112E;
   --oc-brand-contrast: #FFFFFF;
 
-  --oc-bubble-client-bg: #1E1433;
-  --oc-bubble-client-border: #3B2766;
-  --oc-bubble-client-text: #F3E8FF;
-  --oc-bubble-client-meta: #C4B5FD;
+  --oc-bubble-client-bg: rgba(12, 28, 48, 0.52);
+  --oc-bubble-client-border: rgba(56, 189, 248, 0.38);
+  --oc-bubble-client-text: #BAE6FD;
+  --oc-bubble-client-meta: #7DD3FC;
 
-  /* Internal Channel (Orange Dark Mode) */
-  --oc-internal-700: #FDBA74;
-  --oc-internal-600: #FB923C;
-  --oc-internal-500: #F97316;
+  /* Internal Channel (Frosted Aurora Starlight Teal) */
+  --oc-internal-950: #1B0E07;
+  --oc-internal-900: #2C160B;
+  --oc-internal-800: #422110;
+  --oc-internal-700: #FED7AA;
+  --oc-internal-600: #FDBA74;
+  --oc-internal-500: #FB923C;
   --oc-internal-400: #FB923C;
-  --oc-internal-200: #4D2912;
-  --oc-internal-100: #331C0E;
-  --oc-internal-50: #1F1109;
+  --oc-internal-300: #FED7AA;
+  --oc-internal-200: #4D2611;
+  --oc-internal-100: #2A150A;
+  --oc-internal-50: #1A0D06;
   --oc-internal-contrast: #FFFFFF;
 
-  --oc-bubble-internal-bg: #261409;
-  --oc-bubble-internal-border: #4D2912;
-  --oc-bubble-internal-text: #FFEDD5;
-  --oc-bubble-internal-meta: #FDBA74;
+  --oc-bubble-internal-bg: rgba(8, 36, 36, 0.52);
+  --oc-bubble-internal-border: rgba(45, 212, 191, 0.38);
+  --oc-bubble-internal-text: #99F6E4;
+  --oc-bubble-internal-meta: #5EEAD4;
 
   /* Incoming / Other Participant Bubble */
-  --oc-bubble-other-bg: #202026;
-  --oc-bubble-other-border: #2F2F3B;
-  --oc-bubble-other-text: #F4F4F8;
-  --oc-bubble-other-meta: #8E8EA0;
+  --oc-bubble-other-bg: rgba(12, 18, 28, 0.58);
+  --oc-bubble-other-border: rgba(255, 255, 255, 0.20);
+  --oc-bubble-other-text: #FFFFFF;
+  --oc-bubble-other-meta: #94A3B8;
 
   /* Status Semantics (Dark Mode) */
   --oc-status-success-text: #34D399;
@@ -188,6 +217,18 @@ html.dark,
   --oc-status-neutral-text: #9CA3AF;
   --oc-status-neutral-bg: #222228;
   --oc-status-neutral-border: #374151;
+
+  --oc-warning-50: #291D03;
+  --oc-warning-100: #3E2905;
+  --oc-warning-300: #78350F;
+  --oc-warning-500: #FBBF24;
+  --oc-warning-700: #FDE68A;
+
+  --oc-danger-50: #300C0C;
+  --oc-danger-100: #450A0A;
+  --oc-danger-500: #F87171;
+  --oc-danger-600: #EF4444;
+  --oc-danger-700: #FECACA;
 
   /* Shadows (Dark Mode) */
   --oc-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);

@@ -724,6 +724,13 @@ def run_migrations():
     except Exception as e:
         print(f"Note on performance indexes migration: {e}")
 
+    # Ensure order_document_reviews table exists
+    try:
+        import models
+        models.Base.metadata.create_all(bind=engine, tables=[models.OrderDocumentReview.__table__])
+    except Exception as e:
+        print(f"Note on creating order_document_reviews table: {e}")
+
     print("Migration check complete.")
 
 if __name__ == "__main__":

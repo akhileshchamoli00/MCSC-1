@@ -1791,6 +1791,41 @@ class AccurateManualSyncResponse(BaseModel):
     details: Optional[dict] = None
 
 
+class PreSignatureChecklistItem(BaseModel):
+    document_name: str
+    document_id: Optional[int] = None
+    document_path: Optional[str] = None
+    category: Optional[str] = "Pre-Signature Documents"
+    size: Optional[int] = None
+    description: Optional[str] = None
+    source: Optional[str] = "database"
+    is_reviewed: bool = False
+    reviewed_by_id: Optional[int] = None
+    reviewed_by_name: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
+    notes: Optional[str] = None
+
+
+class PreSignatureChecklistResponse(BaseModel):
+    order_number: str
+    company_name: str
+    company_code: Optional[str] = None
+    company_id: Optional[int] = None
+    total_documents: int = 0
+    reviewed_documents: int = 0
+    is_all_reviewed: bool = False
+    lifecycle_status: Optional[str] = None
+    items: List[PreSignatureChecklistItem] = []
+
+
+class PreSignatureChecklistToggleRequest(BaseModel):
+    document_name: str
+    is_reviewed: bool
+    document_id: Optional[int] = None
+    document_path: Optional[str] = None
+    notes: Optional[str] = None
+
+
 
 
 

@@ -23,9 +23,9 @@ export function SystemEventGroup({ events }: SystemEventProps) {
     return (
       <div className="my-2.5 flex items-center justify-center gap-3 px-4 select-none">
         <div className="h-px flex-1 bg-[var(--oc-border)] opacity-60" />
-        <div className="flex items-center gap-2 text-[12px] text-[var(--oc-text-tertiary)] max-w-[80%] text-center">
+        <div className="flex items-center gap-2 text-[12px] text-[var(--oc-text-tertiary)] max-w-[80%] text-center px-2.5 py-0.5 rounded-full bg-white/70 dark:bg-[#18181C]/70 backdrop-blur-xs border border-zinc-200/60 dark:border-white/10 shadow-2xs">
           <Activity className="w-3.5 h-3.5 shrink-0 text-[var(--oc-brand-500)] opacity-80" />
-          <span className="font-medium text-[var(--oc-text-secondary)]">{cleaned}</span>
+          <span className="font-medium text-[var(--oc-text-secondary)] dark:text-zinc-300">{cleaned}</span>
           {time && <span className="tabular-nums text-[11px] opacity-75">{time}</span>}
         </div>
         <div className="h-px flex-1 bg-[var(--oc-border)] opacity-60" />
@@ -44,7 +44,7 @@ export function SystemEventGroup({ events }: SystemEventProps) {
         <button
           type="button"
           onClick={() => setIsExpanded(!isExpanded)}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium text-[var(--oc-text-secondary)] bg-[var(--oc-bg-subtle)] hover:bg-[var(--oc-bg-panel)] border border-[var(--oc-border)] transition-colors cursor-pointer group"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium text-[var(--oc-text-secondary)] dark:text-zinc-300 bg-white/80 dark:bg-[#18181C]/80 hover:bg-white dark:hover:bg-[#18181C] backdrop-blur-xs border border-zinc-200 dark:border-white/15 transition-colors cursor-pointer group shadow-2xs"
         >
           <Activity className="w-3 h-3 text-[var(--oc-brand-500)]" />
           <span>

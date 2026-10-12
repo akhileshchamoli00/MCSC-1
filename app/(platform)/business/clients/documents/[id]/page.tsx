@@ -57,7 +57,8 @@ import {
   X,
   FileSpreadsheet,
   ImageIcon,
-  File as FileIcon
+  File as FileIcon,
+  CheckSquare
 } from "lucide-react";
 import { toast } from "sonner";
 import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
@@ -66,6 +67,7 @@ import Link from "next/link";
 import { format, isBefore, differenceInDays } from "date-fns";
 import { DropboxFileManager } from "@/components/dropbox-file-manager";
 import { DualOrderChatDialog } from "@/components/dual-order-chat-dialog";
+import { PreSignatureReviewDialog } from "@/components/orders";
 import { ExcelPreview } from "@/components/excel-preview";
 import { cn } from "@/lib/utils";
 
@@ -120,6 +122,7 @@ export default function CompanyDocumentsManagementPage() {
   const [holdChannel, setHoldChannel] = useState<"CLIENT" | "INTERNAL">("INTERNAL");
   const [submittingHold, setSubmittingHold] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isReviewChecklistOpen, setIsReviewChecklistOpen] = useState(false);
   const [filterByActiveOrder, setFilterByActiveOrder] = useState(Boolean(orderNumberParam));
 
   // Documents
@@ -1277,17 +1280,6 @@ export default function CompanyDocumentsManagementPage() {
                 </Button>
               )}
 
-              {!isPipelineInquiry && activeOrder.status === "REVIEW_DOCS" && (
-                <Button
-                  size="sm"
-                  onClick={() => handleUpdateActiveOrderStatus("DOCUMENTS_REVIEWED")}
-                  disabled={updatingOrderStatus}
-                  className="bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs h-9 gap-1.5 shadow-sm cursor-pointer"
-                >
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Mark Reviewed
-                </Button>
-              )}
-
               {!isPipelineInquiry && (activeOrder.status === "DOCUMENTS_REVIEWED" || activeOrder.status === "FINAL_DOCUMENT_PREPARATION" || activeOrder.status === "PRE_DOCS_SENT") && (
                 <Button
                   size="sm"
@@ -1442,7 +1434,20 @@ export default function CompanyDocumentsManagementPage() {
                     </button>
                   </div>
                 )}
+                {!isPipelineInquiry && activeOrder && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsReviewChecklistOpen(true)}
+                    className="h-9 px-3 text-xs gap-1.5 border-teal-500/30 bg-teal-500/10 text-teal-700 hover:bg-teal-500/20 dark:text-teal-300 dark:border-teal-500/40 font-semibold shadow-2xs shrink-0 cursor-pointer"
+                    title="Open Pre-Signature Documents Review Checklist"
+                  >
+                    <CheckSquare className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
+                    <span>Review Checklist</span>
+                  </Button>
+                )}
                 <div className="w-full sm:w-80 min-w-[280px] shrink-0">
+
                   <Select value={docCategoryFilter} onValueChange={setDocCategoryFilter}>
                     <SelectTrigger className="h-9 text-xs bg-muted/10 border-border/80 w-full">
                       <SelectValue placeholder="All Categories" />
@@ -1478,26 +1483,24 @@ export default function CompanyDocumentsManagementPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="overflow-x-auto border rounded-xl max-h-[415px] overflow-y-auto shadow-inner bg-muted/5 relative">
-                <table className="w-full text-xs text-left whitespace-nowrap border-collapse">
+              <div className="border rounded-xl max-h-[440px] overflow-y-auto overflow-x-auto shadow-inner bg-muted/5 relative">
+                <table className="w-full text-xs text-left border-collapse">
                   <thead className="bg-muted border-b sticky top-0 z-10 shadow-sm">
                     <tr className="uppercase font-semibold text-[10px] text-muted-foreground tracking-wider bg-muted">
-                      <th className="px-4 py-3 w-12 text-center bg-muted">No.</th>
-                      <th className="px-4 py-3 bg-muted">Document Type</th>
-                      <th className="px-4 py-3 bg-muted">Description</th>
-                      <th className="px-4 py-3 text-center bg-muted">Format</th>
-                      <th className="px-4 py-3 bg-muted">Order Number</th>
-                      <th className="px-4 py-3 bg-muted">Upload Date & Time</th>
-                      <th className="px-4 py-3 bg-muted">Issue Date</th>
-                      <th className="px-4 py-3 bg-muted">Expiry Date</th>
-                      <th className="px-4 py-3 text-center bg-muted">Compliance Status</th>
-                      <th className="px-4 py-3 text-right bg-muted">Actions</th>
+                      <th className="px-2.5 py-3 w-10 text-center bg-muted">No.</th>
+                      <th className="px-3 py-3 bg-muted min-w-[140px]">Document Type</th>
+                      <th className="px-3 py-3 bg-muted min-w-[150px]">Description</th>
+                      <th className="px-3 py-3 bg-muted whitespace-nowrap">Order Number</th>
+                      <th className="px-3 py-3 bg-muted whitespace-nowrap">Upload Date & Time</th>
+                      <th className="px-3 py-3 bg-muted whitespace-nowrap">Issue & Expiry Date</th>
+                      <th className="px-3 py-3 text-center bg-muted whitespace-nowrap">Compliance & Format</th>
+                      <th className="px-3 py-3 text-right bg-muted whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50 bg-background">
                     {filteredDocuments.length === 0 && (
                       <tr>
-                        <td colSpan={10} className="px-4 py-8 text-center bg-muted/10">
+                        <td colSpan={8} className="px-4 py-8 text-center bg-muted/10">
                           <FileText className="mx-auto h-6 w-6 text-muted-foreground/40 mb-1" />
                           <p className="text-sm font-semibold text-foreground">
                             {isPipelineInquiry 
@@ -1516,39 +1519,40 @@ export default function CompanyDocumentsManagementPage() {
                       const compliance = getDocumentComplianceStatus(doc.expiry_date);
                       return (
                         <tr key={doc.id} className="hover:bg-muted/30 transition-colors">
-                          <td className="px-4 py-3 text-center font-mono text-muted-foreground">
+                          <td className="px-2.5 py-3 text-center font-mono text-muted-foreground text-[11px]">
                             {index + 1}
                           </td>
-                          <td className="px-4 py-3 font-bold text-foreground">
-                            <div className="flex flex-col gap-0.5">
-                              <span>{doc.document_type || "General Document"}</span>
+                          <td className="px-3 py-3 font-bold text-foreground">
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                              <span className="truncate block" title={doc.document_type || "General Document"}>
+                                {doc.document_type || "General Document"}
+                              </span>
                               {doc.file_name && (
-                                <span className="text-[11px] font-mono font-normal text-muted-foreground truncate max-w-[220px]" title={doc.file_name}>
+                                <span className="text-[11px] font-mono font-normal text-muted-foreground truncate block max-w-[200px]" title={doc.file_name}>
                                   {doc.file_name}
                                 </span>
                               )}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-muted-foreground text-xs font-medium max-w-[400px] whitespace-pre-line break-words leading-relaxed">
-                            {doc.description || "-"}
+                          <td className="px-3 py-3 text-muted-foreground text-xs font-normal max-w-[220px]">
+                            <p className="line-clamp-2 break-words leading-relaxed" title={doc.description || ""}>
+                              {doc.description || "-"}
+                            </p>
                           </td>
-                          <td className="px-4 py-3 text-center">
-                            {getFileFormatBadge(doc.file_name, doc.file_url)}
-                          </td>
-                          <td className="px-4 py-3 font-mono font-bold text-primary">
+                          <td className="px-3 py-3 font-mono font-bold text-primary whitespace-nowrap">
                             {doc.order_number || "-"}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
+                          <td className="px-3 py-3 whitespace-nowrap">
                             {doc.uploaded_at ? (
                               <div className="flex flex-col gap-0.5">
-                                <div className="flex items-center gap-1.5 font-mono text-foreground font-semibold">
+                                <div className="flex items-center gap-1.5 font-mono text-foreground font-semibold text-[11px]">
                                   <Clock className="h-3 w-3 text-muted-foreground/70 shrink-0" />
                                   <span>{format(new Date(doc.uploaded_at), "MMM d, yyyy")}</span>
                                 </div>
-                                <div className="text-[11px] text-muted-foreground font-mono pl-4.5 flex items-center gap-1">
+                                <div className="text-[10px] text-muted-foreground font-mono pl-4.5 flex items-center gap-1">
                                   <span>{format(new Date(doc.uploaded_at), "HH:mm:ss")}</span>
                                   {doc.uploader_name && (
-                                    <span className="text-[10px] text-muted-foreground/80 font-sans truncate max-w-[130px]" title={`Uploaded by ${doc.uploader_name}`}>
+                                    <span className="text-[10px] text-muted-foreground/80 font-sans truncate max-w-[120px]" title={`Uploaded by ${doc.uploader_name}`}>
                                       • {doc.uploader_name}
                                     </span>
                                   )}
@@ -1558,60 +1562,73 @@ export default function CompanyDocumentsManagementPage() {
                               <span className="text-muted-foreground font-mono">-</span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-muted-foreground font-mono">
-                            {doc.document_date ? format(new Date(doc.document_date), "MMM d, yyyy") : "-"}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <div className="flex flex-col gap-1 font-mono text-[11px]">
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                <span className="text-[9.5px] uppercase font-sans font-semibold tracking-wider text-muted-foreground/70 w-11 shrink-0">Issue:</span>
+                                <span>{doc.document_date ? format(new Date(doc.document_date), "MMM d, yyyy") : "-"}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 font-medium text-foreground">
+                                <span className="text-[9.5px] uppercase font-sans font-semibold tracking-wider text-muted-foreground/70 w-11 shrink-0">Expiry:</span>
+                                <span className={doc.expiry_date ? "" : "text-muted-foreground"}>
+                                  {doc.expiry_date ? format(new Date(doc.expiry_date), "MMM d, yyyy") : "No Expiry"}
+                                </span>
+                              </div>
+                            </div>
                           </td>
-                          <td className="px-4 py-3 font-mono font-medium text-foreground">
-                            {doc.expiry_date ? format(new Date(doc.expiry_date), "MMM d, yyyy") : "No Expiry"}
+                          <td className="px-3 py-3 text-center whitespace-nowrap">
+                            <div className="flex flex-col items-center justify-center gap-1.5">
+                              <Badge className={`${compliance.color} text-[10px] font-bold font-mono px-2 py-0.5 border shadow-2xs`}>
+                                {compliance.label}
+                              </Badge>
+                              {getFileFormatBadge(doc.file_name, doc.file_url)}
+                            </div>
                           </td>
-                          <td className="px-4 py-3 text-center">
-                            <Badge className={`${compliance.color} text-[10px] font-bold font-mono px-2 py-0.5 border`}>
-                              {compliance.label}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3 text-right space-x-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="Preview Document"
-                              className="h-8 w-8 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-                              onClick={() => handlePreviewClick(doc)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {doc.file_url && doc.file_url !== "#" && (
+                          <td className="px-3 py-3 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1">
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-primary hover:bg-primary/10"
-                                onClick={() => handleDownloadDocFile(doc)}
-                                title="Download Document"
+                                title="Preview Document"
+                                className="h-7 w-7 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                                onClick={() => handlePreviewClick(doc)}
                               >
-                                <Download className="h-4 w-4" />
+                                <Eye className="h-3.5 w-3.5" />
                               </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="Edit Document Metadata"
-                              className="h-8 w-8 text-muted-foreground hover:bg-muted/50"
-                              onClick={() => {
-                                setEditDoc(doc);
-                                setEditOrderSearchQuery(doc.order_number || "");
-                                setEditOrderDropdownOpen(false);
-                              }}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="Delete Document"
-                              className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                              onClick={() => setDeleteDocId(doc.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                              {doc.file_url && doc.file_url !== "#" && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-primary hover:bg-primary/10"
+                                  onClick={() => handleDownloadDocFile(doc)}
+                                  title="Download Document"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Edit Document Metadata"
+                                className="h-7 w-7 text-muted-foreground hover:bg-muted/50"
+                                onClick={() => {
+                                  setEditDoc(doc);
+                                  setEditOrderSearchQuery(doc.order_number || "");
+                                  setEditOrderDropdownOpen(false);
+                                }}
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Delete Document"
+                                className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                                onClick={() => setDeleteDocId(doc.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -2891,6 +2908,25 @@ export default function CompanyDocumentsManagementPage() {
         />
       )}
 
+      {/* Pre-Signature Documents Review Checklist Dialog */}
+      {activeOrder && (
+        <PreSignatureReviewDialog
+          open={isReviewChecklistOpen}
+          onOpenChange={setIsReviewChecklistOpen}
+          orderNumber={activeOrder.order_number}
+          companyName={companyName}
+          companyCode={companyCode}
+          companyId={companyId}
+          currentLifecycleStatus={activeOrder.status}
+          onStatusUpdated={(newStatus) => {
+            setActiveOrder((prev: any) => prev ? { ...prev, status: newStatus } : prev);
+            fetchInitialData();
+          }}
+          onOpenChat={() => setIsChatOpen(true)}
+        />
+      )}
+
     </div>
   );
 }
+

@@ -7,6 +7,7 @@ import {
   DeleteOrderDialog,
   OrderEmailDispatchDialog,
   OrderDeliverablesDialog,
+  JobDetailsPrintDialog,
 } from "@/components/orders";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Input } from "@/components/ui/input";
@@ -112,6 +113,8 @@ export default function ClientOrdersPage() {
   // Modal States
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isJobPrintOpen, setIsJobPrintOpen] = useState(false);
+  const [jobPrintOrder, setJobPrintOrder] = useState<any>(null);
   const [progressUpdates, setProgressUpdates] = useState<any[]>([]);
   const [loadingProgress, setLoadingProgress] = useState(false);
   const [newProgressMessage, setNewProgressMessage] = useState("");
@@ -1083,40 +1086,96 @@ export default function ClientOrdersPage() {
   });
   const allocatedStaffCount = allocatedStaffSet.size;
 
+  const getStatusDisplayLabel = (status: string) => {
+    if (!status) return "Completed";
+    const map: Record<string, string> = {
+      FINAL_DOC_READY: "Final docs ready",
+      ORDER_ASSIGNED: "Order assigned",
+      IN_PROGRESS: "In progress",
+      REVIEW_DOCS: "Review docs",
+      DOCUMENTS_REVIEWED: "Docs reviewed",
+      PRE_DOC_SENT_FOR_SIGNATURE: "Pre-doc sent for signature",
+      PRE_DOCS_SENT: "Pre-docs sent",
+      AWAITING_SIGNING_NOTARIZATION: "Awaiting signing",
+      AWAITING_DOCUMENT_RETURN: "Awaiting doc return",
+      AWAITING_THIRD_PARTY_RESPONSE: "Awaiting vendor response",
+      FINAL_DOCUMENT_PREPARATION: "Final doc prep",
+      WAITING_ON_CLIENT: "Waiting on client",
+      WAITING_FOR_FINAL_PAYMENT: "Waiting final payment",
+      WAITING_ON_FINAL_PAYMENT: "Waiting final payment",
+      FINAL_PAYMENT_COMPLETED: "Final payment done",
+      SOFT_COPY_DELIVERED: "Soft copy delivered",
+      HARD_COPY_DELIVERED: "Hard copy delivered",
+      ON_HOLD: "On hold",
+      CONFIRMED: "Confirmed",
+      DRAFT: "Draft",
+      PROFORMA_GENERATED: "Proforma generated",
+      INVOICE_GENERATED: "Invoice generated",
+      COMPLETED: "Completed",
+      CANCELLED: "Cancelled",
+    };
+    if (map[status]) return map[status];
+    return status
+      .toLowerCase()
+      .split("_")
+      .map((word, i) => (i === 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word))
+      .join(" ");
+  };
+
+  const getPaymentDisplayLabel = (pStatus: string) => {
+    if (!pStatus) return "Paid";
+    const upper = pStatus.toUpperCase();
+    if (upper === "PAID") return "Paid";
+    if (upper === "PARTIALLY_PAID" || upper === "PARTIAL") return "Partial";
+    if (upper === "UNPAID") return "Unpaid";
+    return pStatus.charAt(0).toUpperCase() + pStatus.slice(1).toLowerCase();
+  };
+
   const getOrderStatusColor = (status: string) => {
     switch (status) {
-      case "COMPLETED": return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold";
-      case "CONFIRMED": return "bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20 font-bold";
-      case "DRAFT": return "bg-zinc-500/10 dark:bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border-zinc-500/20 font-bold";
-      case "CANCELLED": return "bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/20 font-bold";
-      case "PROFORMA_GENERATED": return "bg-cyan-500/10 dark:bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/20 font-bold";
-      case "WAITING_ON_CLIENT": return "bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20 font-bold";
-      case "ORDER_ASSIGNED": return "bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 font-bold";
-      case "IN_PROGRESS": return "bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/20 font-bold";
-      case "ON_HOLD": return "bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 font-bold";
-      case "REVIEW_DOCS": return "bg-teal-500/10 dark:bg-teal-500/15 text-teal-600 dark:text-teal-400 border-teal-500/20 font-bold";
-      case "DOCUMENTS_REVIEWED": return "bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 font-bold";
-      case "PRE_DOC_SENT_FOR_SIGNATURE": return "bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20 font-bold";
-      case "PRE_DOCS_SENT": return "bg-purple-500/10 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/20 font-bold";
-      case "AWAITING_SIGNING_NOTARIZATION": return "bg-violet-500/10 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/20 font-bold";
-      case "AWAITING_DOCUMENT_RETURN": return "bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20 font-bold";
-      case "AWAITING_THIRD_PARTY_RESPONSE": return "bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20 font-bold";
-      case "FINAL_DOCUMENT_PREPARATION": return "bg-orange-500/10 dark:bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/20 font-bold";
-      case "FINAL_DOC_READY": return "bg-lime-500/10 dark:bg-lime-500/15 text-lime-600 dark:text-lime-400 border-lime-500/20 font-bold";
-      case "INVOICE_GENERATED": return "bg-pink-500/10 dark:bg-pink-500/15 text-pink-600 dark:text-pink-400 border-pink-500/20 font-bold";
-      case "WAITING_FOR_FINAL_PAYMENT": return "bg-pink-500/10 dark:bg-pink-500/15 text-pink-600 dark:text-pink-400 border-pink-500/20 font-bold";
-      case "FINAL_PAYMENT_COMPLETED": return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold";
-      case "SOFT_COPY_DELIVERED": return "bg-sky-500/10 dark:bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/20 font-bold";
-      case "HARD_COPY_DELIVERED": return "bg-violet-500/10 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/20 font-bold";
-      default: return "bg-primary/10 text-primary border-primary/20 font-bold";
+      case "COMPLETED":
+      case "FINAL_DOC_READY":
+      case "FINAL_PAYMENT_COMPLETED":
+        return "bg-emerald-500/10 text-emerald-700 border-emerald-500/25 orders-badge-success font-medium";
+      case "IN_PROGRESS":
+      case "ORDER_ASSIGNED":
+      case "REVIEW_DOCS":
+      case "DOCUMENTS_REVIEWED":
+      case "FINAL_DOCUMENT_PREPARATION":
+      case "CONFIRMED":
+        return "bg-sky-500/10 text-sky-700 border-sky-500/25 orders-badge-info font-medium";
+      case "WAITING_ON_CLIENT":
+      case "WAITING_FOR_FINAL_PAYMENT":
+      case "WAITING_ON_FINAL_PAYMENT":
+      case "AWAITING_DOCUMENT_RETURN":
+      case "AWAITING_THIRD_PARTY_RESPONSE":
+      case "AWAITING_SIGNING_NOTARIZATION":
+      case "ON_HOLD":
+        return "bg-amber-500/10 text-amber-700 border-amber-500/25 orders-badge-warning font-medium";
+      case "PRE_DOC_SENT_FOR_SIGNATURE":
+      case "PRE_DOCS_SENT":
+      case "SOFT_COPY_DELIVERED":
+      case "HARD_COPY_DELIVERED":
+        return "bg-violet-500/10 text-violet-700 border-violet-500/25 orders-badge-purple font-medium";
+      case "DRAFT":
+      case "PROFORMA_GENERATED":
+      case "INVOICE_GENERATED":
+        return "bg-zinc-500/10 text-zinc-700 border-zinc-500/25 orders-badge-neutral font-medium";
+      case "CANCELLED":
+        return "bg-rose-500/10 text-rose-700 border-rose-500/25 orders-badge-danger font-medium";
+      default:
+        return "bg-emerald-500/10 text-emerald-700 border-emerald-500/25 orders-badge-success font-medium";
     }
   };
 
   const getPaymentStatusColor = (pStatus: string) => {
     switch (pStatus) {
-      case "PAID": return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold";
-      case "PARTIALLY_PAID": return "bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20 font-bold";
-      default: return "bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/20 font-bold";
+      case "PAID":
+        return "bg-emerald-500/10 text-emerald-700 border-emerald-500/25 orders-badge-success font-medium";
+      case "PARTIALLY_PAID":
+        return "bg-amber-500/10 text-amber-700 border-amber-500/25 orders-badge-warning font-medium";
+      default:
+        return "bg-rose-500/10 text-rose-700 border-rose-500/25 orders-badge-danger font-medium";
     }
   };
 
@@ -1842,12 +1901,12 @@ export default function ClientOrdersPage() {
 
   return (
     <>
-      <div className="space-y-6 animate-in fade-in duration-500 w-full max-w-none pb-12">
+      <div className="space-y-6 animate-in fade-in duration-500 w-full max-w-none pb-12 orders-page-shell">
 
         {/* Minimalist Metrics Strip Row */}
         <div className="flex flex-col md:flex-row items-stretch gap-3 w-full">
           {/* Minimalist Metric Strip - Expanded Horizontally */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-xs flex-1 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-xs flex-1 gap-3 sm:gap-4 orders-table-card">
 
             {/* Total Orders */}
             <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0 justify-start sm:justify-center">
@@ -1907,18 +1966,18 @@ export default function ClientOrdersPage() {
         </div>
 
         {/* Main Orders Table */}
-        <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
-          <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl orders-table-card">
+          <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between orders-table-toolbar">
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search Order ID, Company..."
-                className="pl-8 h-9 text-xs rounded-lg"
+                className="pl-8 h-9 text-xs rounded-lg orders-control"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold">
+            <span className="text-xs font-normal text-muted-foreground orders-text-secondary">
               Showing {paginatedOrders.length} of {filteredOrders.length} entries
             </span>
           </div>
@@ -1936,17 +1995,14 @@ export default function ClientOrdersPage() {
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                        <th className="py-2.5 px-2 w-8 text-center">No.</th>
-                        <th className="py-2.5 px-2 whitespace-nowrap w-28">Order ID & Date</th>
-                        <th className="py-2.5 px-2 min-w-[120px] max-w-[160px]">Company Entity</th>
-                        <th className="py-2.5 px-2.5 min-w-[220px] max-w-[320px]">Service Package</th>
-                        <th className="py-2.5 px-3 w-36 min-w-[145px] max-w-[170px] whitespace-nowrap text-left">Assigned Consultants</th>
-                        <th className="py-2.5 px-2.5 text-right whitespace-nowrap">Total Amount</th>
-                        <th className="py-2.5 px-2.5 text-right whitespace-nowrap">Vendor Fee</th>
-                        <th className="py-2.5 px-2.5 text-right whitespace-nowrap">Actual Earnings</th>
-                        <th className="py-2.5 px-2 text-center whitespace-nowrap min-w-[85px]">Payment</th>
-                        <th className="py-2.5 px-2 text-left whitespace-nowrap">Lifecycle Status</th>
-                        <th className="py-2.5 px-2 text-right whitespace-nowrap">Actions</th>
+                        <th className="py-2.5 px-2 w-8 text-center orders-th">No.</th>
+                        <th className="py-2.5 px-2 whitespace-nowrap w-28 orders-th">Order ID & Date</th>
+                        <th className="py-2.5 px-2 min-w-[120px] max-w-[160px] orders-th">Company Entity</th>
+                        <th className="py-2.5 px-2.5 min-w-[220px] max-w-[320px] orders-th">Service Package</th>
+                        <th className="py-2.5 px-3 w-36 min-w-[145px] max-w-[170px] whitespace-nowrap text-left orders-th">Assigned Consultants</th>
+                        <th className="py-2.5 px-2.5 text-right whitespace-nowrap orders-th min-w-[140px] max-w-[170px]">Financials (Total / Net)</th>
+                        <th className="py-2.5 px-2 text-center whitespace-nowrap min-w-[115px] max-w-[145px] orders-th">Status & Payment</th>
+                        <th className="py-2.5 px-2 text-right whitespace-nowrap orders-th orders-col-actions w-32 min-w-[120px] max-w-[135px]">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/30">
@@ -1956,12 +2012,12 @@ export default function ClientOrdersPage() {
                           <tr
                             key={ord.order_number || index}
                             id={`order-row-${ord.order_number}`}
-                            className={`transition-colors duration-200 border-b border-border/30 last:border-0 ${isHighlighted
-                                ? "bg-emerald-500/15 dark:bg-emerald-500/25 border-y-2 border-emerald-500"
+                            className={`transition-colors duration-200 border-b border-border/30 last:border-0 orders-row ${isHighlighted
+                                ? "bg-emerald-500/15 dark:bg-emerald-500/25 border-y-2 border-emerald-500 is-highlighted"
                                 : "hover:bg-muted/40"
                               }`}
                           >
-                            <td className={`py-2 px-2 text-center font-mono align-top pt-2.5 text-xs transition-colors ${
+                            <td className={`py-2 px-2 text-center font-mono align-top pt-2.5 text-xs transition-colors orders-text-secondary ${
                               isHighlighted
                                 ? "border-l-4 border-l-emerald-500 font-bold text-emerald-950 dark:text-emerald-100"
                                 : "font-medium text-muted-foreground"
@@ -1973,20 +2029,20 @@ export default function ClientOrdersPage() {
                                 <Link href={`/business/clients/documents/${ord.company_id}?from=orders`}>
                                   <Badge
                                     variant="outline"
-                                    className="font-mono font-bold text-xs bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary cursor-pointer transition-colors px-2 py-0.5 rounded"
+                                    className="font-mono font-medium text-xs bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary cursor-pointer transition-colors px-2 py-0.5 rounded orders-badge-neutral"
                                     title="Go to Company Documents Folder"
                                   >
                                     {ord.order_number}
                                   </Badge>
                                 </Link>
                               ) : (
-                                <Badge variant="outline" className="font-mono font-bold text-xs bg-primary/10 border-primary/30 text-primary px-2 py-0.5 rounded">
+                                <Badge variant="outline" className="font-mono font-medium text-xs bg-primary/10 border-primary/30 text-primary px-2 py-0.5 rounded orders-badge-neutral">
                                   {ord.order_number}
                                 </Badge>
                               )}
                               {ord.created_at && (
                                 <div
-                                  className="text-[10.5px] text-muted-foreground font-medium flex items-center gap-1 mt-1 tracking-tight"
+                                  className="text-[10.5px] text-muted-foreground font-medium flex items-center gap-1 mt-1 tracking-tight orders-text-secondary"
                                   title={`Order Created: ${new Date(ord.created_at).toLocaleString()}`}
                                 >
                                   <Calendar className="h-3 w-3 text-muted-foreground/60 shrink-0" />
@@ -1996,21 +2052,21 @@ export default function ClientOrdersPage() {
                             </td>
                             <td className="py-2 px-2 font-bold text-foreground align-top pt-2.5 min-w-[120px] max-w-[160px]">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-sm font-bold leading-snug break-words">{ord.company_name || "Personal Client Account"}</span>
+                                <span className="text-sm font-semibold leading-snug break-words orders-text-primary">{ord.company_name || "Personal Client Account"}</span>
                                 {(() => {
                                   const comp = companies.find((c: any) => c.id === (ord.company_id || ord.company?.id)) || ord.company;
                                   if (!comp) return null;
                                   const vStatus = comp.validation_status;
                                   if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
                                     return (
-                                      <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 flex items-center gap-0.5" title="Company pending admin validation">
+                                      <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 flex items-center gap-0.5 orders-badge-warning" title="Company pending admin validation">
                                         <Clock className="h-2.5 w-2.5" /> Pending
                                       </Badge>
                                     );
                                   }
                                   if (vStatus === "NEEDS_REVISION") {
                                     return (
-                                      <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 flex items-center gap-0.5" title="Company needs revision">
+                                      <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 flex items-center gap-0.5 orders-badge-danger" title="Company needs revision">
                                         <AlertCircle className="h-2.5 w-2.5" /> Revision
                                       </Badge>
                                     );
@@ -2018,7 +2074,7 @@ export default function ClientOrdersPage() {
                                   return null;
                                 })()}
                               </div>
-                              <div className="text-xs font-normal text-muted-foreground flex items-center gap-1 mt-1 truncate">
+                              <div className="text-xs font-normal text-muted-foreground flex items-center gap-1 mt-1 truncate orders-text-secondary">
                                 <Building className="h-3 w-3 text-muted-foreground shrink-0" /> <span className="truncate">{ord.client_name || "Representative"}</span>
                               </div>
                             </td>
@@ -2026,12 +2082,12 @@ export default function ClientOrdersPage() {
                               {ord.items && ord.items.length > 0 ? (
                                 <div className="space-y-1.5 w-full">
                                   {ord.items.map((item: any, idx: number) => (
-                                    <div key={idx} className="flex flex-wrap items-center gap-1.5 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
-                                      <span className="font-semibold text-foreground text-xs leading-normal break-words">
+                                    <div key={idx} className="flex flex-wrap items-center gap-1.5 border-b border-border/10 last:border-0 pb-1.5 last:pb-0 orders-service-card">
+                                      <span className="font-semibold text-foreground text-xs leading-normal break-words orders-text-primary">
                                         {item.job_title}
                                       </span>
                                       {item.job_id && (
-                                        <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                        <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-primary/5 text-primary border-primary/20 shrink-0 orders-badge-info">
                                           {item.job_id}
                                         </Badge>
                                       )}
@@ -2040,7 +2096,7 @@ export default function ClientOrdersPage() {
                                   ))}
                                 </div>
                               ) : (
-                                <span className="text-muted-foreground italic text-xs">-</span>
+                                <span className="text-muted-foreground italic text-xs orders-text-secondary">-</span>
                               )}
                             </td>
                             <td className="py-2 px-3 align-top pt-2.5 w-36 min-w-[145px] max-w-[170px]">
@@ -2051,7 +2107,7 @@ export default function ClientOrdersPage() {
                                     <Badge
                                       key={r.id}
                                       variant="outline"
-                                      className="text-[9px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 font-semibold flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none"
+                                      className="text-[9px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 font-semibold flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none orders-badge-purple"
                                       title={`Reviewer: ${r.name}`}
                                     >
                                       <ShieldCheck className="h-2.5 w-2.5 text-purple-600 shrink-0" />
@@ -2061,36 +2117,54 @@ export default function ClientOrdersPage() {
                                 })()}
                                 {ord.consultants && ord.consultants.length > 0 ? (
                                   ord.consultants.map((c: any) => (
-                                    <Badge key={c.id} variant="outline" className="text-[9.5px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-medium flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none">
+                                    <Badge key={c.id} variant="outline" className="text-[9.5px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-medium flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none orders-badge-neutral">
                                       <UserCheck className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
                                       <span className="truncate">{c.name}</span>
                                     </Badge>
                                   ))
                                 ) : (!ord.reviewers || ord.reviewers.length === 0) && !ord.reviewer ? (
-                                  <span className="text-muted-foreground italic text-xs">Unassigned</span>
+                                  <span className="text-muted-foreground italic text-xs orders-text-secondary">Unassigned</span>
                                 ) : null}
                               </div>
                             </td>
-                            <td className="py-2 px-2.5 text-right font-mono font-bold text-sm text-foreground align-top pt-2.5 whitespace-nowrap">
-                              {formatCurrency(ord.total_amount)}
+                            <td className="py-2 px-2.5 text-right font-sans align-top pt-2.5 whitespace-nowrap tabular-nums orders-amount min-w-[140px] max-w-[170px]">
+                              <div className="flex flex-col items-end gap-0.5">
+                                <span className="font-bold text-sm text-foreground orders-text-primary" title="Total Amount (Gross)">
+                                  {formatCurrency(ord.total_amount)}
+                                </span>
+                                <div className="text-[10px] flex items-center justify-end gap-1 flex-wrap">
+                                  {ord.total_notary_fee ? (
+                                    <>
+                                      <span className="text-amber-600 dark:text-amber-400 font-medium" title="Vendor Fee">
+                                        - {formatCurrency(ord.total_notary_fee)}
+                                      </span>
+                                      <span className="text-muted-foreground/60 font-mono">=</span>
+                                    </>
+                                  ) : null}
+                                  <span className="text-emerald-600 dark:text-emerald-400 font-bold" title="Actual Net Earnings">
+                                    {formatCurrency((ord.total_amount || 0) - (ord.total_notary_fee || 0))}
+                                  </span>
+                                </div>
+                              </div>
                             </td>
-                            <td className="py-2 px-2.5 text-right font-mono font-bold text-sm text-amber-600 dark:text-amber-400 align-top pt-2.5 whitespace-nowrap">
-                              {formatCurrency(ord.total_notary_fee || 0)}
-                            </td>
-                            <td className="py-2 px-2.5 text-right font-mono font-bold text-sm text-emerald-600 dark:text-emerald-400 align-top pt-2.5 whitespace-nowrap">
-                              {formatCurrency((ord.total_amount || 0) - (ord.total_notary_fee || 0))}
-                            </td>
-                            <td className="py-2 px-2 text-center align-top pt-2.5 whitespace-nowrap min-w-[85px]">
-                              <div className="flex flex-col items-center gap-1 justify-center">
-                                <Badge className={`${getPaymentStatusColor(ord.payment_status)} font-bold font-mono border text-[10px] px-2 py-0.5`}>
-                                  {ord.payment_status || "UNPAID"}
+                            <td className="py-2 px-2 text-center align-top pt-2.5 whitespace-nowrap min-w-[115px] max-w-[145px]">
+                              <div className="flex flex-col items-center gap-1.5 justify-center">
+                                {/* Lifecycle Status Badge */}
+                                <Badge className="text-xs font-semibold py-1 px-2 whitespace-nowrap inline-flex items-center gap-1 rounded font-sans bg-background dark:bg-[#16191F] text-foreground dark:text-zinc-200 border border-zinc-300 dark:border-white/20">
+                                  <Lock className="h-3 w-3 shrink-0 text-emerald-500" />
+                                  {getStatusDisplayLabel(ord.status || "COMPLETED")}
+                                </Badge>
+
+                                {/* Payment Status Badge */}
+                                <Badge className={`${getPaymentStatusColor(ord.payment_status)} font-medium border text-[11px] px-2 py-0.5 rounded font-sans`}>
+                                  {getPaymentDisplayLabel(ord.payment_status)}
                                 </Badge>
 
                                 {/* Service Payment / Invoice Email Dispatch Status Marker */}
                                 {ord.last_invoice_sent_at ? (
                                   <Badge
                                     variant="outline"
-                                    className="text-[8.5px] font-mono font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30 flex items-center gap-1 py-0.5 px-1.5"
+                                    className="text-[8.5px] font-sans font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30 flex items-center gap-1 py-0.5 px-1.5 orders-badge-info"
                                     title={`Invoice dispatched ${ord.invoice_delivery_channel === 'BOTH' ? 'via Email & WhatsApp' : ord.invoice_delivery_channel === 'WHATSAPP' ? 'via WhatsApp' : 'via Email'} on ${formatDate(ord.last_invoice_sent_at)} to ${ord.last_invoice_sent_to || 'client'}`}
                                   >
                                     <MailCheck className="h-2.5 w-2.5 text-sky-600 dark:text-sky-400" />
@@ -2099,7 +2173,7 @@ export default function ClientOrdersPage() {
                                 ) : (ord.is_proforma_finalized || ord.is_final_invoice_finalized) ? (
                                   <Badge
                                     variant="outline"
-                                    className="text-[8.5px] font-mono font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 flex items-center gap-1 py-0.5 px-1.5"
+                                    className="text-[8.5px] font-sans font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 flex items-center gap-1 py-0.5 px-1.5 orders-badge-warning"
                                     title="Invoice PDF finalized in storage, but email has not yet been sent to client"
                                   >
                                     <Clock className="h-2.5 w-2.5 text-amber-600" />
@@ -2111,7 +2185,7 @@ export default function ClientOrdersPage() {
                                 {ord.signed_docs_sent_at && (
                                   <Badge
                                     variant="outline"
-                                    className="text-[8.5px] font-mono font-medium bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/30 flex items-center gap-1 py-0.5 px-1.5"
+                                    className="text-[8.5px] font-sans font-medium bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/30 flex items-center gap-1 py-0.5 px-1.5 orders-badge-purple"
                                     title={`Pre-documents for signature dispatched via Email on ${formatDate(ord.signed_docs_sent_at)} to ${ord.signed_docs_sent_to || 'client'}`}
                                   >
                                     <MailCheck className="h-2.5 w-2.5 text-indigo-600 dark:text-indigo-400" />
@@ -2123,19 +2197,20 @@ export default function ClientOrdersPage() {
                                 {ord.deliverables_sent_at && (
                                   <Badge
                                     variant="outline"
-                                    className="text-[8.5px] font-mono font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 flex items-center gap-1 py-0.5 px-1.5"
+                                    className="text-[8.5px] font-sans font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 flex items-center gap-1 py-0.5 px-1.5 orders-badge-success"
                                     title={`Final documents delivered to ${ord.deliverables_sent_to || 'client'} on ${formatDate(ord.deliverables_sent_at)}`}
                                   >
                                     <FileCheck className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400" />
                                     <span>Docs Sent</span>
                                   </Badge>
                                 )}
+
                                 {isPaymentActionVisible(ord) && (
                                   <div className="flex items-center gap-1 mt-0.5">
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      className="h-5 px-1.5 text-[8.5px] gap-0.5 font-bold border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30 shadow-none"
+                                      className="h-5 px-1.5 text-[8.5px] gap-0.5 font-bold border-emerald-500/20 bg-emerald-500/5 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/30 shadow-none orders-action-btn"
                                       onClick={async () => {
                                         if (ord.payment_link) {
                                           navigator.clipboard.writeText(ord.payment_link);
@@ -2167,7 +2242,7 @@ export default function ClientOrdersPage() {
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      className="h-5 px-1.5 text-[8.5px] gap-0.5 font-bold border-indigo-500/20 bg-indigo-500/5 text-indigo-600 hover:bg-indigo-500/10 hover:text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/30 shadow-none"
+                                      className="h-5 px-1.5 text-[8.5px] gap-0.5 font-bold border-indigo-500/20 bg-indigo-500/5 text-indigo-600 hover:bg-indigo-500/10 hover:text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/30 shadow-none orders-action-btn"
                                       onClick={async () => {
                                         const toastId = toast.loading("Verifying payment...");
                                         try {
@@ -2196,68 +2271,67 @@ export default function ClientOrdersPage() {
                                 )}
                               </div>
                             </td>
-                            <td className="py-2 px-2 text-left align-top pt-2.5 whitespace-nowrap">
-                              <Badge className={`${getOrderStatusColor(ord.status)} font-bold border text-[10px] px-2 py-0.5 inline-flex items-center gap-1`}>
-                                <Lock className="h-2.5 w-2.5" />
-                                {ord.status || "COMPLETED"}
-                              </Badge>
-                            </td>
-                            <td className={`py-2 px-2 text-right align-top pt-2.5 whitespace-nowrap transition-colors ${
+                            <td className={`p-3 text-right align-top pt-4 whitespace-nowrap orders-col-actions w-32 min-w-[120px] max-w-[135px] transition-colors ${
                               isHighlighted ? "border-r-2 border-r-emerald-500" : ""
                             }`}>
-                              <div className="flex items-center justify-end gap-1">
+                              <div className="flex flex-col items-end gap-1.5">
+                                {/* Utility Icon Buttons Row */}
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 rounded p-0 orders-action-btn"
+                                    title="Edit Order & Consultants"
+                                    onClick={() => router.push(`/business/clients/orders/${ord.order_number}/edit`)}
+                                  >
+                                    <Edit className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 rounded p-0 orders-action-btn"
+                                    title="View Order Details"
+                                    onClick={() => {
+                                      setSelectedOrderGroup(ord);
+                                      const pct = ord.proforma_stage_percent || 70;
+                                      setProformaPercent(pct);
+                                      setTempPercent(String(pct));
+                                      if (ord.proforma_paid_amount != null && ord.proforma_paid_amount > 0) {
+                                        setTempAmount(String(Math.round(ord.proforma_paid_amount)));
+                                      } else {
+                                        setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
+                                      }
+                                      setIsPph23(false);
+                                      setIsViewOpen(true);
+                                      fetchProgressUpdates(ord.order_number);
+                                    }}
+                                  >
+                                    <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 rounded p-0 orders-action-btn"
+                                    title="Order Chat"
+                                    onClick={() => {
+                                      setSelectedOrderGroup(ord);
+                                      setIsChatOpen(true);
+                                      fetchProgressUpdates(ord.order_number);
+                                    }}
+                                  >
+                                    <MessageSquare className="h-3.5 w-3.5 text-emerald-600 hover:text-emerald-700" />
+                                  </Button>
+                                </div>
+
+                                {/* Stacked Workflow Action: Send Final Docs */}
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-6 px-1.5 text-[9.5px] font-bold gap-1 shadow-none inline-flex items-center text-emerald-600 border-emerald-500/30 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-500/40 rounded"
+                                  className="h-5 px-1.5 text-[8.5px] font-semibold gap-1 shadow-none inline-flex items-center text-emerald-700 border-emerald-500/30 hover:bg-emerald-50 dark:text-emerald-300 dark:border-emerald-500/40 dark:hover:bg-emerald-950/40 rounded whitespace-nowrap"
                                   title="Send final documents to client email"
                                   onClick={() => handleOpenSendDocs(ord)}
                                 >
-                                  <Send className="h-3 w-3" /> Send Final Docs
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-6 w-6 rounded p-0"
-                                  title="Edit Order & Consultants"
-                                  onClick={() => router.push(`/business/clients/orders/${ord.order_number}/edit`)}
-                                >
-                                  <Edit className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-6 w-6 rounded p-0"
-                                  title="View Order Details"
-                                  onClick={() => {
-                                    setSelectedOrderGroup(ord);
-                                    const pct = ord.proforma_stage_percent || 70;
-                                    setProformaPercent(pct);
-                                    setTempPercent(String(pct));
-                                    if (ord.proforma_paid_amount != null && ord.proforma_paid_amount > 0) {
-                                      setTempAmount(String(Math.round(ord.proforma_paid_amount)));
-                                    } else {
-                                      setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
-                                    }
-                                    setIsPph23(false);
-                                    setIsViewOpen(true);
-                                    fetchProgressUpdates(ord.order_number);
-                                  }}
-                                >
-                                  <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-6 w-6 rounded p-0"
-                                  title="Order Chat"
-                                  onClick={() => {
-                                    setSelectedOrderGroup(ord);
-                                    setIsChatOpen(true);
-                                    fetchProgressUpdates(ord.order_number);
-                                  }}
-                                >
-                                  <MessageSquare className="h-3.5 w-3.5 text-emerald-600 hover:text-emerald-700" />
+                                  <Send className="h-2.5 w-2.5" /> Send Final Docs
                                 </Button>
                               </div>
                             </td>
@@ -2408,6 +2482,19 @@ export default function ClientOrdersPage() {
                               onClick={() => handleOpenSendDocs(ord)}
                             >
                               <Send className="h-3.5 w-3.5" /> Send Docs
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-9 px-2.5 text-xs font-semibold gap-1 text-sky-700 border-sky-500/30 hover:bg-sky-50 dark:text-sky-300 dark:border-sky-500/40 dark:hover:bg-sky-950/40 shadow-xs"
+                              title="Print Job Details & Checklist for Hard Copy Handover"
+                              onClick={() => {
+                                setJobPrintOrder(ord);
+                                setIsJobPrintOpen(true);
+                              }}
+                            >
+                              <Printer className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" /> Print Job Details
                             </Button>
 
                             <Button
@@ -4048,6 +4135,14 @@ export default function ClientOrdersPage() {
         onClose={() => setViewingTeam(null)}
       />
 
+      {/* JOB DETAILS & CHECKLIST PRINT DIALOG */}
+      <JobDetailsPrintDialog
+        open={isJobPrintOpen}
+        onOpenChange={setIsJobPrintOpen}
+        order={jobPrintOrder}
+        services={services}
+      />
+
       {/* GLOBAL PRINT MEDIA CSS */}
       <style jsx global>{`
         @media print {
@@ -4078,7 +4173,7 @@ export default function ClientOrdersPage() {
             border: none !important;
             background: #ffffff !important;
           }
-          #proforma-invoice-doc, #final-invoice-doc {
+          #proforma-invoice-doc, #final-invoice-doc, #job-checklist-print-doc {
             visibility: visible !important;
             display: block !important;
             width: 100% !important;

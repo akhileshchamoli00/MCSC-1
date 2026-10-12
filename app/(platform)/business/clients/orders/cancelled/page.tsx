@@ -477,10 +477,10 @@ export default function CancelledOrdersPage() {
 
     const prefix = isGov ? "Govt Body" : isOther ? "Vendor" : "Notary";
     const baseColor = isGov
-      ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20"
+      ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20 orders-badge-info"
       : isOther
-        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-        : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
+        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 orders-badge-teal"
+        : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20 orders-badge-indigo";
 
     const vStatus = notary.validation_status;
     const isPending = vStatus === "PENDING_VALIDATION" || !vStatus;
@@ -488,16 +488,16 @@ export default function CancelledOrdersPage() {
 
     return (
       <div className="inline-flex items-center gap-1 flex-wrap">
-        <Badge variant="outline" className={`text-[9px] font-bold py-0 px-1.5 ${baseColor} shrink-0`}>
+        <Badge variant="outline" className={`text-[9px] font-medium py-0 px-1.5 ${baseColor} shrink-0`}>
           {prefix}: {notary.name}
         </Badge>
         {isPending && (
-          <Badge variant="outline" className="text-[8px] font-bold py-0 px-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 shrink-0 flex items-center gap-0.5" title="Vendor pending admin validation">
+          <Badge variant="outline" className="text-[8px] font-medium py-0 px-1 orders-badge-warning shrink-0 flex items-center gap-0.5" title="Vendor pending admin validation">
             <Clock className="h-2 w-2" /> Pending Validation
           </Badge>
         )}
         {isRevision && (
-          <Badge variant="outline" className="text-[8px] font-bold py-0 px-1 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 shrink-0 flex items-center gap-0.5" title="Vendor needs revision">
+          <Badge variant="outline" className="text-[8px] font-medium py-0 px-1 orders-badge-danger shrink-0 flex items-center gap-0.5" title="Vendor needs revision">
             <AlertCircle className="h-2 w-2" /> Revision Needed
           </Badge>
         )}
@@ -505,21 +505,95 @@ export default function CancelledOrdersPage() {
     );
   };
 
+  const getStatusDisplayLabel = (status: string) => {
+    if (!status) return "Cancelled";
+    const map: Record<string, string> = {
+      IN_PROGRESS: "In progress",
+      ORDER_ASSIGNED: "Order assigned",
+      REVIEW_DOCS: "Review docs",
+      DOCUMENTS_REVIEWED: "Docs reviewed",
+      PRE_DOC_SENT_FOR_SIGNATURE: "Pre-doc for signature",
+      PRE_DOCS_SENT: "Pre-docs sent",
+      AWAITING_SIGNING_NOTARIZATION: "Awaiting signing",
+      FINAL_DOCUMENT_PREPARATION: "Final doc prep",
+      FINAL_DOC_READY: "Final doc ready",
+      AWAITING_DOCUMENT_RETURN: "Awaiting doc return",
+      AWAITING_THIRD_PARTY_RESPONSE: "Third-party response",
+      WAITING_ON_CLIENT: "Waiting on client",
+      WAITING_FOR_FINAL_PAYMENT: "Waiting final payment",
+      WAITING_ON_FINAL_PAYMENT: "Waiting final payment",
+      FINAL_PAYMENT_COMPLETED: "Final payment done",
+      SOFT_COPY_DELIVERED: "Soft copy delivered",
+      HARD_COPY_DELIVERED: "Hard copy delivered",
+      ON_HOLD: "On hold",
+      CONFIRMED: "Confirmed",
+      DRAFT: "Draft",
+      PROFORMA_GENERATED: "Proforma generated",
+      INVOICE_GENERATED: "Invoice generated",
+      COMPLETED: "Completed",
+      CANCELLED: "Cancelled",
+    };
+    if (map[status]) return map[status];
+    return status
+      .toLowerCase()
+      .split("_")
+      .map((word, i) => (i === 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word))
+      .join(" ");
+  };
+
+  const getPaymentDisplayLabel = (pStatus: string) => {
+    if (!pStatus) return "Unpaid";
+    const upper = pStatus.toUpperCase();
+    if (upper === "PAID") return "Paid";
+    if (upper === "PARTIALLY_PAID" || upper === "PARTIAL") return "Partial";
+    if (upper === "UNPAID") return "Unpaid";
+    return pStatus.charAt(0).toUpperCase() + pStatus.slice(1).toLowerCase();
+  };
+
   const getOrderStatusColor = (status: string) => {
     switch (status) {
-      case "COMPLETED": return "bg-emerald-500/15 text-emerald-600 border-emerald-500/30";
-      case "CANCELLED": return "bg-destructive/15 text-destructive border-destructive/30";
-      case "CONFIRMED": return "bg-purple-500/15 text-purple-600 border-purple-500/30";
-      case "DRAFT": return "bg-zinc-500/15 text-zinc-600 border-zinc-500/30";
-      default: return "bg-destructive/15 text-destructive border-destructive/30";
+      case "COMPLETED":
+      case "FINAL_DOC_READY":
+      case "FINAL_PAYMENT_COMPLETED":
+        return "bg-emerald-500/10 text-emerald-700 border-emerald-500/25 orders-badge-success font-medium";
+      case "IN_PROGRESS":
+      case "ORDER_ASSIGNED":
+      case "REVIEW_DOCS":
+      case "DOCUMENTS_REVIEWED":
+      case "FINAL_DOCUMENT_PREPARATION":
+      case "CONFIRMED":
+        return "bg-sky-500/10 text-sky-700 border-sky-500/25 orders-badge-info font-medium";
+      case "WAITING_ON_CLIENT":
+      case "WAITING_FOR_FINAL_PAYMENT":
+      case "WAITING_ON_FINAL_PAYMENT":
+      case "AWAITING_DOCUMENT_RETURN":
+      case "AWAITING_THIRD_PARTY_RESPONSE":
+      case "AWAITING_SIGNING_NOTARIZATION":
+      case "ON_HOLD":
+        return "bg-amber-500/10 text-amber-700 border-amber-500/25 orders-badge-warning font-medium";
+      case "PRE_DOC_SENT_FOR_SIGNATURE":
+      case "PRE_DOCS_SENT":
+      case "SOFT_COPY_DELIVERED":
+      case "HARD_COPY_DELIVERED":
+        return "bg-violet-500/10 text-violet-700 border-violet-500/25 orders-badge-purple font-medium";
+      case "DRAFT":
+      case "PROFORMA_GENERATED":
+      case "INVOICE_GENERATED":
+        return "bg-zinc-500/10 text-zinc-700 border-zinc-500/25 orders-badge-neutral font-medium";
+      case "CANCELLED":
+      default:
+        return "bg-rose-500/10 text-rose-700 border-rose-500/25 orders-badge-danger font-medium";
     }
   };
 
   const getPaymentStatusColor = (pStatus: string) => {
     switch (pStatus) {
-      case "PAID": return "bg-emerald-500/15 text-emerald-600 border-emerald-500/30";
-      case "PARTIALLY_PAID": return "bg-amber-500/15 text-amber-600 border-amber-500/30";
-      default: return "bg-red-500/15 text-red-600 border-red-500/30";
+      case "PAID":
+        return "bg-emerald-500/10 text-emerald-700 border-emerald-500/25 orders-badge-success font-medium";
+      case "PARTIALLY_PAID":
+        return "bg-amber-500/10 text-amber-700 border-amber-500/25 orders-badge-warning font-medium";
+      default:
+        return "bg-rose-500/10 text-rose-700 border-rose-500/25 orders-badge-danger font-medium";
     }
   };
 
@@ -677,12 +751,12 @@ export default function CancelledOrdersPage() {
 
   return (
     <>
-      <div className="space-y-6 animate-in fade-in duration-500 w-full max-w-none pb-12">
+      <div className="space-y-6 animate-in fade-in duration-500 w-full max-w-none pb-12 orders-page-shell">
 
         {/* Minimalist Metrics Strip & Quick Links Row */}
         <div className="flex flex-col xl:flex-row items-stretch gap-3 w-full">
           {/* Minimalist Metric Strip - Expanded Horizontally */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-xs flex-1 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 items-center bg-card/60 dark:bg-zinc-900/60 backdrop-blur-md border border-border/50 rounded-2xl p-2.5 sm:px-4 sm:py-3 shadow-xs flex-1 gap-3 sm:gap-4 orders-table-card">
             
             {/* Total Cancelled */}
             <div className="flex items-center gap-3 px-2 sm:px-3 py-1 xl:py-0 justify-start sm:justify-center">
@@ -756,18 +830,18 @@ export default function CancelledOrdersPage() {
         </div>
 
         {/* Main Orders Table */}
-        <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl">
-          <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl orders-table-card">
+          <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between orders-table-toolbar">
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search Order ID, Company..."
-                className="pl-8 h-9 text-xs rounded-lg"
+                className="pl-8 h-9 text-xs rounded-lg orders-control"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <span className="text-[10px] font-mono text-muted-foreground uppercase font-bold">
+            <span className="text-xs font-normal text-muted-foreground orders-text-secondary">
               Showing {paginatedOrders.length} of {filteredOrders.length} entries
             </span>
           </div>
@@ -789,17 +863,17 @@ export default function CancelledOrdersPage() {
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                        <th className="py-2.5 px-2 w-8 text-center">No.</th>
-                        <th className="py-2.5 px-2 whitespace-nowrap w-24">Order ID</th>
-                        <th className="py-2.5 px-2 min-w-[120px] max-w-[160px]">Company Entity</th>
-                        <th className="py-2.5 px-2.5 min-w-[220px] max-w-[320px]">Service Package</th>
-                        <th className="py-2.5 px-3 w-36 min-w-[145px] max-w-[170px] whitespace-nowrap text-left">Assigned Consultants</th>
-                        <th className="py-2.5 px-2.5 text-right whitespace-nowrap">Total Amount</th>
-                        <th className="py-2.5 px-2.5 text-right whitespace-nowrap">Vendor Fee</th>
-                        <th className="py-2.5 px-2.5 text-right whitespace-nowrap">Net Voided</th>
-                        <th className="py-2.5 px-2 text-center whitespace-nowrap min-w-[85px]">Payment</th>
-                        <th className="py-2.5 px-2 text-left whitespace-nowrap">Lifecycle Status</th>
-                        <th className="py-2.5 px-2 text-right whitespace-nowrap">Actions</th>
+                        <th className="py-2.5 px-2 w-8 text-center orders-th">No.</th>
+                        <th className="py-2.5 px-2 whitespace-nowrap w-24 orders-th">Order ID</th>
+                        <th className="py-2.5 px-2 min-w-[120px] max-w-[160px] orders-th">Company Entity</th>
+                        <th className="py-2.5 px-2.5 min-w-[220px] max-w-[320px] orders-th">Service Package</th>
+                        <th className="py-2.5 px-3 w-36 min-w-[145px] max-w-[170px] whitespace-nowrap text-left orders-th">Assigned Consultants</th>
+                        <th className="py-2.5 px-2.5 text-right whitespace-nowrap orders-th">Total Amount</th>
+                        <th className="py-2.5 px-2.5 text-right whitespace-nowrap orders-th">Vendor Fee</th>
+                        <th className="py-2.5 px-2.5 text-right whitespace-nowrap orders-th">Net Voided</th>
+                        <th className="py-2.5 px-2 text-center whitespace-nowrap min-w-[85px] orders-th">Payment</th>
+                        <th className="py-2.5 px-2 text-left whitespace-nowrap min-w-[130px] max-w-[155px] orders-th">Lifecycle Status</th>
+                        <th className="py-2.5 px-2 text-right whitespace-nowrap orders-th orders-col-actions w-32 min-w-[120px] max-w-[135px]">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/30">
@@ -809,13 +883,13 @@ export default function CancelledOrdersPage() {
                         <tr 
                           key={ord.order_number || index} 
                           id={`order-row-${ord.order_number}`} 
-                          className={`transition-all duration-300 border-b border-border/30 last:border-0 ${
+                          className={`transition-all duration-300 border-b border-border/30 last:border-0 orders-row ${
                             isHighlighted 
                               ? "bg-emerald-500/20 dark:bg-emerald-500/25 ring-2 ring-emerald-500 ring-inset shadow-md" 
                               : "hover:bg-muted/40"
                           }`}
                         >
-                          <td className="py-2 px-2 text-center font-mono font-medium text-muted-foreground align-top pt-2.5 text-xs">
+                          <td className="py-2 px-2 text-center font-mono font-medium text-muted-foreground orders-text-secondary align-top pt-2.5 text-xs">
                             #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + index))}
                           </td>
                           <td className="py-2 px-2 align-top pt-2.5 whitespace-nowrap">
@@ -823,35 +897,35 @@ export default function CancelledOrdersPage() {
                               <Link href={`/business/clients/documents/${ord.company_id}?from=orders`}>
                                 <Badge
                                   variant="outline"
-                                  className="font-mono font-bold text-xs bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-600 dark:text-rose-400 cursor-pointer transition-colors px-2 py-0.5 rounded"
+                                  className="font-mono font-medium text-xs bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-600 dark:text-rose-400 orders-badge-danger cursor-pointer transition-colors px-2 py-0.5 rounded"
                                   title="Go to Company Documents Folder"
                                 >
                                   {ord.order_number}
                                 </Badge>
                               </Link>
                             ) : (
-                              <Badge variant="outline" className="font-mono font-bold text-xs bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded">
+                              <Badge variant="outline" className="font-mono font-medium text-xs bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 orders-badge-danger px-2 py-0.5 rounded">
                                 {ord.order_number}
                               </Badge>
                             )}
                           </td>
                           <td className="py-2 px-2 font-bold text-foreground align-top pt-2.5 min-w-[120px] max-w-[160px]">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-sm font-bold leading-snug break-words">{ord.company_name || "Personal Client Account"}</span>
+                              <span className="text-sm font-semibold leading-snug break-words orders-text-primary">{ord.company_name || "Personal Client Account"}</span>
                               {(() => {
                                 const comp = companies.find((c: any) => c.id === (ord.company_id || ord.company?.id)) || ord.company;
                                 if (!comp) return null;
                                 const vStatus = comp.validation_status;
                                 if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
                                   return (
-                                    <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 flex items-center gap-0.5" title="Company pending admin validation">
+                                    <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0 orders-badge-warning flex items-center gap-0.5" title="Company pending admin validation">
                                       <Clock className="h-2.5 w-2.5" /> Pending
                                     </Badge>
                                   );
                                 }
                                 if (vStatus === "NEEDS_REVISION") {
                                   return (
-                                    <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 flex items-center gap-0.5" title="Company needs revision">
+                                    <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0 orders-badge-danger flex items-center gap-0.5" title="Company needs revision">
                                       <AlertCircle className="h-2.5 w-2.5" /> Revision
                                     </Badge>
                                   );
@@ -859,20 +933,20 @@ export default function CancelledOrdersPage() {
                                 return null;
                               })()}
                             </div>
-                            <div className="text-xs font-normal text-muted-foreground flex items-center gap-1 mt-1 truncate">
+                            <div className="text-xs font-normal text-muted-foreground orders-text-secondary flex items-center gap-1 mt-1 truncate">
                               <Building className="h-3 w-3 text-muted-foreground shrink-0" /> <span className="truncate">{ord.client_name || "Representative"}</span>
                             </div>
                           </td>
                           <td className="py-2 px-2.5 align-top pt-2.5 min-w-[220px] max-w-[320px]">
                             {ord.items && ord.items.length > 0 ? (
-                              <div className="space-y-1.5 w-full">
+                              <div className="p-1 rounded-md orders-service-card space-y-1.5 w-full">
                                 {ord.items.map((item: any, idx: number) => (
                                   <div key={idx} className="flex flex-wrap items-center gap-1.5 border-b border-border/10 last:border-0 pb-1.5 last:pb-0">
-                                    <span className="font-semibold text-foreground text-xs leading-normal break-words line-through opacity-70">
+                                    <span className="font-medium text-foreground orders-text-primary text-xs leading-normal break-words line-through opacity-70">
                                       {item.job_title}
                                     </span>
                                     {item.job_id && (
-                                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 bg-primary/5 text-primary border-primary/20 shrink-0">
+                                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1.5 orders-badge-info shrink-0">
                                         {item.job_id}
                                       </Badge>
                                     )}
@@ -892,7 +966,7 @@ export default function CancelledOrdersPage() {
                                   <Badge
                                     key={r.id}
                                     variant="outline"
-                                    className="text-[9px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 font-semibold flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none"
+                                    className="text-[9px] orders-badge-purple font-medium flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none"
                                     title={`Reviewer: ${r.name}`}
                                   >
                                     <ShieldCheck className="h-2.5 w-2.5 text-purple-600 shrink-0" />
@@ -902,7 +976,7 @@ export default function CancelledOrdersPage() {
                               })()}
                               {ord.consultants && ord.consultants.length > 0 ? (
                                 ord.consultants.map((c: any) => (
-                                  <Badge key={c.id} variant="outline" className="text-[9.5px] bg-zinc-500/10 text-zinc-700 dark:text-zinc-400 border-zinc-500/20 font-medium flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none">
+                                  <Badge key={c.id} variant="outline" className="text-[9.5px] orders-badge-neutral font-medium flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none">
                                     <UserCheck className="h-2.5 w-2.5 text-zinc-500 shrink-0" />
                                     <span className="truncate">{c.name}</span>
                                   </Badge>
@@ -912,33 +986,85 @@ export default function CancelledOrdersPage() {
                               ) : null}
                             </div>
                           </td>
-                          <td className="py-2 px-2.5 text-right font-mono font-bold text-sm text-muted-foreground line-through align-top pt-2.5 whitespace-nowrap">
+                          <td className="py-2 px-2.5 text-right font-sans font-semibold text-sm tabular-nums orders-amount line-through align-top pt-2.5 whitespace-nowrap">
                             {formatCurrency(ord.total_amount)}
                           </td>
-                          <td className="py-2 px-2.5 text-right font-mono font-bold text-sm text-amber-600/70 dark:text-amber-400/70 line-through align-top pt-2.5 whitespace-nowrap">
+                          <td className="py-2 px-2.5 text-right font-sans font-medium text-sm tabular-nums text-amber-600/70 dark:text-amber-400/70 orders-badge-warning line-through align-top pt-2.5 whitespace-nowrap">
                             {formatCurrency(ord.total_notary_fee || 0)}
                           </td>
-                          <td className="py-2 px-2.5 text-right font-mono font-bold text-sm text-rose-600 dark:text-rose-400 line-through align-top pt-2.5 whitespace-nowrap">
+                          <td className="py-2 px-2.5 text-right font-sans font-semibold text-sm tabular-nums text-rose-600 dark:text-rose-400 orders-badge-danger line-through align-top pt-2.5 whitespace-nowrap">
                             {formatCurrency((ord.total_amount || 0) - (ord.total_notary_fee || 0))}
                           </td>
                           <td className="py-2 px-2 text-center align-top pt-2.5 whitespace-nowrap min-w-[85px]">
-                            <Badge className={`${getPaymentStatusColor(ord.payment_status)} font-bold font-mono border text-[10px] px-2 py-0.5`}>
-                              {ord.payment_status || "UNPAID"}
+                            <Badge className={`${getPaymentStatusColor(ord.payment_status)} font-medium border text-xs px-2 py-0.5 rounded font-sans`}>
+                              {getPaymentDisplayLabel(ord.payment_status)}
                             </Badge>
                           </td>
-                          <td className="py-2 px-2 text-left align-top pt-2.5 whitespace-nowrap">
-                            <Badge className={`${getOrderStatusColor(ord.status)} font-bold border text-[10px] px-2 py-0.5 inline-flex items-center gap-1`}>
+                          <td className="py-2 px-2 text-left align-top pt-2.5 whitespace-nowrap min-w-[130px] max-w-[155px]">
+                            <Badge className={`${getOrderStatusColor(ord.status)} font-medium border text-xs px-2 py-0.5 rounded font-sans inline-flex items-center gap-1`}>
                               <Ban className="h-2.5 w-2.5" />
-                              {ord.status || "CANCELLED"}
+                              {getStatusDisplayLabel(ord.status)}
                             </Badge>
                           </td>
-                          <td className="py-2 px-2 text-right align-top pt-2.5 whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-1">
-                              {/* Restore Order */}
+                          <td className="p-3 text-right align-top pt-4 whitespace-nowrap orders-col-actions w-32 min-w-[120px] max-w-[135px]">
+                            <div className="flex flex-col items-end gap-1.5">
+                              {/* Top row: Utility icon buttons */}
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6 rounded p-0 orders-action-btn"
+                                  title="View Order Details"
+                                  onClick={() => {
+                                    setSelectedOrderGroup(ord);
+                                    const pct = ord.proforma_stage_percent || 70;
+                                    setProformaPercent(pct);
+                                    setTempPercent(String(pct));
+                                    if (ord.proforma_paid_amount != null && ord.proforma_paid_amount > 0) {
+                                      setTempAmount(String(Math.round(ord.proforma_paid_amount)));
+                                    } else {
+                                      setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
+                                    }
+                                    setIsPph23(false);
+                                    setIsViewOpen(true);
+                                    fetchProgressUpdates(ord.order_number);
+                                  }}
+                                >
+                                  <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6 rounded p-0 orders-action-btn"
+                                  title="Order Chat"
+                                  onClick={() => {
+                                    setSelectedOrderGroup(ord);
+                                    setIsChatOpen(true);
+                                    fetchProgressUpdates(ord.order_number);
+                                  }}
+                                >
+                                  <MessageSquare className="h-3.5 w-3.5 text-emerald-600 hover:text-emerald-700" />
+                                </Button>
+                                {isAdmin && (
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 rounded p-0 orders-action-btn is-delete text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                                    title="Delete Cancelled Order"
+                                    onClick={() => {
+                                      setSelectedOrderGroup(ord);
+                                      setIsDeleteOpen(true);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                              {/* Bottom row: Stacked workflow action */}
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-6 px-1.5 text-[9.5px] font-bold gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/40 shadow-none inline-flex items-center rounded"
+                                className="h-5 px-1.5 text-[8.5px] font-semibold gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/40 shadow-none inline-flex items-center rounded whitespace-nowrap"
                                 title="Reopen Order back to Active stream"
                                 onClick={() => {
                                   setSelectedOrderGroup(ord);
@@ -947,58 +1073,6 @@ export default function CancelledOrdersPage() {
                               >
                                 <RotateCcw className="h-2.5 w-2.5" /> Restore
                               </Button>
-                              {/* View Details */}
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6 rounded p-0"
-                                title="View Order Details"
-                                onClick={() => {
-                                  setSelectedOrderGroup(ord);
-                                  const pct = ord.proforma_stage_percent || 70;
-                                  setProformaPercent(pct);
-                                  setTempPercent(String(pct));
-                                  if (ord.proforma_paid_amount != null && ord.proforma_paid_amount > 0) {
-                                    setTempAmount(String(Math.round(ord.proforma_paid_amount)));
-                                  } else {
-                                    setTempAmount(String(Math.round((ord.total_amount || 0) * pct / 100)));
-                                  }
-                                  setIsPph23(false);
-                                  setIsViewOpen(true);
-                                  fetchProgressUpdates(ord.order_number);
-                                }}
-                              >
-                                <Eye className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-                              </Button>
-                              {/* Order Chat */}
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6 rounded p-0"
-                                title="Order Chat"
-                                onClick={() => {
-                                  setSelectedOrderGroup(ord);
-                                  setIsChatOpen(true);
-                                  fetchProgressUpdates(ord.order_number);
-                                }}
-                              >
-                                <MessageSquare className="h-3.5 w-3.5 text-emerald-600 hover:text-emerald-700" />
-                              </Button>
-                              {/* Delete (Admin only) */}
-                              {isAdmin && (
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-6 w-6 rounded p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-                                  title="Delete Cancelled Order"
-                                  onClick={() => {
-                                    setSelectedOrderGroup(ord);
-                                    setIsDeleteOpen(true);
-                                  }}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
                             </div>
                           </td>
                         </tr>
