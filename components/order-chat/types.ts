@@ -74,10 +74,18 @@ export interface OrderCompanySummary {
   company_code?: string;
   tax_number?: string;
   address?: string;
+  director_name?: string;
+  director_email?: string;
+  director_contact?: string;
+  key_contact_person?: string;
+  key_contact_email?: string;
+  key_contact_phone?: string;
   client_id?: number;
   client?: {
     id: number;
     name?: string;
+    contact_person?: string;
+    client_code?: string;
     first_name?: string;
     last_name?: string;
     email?: string;
@@ -97,6 +105,8 @@ export interface OrderSummaryData {
   client?: {
     id: number;
     name?: string;
+    contact_person?: string;
+    client_code?: string;
     first_name?: string;
     last_name?: string;
     email?: string;

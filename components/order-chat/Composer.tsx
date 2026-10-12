@@ -283,7 +283,7 @@ export function Composer({
 
       {/* Unified Composer Container (Theme-synchronized frosted glass) */}
       <div
-        className="relative rounded-xl border transition-all shadow-md backdrop-blur-md overflow-hidden"
+        className="relative rounded-xl border transition-all shadow-md backdrop-blur-md"
         style={{
           backgroundColor: isInternal
             ? "var(--oc-bubble-internal-bg)"
@@ -298,9 +298,19 @@ export function Composer({
             : "none"
         }}
       >
+        {/* Mention Popover: Floats cleanly above the composer box over message stream */}
+        {showMentions && (
+          <MentionPicker
+            candidates={filteredUsers}
+            selectedIndex={selectedMentionIndex}
+            onSelect={handleSelectMention}
+            onClose={() => setShowMentions(false)}
+          />
+        )}
+
         {/* Audience Banner / Mode Tag */}
         <div
-          className="flex items-center justify-between px-3 py-1.5 text-[11px] font-medium border-b border-white/10 select-none transition-colors"
+          className="rounded-t-[11px] flex items-center justify-between px-3 py-1.5 text-[11px] font-medium border-b border-white/10 select-none transition-colors"
           style={{
             backgroundColor: "rgba(255, 255, 255, 0.04)",
             color: isInternal ? "var(--oc-bubble-internal-text)" : "var(--oc-bubble-client-text)",
@@ -351,20 +361,10 @@ export function Composer({
             }}
             aria-label={isInternal ? "Internal chat composer" : "Client chat composer"}
           />
-
-          {/* Mention Popover */}
-          {showMentions && (
-            <MentionPicker
-              candidates={filteredUsers}
-              selectedIndex={selectedMentionIndex}
-              onSelect={handleSelectMention}
-              onClose={() => setShowMentions(false)}
-            />
-          )}
         </div>
 
         {/* Bottom Bar: Action Icons + Send Button */}
-        <div className="flex items-center justify-between px-2.5 pb-2 pt-1">
+        <div className="rounded-b-[11px] flex items-center justify-between px-2.5 pb-2 pt-1">
           {/* Left Actions: Attach, Emoji */}
           <div className="flex items-center gap-1">
             <button

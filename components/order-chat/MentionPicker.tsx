@@ -95,7 +95,7 @@ export function MentionPicker({
   return (
     <div
       ref={listRef}
-      className="absolute bottom-full left-0 mb-2 w-80 max-h-64 overflow-y-auto rounded-xl bg-white dark:bg-[#1E1E26] border border-zinc-200 dark:border-zinc-700/80 shadow-2xl z-50 py-1.5 backdrop-blur-md"
+      className="absolute bottom-full left-0 mb-2 w-80 max-w-[calc(100vw-2rem)] max-h-64 overflow-y-auto rounded-xl bg-white dark:bg-[#1E1E26] border border-zinc-200 dark:border-zinc-700/80 shadow-2xl z-50 py-1.5 backdrop-blur-md"
       style={{
         scrollbarWidth: "thin",
         scrollbarColor: "rgba(125, 125, 125, 0.4) transparent"

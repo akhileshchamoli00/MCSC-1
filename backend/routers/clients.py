@@ -4283,13 +4283,21 @@ def get_order_summary(
 
     client_data = None
     if first_order.partner:
-        client_data = {
-            "id": first_order.partner.id,
-            "client_code": first_order.partner.client_code,
-            "contact_person": first_order.partner.contact_person,
-            "email": first_order.partner.email,
-            "phone": first_order.partner.phone
-        }
+        # If the order is directly for a company and partner is just the default fallback partner X260001,
+        # do not return the fallback partner as client contact
+        is_fallback_partner = bool(
+            first_order.company and
+            not getattr(first_order.company, "client_id", None) and
+            getattr(first_order.partner, "client_code", "") == "X260001"
+        )
+        if not is_fallback_partner:
+            client_data = {
+                "id": first_order.partner.id,
+                "client_code": first_order.partner.client_code,
+                "contact_person": first_order.partner.contact_person,
+                "email": first_order.partner.email,
+                "phone": first_order.partner.phone
+            }
     elif first_order.customer_id:
         cust = db.query(models.Client).filter(models.Client.id == first_order.customer_id).first()
         if cust:

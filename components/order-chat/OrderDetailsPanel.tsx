@@ -82,7 +82,28 @@ export function OrderDetailsPanel({
   const companyName =
     company?.company_name || propCompanyName || fallbackCompanyName || "Client Company";
   const companyCode = company?.company_code;
-  const clientContact = company?.client || orderSummary?.client;
+
+  // Filter out internal/dummy fallback partner X260001 from masquerading as client contact
+  const isFallbackPartner = orderSummary?.client?.client_code === "X260001";
+  const actualPartner = !isFallbackPartner ? orderSummary?.client : null;
+
+  // Primary company contact info: prioritize company key contact details
+  const contactPerson =
+    company?.key_contact_person ||
+    company?.director_name ||
+    actualPartner?.contact_person ||
+    actualPartner?.name;
+
+  const contactEmail =
+    company?.key_contact_email ||
+    company?.director_email ||
+    actualPartner?.email;
+
+  const contactPhone =
+    company?.key_contact_phone ||
+    company?.director_contact ||
+    actualPartner?.phone;
+
   const deliverables = orderSummary?.items || [];
   const consultants = orderSummary?.consultants || [];
   const notaries = orderSummary?.notaries || [];
@@ -161,25 +182,38 @@ export function OrderDetailsPanel({
           </div>
 
           {/* Contact Details */}
-          {clientContact && (
+          {(contactPerson || contactEmail || contactPhone) && (
             <div className="pt-2 border-t border-[var(--oc-border)] space-y-1 text-xs text-[var(--oc-text-secondary)]">
-              {(clientContact.name || clientContact.first_name) && (
+              {contactPerson && (
                 <div className="font-medium text-[var(--oc-text-primary)] truncate">
-                  {clientContact.name || `${clientContact.first_name || ""} ${clientContact.last_name || ""}`.trim()}
+                  {contactPerson}
                 </div>
               )}
-              {clientContact.email && (
+              {contactEmail && (
                 <div className="flex items-center gap-1.5 text-[11px] truncate">
                   <Mail className="h-3 w-3 text-[var(--oc-text-tertiary)] shrink-0" />
-                  <span className="truncate">{clientContact.email}</span>
+                  <span className="truncate">{contactEmail}</span>
                 </div>
               )}
-              {clientContact.phone && (
+              {contactPhone && (
                 <div className="flex items-center gap-1.5 text-[11px] truncate">
                   <Phone className="h-3 w-3 text-[var(--oc-text-tertiary)] shrink-0" />
-                  <span className="truncate">{clientContact.phone}</span>
+                  <span className="truncate">{contactPhone}</span>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Partner / Agent info (only shown if an actual external partner is assigned) */}
+          {actualPartner && actualPartner.contact_person && (
+            <div className="pt-1.5 border-t border-dashed border-[var(--oc-border)] text-[11px] text-[var(--oc-text-secondary)] space-y-0.5">
+              <span className="text-[10px] uppercase font-semibold text-[var(--oc-text-tertiary)] tracking-wider">
+                Partner / Introducer
+              </span>
+              <div className="font-medium text-[var(--oc-text-primary)] truncate">
+                {actualPartner.contact_person}
+                {actualPartner.client_code && ` (${actualPartner.client_code})`}
+              </div>
             </div>
           )}
         </div>
