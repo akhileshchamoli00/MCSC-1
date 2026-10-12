@@ -303,7 +303,7 @@ export default function AccurateSettingsPage() {
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
               Automated 2-way accounting bridge for MCS Platform. Generates Customers, Proforma Sales Orders,
-              Final Tax Invoices with DP allocation, and Sales Receipts into Accurate Online on the fly.
+              Final Invoices with DP allocation, and Sales Receipts into Accurate Online on the fly.
             </p>
           </div>
 

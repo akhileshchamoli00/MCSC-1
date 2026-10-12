@@ -2452,22 +2452,7 @@ export default function AssignedOrdersPage() {
                               </Button>
                             )}
 
-                            {ord.status === "REVIEW_DOCS" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="gap-1.5 font-semibold h-9 px-3 text-xs border-teal-500/30 bg-teal-500/10 text-teal-700 hover:bg-teal-500/20 dark:text-teal-300 dark:border-teal-500/40 shadow-xs shrink-0 rounded cursor-pointer"
-                                title="Review Pre-Signature Documents Checklist"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setReviewOrder(ord);
-                                  setIsReviewDocsOpen(true);
-                                }}
-                              >
-                                <CheckSquare className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
-                                <span>Review Docs</span>
-                              </Button>
-                            )}
+
 
                             <Button
 

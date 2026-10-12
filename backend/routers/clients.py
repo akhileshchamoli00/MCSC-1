@@ -3321,11 +3321,25 @@ def upload_client_document(
             order_number=order_number,
             document_date=parsed_date,
             expiry_date=parsed_expiry_date,
-            uploaded_at=datetime.now(),
+            uploaded_at=datetime.now(timezone.utc),
             uploaded_by=current_user.id
         )
         db.add(db_doc)
         created_docs.append(db_doc)
+
+        # If document is uploaded for an order, reset existing review state to PENDING so reworked versions are re-evaluated
+        if order_number and filename:
+            clean_ord = order_number.strip().upper()
+            existing_rev = db.query(models.OrderDocumentReview).filter(
+                func.upper(models.OrderDocumentReview.order_number) == clean_ord,
+                func.lower(models.OrderDocumentReview.document_name) == filename.strip().lower()
+            ).first()
+            if existing_rev:
+                existing_rev.status = "PENDING"
+                existing_rev.is_reviewed = False
+                existing_rev.reviewed_at = None
+                existing_rev.reviewed_by_user_id = None
+                existing_rev.notes = None
 
     try:
         db.commit()
@@ -3742,6 +3756,17 @@ def delete_client_document(
     file_name = db_doc.file_name or "Document"
     doc_type = db_doc.document_type or "General"
     order_suffix = f" from order {db_doc.order_number}" if db_doc.order_number else ""
+
+    # Clean up associated review record in OrderDocumentReview if exists
+    if db_doc.order_number:
+        clean_doc_ord = db_doc.order_number.strip().upper()
+        db.query(models.OrderDocumentReview).filter(
+            func.upper(models.OrderDocumentReview.order_number) == clean_doc_ord,
+            or_(
+                func.lower(models.OrderDocumentReview.document_name) == file_name.strip().lower(),
+                models.OrderDocumentReview.document_id == db_doc.id
+            )
+        ).delete(synchronize_session=False)
 
     db.delete(db_doc)
     db.commit()
@@ -6166,7 +6191,7 @@ def finalize_order_final_invoice(
         file_name=filename,
         file_url=destination_path,
         document_type="Invoice",
-        description=f"Final Tax Invoice for Order {order_number}",
+        description=f"Final Invoice for Order {order_number}",
         document_path=destination_path,
         order_number=order_number,
         document_date=datetime.now().date(),
@@ -6185,7 +6210,7 @@ def finalize_order_final_invoice(
     db.add(db_progress)
     
     # Log activity
-    log_activity(db, "INVOICE_FINALIZED", f"Finalized final tax invoice for order {order_number} and uploaded to Dropbox", client_id=company.client_id, company_id=company_id, user_id=current_user.id)
+    log_activity(db, "INVOICE_FINALIZED", f"Finalized final invoice for order {order_number} and uploaded to Dropbox", client_id=company.client_id, company_id=company_id, user_id=current_user.id)
     
     db.commit()
 
@@ -7074,7 +7099,7 @@ def find_order_signed_documents(db: Session, order_number: str, company: models.
             func.upper(models.ClientDocument.order_number) == order_folder.upper(),
             models.ClientDocument.company_id.in_(list(company_ids))
         )
-    )
+    ).order_by(models.ClientDocument.uploaded_at.desc().nullslast(), models.ClientDocument.id.desc())
     db_docs = db_query.all()
     
     for d in db_docs:
@@ -7084,6 +7109,10 @@ def find_order_signed_documents(db: Session, order_number: str, company: models.
         desc = (d.description or "").lower()
         d_order = (d.order_number or "").strip().upper()
         
+        # If this document explicitly belongs to a different order, skip it
+        if d_order and d_order != order_folder.upper():
+            continue
+            
         is_signed_or_pre = (
             "pre doc" in dtype or "predoc" in dtype or "pre-doc" in dtype or "pre-signature" in dtype or "pre signature" in dtype or "signed" in dtype or
             "/pre doc" in furl or "/predoc" in furl or "/pre-doc" in furl or "/pre_doc" in furl or "/pre-signature" in furl or "/signed" in furl or
@@ -7091,21 +7120,20 @@ def find_order_signed_documents(db: Session, order_number: str, company: models.
         )
         
         if is_signed_or_pre and fname:
-            key = fname.lower()
+            key = f"db_{d.id}"
             clean_desc = d.description or ""
             if clean_desc.strip().lower().startswith("uploaded via"):
                 clean_desc = ""
 
-            is_explicit_pre = ("pre-signature" in dtype or "pre doc" in dtype or "/pre-signature" in furl or "/pre doc" in furl)
-            if key not in docs_map or (is_explicit_pre and docs_map[key].get("document_type") != "Pre-Signature Documents"):
-                docs_map[key] = {
-                    "id": d.id,
-                    "file_name": fname,
-                    "file_url": d.file_url,
-                    "document_type": d.document_type or "Pre-Signature Documents",
-                    "description": clean_desc,
-                    "source": "database"
-                }
+            docs_map[key] = {
+                "id": d.id,
+                "file_name": fname,
+                "file_url": d.file_url,
+                "document_type": d.document_type or "Pre-Signature Documents",
+                "description": clean_desc,
+                "source": "database",
+                "uploaded_at": d.uploaded_at
+            }
                 
     # 2. Check Dropbox Pre Docs / Signed Docs folders for all candidate company codes
     try:
@@ -7134,23 +7162,23 @@ def find_order_signed_documents(db: Session, order_number: str, company: models.
                 for item in res["items"]:
                     if item.get("type") == "file":
                         fname = item.get("name")
-                        key = fname.lower()
-                        matching_db = next((d for d in db_docs if (d.file_name or "").strip().lower() == fname.strip().lower() or (d.file_url or "").strip().lower().endswith(fname.strip().lower())), None)
-                        if key not in docs_map:
-                            docs_map[key] = {
-                                "id": matching_db.id if matching_db else None,
-                                "file_name": fname,
-                                "file_url": item.get("path_display") or item.get("path_lower"),
-                                "size": item.get("size", 0),
-                                "document_type": (matching_db.document_type if matching_db else None) or "Pre Document",
-                                "description": (matching_db.description if matching_db else None),
-                                "source": "dropbox"
-                            }
+                        matching_db = next((v for v in docs_map.values() if (v.get("file_name") or "").strip().lower() == fname.strip().lower()), None)
+                        if matching_db:
+                            if not matching_db.get("size") and item.get("size"):
+                                matching_db["size"] = item.get("size")
                         else:
-                            if not docs_map[key].get("size") and item.get("size"):
-                                docs_map[key]["size"] = item.get("size")
-                            if not docs_map[key].get("description") and matching_db and matching_db.description:
-                                docs_map[key]["description"] = matching_db.description
+                            drop_key = f"dropbox_{fname.lower()}"
+                            if drop_key not in docs_map:
+                                docs_map[drop_key] = {
+                                    "id": None,
+                                    "file_name": fname,
+                                    "file_url": item.get("path_display") or item.get("path_lower"),
+                                    "size": item.get("size", 0),
+                                    "document_type": "Pre-Signature Documents",
+                                    "description": None,
+                                    "source": "dropbox",
+                                    "uploaded_at": None
+                                }
     except Exception as e:
         print(f"Warning: Dropbox folder scan for pre/signed docs encountered: {e}")
         
@@ -7238,7 +7266,7 @@ def get_order_pre_signature_checklist(
     if not effective_company:
         raise HTTPException(status_code=404, detail="Company not found for this order")
 
-    # 1. Fetch pre-signature documents from DB and Dropbox
+    # 1. Fetch pre-signature documents from DB and Dropbox currently present
     docs = find_order_signed_documents(db, clean_order_no, effective_company)
 
     # 2. Query review records for this order
@@ -7247,20 +7275,46 @@ def get_order_pre_signature_checklist(
     ).filter(
         func.upper(models.OrderDocumentReview.order_number) == clean_order_no
     ).all()
-    review_map = {r.document_name.strip().lower(): r for r in reviews}
+    review_by_doc_id = {r.document_id: r for r in reviews if r.document_id is not None}
+    review_by_name = {r.document_name.strip().lower(): r for r in reviews if r.document_name}
 
     checklist_items: List[schemas.PreSignatureChecklistItem] = []
-    seen_keys = set()
+    seen_ids = set()
+    seen_names = set()
+    needs_db_commit = False
 
     for doc in docs:
         doc_name = (doc.get("file_name") or "Document").strip()
-        key = doc_name.lower()
-        seen_keys.add(key)
-        rev = review_map.get(key)
+        doc_id = doc.get("id")
+        if doc_id:
+            seen_ids.add(doc_id)
+        seen_names.add(doc_name.lower())
+
+        rev = review_by_doc_id.get(doc_id) if doc_id else None
+        if not rev:
+            rev = review_by_name.get(doc_name.lower())
+
+        # Automatically detect if a reworked/updated version was uploaded after the last review (skip if explicitly EXCLUDED)
+        doc_uploaded_at = doc.get("uploaded_at")
+        if rev and rev.status not in ["EXCLUDED", "NOT_REVIEWED", "OUT_OF_SCOPE"] and rev.reviewed_at and doc_uploaded_at:
+            doc_up_tz = doc_uploaded_at if doc_uploaded_at.tzinfo else doc_uploaded_at.replace(tzinfo=timezone.utc)
+            rev_at_tz = rev.reviewed_at if rev.reviewed_at.tzinfo else rev.reviewed_at.replace(tzinfo=timezone.utc)
+            if doc_up_tz > rev_at_tz:
+                # Document was updated or re-uploaded after last review: reset to PENDING
+                rev.status = "PENDING"
+                rev.is_reviewed = False
+                rev.reviewed_at = None
+                rev.reviewed_by_user_id = None
+                rev.notes = None
+                needs_db_commit = True
 
         reviewer_name = None
         if rev and rev.reviewer:
             reviewer_name = get_user_display_name(rev.reviewer)
+
+        doc_status = getattr(rev, "status", None) if rev else None
+        if not doc_status:
+            doc_status = "APPROVED" if (rev and rev.is_reviewed) else "PENDING"
 
         checklist_items.append(schemas.PreSignatureChecklistItem(
             document_name=doc_name,
@@ -7270,6 +7324,7 @@ def get_order_pre_signature_checklist(
             size=doc.get("size"),
             description=doc.get("description") or (rev.notes if rev else None),
             source=doc.get("source", "database"),
+            status=doc_status,
             is_reviewed=bool(rev.is_reviewed) if rev else False,
             reviewed_by_id=rev.reviewed_by_user_id if rev else None,
             reviewed_by_name=reviewer_name,
@@ -7277,28 +7332,25 @@ def get_order_pre_signature_checklist(
             notes=rev.notes if rev else None
         ))
 
-    # Also include any review records registered in DB that might not appear in folder scan
-    for key, rev in review_map.items():
-        if key not in seen_keys:
-            reviewer_name = get_user_display_name(rev.reviewer) if rev.reviewer else None
-            checklist_items.append(schemas.PreSignatureChecklistItem(
-                document_name=rev.document_name,
-                document_id=rev.document_id,
-                document_path=rev.document_path,
-                category=rev.category or "Pre-Signature Documents",
-                size=None,
-                description=rev.notes,
-                source="database",
-                is_reviewed=bool(rev.is_reviewed),
-                reviewed_by_id=rev.reviewed_by_user_id,
-                reviewed_by_name=reviewer_name,
-                reviewed_at=rev.reviewed_at,
-                notes=rev.notes
-            ))
+    # Clean up obsolete review records for deleted files that are no longer present
+    for rev in reviews:
+        if rev.document_id and rev.document_id not in seen_ids:
+            db.delete(rev)
+            needs_db_commit = True
+        elif not rev.document_id and rev.document_name.strip().lower() not in seen_names:
+            db.delete(rev)
+            needs_db_commit = True
+
+    if needs_db_commit:
+        db.commit()
 
     total_count = len(checklist_items)
-    reviewed_count = sum(1 for it in checklist_items if it.is_reviewed)
-    is_all_reviewed = (total_count > 0) and (reviewed_count == total_count)
+    active_items = [it for it in checklist_items if it.status != "EXCLUDED"]
+    active_count = len(active_items)
+    reviewed_count = sum(1 for it in active_items if it.status == "APPROVED" or (it.is_reviewed and it.status != "REJECTED"))
+    faulty_count = sum(1 for it in active_items if it.status == "REJECTED")
+    excluded_count = sum(1 for it in checklist_items if it.status == "EXCLUDED")
+    is_all_reviewed = (active_count > 0) and (reviewed_count == active_count) and (faulty_count == 0)
 
     return schemas.PreSignatureChecklistResponse(
         order_number=clean_order_no,
@@ -7307,6 +7359,8 @@ def get_order_pre_signature_checklist(
         company_id=effective_company.id,
         total_documents=total_count,
         reviewed_documents=reviewed_count,
+        faulty_documents=faulty_count,
+        excluded_documents=excluded_count,
         is_all_reviewed=is_all_reviewed,
         lifecycle_status=first_order.status,
         items=checklist_items
@@ -7329,10 +7383,17 @@ def toggle_order_pre_signature_document_review(
     if not clean_doc_name:
         raise HTTPException(status_code=400, detail="Document name is required")
 
-    rev = db.query(models.OrderDocumentReview).filter(
-        func.upper(models.OrderDocumentReview.order_number) == clean_order_no,
-        func.lower(models.OrderDocumentReview.document_name) == clean_doc_name.lower()
-    ).first()
+    rev = None
+    if payload.document_id:
+        rev = db.query(models.OrderDocumentReview).filter(
+            func.upper(models.OrderDocumentReview.order_number) == clean_order_no,
+            models.OrderDocumentReview.document_id == payload.document_id
+        ).first()
+    if not rev and clean_doc_name:
+        rev = db.query(models.OrderDocumentReview).filter(
+            func.upper(models.OrderDocumentReview.order_number) == clean_order_no,
+            func.lower(models.OrderDocumentReview.document_name) == clean_doc_name.lower()
+        ).first()
 
     if not rev:
         rev = models.OrderDocumentReview(
@@ -7345,9 +7406,12 @@ def toggle_order_pre_signature_document_review(
         )
         db.add(rev)
 
-    rev.is_reviewed = payload.is_reviewed
-    if payload.notes is not None:
-        rev.notes = payload.notes
+    # Determine desired status: 'APPROVED', 'REJECTED', 'EXCLUDED', or 'PENDING'
+    target_status = (payload.status or "").strip().upper()
+    if not target_status:
+        target_status = "APPROVED" if payload.is_reviewed else "PENDING"
+
+    rev.status = target_status
     if payload.document_id:
         rev.document_id = payload.document_id
     if payload.document_path:
@@ -7355,14 +7419,47 @@ def toggle_order_pre_signature_document_review(
 
     reviewer_name = get_user_display_name(current_user)
 
-    if payload.is_reviewed:
+    if target_status == "REJECTED":
+        rev.is_reviewed = False
+        rev.notes = (payload.notes or "").strip() or "Marked as faulty / needs revision."
+        rev.reviewed_by_user_id = current_user.id
+        rev.reviewed_at = datetime.now(timezone.utc)
+        fault_reason = (payload.notes or "").strip() or "Marked as faulty / needs revision."
+        chat_msg = (
+            f"❌ Pre-Signature Document Faulty / Rejected: {reviewer_name} flagged '{clean_doc_name}' as unacceptable.\n"
+            f"Issue / Missing: {fault_reason}"
+        )
+    elif target_status in ["EXCLUDED", "NOT_REVIEWED", "OUT_OF_SCOPE"]:
+        rev.status = "EXCLUDED"
+        rev.is_reviewed = False
+        # Retain original cross file / fault comment if present
+        existing_comment = (payload.notes or "").strip() or (rev.notes or "").strip()
+        if existing_comment and existing_comment != "Old Version - Not for Review":
+            rev.notes = existing_comment
+        else:
+            rev.notes = (payload.notes or "").strip() or None
+        rev.reviewed_by_user_id = current_user.id
+        rev.reviewed_at = datetime.now(timezone.utc)
+        note_details = f" (Previous Cross Issue: '{rev.notes}')" if rev.notes and rev.notes != "Old Version - Not for Review" else ""
+        chat_msg = f"⏭️ Pre-Signature Document Out of Scope: {reviewer_name} marked '{clean_doc_name}' as (Not to be reviewed - Old Version){note_details}."
+    elif target_status == "APPROVED":
+        rev.is_reviewed = True
+        rev.notes = payload.notes if payload.notes is not None else None
         rev.reviewed_by_user_id = current_user.id
         rev.reviewed_at = datetime.now(timezone.utc)
         chat_msg = f"📋 Pre-Signature Document Reviewed: {reviewer_name} has reviewed and verified '{clean_doc_name}'."
-    else:
+    else:  # PENDING
+        rev.is_reviewed = False
+        # If restored to pending, retain existing cross file comment if there was one
+        if payload.notes is not None and payload.notes.strip():
+            rev.notes = payload.notes.strip()
+        elif rev.notes and rev.notes != "Old Version - Not for Review":
+            pass  # keep existing cross comment
+        else:
+            rev.notes = None
         rev.reviewed_by_user_id = None
         rev.reviewed_at = None
-        chat_msg = f"↩️ Pre-Signature Document Review Reopened: {reviewer_name} marked '{clean_doc_name}' as unreviewed."
+        chat_msg = f"↩️ Pre-Signature Document Included: {reviewer_name} restored '{clean_doc_name}' to Active Review Scope."
 
     # Post automated message to INTERNAL order progress/chat
     prog = models.ClientOrderProgress(
@@ -7400,12 +7497,294 @@ def toggle_order_pre_signature_document_review(
         size=None,
         description=rev.notes,
         source="database" if rev.document_id else "dropbox",
+        status=rev.status,
         is_reviewed=bool(rev.is_reviewed),
         reviewed_by_id=rev.reviewed_by_user_id,
-        reviewed_by_name=reviewer_name if rev.is_reviewed else None,
+        reviewed_by_name=reviewer_name if (rev.is_reviewed or rev.status == "REJECTED") else None,
         reviewed_at=rev.reviewed_at,
         notes=rev.notes
     )
+
+
+@router.post("/orders/{order_number}/pre-signature-checklist/upload", response_model=schemas.PreSignatureChecklistResponse)
+def upload_order_pre_signature_documents(
+    order_number: str,
+    background_tasks: BackgroundTasks,
+    files: Optional[List[UploadFile]] = File(None),
+    file: Optional[UploadFile] = File(None),
+    replace_document_name: Optional[str] = Form(None),
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    clean_order_no = (order_number or "").strip().upper()
+    first_order = db.query(models.ClientOrder).filter(func.upper(models.ClientOrder.order_number) == clean_order_no).first()
+    if not first_order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    company_id = first_order.billing_company_id or first_order.company_id
+    company = db.query(models.ClientCompany).filter(models.ClientCompany.id == company_id).first()
+    target_company = db.query(models.ClientCompany).filter(models.ClientCompany.id == first_order.company_id).first()
+    effective_company = company or target_company
+    if not effective_company:
+        raise HTTPException(status_code=404, detail="Company not found for this order")
+
+    upload_list: List[UploadFile] = []
+    if files:
+        upload_list.extend(files)
+    elif file:
+        upload_list.append(file)
+
+    if not upload_list:
+        raise HTTPException(status_code=400, detail="At least one file is required")
+
+    from utils.file_sanitizer import validate_file_security
+    from utils.dropbox_client import delete_path
+
+    company_code = effective_company.company_code or f"comp_{effective_company.id}"
+
+    # If this is replacing an existing document, clean up the old document
+    if replace_document_name:
+        clean_rep_name = replace_document_name.strip()
+        # Delete old review
+        db.query(models.OrderDocumentReview).filter(
+            func.upper(models.OrderDocumentReview.order_number) == clean_order_no,
+            func.lower(models.OrderDocumentReview.document_name) == clean_rep_name.lower()
+        ).delete(synchronize_session=False)
+
+        # Delete old ClientDocument entries
+        old_docs = db.query(models.ClientDocument).filter(
+            func.upper(models.ClientDocument.order_number) == clean_order_no,
+            func.lower(models.ClientDocument.file_name) == clean_rep_name.lower()
+        ).all()
+        for od in old_docs:
+            if od.file_url and od.file_url.startswith("/Clients/"):
+                try:
+                    delete_path(od.file_url)
+                except Exception:
+                    pass
+            elif od.file_url and od.file_url.startswith("/uploads/"):
+                lp = od.file_url.lstrip("/")
+                if os.path.exists(lp):
+                    try:
+                        os.remove(lp)
+                    except Exception:
+                        pass
+            db.delete(od)
+
+        try:
+            delete_path(f"/Clients/{company_code}/{clean_order_no}/Pre-Signature Documents/{clean_rep_name}")
+        except Exception:
+            pass
+
+    reviewer_name = get_user_display_name(current_user)
+    uploaded_names = []
+
+    for item in upload_list:
+        raw_bytes = item.file.read()
+        file_bytes, filename = validate_file_security(raw_bytes, item.filename or "document.pdf", max_size_mb=50, allowed_category="all")
+        destination_path = f"/Clients/{company_code}/{clean_order_no}/Pre-Signature Documents/{filename}"
+
+        # 1. Local disk fallback cache
+        local_rel = destination_path.replace("/Clients/", "", 1)
+        local_full_path = os.path.join("uploads", local_rel)
+        os.makedirs(os.path.dirname(local_full_path), exist_ok=True)
+        try:
+            with open(local_full_path, "wb") as f_out:
+                f_out.write(file_bytes)
+        except Exception as local_err:
+            print(f"Notice: Failed writing local backup: {local_err}")
+
+        # 2. Background sync to Dropbox
+        background_tasks.add_task(sync_dropbox_file_task, file_bytes, destination_path)
+
+        # 3. Create or update ClientDocument record (avoid duplicate rows)
+        existing_cdoc = db.query(models.ClientDocument).filter(
+            models.ClientDocument.company_id == effective_company.id,
+            func.upper(models.ClientDocument.order_number) == clean_order_no,
+            func.lower(models.ClientDocument.file_name) == filename.strip().lower(),
+            func.lower(models.ClientDocument.document_type) == "pre-signature documents"
+        ).first()
+
+        if existing_cdoc:
+            existing_cdoc.file_url = destination_path
+            existing_cdoc.document_path = destination_path
+            existing_cdoc.uploaded_at = datetime.now(timezone.utc)
+            existing_cdoc.uploaded_by = current_user.id
+            cdoc = existing_cdoc
+        else:
+            cdoc = models.ClientDocument(
+                company_id=effective_company.id,
+                file_name=filename,
+                file_url=destination_path,
+                document_type="Pre-Signature Documents",
+                document_path=destination_path,
+                order_number=clean_order_no,
+                uploaded_at=datetime.now(timezone.utc),
+                uploaded_by=current_user.id
+            )
+            db.add(cdoc)
+
+        # 4. Create or reset OrderDocumentReview record to PENDING
+        rev = db.query(models.OrderDocumentReview).filter(
+            func.upper(models.OrderDocumentReview.order_number) == clean_order_no,
+            func.lower(models.OrderDocumentReview.document_name) == filename.strip().lower()
+        ).first()
+        if not rev:
+            rev = models.OrderDocumentReview(
+                order_number=clean_order_no,
+                document_name=filename,
+                category="Pre-Signature Documents",
+                status="PENDING",
+                is_reviewed=False
+            )
+            db.add(rev)
+        else:
+            rev.status = "PENDING"
+            rev.is_reviewed = False
+            rev.reviewed_at = None
+            rev.reviewed_by_user_id = None
+            rev.notes = None
+
+        uploaded_names.append(filename)
+
+    # 5. Post automated chat notification
+    if replace_document_name:
+        chat_msg = f"🔄 Pre-Signature Document Reworked: {reviewer_name} uploaded replacement '{', '.join(uploaded_names)}' (replaced '{replace_document_name}') for review."
+    else:
+        chat_msg = f"📤 Pre-Signature Document Uploaded: {reviewer_name} uploaded {len(uploaded_names)} new document(s) ({', '.join(uploaded_names)}) for review."
+
+    prog = models.ClientOrderProgress(
+        order_number=clean_order_no,
+        user_id=current_user.id,
+        message=chat_msg,
+        channel="INTERNAL"
+    )
+    db.add(prog)
+    db.flush()
+    record_sender_read_watermark(clean_order_no, "INTERNAL", current_user.id, prog.id, db)
+
+    db.commit()
+
+    # Real-time WebSocket ping to order team
+    try:
+        from notification_manager import manager
+        if hasattr(manager, 'loop') and manager.loop:
+            import asyncio
+            for uid in get_assigned_order_team_user_ids(clean_order_no, db):
+                asyncio.run_coroutine_threadsafe(manager.send_personal_message({
+                    "action": "ORDER_CHAT_UPDATE",
+                    "order_number": clean_order_no,
+                    "channel": "INTERNAL"
+                }, uid), manager.loop)
+    except Exception as ws_e:
+        print(f"Warning: WebSocket broadcast failed: {ws_e}")
+
+    return get_order_pre_signature_checklist(clean_order_no, db, current_user)
+
+
+@router.delete("/orders/{order_number}/pre-signature-checklist/documents", response_model=schemas.PreSignatureChecklistResponse)
+def delete_order_pre_signature_document(
+    order_number: str,
+    document_name: str,
+    document_id: Optional[int] = None,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    clean_order_no = (order_number or "").strip().upper()
+    clean_doc_name = (document_name or "").strip()
+    if not clean_doc_name:
+        raise HTTPException(status_code=400, detail="Document name is required")
+
+    first_order = db.query(models.ClientOrder).filter(func.upper(models.ClientOrder.order_number) == clean_order_no).first()
+    if not first_order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    company_id = first_order.billing_company_id or first_order.company_id
+    company = db.query(models.ClientCompany).filter(models.ClientCompany.id == company_id).first()
+    target_company = db.query(models.ClientCompany).filter(models.ClientCompany.id == first_order.company_id).first()
+    effective_company = company or target_company
+    if not effective_company:
+        raise HTTPException(status_code=404, detail="Company not found for this order")
+
+    company_code = effective_company.company_code or f"comp_{effective_company.id}"
+
+    # 1. Delete review record
+    db.query(models.OrderDocumentReview).filter(
+        func.upper(models.OrderDocumentReview.order_number) == clean_order_no,
+        or_(
+            func.lower(models.OrderDocumentReview.document_name) == clean_doc_name.lower(),
+            models.OrderDocumentReview.document_id == document_id if document_id else False
+        )
+    ).delete(synchronize_session=False)
+
+    # 2. Delete ClientDocument entries & underlying files
+    doc_query = db.query(models.ClientDocument).filter(
+        func.upper(models.ClientDocument.order_number) == clean_order_no,
+        or_(
+            func.lower(models.ClientDocument.file_name) == clean_doc_name.lower(),
+            models.ClientDocument.id == document_id if document_id else False
+        )
+    )
+    docs_to_del = doc_query.all()
+    from utils.dropbox_client import delete_path
+    for d in docs_to_del:
+        if d.file_url and d.file_url.startswith("/Clients/"):
+            try:
+                delete_path(d.file_url)
+            except Exception:
+                pass
+        elif d.file_url and d.file_url.startswith("/uploads/"):
+            lp = d.file_url.lstrip("/")
+            if os.path.exists(lp):
+                try:
+                    os.remove(lp)
+                except Exception:
+                    pass
+        db.delete(d)
+
+    # 3. Attempt direct Dropbox delete on Pre-Signature Documents
+    candidate_paths = [
+        f"/Clients/{company_code}/{clean_order_no}/Pre-Signature Documents/{clean_doc_name}",
+        f"/Clients/{company_code}/{clean_order_no}/Pre-Signature Docs/{clean_doc_name}",
+        f"/Clients/{company_code}/{clean_order_no}/Pre Docs/{clean_doc_name}",
+        f"/Clients/{company_code}/{clean_order_no}/Signed Documents/{clean_doc_name}",
+    ]
+    for cp in candidate_paths:
+        try:
+            delete_path(cp)
+        except Exception:
+            pass
+
+    # 4. Chat notification
+    reviewer_name = get_user_display_name(current_user)
+    chat_msg = f"🗑️ Pre-Signature Document Deleted: {reviewer_name} removed '{clean_doc_name}' from the pre-signature documents list."
+    prog = models.ClientOrderProgress(
+        order_number=clean_order_no,
+        user_id=current_user.id,
+        message=chat_msg,
+        channel="INTERNAL"
+    )
+    db.add(prog)
+    db.flush()
+    record_sender_read_watermark(clean_order_no, "INTERNAL", current_user.id, prog.id, db)
+
+    db.commit()
+
+    # WebSocket ping
+    try:
+        from notification_manager import manager
+        if hasattr(manager, 'loop') and manager.loop:
+            import asyncio
+            for uid in get_assigned_order_team_user_ids(clean_order_no, db):
+                asyncio.run_coroutine_threadsafe(manager.send_personal_message({
+                    "action": "ORDER_CHAT_UPDATE",
+                    "order_number": clean_order_no,
+                    "channel": "INTERNAL"
+                }, uid), manager.loop)
+    except Exception as ws_e:
+        print(f"Warning: WebSocket broadcast failed: {ws_e}")
+
+    return get_order_pre_signature_checklist(clean_order_no, db, current_user)
 
 
 @router.post("/orders/{order_number}/advance-to-reviewed")
@@ -7418,6 +7797,16 @@ def advance_order_to_documents_reviewed(
     orders_in_group = db.query(models.ClientOrder).filter(func.upper(models.ClientOrder.order_number) == clean_order_no).all()
     if not orders_in_group:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    faulty_count = db.query(models.OrderDocumentReview).filter(
+        func.upper(models.OrderDocumentReview.order_number) == clean_order_no,
+        func.upper(models.OrderDocumentReview.status) == "REJECTED"
+    ).count()
+    if faulty_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot advance order: {faulty_count} document(s) are marked as faulty/unacceptable. Please resolve them before advancing."
+        )
 
     update_order_group_status(db, orders_in_group, "DOCUMENTS_REVIEWED", current_user.id)
     return {

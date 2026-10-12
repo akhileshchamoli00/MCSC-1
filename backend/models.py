@@ -958,6 +958,7 @@ class OrderDocumentReview(Base):
     document_path = Column(String, nullable=True)
     category = Column(String, default="Pre-Signature Documents", nullable=True)
     is_reviewed = Column(Boolean, default=False, nullable=False)
+    status = Column(String, default="PENDING", nullable=True) # PENDING, APPROVED, REJECTED
     reviewed_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     notes = Column(String, nullable=True)
@@ -966,10 +967,6 @@ class OrderDocumentReview(Base):
 
     reviewer = relationship("User", foreign_keys=[reviewed_by_user_id])
     document = relationship("ClientDocument", foreign_keys=[document_id])
-
-    __table_args__ = (
-        UniqueConstraint("order_number", "document_name", name="uq_order_doc_review_name"),
-    )
 
 
 

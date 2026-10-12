@@ -100,7 +100,7 @@ export function OrderEmailDispatchDialog({
                   <Receipt className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 )}
               </div>
-              <span>Dispatch {isFinal ? 'Final Tax Invoice' : isQuotation ? 'Official Service Quotation' : 'Proforma Invoice'}</span>
+              <span>Dispatch {isFinal ? 'Final Invoice' : isQuotation ? 'Official Service Quotation' : 'Proforma Invoice'}</span>
             </DialogTitle>
             {selectedOrderGroup && (
               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
@@ -310,7 +310,7 @@ export function OrderEmailDispatchDialog({
                     {isQuotation ? "Quotation Summary & Breakdown" : "Invoice Summary & Breakdown"}
                   </label>
                   <span className="text-[11px] text-muted-foreground font-mono bg-muted/60 px-2 py-0.5 rounded">
-                    {isFinal ? 'Final Tax' : isQuotation ? 'Quotation' : 'Proforma'}
+                    {isFinal ? 'Final' : isQuotation ? 'Quotation' : 'Proforma'}
                   </span>
                 </div>
 

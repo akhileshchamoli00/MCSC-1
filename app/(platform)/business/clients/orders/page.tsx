@@ -3111,24 +3111,7 @@ export default function ClientOrdersPage() {
                                 </div>
 
                                 {/* Row 2: Dispatch action buttons placed UNDER edit, view, chat, delete */}
-                                {ord.status === "REVIEW_DOCS" && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-5 px-1.5 text-[8.5px] font-semibold gap-1 shadow-none inline-flex items-center text-teal-700 border-teal-500/30 bg-teal-500/10 hover:bg-teal-500/20 dark:text-teal-300 dark:border-teal-500/40 dark:bg-teal-500/15 rounded whitespace-nowrap cursor-pointer"
-                                    title="Open Pre-Signature Documents Review Checklist"
-                                    onClick={() => {
-                                      setHighlightedOrderNum(ord.order_number);
-                                      if (typeof window !== "undefined") {
-                                        sessionStorage.setItem("active_orders_highlighted_order", ord.order_number);
-                                      }
-                                      setReviewOrder(ord);
-                                      setIsReviewDocsOpen(true);
-                                    }}
-                                  >
-                                    <CheckSquare className="h-2.5 w-2.5 text-teal-600 dark:text-teal-400" /> Review Docs
-                                  </Button>
-                                )}
+
                                 {['DOCUMENTS_REVIEWED', 'PRE_DOC_SENT_FOR_SIGNATURE', 'PRE_DOCS_SENT', 'AWAITING_SIGNING_NOTARIZATION', 'AWAITING_DOCUMENT_RETURN', 'AWAITING_THIRD_PARTY_RESPONSE'].includes(ord.status) && (
 
                                   <Button
@@ -4426,7 +4409,7 @@ export default function ClientOrdersPage() {
 
                       <div className="text-right shrink-0">
                         <div className="inline-block px-3.5 py-1.5 bg-slate-900 text-white font-black font-mono text-xs rounded uppercase tracking-wider mb-1">
-                          FINAL TAX INVOICE
+                          FINAL INVOICE
                         </div>
                         <h3 className="font-mono text-xl font-black text-slate-900">
                           INV-{selectedOrderGroup.order_number}

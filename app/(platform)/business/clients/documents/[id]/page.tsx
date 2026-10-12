@@ -489,6 +489,25 @@ export default function CompanyDocumentsManagementPage() {
     "ON_HOLD"
   ];
 
+  const REVIEW_CHECKLIST_ELIGIBLE_STATUSES = [
+    "REVIEW_DOCS",
+    "DOCUMENTS_REVIEWED",
+    "PRE_DOC_SENT_FOR_SIGNATURE",
+    "PRE_DOCS_SENT",
+    "AWAITING_SIGNING_NOTARIZATION",
+    "AWAITING_DOCUMENT_RETURN",
+    "AWAITING_THIRD_PARTY_RESPONSE",
+    "FINAL_DOCUMENT_PREPARATION",
+    "FINAL_DOC_READY",
+    "COMPLETED"
+  ];
+
+  const effectiveOrderStatus = (activeOrder?.status || selectedOrderObj?.status || "").trim().toUpperCase().replace(/ /g, "_");
+  const isReviewChecklistEligible = Boolean(
+    (activeOrder || selectedOrderObj) &&
+    REVIEW_CHECKLIST_ELIGIBLE_STATUSES.includes(effectiveOrderStatus)
+  );
+
   const getOrderStatusColor = (status: string) => {
     switch (status) {
       case "COMPLETED": return "bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold";
@@ -705,6 +724,17 @@ export default function CompanyDocumentsManagementPage() {
     fetchInitialData();
   }, [companyId]);
 
+  useEffect(() => {
+    const handleDocsChanged = () => {
+      fetchDocuments();
+      fetchActivities();
+    };
+    window.addEventListener("order-documents-changed", handleDocsChanged);
+    return () => {
+      window.removeEventListener("order-documents-changed", handleDocsChanged);
+    };
+  }, [companyId]);
+
   // Compliance Badge Helper
   const getDocumentComplianceStatus = (expiryDateStr: string | null) => {
     if (!expiryDateStr) return { label: "VALID", color: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" };
@@ -814,7 +844,7 @@ export default function CompanyDocumentsManagementPage() {
       });
       formData.append("document_type", uploadRow.type);
       if (uploadRow.description) formData.append("description", uploadRow.description);
-      const orderNumToSave = (isPipelineInquiry ? activeOrderNumber : selectedOrderNum)?.trim();
+      const orderNumToSave = (selectedOrderNum || activeOrderNumber)?.trim();
       if (orderNumToSave) {
         formData.append("order_number", orderNumToSave);
       }
@@ -850,10 +880,11 @@ export default function CompanyDocumentsManagementPage() {
       setDocuments(prev => [...prev, ...newDocsList]);
       const count = uploadRow.files.length;
       setUploadRow({ files: [], type: "", description: "", document_path: "", date: "", expiry_date: "" });
-      setSelectedOrderNum(isPipelineInquiry ? activeOrderNumber : "");
-      setOrderSearchQuery(isPipelineInquiry ? activeOrderNumber : "");
+      setSelectedOrderNum(activeOrderNumber || selectedOrderNum || "");
+      setOrderSearchQuery(activeOrderNumber || selectedOrderNum || "");
       toast.success(`${count} document(s) uploaded successfully!`);
       fetchInitialData();
+      window.dispatchEvent(new CustomEvent("order-documents-changed", { detail: { orderNumber: selectedOrderNum || activeOrderNumber } }));
     } catch (err: any) {
       console.error("Save failed", err);
       toast.error(`Failed to save: ${err.message}`);
@@ -875,6 +906,7 @@ export default function CompanyDocumentsManagementPage() {
       toast.success("Document deleted successfully");
       setDeleteDocId(null);
       fetchActivities();
+      window.dispatchEvent(new CustomEvent("order-documents-changed", { detail: { orderNumber: selectedOrderNum || activeOrderNumber } }));
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -927,6 +959,7 @@ export default function CompanyDocumentsManagementPage() {
       toast.success("Document updated successfully");
       setEditDoc(null);
       fetchInitialData();
+      window.dispatchEvent(new CustomEvent("order-documents-changed", { detail: { orderNumber: editDoc?.order_number || selectedOrderNum } }));
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -1434,7 +1467,7 @@ export default function CompanyDocumentsManagementPage() {
                     </button>
                   </div>
                 )}
-                {!isPipelineInquiry && activeOrder && (
+                {!isPipelineInquiry && (activeOrder || selectedOrderObj) && isReviewChecklistEligible && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -2909,18 +2942,22 @@ export default function CompanyDocumentsManagementPage() {
       )}
 
       {/* Pre-Signature Documents Review Checklist Dialog */}
-      {activeOrder && (
+      {(activeOrder || selectedOrderObj) && (
         <PreSignatureReviewDialog
           open={isReviewChecklistOpen}
           onOpenChange={setIsReviewChecklistOpen}
-          orderNumber={activeOrder.order_number}
+          orderNumber={activeOrder?.order_number || selectedOrderObj?.order_number || ""}
           companyName={companyName}
           companyCode={companyCode}
           companyId={companyId}
-          currentLifecycleStatus={activeOrder.status}
+          currentLifecycleStatus={activeOrder?.status || selectedOrderObj?.status}
           onStatusUpdated={(newStatus) => {
             setActiveOrder((prev: any) => prev ? { ...prev, status: newStatus } : prev);
             fetchInitialData();
+          }}
+          onDocumentsUpdated={() => {
+            fetchDocuments();
+            fetchActivities();
           }}
           onOpenChat={() => setIsChatOpen(true)}
         />

@@ -3915,7 +3915,7 @@ export default function ClientOrdersPage() {
 
                       <div className="text-right shrink-0">
                         <div className="inline-block px-3 py-1 bg-slate-900 text-white font-black font-mono text-[11px] rounded uppercase tracking-wider mb-1">
-                          FINAL TAX INVOICE
+                          FINAL INVOICE
                         </div>
                         <h3 className="font-mono text-lg font-black text-slate-900">
                           INV-{selectedOrderGroup.order_number}

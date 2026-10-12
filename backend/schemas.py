@@ -1799,6 +1799,7 @@ class PreSignatureChecklistItem(BaseModel):
     size: Optional[int] = None
     description: Optional[str] = None
     source: Optional[str] = "database"
+    status: Optional[str] = "PENDING"
     is_reviewed: bool = False
     reviewed_by_id: Optional[int] = None
     reviewed_by_name: Optional[str] = None
@@ -1813,6 +1814,8 @@ class PreSignatureChecklistResponse(BaseModel):
     company_id: Optional[int] = None
     total_documents: int = 0
     reviewed_documents: int = 0
+    faulty_documents: int = 0
+    excluded_documents: int = 0
     is_all_reviewed: bool = False
     lifecycle_status: Optional[str] = None
     items: List[PreSignatureChecklistItem] = []
@@ -1821,6 +1824,7 @@ class PreSignatureChecklistResponse(BaseModel):
 class PreSignatureChecklistToggleRequest(BaseModel):
     document_name: str
     is_reviewed: bool
+    status: Optional[str] = None
     document_id: Optional[int] = None
     document_path: Optional[str] = None
     notes: Optional[str] = None

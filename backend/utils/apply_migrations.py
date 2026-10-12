@@ -724,12 +724,16 @@ def run_migrations():
     except Exception as e:
         print(f"Note on performance indexes migration: {e}")
 
-    # Ensure order_document_reviews table exists
+    # Ensure order_document_reviews table exists and has status column
     try:
         import models
         models.Base.metadata.create_all(bind=engine, tables=[models.OrderDocumentReview.__table__])
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE order_document_reviews ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'PENDING'"))
+            conn.execute(text("ALTER TABLE order_document_reviews DROP CONSTRAINT IF EXISTS uq_order_doc_review_name"))
+            conn.commit()
     except Exception as e:
-        print(f"Note on creating order_document_reviews table: {e}")
+        print(f"Note on order_document_reviews table/status column: {e}")
 
     print("Migration check complete.")
 
