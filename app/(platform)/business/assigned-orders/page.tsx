@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import {
   Building,
   Search,
@@ -1138,12 +1138,14 @@ export default function AssignedOrdersPage() {
   }, [totalPages, currentPage]);
 
   const [highlightedOrderNum, setHighlightedOrderNum] = useState<string | null>(null);
+  const hasDismissedReturnUrlRef = useRef(false);
 
   const openOrderDirectly = (orderNum: string, openChat: boolean = false) => {
     if (!orderNum) return;
+    const cleanNum = (orderNum || "").trim().toUpperCase();
 
     // Find in grouped orders
-    const matched = groupedOrders.find(g => g.order_number?.toUpperCase() === orderNum.toUpperCase());
+    const matched = groupedOrders.find(g => (g.order_number || "").trim().toUpperCase() === cleanNum);
     if (matched) {
 
       const st = (matched.status || "").toUpperCase();
@@ -1210,23 +1212,34 @@ export default function AssignedOrdersPage() {
       if (typeof window !== "undefined") {
         sessionStorage.setItem("assigned_orders_highlighted_order", matched.order_number);
       }
-      setTimeout(() => {
-        const el = document.getElementById(`order-row-${matched.order_number}`) || document.getElementById(`mobile-order-card-${matched.order_number}`);
-        const scrollParent = el?.closest('main') || document.querySelector('main');
-        if (el && scrollParent) {
-          const parentRect = scrollParent.getBoundingClientRect();
-          const elRect = el.getBoundingClientRect();
-          if (elRect.top < parentRect.top || elRect.bottom > parentRect.bottom) {
-            const relativeTop = elRect.top - parentRect.top + scrollParent.scrollTop;
-            scrollParent.scrollTo({ top: Math.max(0, relativeTop - 120), behavior: "smooth" });
+      const attemptScroll = (retriesLeft: number) => {
+        const rowId = `order-row-${cleanNum}`;
+        const mobileId = `mobile-order-card-${cleanNum}`;
+        const el = document.getElementById(rowId) || 
+                   document.getElementById(mobileId) ||
+                   document.querySelector(`[data-order-number="${cleanNum}"]`);
+        if (el) {
+          const scrollContainer = el.closest("main") || document.querySelector("main");
+          if (scrollContainer) {
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const elRect = el.getBoundingClientRect();
+            const currentScrollTop = scrollContainer.scrollTop;
+            const targetScrollTop = currentScrollTop + (elRect.top - containerRect.top) - (containerRect.height / 2) + (elRect.height / 2);
+            scrollContainer.scrollTo({
+              top: Math.max(0, targetScrollTop),
+              behavior: "smooth"
+            });
           }
+          if (typeof window !== "undefined") {
+            window.scrollTo(0, 0);
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
+          }
+        } else if (retriesLeft > 0) {
+          setTimeout(() => attemptScroll(retriesLeft - 1), 120);
         }
-        if (typeof window !== "undefined") {
-          window.scrollTo(0, 0);
-          document.documentElement.scrollTop = 0;
-          document.body.scrollTop = 0;
-        }
-      }, 300);
+      };
+      setTimeout(() => attemptScroll(8), 100);
     } else {
       // Fallback: If not in current assigned orders list, fetch directly from backend API
       fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/clients/orders/group/${encodeURIComponent(orderNum)}`, {
@@ -1249,6 +1262,47 @@ export default function AssignedOrdersPage() {
     }
   };
 
+  const handleBackToOrders = useCallback((backOrderNum?: string | null) => {
+    setIsChatOpen(false);
+    hasDismissedReturnUrlRef.current = true;
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("order_chat_return_url");
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("returnUrl") || url.searchParams.has("order") || url.searchParams.has("chat")) {
+        url.searchParams.delete("returnUrl");
+        url.searchParams.delete("order");
+        url.searchParams.delete("chat");
+        window.history.replaceState({}, "", url.pathname + url.search);
+      }
+    }
+    const orderNum = backOrderNum || selectedGroup?.order_number || (typeof window !== "undefined" ? sessionStorage.getItem("assigned_orders_highlighted_order") : null);
+    if (orderNum) {
+      openOrderDirectly(orderNum, false);
+    }
+  }, [selectedGroup]);
+
+  const handleCloseChat = useCallback(() => {
+    setIsChatOpen(false);
+    if (hasDismissedReturnUrlRef.current) {
+      return;
+    }
+    const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const returnUrl = params?.get("returnUrl") || (typeof window !== "undefined" ? sessionStorage.getItem("order_chat_return_url") : null);
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("order_chat_return_url");
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("returnUrl") || url.searchParams.has("order") || url.searchParams.has("chat")) {
+        url.searchParams.delete("returnUrl");
+        url.searchParams.delete("order");
+        url.searchParams.delete("chat");
+        window.history.replaceState({}, "", url.pathname + url.search);
+      }
+    }
+    if (returnUrl && returnUrl !== (window.location.pathname + window.location.search)) {
+      router.push(returnUrl);
+    }
+  }, [router]);
+
   const hasProcessedUrlOrder = useRef(false);
 
   // URL Query Params & sessionStorage initial handler
@@ -1265,12 +1319,23 @@ export default function AssignedOrdersPage() {
     if (orders.length > 0) {
       hasProcessedUrlOrder.current = true;
       openOrderDirectly(orderNum, shouldOpenChat);
-      sessionStorage.removeItem("auto_open_order_chat");
-      const url = new URL(window.location.href);
-      if (url.searchParams.has("order") || url.searchParams.has("chat")) {
-        url.searchParams.delete("order");
-        url.searchParams.delete("chat");
-        window.history.replaceState({}, "", url.pathname + url.search);
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("auto_open_order_chat");
+        const url = new URL(window.location.href);
+        let changed = false;
+        if (url.searchParams.has("order") || url.searchParams.has("chat")) {
+          url.searchParams.delete("order");
+          url.searchParams.delete("chat");
+          changed = true;
+        }
+        if (url.searchParams.has("returnUrl")) {
+          sessionStorage.setItem("order_chat_return_url", url.searchParams.get("returnUrl") || "");
+          url.searchParams.delete("returnUrl");
+          changed = true;
+        }
+        if (changed) {
+          window.history.replaceState({}, "", url.pathname + url.search);
+        }
       }
     } else if (!hasProcessedUrlOrder.current) {
       hasProcessedUrlOrder.current = true;
@@ -2261,11 +2326,14 @@ export default function AssignedOrdersPage() {
                     </tr>
                   ) : (
                     paginatedOrders.map((ord, idx) => {
-                      const isHighlighted = highlightedOrderNum === ord.order_number;
+                      const cleanHighlighted = (highlightedOrderNum || "").trim().toUpperCase();
+                      const ordCleanNum = (ord.order_number || "").trim().toUpperCase();
+                      const isHighlighted = !!cleanHighlighted && ordCleanNum === cleanHighlighted;
                       return (
                         <tr
                           key={ord.order_number}
-                          id={`order-row-${ord.order_number}`}
+                          id={`order-row-${ordCleanNum}`}
+                          data-order-number={ordCleanNum}
                           onClick={() => {
                             setHighlightedOrderNum(ord.order_number);
                             if (typeof window !== "undefined") {
@@ -2622,14 +2690,17 @@ export default function AssignedOrdersPage() {
                 </div>
               ) : (
                 paginatedOrders.map((ord, idx) => {
-                  const isHighlighted = highlightedOrderNum === ord.order_number;
+                  const cleanHighlighted = (highlightedOrderNum || "").trim().toUpperCase();
+                  const ordCleanNum = (ord.order_number || "").trim().toUpperCase();
+                  const isHighlighted = !!cleanHighlighted && ordCleanNum === cleanHighlighted;
                   const isCompleted = ord.status === "COMPLETED";
                   const canSelectStatus = CONSULTANT_EDITABLE_STATUSES.includes((ord.status || "").toUpperCase());
 
                   return (
                     <div
                       key={ord.order_number}
-                      id={`mobile-order-card-${ord.order_number}`}
+                      id={`mobile-order-card-${ordCleanNum}`}
+                      data-order-number={ordCleanNum}
                       onClick={() => {
                         setHighlightedOrderNum(ord.order_number);
                         if (typeof window !== "undefined") {
@@ -3653,7 +3724,8 @@ export default function AssignedOrdersPage() {
       {/* DUAL ORDER CHAT DIALOG (SIDE-BY-SIDE CLIENT & INTERNAL CHAT) */}
       <DualOrderChatDialog
         isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
+        onClose={handleCloseChat}
+        onBack={handleBackToOrders}
         orderNumber={selectedGroup?.order_number || null}
         orderTitle={selectedGroup?.items?.[0]?.job_title}
         companyName={selectedGroup?.company_name}

@@ -9,11 +9,13 @@ import {
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { DeleteNotificationDialog } from "@/components/delete-notification-dialog";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -36,6 +38,11 @@ export default function ClientNotificationsPage() {
   const [filterType, setFilterType] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
 
   const fetchNotifications = async () => {
@@ -111,18 +118,68 @@ export default function ClientNotificationsPage() {
     }
   };
 
-  const deleteNotification = async (id: number, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
+  const handleInitiateDelete = (notif: any, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    setDeleteTarget(notif);
+  };
 
+  const handleConfirmSingleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}`, {
-      credentials: "include",
+      const id = deleteTarget.id;
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}`, {
+        credentials: "include",
         method: "DELETE",
+      });
+      if (res.ok) {
+        setNotifications((prev) => prev.filter((n) => n.id !== id));
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
         });
-      setNotifications(prev => prev.filter(n => n.id !== id));
-      window.dispatchEvent(new Event("notifications-updated"));
+        toast.success("Notification deleted");
+        window.dispatchEvent(new Event("notifications-updated"));
+      } else {
+        toast.error("Failed to delete notification");
+      }
+      setDeleteTarget(null);
     } catch (err) {
       console.error(err);
+      toast.error("Failed to delete notification");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleConfirmBatchDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setIsDeleting(true);
+    const ids = Array.from(selectedIds);
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}`, {
+            credentials: "include",
+            method: "DELETE",
+          })
+        )
+      );
+      setNotifications((prev) => prev.filter((n) => !selectedIds.has(n.id)));
+      toast.success(`${ids.length} notifications deleted`);
+      setSelectedIds(new Set());
+      window.dispatchEvent(new Event("notifications-updated"));
+      setIsBatchDeleteOpen(false);
+    } catch (err) {
+      console.error("Failed to delete selected notifications", err);
+      toast.error("Failed to delete some notifications");
+      fetchNotifications();
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -228,6 +285,90 @@ export default function ClientNotificationsPage() {
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
+  const handleToggleSelectAll = () => {
+    if (filteredNotifications.length === 0) return;
+    const allVisibleSelected = filteredNotifications.every((n) => selectedIds.has(n.id));
+    if (allVisibleSelected) {
+      const newSet = new Set(selectedIds);
+      filteredNotifications.forEach((n) => newSet.delete(n.id));
+      setSelectedIds(newSet);
+    } else {
+      const newSet = new Set(selectedIds);
+      filteredNotifications.forEach((n) => newSet.add(n.id));
+      setSelectedIds(newSet);
+    }
+  };
+
+  const handleToggleSelectOne = (id: number, checked: boolean) => {
+    const newSet = new Set(selectedIds);
+    if (checked) {
+      newSet.add(id);
+    } else {
+      newSet.delete(id);
+    }
+    setSelectedIds(newSet);
+  };
+
+  const handleMarkSelectedAsRead = async () => {
+    if (selectedIds.size === 0) return;
+    setIsProcessingBatch(true);
+    const ids = Array.from(selectedIds);
+
+    setNotifications((prev) =>
+      prev.map((n) => (selectedIds.has(n.id) ? { ...n, is_read: true } : n))
+    );
+    window.dispatchEvent(new Event("notifications-updated"));
+
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}/read`, {
+            credentials: "include",
+            method: "PUT",
+          })
+        )
+      );
+      toast.success(`${ids.length} ${ids.length === 1 ? "notification" : "notifications"} marked as read`);
+      setSelectedIds(new Set());
+    } catch (err) {
+      console.error("Failed to mark selected notifications as read", err);
+      toast.error("Failed to mark some notifications as read");
+      fetchNotifications();
+    } finally {
+      setIsProcessingBatch(false);
+    }
+  };
+
+  const handleMarkSelectedAsUnread = async () => {
+    if (selectedIds.size === 0) return;
+    setIsProcessingBatch(true);
+    const ids = Array.from(selectedIds);
+
+    setNotifications((prev) =>
+      prev.map((n) => (selectedIds.has(n.id) ? { ...n, is_read: false } : n))
+    );
+    window.dispatchEvent(new Event("notifications-updated"));
+
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}/unread`, {
+            credentials: "include",
+            method: "PUT",
+          })
+        )
+      );
+      toast.success(`${ids.length} ${ids.length === 1 ? "notification" : "notifications"} marked as unread`);
+      setSelectedIds(new Set());
+    } catch (err) {
+      console.error("Failed to mark selected notifications as unread", err);
+      toast.error("Failed to mark some notifications as unread");
+      fetchNotifications();
+    } finally {
+      setIsProcessingBatch(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Minimalist Metrics Strip & Action Button Row */}
@@ -280,14 +421,36 @@ export default function ClientNotificationsPage() {
           </div>
         </div>
 
-        {/* Mark All as Read Button */}
-        <Button 
-          onClick={markAllAsRead} 
-          disabled={unreadCount === 0}
-          className="gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm shrink-0 cursor-pointer disabled:opacity-50"
-        >
-          <CheckCheck className="h-4 w-4" /> Mark all as read
-        </Button>
+        {/* Action Buttons Row */}
+        <div className="flex items-stretch gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+          {selectedIds.size > 0 && (
+            <>
+              <Button
+                onClick={handleMarkSelectedAsRead}
+                disabled={isProcessingBatch || isDeleting}
+                className="gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 cursor-pointer"
+              >
+                <CheckCheck className="h-4 w-4" /> Mark selected read ({selectedIds.size})
+              </Button>
+              <Button
+                onClick={() => setIsBatchDeleteOpen(true)}
+                disabled={isProcessingBatch || isDeleting}
+                variant="outline"
+                className="gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-5 text-sm text-rose-600 dark:text-rose-400 border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 hover:text-rose-500 shrink-0 cursor-pointer"
+              >
+                <Trash2 className="h-4 w-4" /> Delete selected ({selectedIds.size})
+              </Button>
+            </>
+          )}
+          <Button 
+            onClick={markAllAsRead} 
+            disabled={unreadCount === 0}
+            variant={selectedIds.size > 0 ? "outline" : "default"}
+            className="gap-2 font-bold shadow-sm rounded-2xl h-full min-h-[48px] px-6 text-sm shrink-0 cursor-pointer disabled:opacity-50"
+          >
+            <CheckCheck className="h-4 w-4" /> Mark all as read
+          </Button>
+        </div>
       </div>
 
       {/* Main Table Card with Filter Bar */}
@@ -333,11 +496,117 @@ export default function ClientNotificationsPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
+          {/* Always-visible Quick Selection Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-border/40 bg-muted/20 text-xs transition-all">
+            <div className="flex items-center gap-3 flex-wrap">
+              <label className="flex items-center gap-2 font-semibold text-foreground cursor-pointer select-none">
+                <Checkbox
+                  checked={
+                    filteredNotifications.length > 0 &&
+                    filteredNotifications.every((n) => selectedIds.has(n.id))
+                      ? true
+                      : filteredNotifications.some((n) => selectedIds.has(n.id))
+                        ? "indeterminate"
+                        : false
+                  }
+                  onCheckedChange={handleToggleSelectAll}
+                  className="cursor-pointer border-muted-foreground/60 dark:border-zinc-400 dark:bg-zinc-900/90 hover:border-emerald-500 dark:hover:border-emerald-400 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 dark:data-[state=checked]:bg-emerald-600 dark:data-[state=checked]:border-emerald-600 data-[state=indeterminate]:bg-emerald-600 data-[state=indeterminate]:border-emerald-600 dark:data-[state=indeterminate]:bg-emerald-600 dark:data-[state=indeterminate]:border-emerald-600"
+                  aria-label="Select all notifications"
+                />
+                <span className="text-xs font-bold text-foreground">
+                  Select all notifications ({filteredNotifications.length})
+                </span>
+              </label>
+
+              {selectedIds.size > 0 && (
+                <>
+                  <span className="text-muted-foreground">•</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                    {selectedIds.size} selected
+                  </span>
+                  <span className="text-muted-foreground">•</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newSet = new Set(selectedIds);
+                      filteredNotifications.forEach((n) => newSet.add(n.id));
+                      setSelectedIds(newSet);
+                    }}
+                    className="text-primary hover:underline font-semibold text-xs cursor-pointer"
+                  >
+                    Select all {filteredNotifications.length} visible
+                  </button>
+                  <span className="text-muted-foreground">•</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds(new Set())}
+                    className="text-muted-foreground hover:text-foreground hover:underline font-medium text-xs cursor-pointer"
+                  >
+                    Deselect all
+                  </button>
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {selectedIds.size > 0 ? (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleMarkSelectedAsUnread}
+                    disabled={isProcessingBatch}
+                    className="h-8 text-xs font-semibold gap-1.5 cursor-pointer"
+                    title="Mark selected as unread"
+                  >
+                    <Mail className="h-3.5 w-3.5" />
+                    Mark as unread
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleMarkSelectedAsRead}
+                    disabled={isProcessingBatch}
+                    className="h-8 text-xs font-semibold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer"
+                  >
+                    <CheckCheck className="h-3.5 w-3.5" />
+                    Mark as read ({selectedIds.size})
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={markAllAsRead}
+                  disabled={unreadCount === 0}
+                  className="h-8 text-xs font-semibold gap-1.5 cursor-pointer"
+                >
+                  <CheckCheck className="h-3.5 w-3.5 text-emerald-500" />
+                  Mark all as read
+                </Button>
+              )}
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                  <TableHead className="w-[50px] pl-5"></TableHead>
+                  <TableHead className="w-[44px] text-center px-2">
+                    <Checkbox
+                      checked={
+                        filteredNotifications.length > 0 &&
+                        filteredNotifications.every((n) => selectedIds.has(n.id))
+                          ? true
+                          : filteredNotifications.some((n) => selectedIds.has(n.id))
+                            ? "indeterminate"
+                            : false
+                      }
+                      onCheckedChange={handleToggleSelectAll}
+                      className="cursor-pointer border-muted-foreground/60 dark:border-zinc-400 dark:bg-zinc-900/90 hover:border-emerald-500 dark:hover:border-emerald-400 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 dark:data-[state=checked]:bg-emerald-600 dark:data-[state=checked]:border-emerald-600 data-[state=indeterminate]:bg-emerald-600 data-[state=indeterminate]:border-emerald-600 dark:data-[state=indeterminate]:bg-emerald-600 dark:data-[state=indeterminate]:border-emerald-600"
+                      aria-label="Select all visible notifications"
+                    />
+                  </TableHead>
+                  <TableHead className="w-[50px] pl-3"></TableHead>
                   <TableHead className="min-w-[200px]">Notification Details</TableHead>
                   <TableHead className="w-[130px]">Category</TableHead>
                   <TableHead className="w-[160px]">Date & Time</TableHead>
@@ -348,7 +617,7 @@ export default function ClientNotificationsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center h-32">
+                    <TableCell colSpan={7} className="text-center h-32">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
                         <span className="text-xs text-muted-foreground">Loading notifications...</span>
@@ -357,7 +626,7 @@ export default function ClientNotificationsPage() {
                   </TableRow>
                 ) : filteredNotifications.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center h-48 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center h-48 text-muted-foreground">
                       <Bell className="h-10 w-10 mx-auto mb-2 opacity-25 text-emerald-500" />
                       <p className="font-bold text-sm text-foreground">No notifications found</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
@@ -372,11 +641,23 @@ export default function ClientNotificationsPage() {
                     <TableRow 
                       key={notif.id} 
                       className={`cursor-pointer transition-colors border-b border-border/30 last:border-0 text-xs hover:bg-muted/40 ${
-                        !notif.is_read ? "bg-emerald-500/[0.04] font-medium" : ""
+                        selectedIds.has(notif.id)
+                          ? "bg-emerald-500/10 dark:bg-emerald-950/30"
+                          : !notif.is_read 
+                            ? "bg-emerald-500/[0.04] font-medium" 
+                            : ""
                       }`}
                       onClick={() => handleRowClick(notif)}
                     >
-                      <TableCell className="w-[50px] pl-5">
+                      <TableCell className="w-[44px] text-center px-2" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(notif.id)}
+                          onCheckedChange={(checked) => handleToggleSelectOne(notif.id, !!checked)}
+                          className="cursor-pointer border-muted-foreground/60 dark:border-zinc-400 dark:bg-zinc-900/90 hover:border-emerald-500 dark:hover:border-emerald-400 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 dark:data-[state=checked]:bg-emerald-600 dark:data-[state=checked]:border-emerald-600 data-[state=indeterminate]:bg-emerald-600 data-[state=indeterminate]:border-emerald-600 dark:data-[state=indeterminate]:bg-emerald-600 dark:data-[state=indeterminate]:border-emerald-600"
+                          aria-label={`Select notification ${notif.title}`}
+                        />
+                      </TableCell>
+                      <TableCell className="w-[50px] pl-3">
                         <div className="h-8 w-8 rounded-xl bg-muted/60 border border-border/40 flex items-center justify-center shrink-0">
                           {getIcon(notif.type, notif.module)}
                         </div>
@@ -441,8 +722,8 @@ export default function ClientNotificationsPage() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                          onClick={(e) => deleteNotification(notif.id, e)}
+                          className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer"
+                          onClick={(e) => handleInitiateDelete(notif, e)}
                           title="Delete Notification"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -456,6 +737,26 @@ export default function ClientNotificationsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <DeleteNotificationDialog
+        open={!!deleteTarget}
+        onOpenChange={(isOpen) => {
+          if (!isOpen && !isDeleting) setDeleteTarget(null);
+        }}
+        notification={deleteTarget}
+        onConfirm={handleConfirmSingleDelete}
+        isDeleting={isDeleting}
+      />
+
+      <DeleteNotificationDialog
+        open={isBatchDeleteOpen}
+        onOpenChange={(isOpen) => {
+          if (!isOpen && !isDeleting) setIsBatchDeleteOpen(false);
+        }}
+        count={selectedIds.size}
+        onConfirm={handleConfirmBatchDelete}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 }

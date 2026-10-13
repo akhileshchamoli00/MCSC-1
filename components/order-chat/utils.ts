@@ -345,7 +345,8 @@ export function formatExternalTeamName(name?: string | null): string {
 
 export function isImageFile(filename?: string | null): boolean {
   if (!filename) return false;
-  return /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(filename);
+  const clean = filename.split("?")[0].split("#")[0];
+  return /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(clean);
 }
 
 export function formatFileSize(bytes?: number | null): string {
@@ -365,7 +366,8 @@ export function resolveAttachmentUrl(
     attachmentUrl.startsWith("http://") ||
     attachmentUrl.startsWith("https://") ||
     attachmentUrl.startsWith("data:") ||
-    attachmentUrl.startsWith("blob:")
+    attachmentUrl.startsWith("blob:") ||
+    attachmentUrl.startsWith("/api-proxy/")
   ) {
     return attachmentUrl;
   }
@@ -379,8 +381,9 @@ export function resolveAttachmentUrl(
 
 export function formatAttachmentDisplayName(filename?: string | null): string {
   if (!filename) return "Attachment";
+  const clean = filename.split("?")[0].split("#")[0];
   // Strip any directory path (Unix or Windows)
-  const basename = filename.split(/[/\\]/).pop() || filename;
+  const basename = clean.split(/[/\\]/).pop() || clean;
   // If filename is a raw UUID or auto-generated snippet filename
   if (
     /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}(\.[a-z0-9]+)?$/i.test(

@@ -268,6 +268,25 @@ async def get_uploaded_file(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Access denied. You are not an authorized participant in the conversation containing this attachment."
                 )
+
+        elif clean_subfolder == "chat_snippets":
+            is_authorized_snippet = False
+            if (
+                role_name in ("ADMIN", "SUPER ADMIN", "HR") or 
+                auth.has_permission(current_user, "clients_my", "view", db) or 
+                auth.has_permission(current_user, "clients_orders_active", "view", db) or 
+                auth.has_permission(current_user, "clients_orders_pipeline", "view", db) or 
+                auth.has_permission(current_user, "clients_orders_completed", "view", db) or
+                current_user.employee is not None or 
+                current_user.client is not None
+            ):
+                is_authorized_snippet = True
+
+            if not is_authorized_snippet:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied. You do not have permission to view this chat snippet."
+                )
             
     return FileResponse(
         target_path,

@@ -39,6 +39,7 @@ import {
 interface DualOrderChatDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  onBack?: (orderNumber?: string | null) => void;
   orderNumber: string | null;
   orderTitle?: string;
   companyName?: string;
@@ -63,6 +64,7 @@ const deduplicateMessages = (msgs: any[]): ChatMessage[] => {
 export function DualOrderChatDialog({
   isOpen,
   onClose,
+  onBack,
   orderNumber,
   orderTitle,
   companyName,
@@ -234,9 +236,19 @@ export function DualOrderChatDialog({
   const handlePreviewAttachment = (msg: any) => {
     if (!msg.attachment_url || msg.attachment_url === "uploading...") return;
     setPreviewAttachment(msg);
-    const url = `/api-proxy/api/clients/orders/${orderNumber}/attachments/preview?path=${encodeURIComponent(
-      msg.attachment_url
-    )}`;
+    const rawUrl = msg.attachment_url;
+    let url = rawUrl;
+    if (
+      !rawUrl.startsWith("/api-proxy/") &&
+      !rawUrl.startsWith("http://") &&
+      !rawUrl.startsWith("https://") &&
+      !rawUrl.startsWith("data:") &&
+      !rawUrl.startsWith("blob:")
+    ) {
+      url = `/api-proxy/api/clients/orders/${encodeURIComponent(orderNumber || "")}/attachments/preview?path=${encodeURIComponent(
+        rawUrl
+      )}`;
+    }
     setPreviewUrl(url);
   };
 
@@ -951,6 +963,7 @@ export function DualOrderChatDialog({
               downloadingTranscript={downloadingTranscript}
               onOpenWallpaper={() => setIsWallpaperOpen(true)}
               onClose={onClose}
+              onBack={onBack ? (num) => onBack(num || orderNumber) : undefined}
             />
 
             {/* Mobile Tab Selector (< 1024px) */}

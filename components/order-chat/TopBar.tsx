@@ -33,6 +33,7 @@ interface TopBarProps {
   isRefreshing?: boolean;
   refreshing?: boolean;
   onClose: () => void;
+  onBack?: (orderNumber?: string | null) => void;
   isAdmin?: boolean;
   onSaveToDropbox?: () => void;
   isSavingToDropbox?: boolean;
@@ -55,6 +56,7 @@ export function TopBar({
   isRefreshing,
   refreshing,
   onClose,
+  onBack,
   onSaveToDropbox,
   isSavingToDropbox,
   savingToDropbox,
@@ -88,15 +90,15 @@ export function TopBar({
             <TooltipTrigger asChild>
               <button
                 type="button"
-                onClick={onClose}
-                title="Back to orders"
-                aria-label="Back to orders"
+                onClick={() => (onBack ? onBack(orderNumber) : onClose())}
+                title="Back to Orders table"
+                aria-label="Back to Orders table"
                 className="h-8 w-8 sm:h-9 sm:w-9 rounded-[var(--oc-radius-sm)] flex items-center justify-center text-[var(--oc-text-secondary)] hover:text-[var(--oc-text-primary)] hover:bg-[var(--oc-bg-subtle)] border border-[var(--oc-border)] transition-colors cursor-pointer shrink-0"
               >
                 <ArrowLeft className="h-4 w-4" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" align="start" className="z-[100]">Back to Orders</TooltipContent>
+            <TooltipContent side="bottom" align="start" className="z-[100]">Back to Orders table</TooltipContent>
           </Tooltip>
         </TooltipProvider>
 
@@ -263,7 +265,7 @@ export function TopBar({
                 <X className="h-4 w-4" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" className="z-[100]">Close workspace</TooltipContent>
+            <TooltipContent side="bottom" className="z-[100]">Close & Return</TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </div>

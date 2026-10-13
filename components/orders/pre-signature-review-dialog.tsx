@@ -38,6 +38,7 @@ import {
   Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ExcelPreview } from "@/components/excel-preview";
 
 export interface PreSignatureChecklistItem {
   document_name: string;
@@ -112,10 +113,80 @@ export function PreSignatureReviewDialog({
   const [downloadingDoc, setDownloadingDoc] = useState(false);
   const [isFullscreenPreview, setIsFullscreenPreview] = useState(false);
 
+  // DOCX inline preview states
+  const [docxLoading, setDocxLoading] = useState(false);
+  const [docxError, setDocxError] = useState<string | null>(null);
+  const docxContainerRef = React.useRef<HTMLDivElement>(null);
+
   // Faulty / Rejection Dialog State
   const [faultDialogDoc, setFaultDialogDoc] = useState<PreSignatureChecklistItem | null>(null);
   const [faultComment, setFaultComment] = useState("");
   const [submittingFault, setSubmittingFault] = useState(false);
+
+  // Render Word document (.docx) using docx-preview
+  useEffect(() => {
+    if (!selectedDoc || !selectedDoc.document_name?.match(/\.docx$/i) || !previewBlobUrl) {
+      setDocxLoading(false);
+      setDocxError(null);
+      return;
+    }
+
+    let isMounted = true;
+    setDocxLoading(true);
+    setDocxError(null);
+
+    fetch(previewBlobUrl)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Could not load document (${res.status})`);
+        return res.blob();
+      })
+      .then(async (blob) => {
+        if (!isMounted) return;
+        setTimeout(async () => {
+          if (!isMounted || !docxContainerRef.current) return;
+          try {
+            docxContainerRef.current.innerHTML = "";
+            const { renderAsync } = await import("docx-preview");
+            await renderAsync(blob, docxContainerRef.current, undefined, {
+              className: "docx-preview-content",
+              inWrapper: true,
+              ignoreWidth: false,
+              ignoreHeight: false,
+            });
+            if (isMounted) setDocxLoading(false);
+          } catch (renderErr: any) {
+            console.error("docx render error", renderErr);
+            if (isMounted) {
+              const msg = renderErr?.message || "";
+              if (
+                msg.toLowerCase().includes("central directory") ||
+                msg.toLowerCase().includes("zip") ||
+                msg.toLowerCase().includes("password") ||
+                msg.toLowerCase().includes("encrypt")
+              ) {
+                setDocxError(
+                  "This Word document is password-protected or encrypted. Please download the file to open and enter the password."
+                );
+              } else {
+                setDocxError(msg || "Failed to render Word document preview.");
+              }
+              setDocxLoading(false);
+            }
+          }
+        }, 60);
+      })
+      .catch((err: any) => {
+        console.error("docx fetch error", err);
+        if (isMounted) {
+          setDocxError(err.message || "Failed to retrieve Word document data.");
+          setDocxLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedDoc, previewBlobUrl]);
 
   const fetchChecklist = useCallback(async (silent = false) => {
     if (!orderNumber) return;
@@ -151,6 +222,8 @@ export function PreSignatureReviewDialog({
   const handleClosePreview = useCallback(() => {
     setSelectedDoc(null);
     setPreviewError(null);
+    setDocxError(null);
+    setDocxLoading(false);
     setIsFullscreenPreview(false);
     setPreviewBlobUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
@@ -612,6 +685,8 @@ export function PreSignatureReviewDialog({
     setSelectedDoc(item);
     setPreviewLoading(true);
     setPreviewError(null);
+    setDocxError(null);
+    setDocxLoading(false);
 
     // Revoke previous blob
     if (previewBlobUrl) {
@@ -622,17 +697,38 @@ export function PreSignatureReviewDialog({
     try {
       const effectiveCompId = data?.company_id || companyId;
 
+      const createSafeBlobUrl = async (blob: Blob, docName: string) => {
+        const isPdfOrDoc = Boolean(
+          blob.type.includes("pdf") || docName.match(/\.(pdf|doc)$/i)
+        );
+        if (isPdfOrDoc) {
+          const headerSlice = blob.slice(0, 5);
+          const headerBuffer = await headerSlice.arrayBuffer();
+          const headerText = new TextDecoder().decode(headerBuffer);
+          if (!headerText.startsWith("%PDF")) {
+            if (docName.match(/\.doc$/i)) {
+              throw new Error("This Word document (.doc) could not be converted to a PDF preview on the server. Please download the file to view.");
+            }
+          }
+          const pdfBlob = new Blob([blob], { type: "application/pdf" });
+          return URL.createObjectURL(pdfBlob);
+        }
+        return URL.createObjectURL(blob);
+      };
+
       // 1. Primary: Direct order pre-signature stream endpoint
+      const params = new URLSearchParams({ document_name: item.document_name });
+      if (item.document_id) params.set("document_id", String(item.document_id));
+      if (item.document_path) params.set("document_path", item.document_path);
+
       const streamEndpoint = `${process.env.NEXT_PUBLIC_API_URL || ""}/api/clients/orders/${encodeURIComponent(
         orderNumber
-      )}/pre-signature-checklist/stream-preview?document_name=${encodeURIComponent(
-        item.document_name
-      )}&document_id=${item.document_id || ""}&document_path=${encodeURIComponent(item.document_path || "")}`;
+      )}/pre-signature-checklist/stream-preview?${params.toString()}`;
 
       const res = await fetch(streamEndpoint, { credentials: "include" });
       if (res.ok) {
         const blob = await res.blob();
-        const objUrl = URL.createObjectURL(blob);
+        const objUrl = await createSafeBlobUrl(blob, item.document_name);
         setPreviewBlobUrl(objUrl);
         return;
       }
@@ -643,7 +739,7 @@ export function PreSignatureReviewDialog({
         const compRes = await fetch(compEndpoint, { credentials: "include" });
         if (compRes.ok) {
           const blob = await compRes.blob();
-          const objUrl = URL.createObjectURL(blob);
+          const objUrl = await createSafeBlobUrl(blob, item.document_name);
           setPreviewBlobUrl(objUrl);
           return;
         }
@@ -662,7 +758,7 @@ export function PreSignatureReviewDialog({
           const fileRes = await fetch(dropJson.link);
           if (fileRes.ok) {
             const blob = await fileRes.blob();
-            const objUrl = URL.createObjectURL(blob);
+            const objUrl = await createSafeBlobUrl(blob, item.document_name);
             setPreviewBlobUrl(objUrl);
             return;
           }
@@ -684,13 +780,16 @@ export function PreSignatureReviewDialog({
     const toastId = toast.loading(`Preparing download for ${item.document_name}...`);
 
     try {
+      const params = new URLSearchParams({
+        document_name: item.document_name,
+        download: "true",
+      });
+      if (item.document_id) params.set("document_id", String(item.document_id));
+      if (item.document_path) params.set("document_path", item.document_path);
+
       const streamEndpoint = `${process.env.NEXT_PUBLIC_API_URL || ""}/api/clients/orders/${encodeURIComponent(
         orderNumber
-      )}/pre-signature-checklist/stream-preview?document_name=${encodeURIComponent(
-        item.document_name
-      )}&document_id=${item.document_id || ""}&document_path=${encodeURIComponent(
-        item.document_path || ""
-      )}&download=true`;
+      )}/pre-signature-checklist/stream-preview?${params.toString()}`;
 
       const res = await fetch(streamEndpoint, { credentials: "include" });
       if (res.ok) {
@@ -743,9 +842,10 @@ export function PreSignatureReviewDialog({
     const ext = name.split(".").pop()?.toUpperCase() || "DOC";
     if (ext === "PDF") return "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20";
     if (["DOC", "DOCX"].includes(ext)) return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
-    if (["JPG", "JPEG", "PNG", "WEBP"].includes(ext))
+    if (["JPG", "JPEG", "PNG", "WEBP", "GIF", "SVG"].includes(ext))
       return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
-    if (["XLS", "XLSX"].includes(ext)) return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
+    if (["XLS", "XLSX", "CSV"].includes(ext)) return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
+    if (["TXT", "JSON"].includes(ext)) return "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20";
     return "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20";
   };
 
@@ -1360,6 +1460,21 @@ export function PreSignatureReviewDialog({
                       <span>{selectedDoc.status === "EXCLUDED" ? "Include in Review" : "Not for Review"}</span>
                     </Button>
 
+                    {/* Open Document in New Tab */}
+                    {previewBlobUrl && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(previewBlobUrl, "_blank")}
+                        className="h-8 px-2 text-xs gap-1 border-border/80 hover:bg-muted"
+                        title="Open Document in New Tab"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">New Tab</span>
+                      </Button>
+                    )}
+
                     {/* Download button */}
                     <Button
                       type="button"
@@ -1489,13 +1604,7 @@ export function PreSignatureReviewDialog({
                       </div>
                     </div>
                   ) : previewBlobUrl ? (
-                    isDocPdf(selectedDoc.document_name) ? (
-                      <iframe
-                        src={`${previewBlobUrl}#toolbar=1&navpanes=0`}
-                        className="w-full h-full rounded-xl bg-white border border-border/70 shadow-xs"
-                        title={selectedDoc.document_name}
-                      />
-                    ) : isDocImage(selectedDoc.document_name) ? (
+                    selectedDoc.document_name?.match(/\.(jpeg|jpg|gif|png|webp|svg)/i) ? (
                       <div className="w-full h-full flex items-center justify-center overflow-auto rounded-xl bg-zinc-950/20 dark:bg-zinc-950/70 border border-border/60 p-3">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
@@ -1504,6 +1613,60 @@ export function PreSignatureReviewDialog({
                           className="max-h-full max-w-full object-contain rounded-lg shadow-lg border border-border/40"
                         />
                       </div>
+                    ) : selectedDoc.document_name?.match(/\.docx$/i) ? (
+                      <div className="w-full h-full overflow-y-auto bg-slate-200/70 dark:bg-slate-900/90 rounded-xl p-2 sm:p-6 flex flex-col items-center border border-border/60">
+                        {docxLoading && (
+                          <div className="flex flex-col items-center justify-center p-12 space-y-3 m-auto">
+                            <Loader2 className="h-8 w-8 animate-spin text-teal-500" />
+                            <p className="text-xs font-semibold text-muted-foreground">Rendering Word Document (.docx)...</p>
+                          </div>
+                        )}
+                        {docxError && (
+                          <div className="text-center p-8 bg-card rounded-2xl border border-border space-y-3 max-w-md m-auto shadow-sm">
+                            <AlertCircle className="h-10 w-10 text-amber-500 mx-auto" />
+                            <p className="text-sm font-bold text-foreground">Could not preview Word document</p>
+                            <p className="text-xs text-muted-foreground leading-relaxed">{docxError}</p>
+                            <Button
+                              size="sm"
+                              onClick={() => handleDownloadDoc(selectedDoc)}
+                              className="font-bold gap-2 text-xs bg-teal-600 hover:bg-teal-700 text-white"
+                            >
+                              <Download className="h-4 w-4" /> Download Word File (.docx)
+                            </Button>
+                          </div>
+                        )}
+                        <div
+                          ref={docxContainerRef}
+                          className={`w-full max-w-4xl bg-white text-black dark:bg-slate-100 rounded-lg shadow-md p-4 sm:p-8 font-sans ${
+                            docxLoading || docxError ? "hidden" : "block"
+                          }`}
+                        />
+                      </div>
+                    ) : selectedDoc.document_name?.match(/\.(xlsx|xls|csv)$/i) ? (
+                      <ExcelPreview
+                        fileUrl={previewBlobUrl}
+                        fileName={selectedDoc.document_name}
+                        onDownload={() => handleDownloadDoc(selectedDoc)}
+                        className="h-full w-full flex-1 min-h-0 border border-border/60 shadow-none rounded-xl"
+                      />
+                    ) : selectedDoc.document_name?.match(/\.(pdf|doc)$/i) ? (
+                      <object
+                        data={`${previewBlobUrl}#toolbar=1&navpanes=0`}
+                        type="application/pdf"
+                        className="w-full h-full rounded-xl border border-border/70 shadow-xs bg-white"
+                      >
+                        <iframe
+                          src={`${previewBlobUrl}#toolbar=1&navpanes=0`}
+                          className="w-full h-full rounded-xl border-0 shadow-xs bg-white"
+                          title={selectedDoc.document_name}
+                        />
+                      </object>
+                    ) : selectedDoc.document_name?.match(/\.(txt|json)$/i) ? (
+                      <iframe
+                        src={previewBlobUrl}
+                        className="w-full h-full rounded-xl border border-border/70 shadow-xs bg-white p-4 font-mono text-xs"
+                        title={selectedDoc.document_name}
+                      />
                     ) : (
                       <div className="text-center p-8 bg-card rounded-2xl border border-border space-y-3 max-w-md m-auto shadow-sm">
                         <FileText className="h-10 w-10 text-teal-500 mx-auto" />

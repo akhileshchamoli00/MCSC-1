@@ -73,7 +73,7 @@ import {
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { PhoneInput, isValidPhoneNumber, isValidEmail } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
@@ -734,6 +734,8 @@ export default function ClientOrdersPage() {
       }
     }
   }, []);
+  const sortedOrdersRef = useRef<any[]>([]);
+  const hasDismissedReturnUrlRef = useRef(false);
   const [deletedItemIds, setDeletedItemIds] = useState<number[]>([]);
 
   // Group raw rows by order_number
@@ -863,17 +865,162 @@ export default function ClientOrdersPage() {
 
   const groupedOrders = Array.from(groupedOrdersMap.values());
 
+  // Map of order_number -> running chronological sequence number (1, 2, ..., N)
+  // Oldest order = 1, latest order = N
+  const orderSeqMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const sorted = [...groupedOrders].sort((a, b) => {
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      if (timeA !== timeB) return timeA - timeB;
+      return (a.id || 0) - (b.id || 0);
+    });
+    sorted.forEach((ord, index) => {
+      const key = ord.order_number || `SINGLE-${ord.id}`;
+      map.set(key, index + 1);
+    });
+    return map;
+  }, [groupedOrders]);
+
+  // Active Orders: Exclude completed & paid orders from Active Orders Management, exclude PIPELINE orders, and exclude CANCELLED orders
+  // Sorted reverse-chronologically (newest first) so the latest order is at the top of the list
+  const activeOrders = useMemo(() => {
+    return groupedOrders
+      .filter((ord) => {
+        const isCompletedAndPaid = ord.status === "COMPLETED" && ord.payment_status === "PAID";
+        const isEnquiry = ["PIPELINE", "PROSPECT", "UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED", "BEING_CHECKED", "ENQUIRY"].includes((ord.status || "").toUpperCase());
+        const isCancelled = (ord.status || "").toUpperCase() === "CANCELLED";
+        return !isCompletedAndPaid && !isEnquiry && !isCancelled;
+      })
+      .sort((a, b) => {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        if (timeA !== timeB) return timeB - timeA;
+        return (b.id || 0) - (a.id || 0);
+      });
+  }, [groupedOrders]);
+
+  const scrollToOrderRow = useCallback((orderNum: string) => {
+    if (!orderNum) return;
+    const cleanNum = orderNum.trim().toUpperCase();
+    setHighlightedOrderNum(cleanNum);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("active_orders_highlighted_order", cleanNum);
+    }
+
+    // 1. Reset any search / filters that might hide the targeted order
+    setSearchTerm("");
+    setColFilterOrderId("");
+    setColFilterCompany("");
+    setColFilterService("");
+    setColFilterConsultant("");
+    setColFilterAmount("");
+    setColFilterPayment("ALL");
+    setColFilterStatus("ALL");
+
+    // 2. Select matched group
+    const matched = groupedOrdersMap.get(cleanNum) || Array.from(groupedOrdersMap.values()).find(g => (g.order_number || "").trim().toUpperCase() === cleanNum);
+    if (matched) {
+      setSelectedOrderGroup(matched);
+    }
+
+    // 3. Compute accurate target pagination page from active orders
+    const currentList = sortedOrdersRef.current && sortedOrdersRef.current.length > 0 
+      ? sortedOrdersRef.current 
+      : (activeOrders && activeOrders.length > 0 ? activeOrders : Array.from(groupedOrdersMap.values()));
+    const orderIdx = currentList.findIndex(o => (o.order_number || "").trim().toUpperCase() === cleanNum);
+    if (orderIdx !== -1) {
+      const targetPage = Math.floor(orderIdx / pageSize) + 1;
+      setCurrentPage(targetPage);
+    }
+
+    // 4. Repeatedly poll DOM until target row element is rendered and scroll into center without displacing the top platform header
+    const attemptScroll = (retriesLeft: number) => {
+      const rowId = `order-row-${cleanNum}`;
+      const mobileId = `mobile-order-row-${cleanNum}`;
+      const el = document.getElementById(rowId) || 
+                 document.getElementById(mobileId) ||
+                 document.querySelector(`[data-order-number="${cleanNum}"]`);
+      if (el) {
+        const scrollContainer = el.closest("main") || document.querySelector("main");
+        if (scrollContainer) {
+          const containerRect = scrollContainer.getBoundingClientRect();
+          const elRect = el.getBoundingClientRect();
+          const currentScrollTop = scrollContainer.scrollTop;
+          const targetScrollTop = currentScrollTop + (elRect.top - containerRect.top) - (containerRect.height / 2) + (elRect.height / 2);
+          scrollContainer.scrollTo({
+            top: Math.max(0, targetScrollTop),
+            behavior: "smooth"
+          });
+        }
+        if (typeof window !== "undefined") {
+          window.scrollTo(0, 0);
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+        }
+      } else if (retriesLeft > 0) {
+        setTimeout(() => attemptScroll(retriesLeft - 1), 120);
+      }
+    };
+    setTimeout(() => attemptScroll(8), 80);
+  }, [groupedOrdersMap, activeOrders, pageSize]);
+
+  const handleBackToOrders = useCallback((backOrderNum?: string | null) => {
+    setIsChatOpen(false);
+    hasDismissedReturnUrlRef.current = true;
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("order_chat_return_url");
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("returnUrl") || url.searchParams.has("order") || url.searchParams.has("chat")) {
+        url.searchParams.delete("returnUrl");
+        url.searchParams.delete("order");
+        url.searchParams.delete("chat");
+        window.history.replaceState({}, "", url.pathname + url.search);
+      }
+    }
+    const orderNum = backOrderNum || selectedOrderGroup?.order_number || searchParams?.get("order") || (typeof window !== "undefined" ? sessionStorage.getItem("active_orders_highlighted_order") : null);
+    if (orderNum) {
+      scrollToOrderRow(orderNum);
+    }
+  }, [selectedOrderGroup, searchParams, scrollToOrderRow]);
+
+  const handleCloseChat = useCallback(() => {
+    setIsChatOpen(false);
+    if (hasDismissedReturnUrlRef.current) {
+      return;
+    }
+    const returnUrl = searchParams?.get("returnUrl") || (typeof window !== "undefined" ? sessionStorage.getItem("order_chat_return_url") : null);
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("order_chat_return_url");
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("returnUrl") || url.searchParams.has("order") || url.searchParams.has("chat")) {
+        url.searchParams.delete("returnUrl");
+        url.searchParams.delete("order");
+        url.searchParams.delete("chat");
+        window.history.replaceState({}, "", url.pathname + url.search);
+      }
+    }
+    if (returnUrl && returnUrl !== (window.location.pathname + window.location.search)) {
+      router.push(returnUrl);
+    }
+  }, [searchParams, router]);
+
   const openOrderDirectly = (orderNum: string, openChat: boolean = false) => {
     if (!orderNum) return;
+    const cleanNum = orderNum.trim().toUpperCase();
 
-    const matched = groupedOrdersMap.get(orderNum) || Array.from(groupedOrdersMap.values()).find(g => g.order_number?.toUpperCase() === orderNum.toUpperCase());
+    // Reset filters
+    setSearchTerm("");
+    setColFilterOrderId("");
+    setColFilterCompany("");
+    setColFilterService("");
+    setColFilterConsultant("");
+    setColFilterAmount("");
+    setColFilterPayment("ALL");
+    setColFilterStatus("ALL");
+
+    const matched = groupedOrdersMap.get(cleanNum) || Array.from(groupedOrdersMap.values()).find(g => (g.order_number || "").trim().toUpperCase() === cleanNum);
     if (matched) {
-      setSearchTerm("");
-      const orderIdx = Array.from(groupedOrdersMap.values()).findIndex(o => o.order_number?.toUpperCase() === orderNum.toUpperCase());
-      if (orderIdx !== -1) {
-        const targetPage = Math.floor(orderIdx / pageSize) + 1;
-        setCurrentPage(targetPage);
-      }
       setSelectedOrderGroup(matched);
       if (openChat) {
         setIsChatOpen(true);
@@ -884,23 +1031,42 @@ export default function ClientOrdersPage() {
       if (typeof window !== "undefined") {
         sessionStorage.setItem("active_orders_highlighted_order", matched.order_number);
       }
-      setTimeout(() => {
-        const el = document.getElementById(`order-row-${matched.order_number}`) || document.getElementById(`mobile-order-row-${matched.order_number}`);
-        const scrollParent = el?.closest('main') || document.querySelector('main');
-        if (el && scrollParent) {
-          const parentRect = scrollParent.getBoundingClientRect();
-          const elRect = el.getBoundingClientRect();
-          if (elRect.top < parentRect.top || elRect.bottom > parentRect.bottom) {
-            const relativeTop = elRect.top - parentRect.top + scrollParent.scrollTop;
-            scrollParent.scrollTo({ top: Math.max(0, relativeTop - 120), behavior: "smooth" });
+
+      const currentList = sortedOrdersRef.current && sortedOrdersRef.current.length > 0 
+        ? sortedOrdersRef.current 
+        : (activeOrders && activeOrders.length > 0 ? activeOrders : Array.from(groupedOrdersMap.values()));
+      const orderIdx = currentList.findIndex(o => (o.order_number || "").trim().toUpperCase() === cleanNum);
+      if (orderIdx !== -1) {
+        const targetPage = Math.floor(orderIdx / pageSize) + 1;
+        setCurrentPage(targetPage);
+      }
+
+      const attemptScroll = (retriesLeft: number) => {
+        const el = document.getElementById(`order-row-${cleanNum}`) || 
+                   document.getElementById(`mobile-order-row-${cleanNum}`) ||
+                   document.querySelector(`[data-order-number="${cleanNum}"]`);
+        if (el) {
+          const scrollContainer = el.closest("main") || document.querySelector("main");
+          if (scrollContainer) {
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const elRect = el.getBoundingClientRect();
+            const currentScrollTop = scrollContainer.scrollTop;
+            const targetScrollTop = currentScrollTop + (elRect.top - containerRect.top) - (containerRect.height / 2) + (elRect.height / 2);
+            scrollContainer.scrollTo({
+              top: Math.max(0, targetScrollTop),
+              behavior: "smooth"
+            });
           }
+          if (typeof window !== "undefined") {
+            window.scrollTo(0, 0);
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
+          }
+        } else if (retriesLeft > 0) {
+          setTimeout(() => attemptScroll(retriesLeft - 1), 120);
         }
-        if (typeof window !== "undefined") {
-          window.scrollTo(0, 0);
-          document.documentElement.scrollTop = 0;
-          document.body.scrollTop = 0;
-        }
-      }, 300);
+      };
+      setTimeout(() => attemptScroll(8), 100);
     } else {
       // Fallback: If not in current active orders list, fetch directly from backend API
       fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/clients/orders/group/${encodeURIComponent(orderNum)}`, {
@@ -958,9 +1124,18 @@ export default function ClientOrdersPage() {
       if (typeof window !== "undefined") {
         sessionStorage.removeItem("auto_open_order_chat");
         const url = new URL(window.location.href);
+        let changed = false;
         if (url.searchParams.has("order") || url.searchParams.has("chat")) {
           url.searchParams.delete("order");
           url.searchParams.delete("chat");
+          changed = true;
+        }
+        if (url.searchParams.has("returnUrl")) {
+          sessionStorage.setItem("order_chat_return_url", url.searchParams.get("returnUrl") || "");
+          url.searchParams.delete("returnUrl");
+          changed = true;
+        }
+        if (changed) {
           window.history.replaceState({}, "", url.pathname + url.search);
         }
       }
@@ -1033,41 +1208,6 @@ export default function ClientOrdersPage() {
       setSaving(false);
     }
   };
-
-  // Map of order_number -> running chronological sequence number (1, 2, ..., N)
-  // Oldest order = 1, latest order = N
-  const orderSeqMap = useMemo(() => {
-    const map = new Map<string, number>();
-    const sorted = [...groupedOrders].sort((a, b) => {
-      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-      if (timeA !== timeB) return timeA - timeB;
-      return (a.id || 0) - (b.id || 0);
-    });
-    sorted.forEach((ord, index) => {
-      const key = ord.order_number || `SINGLE-${ord.id}`;
-      map.set(key, index + 1);
-    });
-    return map;
-  }, [groupedOrders]);
-
-  // Active Orders: Exclude completed & paid orders from Active Orders Management, exclude PIPELINE orders, and exclude CANCELLED orders
-  // Sorted reverse-chronologically (newest first) so the latest order is at the top of the list
-  const activeOrders = useMemo(() => {
-    return groupedOrders
-      .filter((ord) => {
-        const isCompletedAndPaid = ord.status === "COMPLETED" && ord.payment_status === "PAID";
-        const isEnquiry = ["PIPELINE", "PROSPECT", "UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED", "BEING_CHECKED", "ENQUIRY"].includes((ord.status || "").toUpperCase());
-        const isCancelled = (ord.status || "").toUpperCase() === "CANCELLED";
-        return !isCompletedAndPaid && !isEnquiry && !isCancelled;
-      })
-      .sort((a, b) => {
-        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-        if (timeA !== timeB) return timeB - timeA;
-        return (b.id || 0) - (a.id || 0);
-      });
-  }, [groupedOrders]);
 
   const filteredOrders = activeOrders.filter((ord) => {
     // 1. Global Search
@@ -1225,6 +1365,8 @@ export default function ClientOrdersPage() {
       }
     });
   }, [filteredOrders, sortColumn, sortDirection]);
+
+  sortedOrdersRef.current = sortedOrders;
 
   const totalPages = Math.ceil(sortedOrders.length / pageSize) || 1;
   const startIndex = (currentPage - 1) * pageSize;
@@ -2635,26 +2777,29 @@ export default function ClientOrdersPage() {
                         </tr>
                       ) : (
                         paginatedOrders.map((ord, index) => {
-                        const isHighlighted = highlightedOrderNum === ord.order_number;
+                        const cleanHighlighted = (highlightedOrderNum || "").trim().toUpperCase();
+                        const ordCleanNum = (ord.order_number || "").trim().toUpperCase();
+                        const isHighlighted = !!cleanHighlighted && ordCleanNum === cleanHighlighted;
                         return (
                           <tr
                             key={ord.order_number || index}
-                            id={`order-row-${ord.order_number}`}
+                            id={`order-row-${ordCleanNum}`}
+                            data-order-number={ordCleanNum}
                             onClick={() => {
                               setHighlightedOrderNum(ord.order_number);
                               if (typeof window !== "undefined") {
                                 sessionStorage.setItem("active_orders_highlighted_order", ord.order_number);
                               }
                             }}
-                            className={`group transition-colors duration-200 cursor-pointer orders-row ${
+                            className={`group transition-all duration-300 cursor-pointer orders-row ${
                               isHighlighted
-                                ? "is-highlighted bg-sky-500/10 dark:bg-sky-950/30 border-y-2 border-sky-500/60 dark:border-sky-500/40"
+                                ? "is-highlighted bg-sky-500/20 dark:bg-sky-950/50 ring-2 ring-inset ring-sky-500/80 border-y-2 border-sky-500 shadow-sm"
                                 : "border-b border-border/30 dark:border-zinc-800/40 last:border-0 hover:bg-muted/40 dark:hover:bg-zinc-800/30"
                             }`}
                           >
                             <td className={`py-2 px-2 text-center font-mono align-top pt-2.5 text-xs transition-colors w-10 min-w-[38px] max-w-[42px] orders-text-secondary ${
                               isHighlighted
-                                ? "border-l-4 border-l-sky-500 text-sky-900 dark:text-sky-200 font-bold bg-sky-500/5 dark:bg-sky-950/20"
+                                ? "border-l-4 border-l-sky-500 text-sky-900 dark:text-sky-200 font-bold bg-sky-500/10 dark:bg-sky-950/30"
                                 : "font-medium text-muted-foreground dark:text-zinc-400"
                             }`}>
                               #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + index))}
@@ -3192,11 +3337,14 @@ export default function ClientOrdersPage() {
                     </div>
                   ) : (
                     paginatedOrders.map((ord, index) => {
-                      const isHighlighted = highlightedOrderNum === ord.order_number;
+                      const cleanHighlighted = (highlightedOrderNum || "").trim().toUpperCase();
+                      const ordCleanNum = (ord.order_number || "").trim().toUpperCase();
+                      const isHighlighted = !!cleanHighlighted && ordCleanNum === cleanHighlighted;
                       return (
                         <div
                           key={ord.order_number || index}
-                          id={`mobile-order-row-${ord.order_number}`}
+                          id={`mobile-order-row-${ordCleanNum}`}
+                          data-order-number={ordCleanNum}
                           onClick={() => {
                             setHighlightedOrderNum(ord.order_number);
                             if (typeof window !== "undefined") {
@@ -3204,9 +3352,9 @@ export default function ClientOrdersPage() {
                             }
                           }}
                           className={cn(
-                            "p-4 space-y-3 transition-all duration-200 cursor-pointer",
+                            "p-4 space-y-3 transition-all duration-300 cursor-pointer",
                             isHighlighted
-                              ? "bg-sky-500/10 dark:bg-sky-950/30 border-l-4 border-l-sky-500"
+                              ? "bg-sky-500/20 dark:bg-sky-950/50 border-l-4 border-l-sky-500 ring-2 ring-inset ring-sky-500/70 shadow-md"
                               : "hover:bg-muted/30 dark:hover:bg-zinc-800/30"
                           )}
                         >
@@ -4910,7 +5058,8 @@ export default function ClientOrdersPage() {
       {/* DUAL ORDER CHAT DIALOG (SIDE-BY-SIDE CLIENT & INTERNAL CHAT) */}
       <DualOrderChatDialog
         isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
+        onClose={handleCloseChat}
+        onBack={handleBackToOrders}
         orderNumber={selectedOrderGroup?.order_number || null}
         orderTitle={selectedOrderGroup?.items?.[0]?.job_title || selectedOrderGroup?.job_title}
         companyName={selectedOrderGroup?.company_name}

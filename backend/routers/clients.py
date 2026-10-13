@@ -5794,17 +5794,23 @@ async def upload_order_attachment(
     from utils.file_sanitizer import validate_file_security
     file_bytes, sanitized_filename = validate_file_security(raw_bytes, file.filename or "attachment.png", max_size_mb=50, allowed_category="all")
     
+    from storage import UPLOAD_DIR
     if target_channel == "INTERNAL":
         # INTERNAL CHAT: strictly kept in the chat and NOT stored in Dropbox or Company Documents Vault
         chat_snippet_rel = os.path.join("chat_snippets", order_folder, sanitized_filename).replace("\\", "/")
         destination_path = f"/{chat_snippet_rel}"
-        local_full_path = os.path.join("uploads", "chat_snippets", order_folder, sanitized_filename)
-        os.makedirs(os.path.dirname(local_full_path), exist_ok=True)
-        try:
-            with open(local_full_path, "wb") as f_out:
-                f_out.write(file_bytes)
-        except Exception as local_err:
-            print(f"Notice: Failed writing local internal chat media: {local_err}")
+        
+        save_targets = [
+            os.path.join(UPLOAD_DIR, "chat_snippets", order_folder, sanitized_filename),
+            os.path.join("uploads", "chat_snippets", order_folder, sanitized_filename)
+        ]
+        for local_full_path in save_targets:
+            try:
+                os.makedirs(os.path.dirname(local_full_path), exist_ok=True)
+                with open(local_full_path, "wb") as f_out:
+                    f_out.write(file_bytes)
+            except Exception as local_err:
+                print(f"Notice: Failed writing local internal chat media to {local_full_path}: {local_err}")
         # Note: Dropbox upload skipped entirely
         # Note: ClientDocument creation skipped entirely (never in Company Vault)
     else:
@@ -5814,15 +5820,19 @@ async def upload_order_attachment(
         if destination_path.startswith("//"):
             destination_path = destination_path[1:]
             
-        # 1. Local disk fallback cache
+        # 1. Local disk fallback cache in UPLOAD_DIR and local uploads
         local_rel = destination_path.replace("/Clients/", "", 1)
-        local_full_path = os.path.join("uploads", local_rel)
-        os.makedirs(os.path.dirname(local_full_path), exist_ok=True)
-        try:
-            with open(local_full_path, "wb") as f_out:
-                f_out.write(file_bytes)
-        except Exception as local_err:
-            print(f"Notice: Failed writing local backup: {local_err}")
+        save_targets = [
+            os.path.join(UPLOAD_DIR, local_rel),
+            os.path.join("uploads", local_rel)
+        ]
+        for local_full_path in save_targets:
+            try:
+                os.makedirs(os.path.dirname(local_full_path), exist_ok=True)
+                with open(local_full_path, "wb") as f_out:
+                    f_out.write(file_bytes)
+            except Exception as local_err:
+                print(f"Notice: Failed writing local backup to {local_full_path}: {local_err}")
             
         # 2. Upload to Dropbox under Client Shared Docs
         try:
@@ -5985,32 +5995,71 @@ async def preview_order_attachment(
     import mimetypes
     from fastapi.responses import StreamingResponse
     import httpx
+    from storage import UPLOAD_DIR
     
-    # 1. Check local storage
-    if path.startswith("/Clients/"):
-        local_rel = path.replace("/Clients/", "", 1)
-    elif path.startswith("/uploads/"):
-        local_rel = path.replace("/uploads/", "", 1)
-    elif path.startswith("/chat_snippets/"):
-        local_rel = path.replace("/chat_snippets/", "chat_snippets/", 1)
-    elif path.startswith("chat_snippets/"):
-        local_rel = path
+    # 0. Clean and unwrap path if double-encoded or containing query parameters
+    clean_path = path.strip() if path else ""
+    if "path=" in clean_path:
+        from urllib.parse import parse_qs, urlparse
+        parsed = urlparse(clean_path)
+        qs = parse_qs(parsed.query)
+        if "path" in qs and qs["path"]:
+            clean_path = qs["path"][0].strip()
+
+    # 1. Candidate relative paths for disk search
+    candidates = []
+    if clean_path.startswith("/Clients/"):
+        candidates.append(clean_path.replace("/Clients/", "", 1))
+        candidates.append(clean_path.lstrip("/"))
+    elif clean_path.startswith("Clients/"):
+        candidates.append(clean_path.replace("Clients/", "", 1))
+        candidates.append(clean_path)
+    elif clean_path.startswith("/uploads/"):
+        candidates.append(clean_path.replace("/uploads/", "", 1))
+    elif clean_path.startswith("uploads/"):
+        candidates.append(clean_path.replace("uploads/", "", 1))
+    elif clean_path.startswith("/chat_snippets/"):
+        candidates.append(clean_path.replace("/chat_snippets/", "chat_snippets/", 1))
+        candidates.append(clean_path.lstrip("/"))
+    elif clean_path.startswith("chat_snippets/"):
+        candidates.append(clean_path)
     else:
-        local_rel = path.lstrip("/")
-    local_path = os.path.join("uploads", local_rel)
-    if os.path.exists(local_path):
-        mime_type, _ = mimetypes.guess_type(local_path)
+        candidates.append(clean_path.lstrip("/"))
+
+    # Check across storage locations: persistent UPLOAD_DIR, ./uploads, backend/uploads
+    possible_roots = [
+        UPLOAD_DIR,
+        os.path.abspath("uploads"),
+        os.path.join(os.path.dirname(__file__), "..", "uploads"),
+        os.path.join(os.path.dirname(__file__), "uploads")
+    ]
+
+    found_file = None
+    for root in possible_roots:
+        if not root or not os.path.exists(root):
+            continue
+        for rel in candidates:
+            p = os.path.abspath(os.path.join(root, rel))
+            if os.path.exists(p) and os.path.isfile(p):
+                found_file = p
+                break
+        if found_file:
+            break
+
+    if found_file:
+        mime_type, _ = mimetypes.guess_type(found_file)
         if not mime_type:
             mime_type = "application/octet-stream"
         def iterfile():
-            with open(local_path, mode="rb") as f:
+            with open(found_file, mode="rb") as f:
                 yield from f
         return StreamingResponse(iterfile(), media_type=mime_type)
         
     # 2. Check Dropbox temporary link
-    if path.startswith("/Clients/"):
+    dropbox_path = clean_path if clean_path.startswith("/") else f"/{clean_path}"
+    if dropbox_path.startswith("/Clients/"):
         from utils.dropbox_client import get_temporary_link
-        res = get_temporary_link(path)
+        res = get_temporary_link(dropbox_path)
         if res.get("success") and res.get("link"):
             link = res.get("link")
             async def stream_file():
@@ -6020,7 +6069,7 @@ async def preview_order_attachment(
                             raise HTTPException(status_code=response.status_code, detail="Dropbox file retrieval failed")
                         async for chunk in response.aiter_bytes():
                             yield chunk
-            mime_type, _ = mimetypes.guess_type(os.path.basename(path))
+            mime_type, _ = mimetypes.guess_type(os.path.basename(dropbox_path))
             if not mime_type:
                 mime_type = "application/octet-stream"
             return StreamingResponse(stream_file(), media_type=mime_type)
@@ -7829,7 +7878,7 @@ def advance_order_to_documents_reviewed(
 async def stream_pre_signature_document_preview(
     order_number: str,
     document_name: str = Query(...),
-    document_id: Optional[int] = Query(None),
+    document_id: Optional[Union[int, str]] = Query(None),
     document_path: Optional[str] = Query(None),
     download: bool = Query(False),
     db: Session = Depends(database.get_db),
@@ -7851,10 +7900,17 @@ async def stream_pre_signature_document_preview(
     if not effective_company:
         effective_company = db.query(models.ClientCompany).filter(models.ClientCompany.id == first_order.company_id).first()
 
+    parsed_doc_id = None
+    if document_id:
+        try:
+            parsed_doc_id = int(str(document_id).strip())
+        except (ValueError, TypeError):
+            parsed_doc_id = None
+
     # 1. Check if document exists in DB
     db_doc = None
-    if document_id:
-        db_doc = db.query(models.ClientDocument).filter(models.ClientDocument.id == document_id).first()
+    if parsed_doc_id:
+        db_doc = db.query(models.ClientDocument).filter(models.ClientDocument.id == parsed_doc_id).first()
     if not db_doc:
         db_doc = db.query(models.ClientDocument).filter(
             func.upper(models.ClientDocument.order_number) == clean_order_no,
@@ -7893,6 +7949,30 @@ async def stream_pre_signature_document_preview(
         "Cache-Control": "private, max-age=300"
     }
 
+    # Fast-path for cached .doc -> .pdf preview
+    if ext == "doc" and not download:
+        from utils.doc_converter import get_cached_pdf_path
+        candidate_keys = []
+        if db_doc and db_doc.id:
+            candidate_keys.append(f"doc_{db_doc.id}_{safe_filename}")
+        if document_id and (not db_doc or document_id != db_doc.id):
+            candidate_keys.append(f"doc_{document_id}_{safe_filename}")
+        candidate_keys.append(f"doc_{clean_order_no}_{safe_filename}")
+
+        for ck in candidate_keys:
+            cached_pdf = get_cached_pdf_path(ck)
+            if os.path.exists(cached_pdf) and os.path.getsize(cached_pdf) > 0:
+                pdf_filename = f"{safe_filename.rsplit('.', 1)[0]}.pdf"
+                pdf_headers = {
+                    "Content-Disposition": f'inline; filename="{pdf_filename}"',
+                    "Access-Control-Expose-Headers": "Content-Disposition",
+                    "Cache-Control": "private, max-age=300"
+                }
+                def iter_cached_pdf(path=cached_pdf):
+                    with open(path, "rb") as f:
+                        yield from f
+                return StreamingResponse(iter_cached_pdf(), media_type="application/pdf", headers=pdf_headers)
+
     file_url = (db_doc.file_url if db_doc else document_path) or ""
 
     # Check local file path in uploads
@@ -7907,8 +7987,32 @@ async def stream_pre_signature_document_preview(
         candidate = os.path.join("uploads", local_rel)
         if os.path.exists(candidate):
             local_path = candidate
+        else:
+            parts = local_rel.split("/")
+            if len(parts) >= 4:
+                old_rel = f"{parts[0]}/{parts[2]}/{parts[3]}"
+                old_path = os.path.join("uploads", old_rel)
+                if os.path.exists(old_path):
+                    local_path = old_path
 
     if local_path and os.path.exists(local_path):
+        if ext == "doc" and not download:
+            import asyncio
+            from utils.doc_converter import convert_doc_to_pdf
+            with open(local_path, "rb") as f:
+                raw_bytes = f.read()
+            loop = asyncio.get_running_loop()
+            primary_key = f"doc_{db_doc.id if db_doc else (document_id or clean_order_no)}_{safe_filename}"
+            pdf_bytes = await loop.run_in_executor(None, convert_doc_to_pdf, raw_bytes, primary_key)
+            if pdf_bytes:
+                pdf_filename = f"{safe_filename.rsplit('.', 1)[0]}.pdf"
+                pdf_headers = {
+                    "Content-Disposition": f'inline; filename="{pdf_filename}"',
+                    "Access-Control-Expose-Headers": "Content-Disposition",
+                    "Cache-Control": "private, max-age=300"
+                }
+                return Response(content=pdf_bytes, media_type="application/pdf", headers=pdf_headers)
+
         def iterfile():
             with open(local_path, mode="rb") as f:
                 yield from f
@@ -7924,6 +8028,26 @@ async def stream_pre_signature_document_preview(
         res = get_temporary_link(file_url)
         if res.get("success") and res.get("link"):
             link = res.get("link")
+            # For .doc preview, download bytes from Dropbox, convert to PDF, and return
+            if ext == "doc" and not download:
+                import asyncio
+                from utils.doc_converter import convert_doc_to_pdf
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.get(link)
+                    if resp.status_code == 200:
+                        raw_bytes = resp.content
+                        loop = asyncio.get_running_loop()
+                        primary_key = f"doc_{db_doc.id if db_doc else (document_id or clean_order_no)}_{safe_filename}"
+                        pdf_bytes = await loop.run_in_executor(None, convert_doc_to_pdf, raw_bytes, primary_key)
+                        if pdf_bytes:
+                            pdf_filename = f"{safe_filename.rsplit('.', 1)[0]}.pdf"
+                            pdf_headers = {
+                                "Content-Disposition": f'inline; filename="{pdf_filename}"',
+                                "Access-Control-Expose-Headers": "Content-Disposition",
+                                "Cache-Control": "private, max-age=300"
+                            }
+                            return Response(content=pdf_bytes, media_type="application/pdf", headers=pdf_headers)
+
             async def stream_dropbox():
                 async with httpx.AsyncClient() as client:
                     async with client.stream("GET", link) as response:

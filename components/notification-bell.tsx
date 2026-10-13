@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bell, Trash2, Calendar, Wallet, Monitor, CheckCircle2, Clock, Package, MessageSquare, FileText, Megaphone, Briefcase, Users, Building2, ShieldCheck, UserCheck, Mail, Check } from "lucide-react";
+import { Bell, Trash2, Calendar, Wallet, Monitor, CheckCircle2, Clock, Package, MessageSquare, FileText, Megaphone, Briefcase, Users, Building2, ShieldCheck, UserCheck, Mail, Check, CheckCheck } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,11 +9,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { useUser } from "@/contexts/user-context";
+import { DeleteNotificationDialog } from "@/components/delete-notification-dialog";
 
 interface NotificationBellProps {
   systemArea?: "hrms" | "business" | "all";
@@ -25,6 +27,10 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [isClientUser, setIsClientUser] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   
@@ -168,28 +174,111 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
       
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadCount(0);
+      setSelectedIds(new Set());
       window.dispatchEvent(new Event("notifications-updated"));
     } catch (err) {
       console.error(err);
     }
   };
 
-  const deleteNotification = async (id: number, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleToggleSelectOne = (id: number, checked: boolean) => {
+    const next = new Set(selectedIds);
+    if (checked) {
+      next.add(id);
+    } else {
+      next.delete(id);
+    }
+    setSelectedIds(next);
+  };
+
+  const handleToggleSelectAll = () => {
+    if (notifications.length === 0) return;
+    const allSelected = notifications.every((n) => selectedIds.has(n.id));
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(notifications.map((n) => n.id)));
+    }
+  };
+
+  const handleMarkSelectedAsRead = async () => {
+    if (selectedIds.size === 0 || isProcessingBatch) return;
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}`, {
+      setIsProcessingBatch(true);
+      const ids = Array.from(selectedIds);
+      await Promise.all(
+        ids.map((id) =>
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}/read`, {
+            credentials: "include",
+            method: "PUT",
+          })
+        )
+      );
+      setNotifications((prev) =>
+        prev.map((n) => (selectedIds.has(n.id) ? { ...n, is_read: true } : n))
+      );
+      setUnreadCount((prev) => {
+        const markedUnread = notifications.filter(
+          (n) => selectedIds.has(n.id) && !n.is_read
+        ).length;
+        return Math.max(0, prev - markedUnread);
+      });
+      setSelectedIds(new Set());
+      toast.success(`${ids.length} marked as read`);
+      window.dispatchEvent(new Event("notifications-updated"));
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to mark selected notifications as read");
+    } finally {
+      setIsProcessingBatch(false);
+    }
+  };
+
+  const handleInitiateDelete = (notif: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setOpen(false);
+    setDeleteTarget(notif);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const id = deleteTarget.id;
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}`, {
         method: "DELETE",
         credentials: "include"
       });
       
-      const notif = notifications.find(n => n.id === id);
-      if (notif && !notif.is_read) {
-        setUnreadCount(prev => Math.max(0, prev - 1));
+      if (res.ok) {
+        if (!deleteTarget.is_read) {
+          setUnreadCount(prev => Math.max(0, prev - 1));
+        }
+        setNotifications(prev => prev.filter(n => n.id !== id));
+        setSelectedIds(prev => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        toast.success("Notification deleted");
+        window.dispatchEvent(new Event("notifications-updated"));
+      } else {
+        toast.error("Failed to delete notification");
       }
-      setNotifications(prev => prev.filter(n => n.id !== id));
-      window.dispatchEvent(new Event("notifications-updated"));
+      setDeleteTarget(null);
     } catch (err) {
       console.error(err);
+      toast.error("Failed to delete notification");
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+      setOpen(false);
+      setTimeout(() => {
+        if (typeof document !== "undefined") {
+          document.body.style.pointerEvents = "";
+        }
+      }, 50);
     }
   };
 
@@ -267,6 +356,13 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
         }
         try {
           sessionStorage.setItem("auto_open_order_chat", orderNum);
+          const currentOrigin = typeof window !== "undefined" ? (window.location.pathname + window.location.search) : "";
+          if (currentOrigin && !currentOrigin.startsWith("/business/clients/orders") && !currentOrigin.startsWith("/business/assigned-orders")) {
+            sessionStorage.setItem("order_chat_return_url", currentOrigin);
+            targetUrl += `&returnUrl=${encodeURIComponent(currentOrigin)}`;
+          } else {
+            sessionStorage.removeItem("order_chat_return_url");
+          }
         } catch {}
       }
 
@@ -377,7 +473,8 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
   const badgeGlow = activeArea === "business" ? "text-emerald-400" : "text-indigo-400";
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <>
+      <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
       <DropdownMenuTrigger asChild>
         <button className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-300 hover:text-white hover:bg-white/10 hover:border-white/20 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/30 transition-all duration-200 cursor-pointer shadow-sm">
           <Bell className={`h-4 w-4 ${unreadCount > 0 ? `animate-[wiggle_1s_ease-in-out_infinite] ${badgeGlow}` : ""}`} />
@@ -402,13 +499,65 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
               </span>
             )}
           </div>
-          {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={markAllAsRead} className="h-6 px-2 text-[11px] text-zinc-400 hover:text-white hover:bg-white/10 rounded-md">
-              <CheckCircle2 className="mr-1 h-3 w-3 text-emerald-400" />
-              Mark all read
-            </Button>
-          )}
+          <div className="flex items-center gap-1.5">
+            {selectedIds.size > 0 ? (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleMarkSelectedAsRead} 
+                disabled={isProcessingBatch}
+                className="h-6 px-2 text-[11px] text-emerald-400 hover:text-white hover:bg-emerald-600/30 rounded-md font-semibold cursor-pointer"
+              >
+                <CheckCheck className="mr-1 h-3 w-3" />
+                Mark read ({selectedIds.size})
+              </Button>
+            ) : (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={markAllAsRead} 
+                disabled={unreadCount === 0}
+                className="h-6 px-2 text-[11px] text-zinc-300 hover:text-white hover:bg-white/10 rounded-md disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer"
+              >
+                <CheckCheck className="mr-1 h-3 w-3 text-emerald-400" />
+                Mark all read
+              </Button>
+            )}
+          </div>
         </div>
+
+        {/* Quick Select All Toolbar in Bell Dropdown */}
+        {notifications.length > 0 && (
+          <div className="flex items-center justify-between px-4 py-2 bg-white/[0.02] border-b border-zinc-800/60 text-[11px] text-zinc-400">
+            <label className="flex items-center gap-2 cursor-pointer select-none hover:text-zinc-200">
+              <Checkbox
+                checked={
+                  notifications.length > 0 && notifications.every((n) => selectedIds.has(n.id))
+                    ? true
+                    : notifications.some((n) => selectedIds.has(n.id))
+                      ? "indeterminate"
+                      : false
+                }
+                onCheckedChange={handleToggleSelectAll}
+                className="h-3.5 w-3.5 rounded border-zinc-600 cursor-pointer"
+                aria-label="Select all notifications"
+              />
+              <span className="text-[11px] font-semibold text-zinc-300">
+                Select all ({notifications.length})
+              </span>
+            </label>
+
+            {selectedIds.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className="text-[11px] text-zinc-400 hover:text-zinc-200 hover:underline cursor-pointer"
+              >
+                Deselect all
+              </button>
+            )}
+          </div>
+        )}
         
         <div className="max-h-[380px] overflow-y-auto">
           {notifications.length === 0 ? (
@@ -425,8 +574,16 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
                 <div 
                   key={notif.id}
                   onClick={() => handleNotificationClick(notif)}
-                  className={`group relative flex gap-3.5 p-3.5 cursor-pointer hover:bg-white/[0.06] transition-colors ${!notif.is_read ? (activeArea === "business" ? "bg-emerald-500/[0.05]" : "bg-indigo-500/[0.05]") : ""}`}
+                  className={`group relative flex items-start gap-3 p-3.5 cursor-pointer hover:bg-white/[0.06] transition-colors ${selectedIds.has(notif.id) ? "bg-emerald-500/10" : !notif.is_read ? (activeArea === "business" ? "bg-emerald-500/[0.05]" : "bg-indigo-500/[0.05]") : ""}`}
                 >
+                  <div className="pt-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selectedIds.has(notif.id)}
+                      onCheckedChange={(checked) => handleToggleSelectOne(notif.id, !!checked)}
+                      className="h-3.5 w-3.5 rounded border-zinc-600 cursor-pointer"
+                      aria-label={`Select notification ${notif.title}`}
+                    />
+                  </div>
                   {!notif.is_read && (
                     <div className={`absolute left-1.5 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full ${activeArea === "business" ? "bg-emerald-400 shadow-[0_0_6px_#34d399]" : "bg-indigo-400 shadow-[0_0_6px_#818cf8]"}`} />
                   )}
@@ -462,7 +619,7 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
                         )}
                         <button 
                           type="button"
-                          onClick={(e) => deleteNotification(notif.id, e)}
+                          onClick={(e) => handleInitiateDelete(notif, e)}
                           title="Delete notification"
                           className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-rose-400 p-1 rounded-md hover:bg-rose-500/10 cursor-pointer"
                         >
@@ -499,6 +656,24 @@ export function NotificationBell({ systemArea }: NotificationBellProps = {}) {
         </div>
       </DropdownMenuContent>
     </DropdownMenu>
+
+    <DeleteNotificationDialog
+      open={!!deleteTarget}
+      onOpenChange={(isOpen) => {
+        if (!isOpen && !isDeleting) {
+          setDeleteTarget(null);
+          setTimeout(() => {
+            if (typeof document !== "undefined") {
+              document.body.style.pointerEvents = "";
+            }
+          }, 50);
+        }
+      }}
+      notification={deleteTarget}
+      onConfirm={handleConfirmDelete}
+      isDeleting={isDeleting}
+    />
+  </>
   );
 }
 

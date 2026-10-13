@@ -168,6 +168,10 @@ const nextConfig = {
       {
         source: '/api-proxy/uploads/:path*',
         destination: `${backendUrl}/uploads/:path*`
+      },
+      {
+        source: '/api-proxy/chat_snippets/:path*',
+        destination: `${backendUrl}/uploads/chat_snippets/:path*`
       }
     ];
   }

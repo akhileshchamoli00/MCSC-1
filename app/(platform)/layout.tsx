@@ -396,6 +396,16 @@ function HRMSLayoutContent({ children }: { children: React.ReactNode }) {
       mainScrollRef.current.scrollTo({ top: 0, left: 0, behavior: "instant" });
     }
     window.scrollTo(0, 0);
+
+    const lockWindowScroll = () => {
+      if (window.scrollY !== 0 || window.scrollX !== 0) {
+        window.scrollTo(0, 0);
+      }
+    };
+    window.addEventListener("scroll", lockWindowScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", lockWindowScroll);
+    };
   }, [pathname]);
 
   // Route protection and authentication guards
