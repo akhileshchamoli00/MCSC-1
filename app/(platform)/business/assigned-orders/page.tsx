@@ -29,9 +29,14 @@ import {
   Scale,
   GitBranch,
   Printer,
-  CheckSquare
+  CheckSquare,
+  SlidersHorizontal,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import { JobDetailsPrintDialog, PreSignatureReviewDialog } from "@/components/orders";
+import { useDebounce } from "@/hooks/use-debounce";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,6 +66,8 @@ import { DualOrderChatDialog } from "@/components/dual-order-chat-dialog";
 import { useUser } from "@/contexts/user-context";
 import { cn } from "@/lib/utils";
 
+const FILTERS_STORAGE_KEY = "mcsc_assigned_orders_filters";
+
 export default function AssignedOrdersPage() {
   const router = useRouter();
   const { profile, isAdmin, hasPermission, loading: userLoading } = useUser();
@@ -70,8 +77,144 @@ export default function AssignedOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [savingStatus, setSavingStatus] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm, 250);
   const [activeTab, setActiveTab] = useState<"ALL" | "INQUIRY" | "ASSIGNED" | "IN_PROGRESS" | "REVIEW_ORDER" | "ON_HOLD" | "COMPLETED">("ALL");
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(15);
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
+
+  // Column Header Sorting State
+  const [sortColumn, setSortColumn] = useState<string | null>("created_at");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  const handleSort = (columnKey: string) => {
+    if (sortColumn === columnKey) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(columnKey);
+      setSortDirection("asc");
+    }
+  };
+
+  const renderSortIcon = (columnKey: string) => {
+    if (sortColumn === columnKey) {
+      return sortDirection === "asc" ? (
+        <ArrowUp className="h-3 w-3 text-primary shrink-0" />
+      ) : (
+        <ArrowDown className="h-3 w-3 text-primary shrink-0" />
+      );
+    }
+    return <ArrowUpDown className="h-3 w-3 opacity-30 group-hover/th:opacity-80 transition-opacity shrink-0" />;
+  };
+
+  // Column-Specific Filters State
+  const [colFilterOrderId, setColFilterOrderId] = useState("");
+  const [colFilterCompany, setColFilterCompany] = useState("");
+  const [colFilterService, setColFilterService] = useState("");
+  const [colFilterTeam, setColFilterTeam] = useState("");
+  const [colFilterStage, setColFilterStage] = useState("ALL");
+  const [showColumnFilters, setShowColumnFilters] = useState(true);
+
+  const isRestoredRef = useRef(false);
+
+  const activeColFilterCount = useMemo(() => {
+    return [
+      colFilterOrderId.trim(),
+      colFilterCompany.trim(),
+      colFilterService.trim(),
+      colFilterTeam.trim(),
+      colFilterStage !== "ALL" ? colFilterStage : "",
+    ].filter(Boolean).length;
+  }, [colFilterOrderId, colFilterCompany, colFilterService, colFilterTeam, colFilterStage]);
+
+  const saveCurrentFilters = () => {
+    if (typeof window === "undefined") return;
+    try {
+      const dataToSave = {
+        searchTerm,
+        colFilterOrderId,
+        colFilterCompany,
+        colFilterService,
+        colFilterTeam,
+        colFilterStage,
+        showColumnFilters,
+        sortColumn,
+        sortDirection,
+        currentPage,
+        pageSize,
+      };
+      sessionStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(dataToSave));
+      localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(dataToSave));
+    } catch (e) {
+      console.error("Error saving filters:", e);
+    }
+  };
+
+  // Restore saved search and filter parameters on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = sessionStorage.getItem(FILTERS_STORAGE_KEY) || localStorage.getItem(FILTERS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed.searchTerm === "string") setSearchTerm(parsed.searchTerm);
+        if (typeof parsed.colFilterOrderId === "string") setColFilterOrderId(parsed.colFilterOrderId);
+        if (typeof parsed.colFilterCompany === "string") setColFilterCompany(parsed.colFilterCompany);
+        if (typeof parsed.colFilterService === "string") setColFilterService(parsed.colFilterService);
+        if (typeof parsed.colFilterTeam === "string") setColFilterTeam(parsed.colFilterTeam);
+        if (typeof parsed.colFilterStage === "string") setColFilterStage(parsed.colFilterStage);
+        if (typeof parsed.showColumnFilters === "boolean") setShowColumnFilters(parsed.showColumnFilters);
+        if (typeof parsed.sortColumn === "string") setSortColumn(parsed.sortColumn);
+        if (parsed.sortDirection === "asc" || parsed.sortDirection === "desc") setSortDirection(parsed.sortDirection);
+        if (typeof parsed.currentPage === "number" && parsed.currentPage > 0) setCurrentPage(parsed.currentPage);
+        if (typeof parsed.pageSize === "number" && [15, 25, 50, 100].includes(parsed.pageSize)) {
+          setPageSize(parsed.pageSize);
+        }
+      }
+    } catch (e) {
+      console.error("Error reading saved filters:", e);
+    } finally {
+      setTimeout(() => {
+        isRestoredRef.current = true;
+      }, 100);
+    }
+  }, []);
+
+  // Save search and filter parameters whenever they change AFTER initial restoration
+  useEffect(() => {
+    if (!isRestoredRef.current || typeof window === "undefined") return;
+    saveCurrentFilters();
+  }, [
+    searchTerm,
+    colFilterOrderId,
+    colFilterCompany,
+    colFilterService,
+    colFilterTeam,
+    colFilterStage,
+    showColumnFilters,
+    sortColumn,
+    sortDirection,
+    currentPage,
+    pageSize,
+  ]);
+
+  const handleClearAllFilters = () => {
+    setSearchTerm("");
+    setColFilterOrderId("");
+    setColFilterCompany("");
+    setColFilterService("");
+    setColFilterTeam("");
+    setColFilterStage("ALL");
+    setCurrentPage(1);
+    try {
+      sessionStorage.removeItem(FILTERS_STORAGE_KEY);
+      localStorage.removeItem(FILTERS_STORAGE_KEY);
+    } catch (e) { }
+  };
 
   // Restore active tab from URL query parameter or sessionStorage on mount
   useEffect(() => {
@@ -808,6 +951,11 @@ export default function AssignedOrdersPage() {
     return map;
   }, [groupedOrders]);
 
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "-";
+    return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  };
+
   const filteredOrders = useMemo(() => {
     return groupedOrders
       .filter((ord) => {
@@ -854,26 +1002,140 @@ export default function AssignedOrdersPage() {
           if (isReviewOnly || !isExecuting || !COMPLETED_STATUSES.includes(status)) return false;
         }
 
-        const term = searchTerm.toLowerCase();
-        const orderNum = (ord.order_number || "").toLowerCase();
-        const clientName = (ord.client_name || "").toLowerCase();
-        const compName = (ord.company_name || "").toLowerCase();
-        const itemsStr = (ord.items || []).map((i: any) => `${i.job_title} ${i.job_id}`).join(" ").toLowerCase();
-        const notariesStr = (ord.notaries || []).map((n: any) => n.name).join(" ").toLowerCase();
-        return orderNum.includes(term) || clientName.includes(term) || compName.includes(term) || itemsStr.includes(term) || notariesStr.includes(term);
-      })
-      .sort((a, b) => {
+        // Global Search
+        if (debouncedSearchTerm) {
+          const term = debouncedSearchTerm.toLowerCase();
+          const orderNum = (ord.order_number || "").toLowerCase();
+          const clientName = (ord.client_name || "").toLowerCase();
+          const compName = (ord.company_name || "").toLowerCase();
+          const itemsStr = (ord.items || []).map((i: any) => `${i.job_title} ${i.job_id} ${i.branch_name || ""}`).join(" ").toLowerCase();
+          const consultantsStr = (ord.consultants || []).map((c: any) => c.name).join(" ").toLowerCase();
+          const notariesStr = (ord.notaries || []).map((n: any) => n.name).join(" ").toLowerCase();
+          const reviewerStr = ord.reviewer?.name?.toLowerCase() || "";
+          const dateStr = ord.created_at ? formatDate(ord.created_at).toLowerCase() : "";
+          if (!orderNum.includes(term) && !clientName.includes(term) && !compName.includes(term) && !itemsStr.includes(term) && !consultantsStr.includes(term) && !notariesStr.includes(term) && !reviewerStr.includes(term) && !dateStr.includes(term)) {
+            return false;
+          }
+        }
+
+        // Column 1: Order ID & Date
+        if (colFilterOrderId.trim()) {
+          const q = colFilterOrderId.trim().toLowerCase();
+          const orderNum = (ord.order_number || "").toLowerCase();
+          const dateStr = ord.created_at ? formatDate(ord.created_at).toLowerCase() : "";
+          if (!orderNum.includes(q) && !dateStr.includes(q)) return false;
+        }
+
+        // Column 2: Client & Company
+        if (colFilterCompany.trim()) {
+          const q = colFilterCompany.trim().toLowerCase();
+          const compName = (ord.company_name || "").toLowerCase();
+          const clientName = (ord.client_name || "").toLowerCase();
+          if (!compName.includes(q) && !clientName.includes(q)) return false;
+        }
+
+        // Column 3: Service Scope
+        if (colFilterService.trim()) {
+          const q = colFilterService.trim().toLowerCase();
+          const itemsStr = (ord.items || []).map((i: any) => `${i.job_title} ${i.job_id} ${i.branch_name || ""}`).join(" ").toLowerCase();
+          if (!itemsStr.includes(q)) return false;
+        }
+
+        // Column 4: Team & Notary
+        if (colFilterTeam.trim()) {
+          const q = colFilterTeam.trim().toLowerCase();
+          const consultantsStr = (ord.consultants || []).map((c: any) => c.name).join(" ").toLowerCase();
+          const notariesStr = (ord.notaries || []).map((n: any) => n.name).join(" ").toLowerCase();
+          const reviewerStr = ord.reviewer?.name?.toLowerCase() || "";
+          const reviewersStr = (ord.reviewers || []).map((r: any) => r.name).join(" ").toLowerCase();
+          if (!consultantsStr.includes(q) && !notariesStr.includes(q) && !reviewerStr.includes(q) && !reviewersStr.includes(q)) return false;
+        }
+
+        // Column 5: Execution Stage
+        if (colFilterStage !== "ALL") {
+          if ((ord.status || "").toUpperCase() !== colFilterStage.toUpperCase()) return false;
+        }
+
+        return true;
+      });
+  }, [groupedOrders, activeTab, debouncedSearchTerm, colFilterOrderId, colFilterCompany, colFilterService, colFilterTeam, colFilterStage, myEmpId, isAdmin]);
+
+  const sortedOrders = useMemo(() => {
+    if (!sortColumn) {
+      return [...filteredOrders].sort((a, b) => {
         const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
         const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
         if (timeA !== timeB) return timeB - timeA;
         return (b.id || 0) - (a.id || 0);
       });
-  }, [groupedOrders, activeTab, searchTerm, myEmpId, isAdmin]);
+    }
 
-  const totalPages = Math.ceil(filteredOrders.length / 10);
-  const startIndex = (currentPage - 1) * 10;
-  const endIndex = startIndex + 10;
-  const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
+    return [...filteredOrders].sort((a, b) => {
+      let aVal: any = "";
+      let bVal: any = "";
+
+      switch (sortColumn) {
+        case "id":
+          aVal = a.id || 0;
+          bVal = b.id || 0;
+          return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+
+        case "order_number":
+          aVal = a.order_number || "";
+          bVal = b.order_number || "";
+          return sortDirection === "asc"
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+
+        case "created_at":
+          aVal = a.created_at ? new Date(a.created_at).getTime() : 0;
+          bVal = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+
+        case "company_name":
+          aVal = a.company_name || a.client_name || "";
+          bVal = b.company_name || b.client_name || "";
+          return sortDirection === "asc"
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+
+        case "service":
+          aVal = a.items?.[0]?.job_title || "";
+          bVal = b.items?.[0]?.job_title || "";
+          return sortDirection === "asc"
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+
+        case "team":
+          aVal = (a.consultants || []).map((c: any) => c.name).join(", ") || a.reviewer?.name || "";
+          bVal = (b.consultants || []).map((c: any) => c.name).join(", ") || b.reviewer?.name || "";
+          return sortDirection === "asc"
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+
+        case "status":
+          aVal = a.status || "";
+          bVal = b.status || "";
+          return sortDirection === "asc"
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+
+        default:
+          return 0;
+      }
+    });
+  }, [filteredOrders, sortColumn, sortDirection]);
+
+  const totalPages = Math.ceil(sortedOrders.length / pageSize) || 1;
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedOrders = sortedOrders.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
 
   const [highlightedOrderNum, setHighlightedOrderNum] = useState<string | null>(null);
 
@@ -884,87 +1146,87 @@ export default function AssignedOrdersPage() {
     const matched = groupedOrders.find(g => g.order_number?.toUpperCase() === orderNum.toUpperCase());
     if (matched) {
 
-    const st = (matched.status || "").toUpperCase();
-    const isRevOnly = checkIsReviewOnly(matched);
-    const isRev = checkIsReviewer(matched);
+      const st = (matched.status || "").toUpperCase();
+      const isRevOnly = checkIsReviewOnly(matched);
+      const isRev = checkIsReviewer(matched);
 
-    let targetTab: "ALL" | "INQUIRY" | "ASSIGNED" | "IN_PROGRESS" | "REVIEW_ORDER" | "ON_HOLD" | "COMPLETED" = "ALL";
-    if (INQUIRY_STATUSES.includes(st)) {
-      targetTab = "INQUIRY";
-    } else if (activeTab === "ALL" && !COMPLETED_STATUSES.includes(st) && st !== "CANCELLED") {
-      targetTab = "ALL";
-    } else if (isRevOnly) {
-      if (!COMPLETED_STATUSES.includes(st) && st !== "CANCELLED") {
-        targetTab = "REVIEW_ORDER";
+      let targetTab: "ALL" | "INQUIRY" | "ASSIGNED" | "IN_PROGRESS" | "REVIEW_ORDER" | "ON_HOLD" | "COMPLETED" = "ALL";
+      if (INQUIRY_STATUSES.includes(st)) {
+        targetTab = "INQUIRY";
+      } else if (activeTab === "ALL" && !COMPLETED_STATUSES.includes(st) && st !== "CANCELLED") {
+        targetTab = "ALL";
+      } else if (isRevOnly) {
+        if (!COMPLETED_STATUSES.includes(st) && st !== "CANCELLED") {
+          targetTab = "REVIEW_ORDER";
+        } else {
+          targetTab = "COMPLETED";
+        }
       } else {
-        targetTab = "COMPLETED";
-      }
-    } else {
-      if (ON_HOLD_STATUSES.includes(st)) {
-        targetTab = "ON_HOLD";
-      } else if (COMPLETED_STATUSES.includes(st)) {
-        targetTab = "COMPLETED";
-      } else if (IN_PROGRESS_STATUSES.includes(st)) {
-        targetTab = "IN_PROGRESS";
-      } else {
-        targetTab = "ASSIGNED";
-      }
-    }
-
-    setActiveTab(targetTab);
-    setSearchTerm("");
-
-    // Calculate index within targetTab
-    const tabOrders = groupedOrders.filter(ord => {
-      const ost = (ord.status || "").toUpperCase();
-      if (!ALLOWED_EXECUTION_STATUSES.includes(ost)) return false;
-      const oRevOnly = checkIsReviewOnly(ord);
-      const oExecuting = checkIsExecuting(ord);
-      const oReviewer = checkIsReviewer(ord);
-
-      if (targetTab === "INQUIRY" && (!INQUIRY_STATUSES.includes(ost) || (!oExecuting && !oReviewer && !isAdmin))) return false;
-      if (targetTab === "ALL" && (COMPLETED_STATUSES.includes(ost) || ost === "CANCELLED" || (!oExecuting && !oReviewer && !isAdmin))) return false;
-      if (targetTab === "ASSIGNED" && (oRevOnly || !oExecuting || !ASSIGNED_STATUSES.includes(ost))) return false;
-      if (targetTab === "IN_PROGRESS" && (oRevOnly || !oExecuting || !IN_PROGRESS_STATUSES.includes(ost))) return false;
-      if (targetTab === "REVIEW_ORDER" && (!oReviewer || COMPLETED_STATUSES.includes(ost) || ost === "CANCELLED")) return false;
-      if (targetTab === "ON_HOLD" && (oRevOnly || !oExecuting || !ON_HOLD_STATUSES.includes(ost))) return false;
-      if (targetTab === "COMPLETED" && (oRevOnly || !oExecuting || !COMPLETED_STATUSES.includes(ost))) return false;
-      return true;
-    });
-
-    const orderIdx = tabOrders.findIndex(o => o.order_number?.toUpperCase() === orderNum.toUpperCase());
-    if (orderIdx !== -1) {
-      const targetPage = Math.floor(orderIdx / 10) + 1;
-      setCurrentPage(targetPage);
-    }
-
-    setSelectedGroup(matched);
-    if (openChat) {
-      setIsChatOpen(true);
-      fetchProgressUpdates(matched.order_number);
-    }
-
-    setHighlightedOrderNum(matched.order_number);
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("assigned_orders_highlighted_order", matched.order_number);
-    }
-    setTimeout(() => {
-      const el = document.getElementById(`order-row-${matched.order_number}`) || document.getElementById(`mobile-order-card-${matched.order_number}`);
-      const scrollParent = el?.closest('main') || document.querySelector('main');
-      if (el && scrollParent) {
-        const parentRect = scrollParent.getBoundingClientRect();
-        const elRect = el.getBoundingClientRect();
-        if (elRect.top < parentRect.top || elRect.bottom > parentRect.bottom) {
-          const relativeTop = elRect.top - parentRect.top + scrollParent.scrollTop;
-          scrollParent.scrollTo({ top: Math.max(0, relativeTop - 120), behavior: "smooth" });
+        if (ON_HOLD_STATUSES.includes(st)) {
+          targetTab = "ON_HOLD";
+        } else if (COMPLETED_STATUSES.includes(st)) {
+          targetTab = "COMPLETED";
+        } else if (IN_PROGRESS_STATUSES.includes(st)) {
+          targetTab = "IN_PROGRESS";
+        } else {
+          targetTab = "ASSIGNED";
         }
       }
-      if (typeof window !== "undefined") {
-        window.scrollTo(0, 0);
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
+
+      setActiveTab(targetTab);
+      setSearchTerm("");
+
+      // Calculate index within targetTab
+      const tabOrders = groupedOrders.filter(ord => {
+        const ost = (ord.status || "").toUpperCase();
+        if (!ALLOWED_EXECUTION_STATUSES.includes(ost)) return false;
+        const oRevOnly = checkIsReviewOnly(ord);
+        const oExecuting = checkIsExecuting(ord);
+        const oReviewer = checkIsReviewer(ord);
+
+        if (targetTab === "INQUIRY" && (!INQUIRY_STATUSES.includes(ost) || (!oExecuting && !oReviewer && !isAdmin))) return false;
+        if (targetTab === "ALL" && (COMPLETED_STATUSES.includes(ost) || ost === "CANCELLED" || (!oExecuting && !oReviewer && !isAdmin))) return false;
+        if (targetTab === "ASSIGNED" && (oRevOnly || !oExecuting || !ASSIGNED_STATUSES.includes(ost))) return false;
+        if (targetTab === "IN_PROGRESS" && (oRevOnly || !oExecuting || !IN_PROGRESS_STATUSES.includes(ost))) return false;
+        if (targetTab === "REVIEW_ORDER" && (!oReviewer || COMPLETED_STATUSES.includes(ost) || ost === "CANCELLED")) return false;
+        if (targetTab === "ON_HOLD" && (oRevOnly || !oExecuting || !ON_HOLD_STATUSES.includes(ost))) return false;
+        if (targetTab === "COMPLETED" && (oRevOnly || !oExecuting || !COMPLETED_STATUSES.includes(ost))) return false;
+        return true;
+      });
+
+      const orderIdx = tabOrders.findIndex(o => o.order_number?.toUpperCase() === orderNum.toUpperCase());
+      if (orderIdx !== -1) {
+        const targetPage = Math.floor(orderIdx / 10) + 1;
+        setCurrentPage(targetPage);
       }
-    }, 300);
+
+      setSelectedGroup(matched);
+      if (openChat) {
+        setIsChatOpen(true);
+        fetchProgressUpdates(matched.order_number);
+      }
+
+      setHighlightedOrderNum(matched.order_number);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("assigned_orders_highlighted_order", matched.order_number);
+      }
+      setTimeout(() => {
+        const el = document.getElementById(`order-row-${matched.order_number}`) || document.getElementById(`mobile-order-card-${matched.order_number}`);
+        const scrollParent = el?.closest('main') || document.querySelector('main');
+        if (el && scrollParent) {
+          const parentRect = scrollParent.getBoundingClientRect();
+          const elRect = el.getBoundingClientRect();
+          if (elRect.top < parentRect.top || elRect.bottom > parentRect.bottom) {
+            const relativeTop = elRect.top - parentRect.top + scrollParent.scrollTop;
+            scrollParent.scrollTo({ top: Math.max(0, relativeTop - 120), behavior: "smooth" });
+          }
+        }
+        if (typeof window !== "undefined") {
+          window.scrollTo(0, 0);
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+        }
+      }, 300);
     } else {
       // Fallback: If not in current assigned orders list, fetch directly from backend API
       fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/clients/orders/group/${encodeURIComponent(orderNum)}`, {
@@ -1029,11 +1291,6 @@ export default function AssignedOrdersPage() {
       window.removeEventListener("open-order-chat", handleCustomOpen);
     };
   }, [orders, groupedOrders]);
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  };
 
   const getStatusDisplayLabel = (status: string) => {
     if (!status) return "Assigned";
@@ -1737,439 +1994,303 @@ export default function AssignedOrdersPage() {
               </div>
               <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />
               <span className="text-xs font-normal text-muted-foreground orders-text-secondary">
-                {filteredOrders.length} {filteredOrders.length === 1 ? "order" : "orders"} listed
+                {sortedOrders.length} {sortedOrders.length === 1 ? "order" : "orders"} listed
               </span>
             </div>
 
             {/* Search bar & Filter actions */}
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-              <div className="relative w-full sm:w-72">
+            <div className="flex flex-wrap items-center gap-2 flex-1 justify-end">
+              <div className="relative flex-1 min-w-[200px] max-w-md">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder={`Search inside ${activeTab === "ALL" ? "all orders" : activeTab === "INQUIRY" ? "inquiry orders" : activeTab === "ASSIGNED" ? "assigned orders" : activeTab === "IN_PROGRESS" ? "in-progress orders" : activeTab === "REVIEW_ORDER" ? "review orders" : activeTab === "ON_HOLD" ? "on-hold orders" : "completed orders"}...`}
-                  className="pl-8 h-9 text-xs rounded-lg orders-control"
+                  className="pl-8 h-9 text-xs rounded-xl bg-background/70 border-border/50 orders-control"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              {searchTerm && (
+              <Button
+                type="button"
+                variant={showColumnFilters ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setShowColumnFilters(!showColumnFilters)}
+                className="h-9 px-3 rounded-xl text-xs font-semibold gap-1.5 shrink-0 orders-control"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                <span>Column Filters</span>
+                {activeColFilterCount > 0 && (
+                  <Badge variant="default" className="h-4 px-1.5 text-[9px] font-bold rounded-full ml-0.5">
+                    {activeColFilterCount}
+                  </Badge>
+                )}
+              </Button>
+              {(searchTerm || activeColFilterCount > 0) && (
                 <Button
+                  type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => setSearchTerm("")}
-                  className="h-9 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={handleClearAllFilters}
+                  className="h-9 px-2.5 text-xs text-muted-foreground hover:text-destructive gap-1 shrink-0"
                 >
-                  Clear
+                  <X className="h-3.5 w-3.5" /> Clear Filters
                 </Button>
               )}
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground orders-text-secondary ml-1">
+                <span className="text-[11px] font-medium orders-text-secondary">Show</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                  className="h-8 px-2 py-0.5 text-xs font-semibold rounded-lg bg-background border border-border/60 text-foreground cursor-pointer hover:bg-accent/50 focus:outline-none focus:ring-1 focus:ring-primary transition-colors shadow-2xs orders-control"
+                  aria-label="Select orders per page"
+                >
+                  <option value={15}>15</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <span className="text-[11px] font-medium orders-text-secondary">per page</span>
+              </div>
             </div>
           </div>
 
           <CardContent className="p-0">
-            {filteredOrders.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <ShoppingCart className="h-12 w-12 text-muted-foreground/35 mb-3" />
-                <h3 className="font-bold text-lg">
-                  {activeTab === "ALL" ? "No Active Assigned Orders" : activeTab === "INQUIRY" ? "No Inquiry Orders Found" : activeTab === "ASSIGNED" ? "No Newly Assigned Orders" : activeTab === "IN_PROGRESS" ? "No In-Progress Orders" : activeTab === "REVIEW_ORDER" ? "No Review Orders" : activeTab === "ON_HOLD" ? "No On-Hold Orders" : "No Completed Orders"}
-                </h3>
-                <p className="text-sm text-muted-foreground max-w-sm mt-1">
-                  {searchTerm
-                    ? "No results match your search query."
-                    : activeTab === "ALL"
-                      ? "There are currently no active orders assigned to you."
-                      : activeTab === "INQUIRY"
-                        ? "There are currently no inquiry pre-orders allocated to you for initial check."
-                        : activeTab === "ASSIGNED"
-                          ? "There are currently no new unstarted orders waiting in the assigned queue."
-                          : activeTab === "IN_PROGRESS"
-                            ? "There are currently no orders in active progress in your queue."
-                            : activeTab === "REVIEW_ORDER"
-                              ? "There are currently no active orders allocated to you for continuous lifecycle review."
-                              : activeTab === "ON_HOLD"
-                                ? "There are currently no paused orders placed on hold."
-                                : "There are currently no completed orders in your archive."}
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-muted/50 border-b text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                        <th className="py-2.5 px-2 w-8 min-w-[30px] max-w-[36px] text-center orders-th">No.</th>
-                        <th className="py-2.5 px-2 w-28 min-w-[100px] max-w-[125px] whitespace-nowrap orders-th">Order ID</th>
-                        <th className="py-2.5 px-2 min-w-[130px] max-w-[170px] orders-th">Client & Company</th>
-                        <th className="py-2.5 px-2.5 min-w-[180px] orders-th">Service Scope</th>
-                        <th className="py-2.5 px-2 w-36 min-w-[120px] max-w-[145px] orders-th">Team & Notary</th>
-                        <th className="py-2.5 px-2 w-60 min-w-[220px] max-w-[260px] text-center whitespace-nowrap orders-th">Execution Stage</th>
-                        <th className="py-2.5 px-2 w-20 min-w-[75px] max-w-[85px] text-right whitespace-nowrap orders-th orders-col-actions">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/30">
-                      {paginatedOrders.map((ord, idx) => {
-                        const isHighlighted = highlightedOrderNum === ord.order_number;
-                        return (
-                          <tr
-                            key={ord.order_number}
-                            id={`order-row-${ord.order_number}`}
-                            onClick={() => {
-                              setHighlightedOrderNum(ord.order_number);
-                              if (typeof window !== "undefined") {
-                                sessionStorage.setItem("assigned_orders_highlighted_order", ord.order_number);
-                              }
-                            }}
-                            className={cn(
-                              "transition-colors duration-150 cursor-pointer orders-row",
-                              isHighlighted
-                                ? "is-highlighted bg-emerald-500/10 dark:bg-emerald-950/40"
-                                : "hover:bg-muted/40 dark:hover:bg-zinc-800/30"
-                            )}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="sticky top-0 z-30">
+                  <tr className="border-b border-border/60 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
+                    <th
+                      onClick={() => handleSort("id")}
+                      className="sticky top-0 z-30 py-2.5 px-2 w-8 min-w-[30px] max-w-[36px] text-center bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors orders-th"
+                      title="Click to sort by Sequence #"
+                    >
+                      <div className="flex items-center justify-center gap-0.5">
+                        <span>No.</span>
+                        {renderSortIcon("id")}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSort("order_number")}
+                      className="sticky top-0 z-30 py-2.5 px-2 w-28 min-w-[100px] max-w-[125px] whitespace-nowrap bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors orders-th"
+                      title="Click to sort by Order ID & Date"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>Order ID</span>
+                        {renderSortIcon("order_number")}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSort("company_name")}
+                      className="sticky top-0 z-30 py-2.5 px-2 min-w-[130px] max-w-[170px] bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors orders-th"
+                      title="Click to sort by Client & Company"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>Client & Company</span>
+                        {renderSortIcon("company_name")}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSort("service")}
+                      className="sticky top-0 z-30 py-2.5 px-2.5 min-w-[180px] bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors orders-th"
+                      title="Click to sort by Service Scope"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>Service Scope</span>
+                        {renderSortIcon("service")}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSort("team")}
+                      className="sticky top-0 z-30 py-2.5 px-2 w-36 min-w-[120px] max-w-[145px] bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors orders-th"
+                      title="Click to sort by Team & Notary"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>Team & Notary</span>
+                        {renderSortIcon("team")}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSort("status")}
+                      className="sticky top-0 z-30 py-2.5 px-2 w-60 min-w-[220px] max-w-[260px] text-center whitespace-nowrap bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors orders-th"
+                      title="Click to sort by Execution Stage"
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        <span>Execution Stage</span>
+                        {renderSortIcon("status")}
+                      </div>
+                    </th>
+                    <th className="sticky top-0 right-0 z-40 py-2.5 px-2 w-20 min-w-[75px] max-w-[85px] text-right whitespace-nowrap bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs border-l border-border/40 orders-th orders-col-actions">
+                      Actions
+                    </th>
+                  </tr>
+                  {showColumnFilters && (
+                    <tr className="bg-muted/15 dark:bg-zinc-900/60 border-b border-border/50 dark:border-zinc-800 text-xs orders-filter-row">
+                      {/* 1. No. */}
+                      <th className="py-1.5 px-1 text-center align-middle">
+                        {activeColFilterCount > 0 ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleClearAllFilters}
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 mx-auto orders-action-btn is-delete"
+                            title="Reset all column filters"
                           >
-                            <td className={cn(
-                              "py-2 px-1.5 text-center font-mono align-top pt-2.5 transition-colors text-xs orders-text-secondary w-8 min-w-[30px] max-w-[36px]",
-                              isHighlighted
-                                ? "border-l-4 border-l-emerald-500 border-y-2 border-emerald-500 font-bold text-emerald-900 dark:text-emerald-200 shadow-[inset_4px_0_0_0_#10b981,inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
-                                : "font-medium text-muted-foreground"
-                            )}>
-                              #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + idx))}
-                            </td>
-                            <td className={cn(
-                              "py-2 px-2 align-top pt-2.5 whitespace-nowrap w-28 min-w-[100px] max-w-[125px]",
-                              isHighlighted && "border-y-2 border-emerald-500 shadow-[inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
-                            )}>
-                              {ord.company_id ? (
-                                <Link
-                                  href={`/business/clients/documents/${ord.company_id}?order=${ord.order_number}&from=assigned-orders&tab=${activeTab}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setHighlightedOrderNum(ord.order_number);
-                                    if (typeof window !== "undefined") {
-                                      sessionStorage.setItem("assigned_orders_highlighted_order", ord.order_number);
-                                    }
-                                  }}
-                                >
-                                  <Badge
-                                    variant="outline"
-                                    className="font-mono font-medium text-xs orders-badge-neutral cursor-pointer transition-colors px-1.5 py-0.5 rounded"
-                                    title="Navigate to Company Documents Folder for this Order"
-                                  >
-                                    {ord.order_number}
-                                  </Badge>
-                                </Link>
-                              ) : (
-                                <Badge variant="outline" className="font-mono font-medium text-xs orders-badge-neutral px-1.5 py-0.5 rounded">
-                                  {ord.order_number}
-                                </Badge>
-                              )}
-                              <div className="text-[11px] font-mono text-muted-foreground orders-text-secondary mt-1 flex items-center gap-1">
-                                <Clock className="h-3 w-3 shrink-0 opacity-70" />
-                                <span>{formatDate(ord.created_at)}</span>
-                              </div>
-                            </td>
-                            <td className={cn(
-                              "py-2 px-2 text-muted-foreground space-y-0.5 align-top pt-2.5 min-w-[120px] max-w-[160px]",
-                              isHighlighted && "border-y-2 border-emerald-500 shadow-[inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
-                            )}>
-                              <div className="flex items-center gap-1 flex-wrap">
-                                <span className="text-foreground orders-text-primary font-semibold text-xs leading-snug break-words">{ord.company_name || "Personal Client"}</span>
-                                {(() => {
-                                  const vStatus = ord.company?.validation_status;
-                                  if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
-                                    return (
-                                      <Badge variant="outline" className="text-[8.5px] font-medium px-1 py-0 orders-badge-warning flex items-center gap-0.5" title="Company pending admin validation">
-                                        <Clock className="h-2 w-2" /> Pending
-                                      </Badge>
-                                    );
-                                  }
-                                  if (vStatus === "NEEDS_REVISION") {
-                                    return (
-                                      <Badge variant="outline" className="text-[8.5px] font-medium px-1 py-0 orders-badge-danger flex items-center gap-0.5" title="Company needs revision">
-                                        <AlertCircle className="h-2 w-2" /> Revision
-                                      </Badge>
-                                    );
-                                  }
-                                  return null;
-                                })()}
-                              </div>
-                              <div className="text-[11px] text-muted-foreground orders-text-secondary flex items-center gap-1 mt-0.5 truncate">
-                                <Building className="h-3 w-3 shrink-0" />
-                                <span className="truncate">{ord.client_name || "Representative"}</span>
-                              </div>
-                            </td>
-                            <td className={cn(
-                              "py-2 px-2.5 text-muted-foreground align-top pt-2.5 min-w-[180px]",
-                              isHighlighted && "border-y-2 border-emerald-500 shadow-[inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
-                            )}>
-                              {ord.items && ord.items.length > 0 ? (
-                                <div className="space-y-1.5 w-full my-0.5">
-                                  {ord.items.map((item: any, idx: number) => {
-                                    const itemKey = `${ord.order_number}-${idx}`;
-                                    const isExpanded = !!expandedItems[itemKey];
-                                    return (
-                                      <div
-                                        key={idx}
-                                        className="p-1.5 rounded-md orders-service-card space-y-1 transition-all duration-200"
-                                      >
-                                        <div className="flex flex-wrap items-center gap-1">
-                                          <span className="font-medium text-foreground orders-text-primary text-xs leading-tight break-words">
-                                            {item.job_title}
-                                          </span>
-                                          {item.job_id && (
-                                            <Badge variant="outline" className="text-[8.5px] font-mono py-0 px-1 orders-badge-info shrink-0">
-                                              {item.job_id}
-                                            </Badge>
-                                          )}
-                                          {item.pricing_tier && (
-                                            <Badge variant="secondary" className="text-[8.5px] py-0 px-1 font-medium orders-badge-neutral capitalize shrink-0">
-                                              {item.pricing_tier.toLowerCase().replace('_', ' ')}
-                                            </Badge>
-                                          )}
-                                          {renderVendorBadge(item)}
-                                        </div>
-                                        {item.description && (
-                                          <div className="space-y-0.5">
-                                            {isExpanded && (
-                                              <div className="text-[10px] text-muted-foreground orders-text-secondary leading-relaxed whitespace-pre-wrap transition-all duration-200 mt-0.5 border-l-2 border-border pl-1.5 py-0.5">
-                                                {item.description}
-                                              </div>
-                                            )}
-                                            <button
-                                              type="button"
-                                              onClick={() => toggleItemExpansion(itemKey)}
-                                              className="text-[9px] text-primary hover:text-primary/80 font-semibold hover:underline block"
-                                            >
-                                              {isExpanded ? "Hide details" : "Show details"}
-                                            </button>
-                                          </div>
-                                        )}
-
-                                        {item.service_instructions && (
-                                          <div className="mt-1 p-1.5 rounded bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-0.5">
-                                            <div className="flex items-center gap-1 font-semibold text-[9.5px] text-amber-700 dark:text-amber-400">
-                                              <FileText className="h-2.5 w-2.5 shrink-0" />
-                                              <span>Instructions:</span>
-                                            </div>
-                                            <p className="text-[10px] font-medium leading-relaxed whitespace-pre-wrap text-foreground/90">
-                                              {item.service_instructions}
-                                            </p>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground italic text-xs">-</span>
-                              )}
-                            </td>
-                            <td className={cn(
-                              "py-2 px-2 align-top pt-2.5 w-36 min-w-[120px] max-w-[145px]",
-                              isHighlighted && "border-y-2 border-emerald-500 shadow-[inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
-                            )}>
-                              <div className="flex flex-col items-start gap-1 w-full">
-                                {ord.consultants && ord.consultants.length > 0 ? (
-                                  ord.consultants.map((c: any) => (
-                                    <Badge
-                                      key={c.id}
-                                      variant="outline"
-                                      className="text-[9px] orders-badge-neutral font-medium flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none"
-                                      title={`Assigned Consultant: ${c.name}`}
-                                    >
-                                      <UserCheck className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
-                                      <span className="truncate">{c.name}</span>
-                                    </Badge>
-                                  ))
-                                ) : (
-                                  <span className="text-muted-foreground italic text-[10px]">Unassigned</span>
-                                )}
-                                {(() => {
-                                  const revs = ord.reviewers && ord.reviewers.length > 0 ? ord.reviewers : (ord.reviewer ? [ord.reviewer] : []);
-                                  return revs.map((r: any) => (
-                                    <Badge
-                                      key={r.id}
-                                      variant="outline"
-                                      className="text-[9px] orders-badge-purple font-medium flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none"
-                                      title={`Designated Reviewer: ${r.name}`}
-                                    >
-                                      <ShieldCheck className="h-2.5 w-2.5 text-purple-600 dark:text-purple-400 shrink-0" />
-                                      <span className="truncate">Rev: {r.name}</span>
-                                    </Badge>
-                                  ));
-                                })()}
-                                {ord.notaries && ord.notaries.length > 0 && (
-                                  ord.notaries.map((notary: any) => (
-                                    <Badge
-                                      key={notary.id}
-                                      variant="outline"
-                                      className="text-[9px] orders-badge-indigo font-medium flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none"
-                                      title={`Assigned Notary: ${notary.name}`}
-                                    >
-                                      <Scale className="h-2.5 w-2.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                                      <span className="truncate">Notary: {notary.name}</span>
-                                    </Badge>
-                                  ))
-                                )}
-                              </div>
-                            </td>
-                            <td className={cn(
-                              "py-2 px-2 text-center align-top pt-2.5 w-60 min-w-[220px] max-w-[260px]",
-                              isHighlighted && "border-y-2 border-emerald-500 shadow-[inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
-                            )}>
-                              {checkIsEnquiry(ord) ? (
-                                <div onClick={(e) => e.stopPropagation()} className="w-full">
-                                  <Select
-                                    value={["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED"].includes((ord.status || "").toUpperCase()) ? ord.status.toUpperCase() : "UNDER_INITIAL_CHECK"}
-                                    disabled={savingStatus}
-                                    onValueChange={(val) => handleUpdateStatus(ord, val)}
-                                  >
-                                    <SelectTrigger className={cn("h-8 w-full text-xs font-semibold rounded-md shadow-xs transition-colors cursor-pointer justify-between", getOrderStatusTriggerStyles(ord.status))}>
-                                      <div className="flex items-center gap-1.5 truncate">
-                                        <span className={cn("h-2 w-2 rounded-full shrink-0", getOrderStatusDot(ord.status))} />
-                                        <span className="truncate">{getStatusDisplayLabel(ord.status)}</span>
-                                      </div>
-                                    </SelectTrigger>
-                                    <SelectContent align="center" className="min-w-[220px] bg-card dark:bg-[#16191F] border border-zinc-300 dark:border-white/20 shadow-xl z-50">
-                                      <SelectItem value="UNDER_INITIAL_CHECK" className="text-xs cursor-pointer">
-                                        <span className="flex items-center gap-2">
-                                          <span className="h-2 w-2 rounded-full bg-zinc-400 shrink-0" />
-                                          Under Initial Check
-                                        </span>
-                                      </SelectItem>
-                                      <SelectItem value="NEED_MORE_INFO" className="text-xs cursor-pointer">
-                                        <span className="flex items-center gap-2">
-                                          <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
-                                          Need More Info
-                                        </span>
-                                      </SelectItem>
-                                      <SelectItem value="CHECK_COMPLETED" className="text-xs cursor-pointer">
-                                        <span className="flex items-center gap-2">
-                                          <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-                                          Initial Check Passed
-                                        </span>
-                                      </SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              ) : CONSULTANT_EDITABLE_STATUSES.includes((ord.status || "").toUpperCase()) ? (
-                                <div onClick={(e) => e.stopPropagation()} className="w-full">
-                                  <Select
-                                    value={ord.status}
-                                    disabled={savingStatus}
-                                    onValueChange={(val) => handleUpdateStatus(ord, val)}
-                                  >
-                                    <SelectTrigger className={cn("h-8 w-full text-xs font-semibold rounded-md shadow-xs transition-colors cursor-pointer justify-between", getOrderStatusTriggerStyles(ord.status))}>
-                                      <div className="flex items-center gap-1.5 truncate">
-                                        <span className={cn("h-2 w-2 rounded-full shrink-0", getOrderStatusDot(ord.status))} />
-                                        <span className="truncate">{getStatusDisplayLabel(ord.status)}</span>
-                                      </div>
-                                    </SelectTrigger>
-                                    <SelectContent align="center" className="min-w-[230px] max-h-64 bg-card dark:bg-[#16191F] border border-zinc-300 dark:border-white/20 shadow-xl z-50">
-                                      <SelectItem value="ORDER_ASSIGNED" className="text-xs cursor-pointer">
-                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Order Assigned</span>
-                                      </SelectItem>
-                                      <SelectItem value="IN_PROGRESS" className="text-xs cursor-pointer">
-                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />In Progress</span>
-                                      </SelectItem>
-                                      <SelectItem value="REVIEW_DOCS" className="text-xs cursor-pointer">
-                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Review Docs</span>
-                                      </SelectItem>
-                                      <SelectItem value="DOCUMENTS_REVIEWED" className="text-xs cursor-pointer">
-                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Documents Reviewed</span>
-                                      </SelectItem>
-                                      <SelectItem value="PRE_DOC_SENT_FOR_SIGNATURE" className="text-xs cursor-pointer">
-                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />Pre Doc Sent for Signature</span>
-                                      </SelectItem>
-                                      <SelectItem value="AWAITING_SIGNING_NOTARIZATION" className="text-xs cursor-pointer">
-                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Signing / Notarization</span>
-                                      </SelectItem>
-                                      <SelectItem value="AWAITING_DOCUMENT_RETURN" className="text-xs cursor-pointer">
-                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Document Return</span>
-                                      </SelectItem>
-                                      <SelectItem value="AWAITING_THIRD_PARTY_RESPONSE" className="text-xs cursor-pointer">
-                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Third-Party Response</span>
-                                      </SelectItem>
-                                      <SelectItem value="FINAL_DOCUMENT_PREPARATION" className="text-xs cursor-pointer">
-                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Final Document Preparation</span>
-                                      </SelectItem>
-                                      <SelectItem value="FINAL_DOC_READY" className="text-xs cursor-pointer">
-                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />Final Doc Ready</span>
-                                      </SelectItem>
-                                      <SelectItem value="ON_HOLD" className="text-xs cursor-pointer">
-                                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />On Hold</span>
-                                      </SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              ) : ord.status === "COMPLETED" ? (
-                                <Badge variant="outline" className={cn("text-xs font-semibold py-1 px-2.5 whitespace-nowrap inline-flex items-center justify-center gap-1.5 mx-auto rounded font-sans", getOrderStatusTriggerStyles(ord.status))}>
-                                  <Lock className="h-3 w-3 shrink-0" />
-                                  Completed
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className={cn("text-xs font-semibold py-1 px-2.5 whitespace-nowrap inline-flex items-center justify-center gap-1.5 mx-auto rounded font-sans", getOrderStatusTriggerStyles(ord.status))}>
-                                  <span className={cn("h-2 w-2 rounded-full shrink-0", getOrderStatusDot(ord.status))} />
-                                  {getStatusDisplayLabel(ord.status)}
-                                </Badge>
-                              )}
-                            </td>
-                            <td className={cn(
-                              "py-2 px-2 text-right align-top pt-2.5 whitespace-nowrap orders-col-actions w-20 min-w-[75px] max-w-[85px]",
-                              isHighlighted && "border-r-2 border-r-emerald-500 border-y-2 border-emerald-500 shadow-[inset_-2px_0_0_0_#10b981,inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
-                            )}>
-                              <div className="flex items-center justify-end">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-6 px-1.5 text-[9.5px] font-semibold gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/40 shadow-none inline-flex items-center rounded"
-                                  title="Order Chat"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedGroup(ord);
-                                    setIsChatOpen(true);
-                                    fetchProgressUpdates(ord.order_number);
-                                  }}
-                                >
-                                  <MessageSquare className="h-3 w-3" /> Chat
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Mobile Card View (< md) */}
-                <div className="block md:hidden divide-y divide-border/60">
-                  {paginatedOrders.map((ord, idx) => {
-                    const isHighlighted = highlightedOrderNum === ord.order_number;
-                    const isCompleted = ord.status === "COMPLETED";
-                    const canSelectStatus = CONSULTANT_EDITABLE_STATUSES.includes((ord.status || "").toUpperCase());
-
-                    return (
-                      <div
-                        key={ord.order_number}
-                        id={`mobile-order-card-${ord.order_number}`}
-                        onClick={() => {
-                          setHighlightedOrderNum(ord.order_number);
-                          if (typeof window !== "undefined") {
-                            sessionStorage.setItem("assigned_orders_highlighted_order", ord.order_number);
-                          }
-                        }}
-                        className={cn(
-                          "p-4 transition-all duration-200 space-y-3 cursor-pointer orders-row",
-                          isHighlighted
-                            ? "is-highlighted bg-emerald-500/10 dark:bg-emerald-500/15 border-l-4 border-l-emerald-500 border-y border-r border-emerald-500/40 shadow-sm"
-                            : "hover:bg-muted/30"
+                            <X className="h-3 w-3" />
+                          </Button>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground/40 dark:text-zinc-600 font-mono orders-text-secondary">#</span>
                         )}
-                      >
-                        {/* Top Header: Index, Order ID, Date */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs font-medium text-muted-foreground orders-text-secondary">
-                              #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + idx))}
-                            </span>
+                      </th>
+                      {/* 2. Order ID */}
+                      <th className="py-1.5 px-1.5">
+                        <Input
+                          placeholder="ID / date..."
+                          value={colFilterOrderId}
+                          onChange={(e) => setColFilterOrderId(e.target.value)}
+                          className="h-7 text-[11px] px-1.5 rounded-md bg-background/80 dark:bg-zinc-900 border-border/60 dark:border-zinc-700/60 font-mono text-foreground dark:text-zinc-100 placeholder:text-muted-foreground/50 dark:placeholder:text-zinc-500 w-full orders-control"
+                        />
+                      </th>
+                      {/* 3. Client & Company */}
+                      <th className="py-1.5 px-1.5">
+                        <Input
+                          placeholder="Company / client..."
+                          value={colFilterCompany}
+                          onChange={(e) => setColFilterCompany(e.target.value)}
+                          className="h-7 text-[11px] px-2 rounded-md bg-background/80 dark:bg-zinc-900 border-border/60 dark:border-zinc-700/60 text-foreground dark:text-zinc-100 placeholder:text-muted-foreground/50 dark:placeholder:text-zinc-500 w-full orders-control"
+                        />
+                      </th>
+                      {/* 4. Service Scope */}
+                      <th className="py-1.5 px-1.5">
+                        <Input
+                          placeholder="Service / code..."
+                          value={colFilterService}
+                          onChange={(e) => setColFilterService(e.target.value)}
+                          className="h-7 text-[11px] px-2 rounded-md bg-background/80 dark:bg-zinc-900 border-border/60 dark:border-zinc-700/60 text-foreground dark:text-zinc-100 placeholder:text-muted-foreground/50 dark:placeholder:text-zinc-500 w-full orders-control"
+                        />
+                      </th>
+                      {/* 5. Team & Notary */}
+                      <th className="py-1.5 px-1.5">
+                        <Input
+                          placeholder="Team / notary / reviewer..."
+                          value={colFilterTeam}
+                          onChange={(e) => setColFilterTeam(e.target.value)}
+                          className="h-7 text-[11px] px-2 rounded-md bg-background/80 dark:bg-zinc-900 border-border/60 dark:border-zinc-700/60 text-foreground dark:text-zinc-100 placeholder:text-muted-foreground/50 dark:placeholder:text-zinc-500 w-full orders-control"
+                        />
+                      </th>
+                      {/* 6. Execution Stage */}
+                      <th className="py-1.5 px-1.5 min-w-[220px] max-w-[260px]">
+                        <select
+                          value={colFilterStage}
+                          onChange={(e) => setColFilterStage(e.target.value)}
+                          className="h-7 w-full text-[11px] px-1 rounded-md bg-background/80 dark:bg-zinc-900 border border-border/60 dark:border-zinc-700/60 font-bold text-foreground dark:text-zinc-200 truncate orders-control"
+                        >
+                          <option value="ALL">All Stages</option>
+                          <option value="ORDER_ASSIGNED">ORDER ASSIGNED</option>
+                          <option value="IN_PROGRESS">IN PROGRESS</option>
+                          <option value="REVIEW_DOCS">REVIEW DOCS</option>
+                          <option value="DOCUMENTS_REVIEWED">DOCUMENTS REVIEWED</option>
+                          <option value="PRE_DOC_SENT_FOR_SIGNATURE">PRE DOC SENT FOR SIGNATURE</option>
+                          <option value="AWAITING_SIGNING_NOTARIZATION">AWAITING SIGNING / NOTARIZATION</option>
+                          <option value="AWAITING_DOCUMENT_RETURN">AWAITING DOCUMENT RETURN FROM CLIENT</option>
+                          <option value="AWAITING_THIRD_PARTY_RESPONSE">AWAITING THIRD-PARTY RESPONSE (VENDOR)</option>
+                          <option value="FINAL_DOCUMENT_PREPARATION">FINAL DOC PREP</option>
+                          <option value="FINAL_DOC_READY">FINAL DOC READY</option>
+                          <option value="WAITING_ON_CLIENT">WAITING ON CLIENT</option>
+                          <option value="WAITING_FOR_FINAL_PAYMENT">WAITING FINAL PAYMENT</option>
+                          <option value="COMPLETED">COMPLETED</option>
+                        </select>
+                      </th>
+                      {/* 7. Actions */}
+                      <th className="py-1.5 px-2 text-right"></th>
+                    </tr>
+                  )}
+                </thead>
+                <tbody className="divide-y divide-border/30">
+                  {paginatedOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-14 text-center text-muted-foreground">
+                        <div className="flex flex-col items-center justify-center gap-2.5">
+                          <ShoppingCart className="h-10 w-10 text-muted-foreground/30 stroke-[1.5]" />
+                          <span className="text-sm font-semibold text-foreground/80">
+                            {searchTerm || activeColFilterCount > 0
+                              ? "No Matching Orders Found"
+                              : activeTab === "ALL"
+                                ? "No Active Assigned Orders"
+                                : activeTab === "INQUIRY"
+                                  ? "No Inquiry Orders Found"
+                                  : activeTab === "ASSIGNED"
+                                    ? "No Newly Assigned Orders"
+                                    : activeTab === "IN_PROGRESS"
+                                      ? "No In-Progress Orders"
+                                      : activeTab === "REVIEW_ORDER"
+                                        ? "No Review Orders"
+                                        : activeTab === "ON_HOLD"
+                                          ? "No On-Hold Orders"
+                                          : "No Completed Orders"}
+                          </span>
+                          <p className="text-xs max-w-sm text-muted-foreground">
+                            {searchTerm || activeColFilterCount > 0
+                              ? "No orders match the specified filter or search criteria. You can clear your filters above."
+                              : activeTab === "ALL"
+                                ? "There are currently no active orders assigned to you."
+                                : activeTab === "INQUIRY"
+                                  ? "There are currently no inquiry pre-orders allocated to you for initial check."
+                                  : activeTab === "ASSIGNED"
+                                    ? "There are currently no new unstarted orders waiting in the assigned queue."
+                                    : activeTab === "IN_PROGRESS"
+                                      ? "There are currently no orders in active progress in your queue."
+                                      : activeTab === "REVIEW_ORDER"
+                                        ? "There are currently no active orders allocated to you for continuous lifecycle review."
+                                        : activeTab === "ON_HOLD"
+                                          ? "There are currently no paused orders placed on hold."
+                                          : "There are currently no completed orders in your archive."}
+                          </p>
+                          {(searchTerm || activeColFilterCount > 0) && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={handleClearAllFilters}
+                              className="mt-1 text-xs font-semibold h-8 px-3"
+                            >
+                              Clear Filters
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedOrders.map((ord, idx) => {
+                      const isHighlighted = highlightedOrderNum === ord.order_number;
+                      return (
+                        <tr
+                          key={ord.order_number}
+                          id={`order-row-${ord.order_number}`}
+                          onClick={() => {
+                            setHighlightedOrderNum(ord.order_number);
+                            if (typeof window !== "undefined") {
+                              sessionStorage.setItem("assigned_orders_highlighted_order", ord.order_number);
+                            }
+                          }}
+                          className={cn(
+                            "transition-colors duration-150 cursor-pointer orders-row",
+                            isHighlighted
+                              ? "is-highlighted bg-emerald-500/10 dark:bg-emerald-950/40"
+                              : "hover:bg-muted/40 dark:hover:bg-zinc-800/30"
+                          )}
+                        >
+                          <td className={cn(
+                            "py-2 px-1.5 text-center font-mono align-top pt-2.5 transition-colors text-xs orders-text-secondary w-8 min-w-[30px] max-w-[36px]",
+                            isHighlighted
+                              ? "border-l-4 border-l-emerald-500 border-y-2 border-emerald-500 font-bold text-emerald-900 dark:text-emerald-200 shadow-[inset_4px_0_0_0_#10b981,inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
+                              : "font-medium text-muted-foreground"
+                          )}>
+                            #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (sortedOrders.length - (startIndex + idx))}
+                          </td>
+                          <td className={cn(
+                            "py-2 px-2 align-top pt-2.5 whitespace-nowrap w-28 min-w-[100px] max-w-[125px]",
+                            isHighlighted && "border-y-2 border-emerald-500 shadow-[inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
+                          )}>
                             {ord.company_id ? (
                               <Link
                                 href={`/business/clients/documents/${ord.company_id}?order=${ord.order_number}&from=assigned-orders&tab=${activeTab}`}
@@ -2183,308 +2304,669 @@ export default function AssignedOrdersPage() {
                               >
                                 <Badge
                                   variant="outline"
-                                  className="font-mono font-medium text-xs orders-badge-neutral cursor-pointer transition-colors px-2 py-0.5 rounded"
+                                  className="font-mono font-medium text-xs orders-badge-neutral cursor-pointer transition-colors px-1.5 py-0.5 rounded"
+                                  title="Navigate to Company Documents Folder for this Order"
                                 >
                                   {ord.order_number}
                                 </Badge>
                               </Link>
                             ) : (
-                              <Badge variant="outline" className="font-mono font-medium text-xs orders-badge-neutral px-2 py-0.5 rounded">
+                              <Badge variant="outline" className="font-mono font-medium text-xs orders-badge-neutral px-1.5 py-0.5 rounded">
                                 {ord.order_number}
                               </Badge>
                             )}
-                          </div>
-                          <span className="text-xs font-mono text-muted-foreground orders-text-secondary flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {formatDate(ord.created_at)}
-                          </span>
-                        </div>
-
-                        {/* Client & Company */}
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-foreground orders-text-primary font-semibold text-sm">{ord.company_name || "Personal Client"}</span>
-                            {(() => {
-                              const vStatus = ord.company?.validation_status;
-                              if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
-                                return (
-                                  <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0 orders-badge-warning flex items-center gap-0.5">
-                                    <Clock className="h-2.5 w-2.5" /> Pending Company
-                                  </Badge>
-                                );
-                              }
-                              if (vStatus === "NEEDS_REVISION") {
-                                return (
-                                  <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0 orders-badge-danger flex items-center gap-0.5">
-                                    <AlertCircle className="h-2.5 w-2.5" /> Revision Required
-                                  </Badge>
-                                );
-                              }
-                              return null;
-                            })()}
-                          </div>
-                          <div className="text-xs text-muted-foreground orders-text-secondary flex items-center gap-1.5">
-                            <Building className="h-3.5 w-3.5 shrink-0" />
-                            <span>{ord.client_name || "Representative"}</span>
-                          </div>
-                        </div>
-
-                        {/* Deliverables / Scope */}
-                        {ord.items && ord.items.length > 0 && (
-                          <div className="space-y-2 orders-service-card rounded-xl p-2.5">
-                            <div className="text-xs font-medium text-muted-foreground orders-text-secondary flex items-center justify-between">
-                              <span>Deliverables ({ord.items.length})</span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedGroup(ord);
-                                  setIsViewOpen(true);
-                                }}
-                                className="text-primary hover:underline text-[11px] font-semibold"
-                              >
-                                View Scope
-                              </button>
+                            <div className="text-[11px] font-mono text-muted-foreground orders-text-secondary mt-1 flex items-center gap-1">
+                              <Clock className="h-3 w-3 shrink-0 opacity-70" />
+                              <span>{formatDate(ord.created_at)}</span>
                             </div>
-                            {ord.items.map((item: any, iIdx: number) => {
-                              const itemKey = `${ord.order_number}-${iIdx}`;
-                              const isExpanded = !!expandedItems[itemKey];
-                              return (
-                                <div key={iIdx} className="text-xs space-y-1">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-medium text-foreground orders-text-primary">{item.job_title}</span>
-                                    {item.job_id && (
-                                      <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 orders-badge-info">
-                                        {item.job_id}
-                                      </Badge>
-                                    )}
-                                    {renderVendorBadge(item)}
-                                  </div>
-                                  {item.description && (
-                                    <div>
-                                      {isExpanded && (
-                                        <p className="text-[11px] text-muted-foreground orders-text-secondary leading-relaxed whitespace-pre-wrap pl-2 border-l-2 border-border my-1">
-                                          {item.description}
-                                        </p>
+                          </td>
+                          <td className={cn(
+                            "py-2 px-2 text-muted-foreground space-y-0.5 align-top pt-2.5 min-w-[120px] max-w-[160px]",
+                            isHighlighted && "border-y-2 border-emerald-500 shadow-[inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
+                          )}>
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <span className="text-foreground orders-text-primary font-semibold text-xs leading-snug break-words">{ord.company_name || "Personal Client"}</span>
+                              {(() => {
+                                const vStatus = ord.company?.validation_status;
+                                if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
+                                  return (
+                                    <Badge variant="outline" className="text-[8.5px] font-medium px-1 py-0 orders-badge-warning flex items-center gap-0.5" title="Company pending admin validation">
+                                      <Clock className="h-2 w-2" /> Pending
+                                    </Badge>
+                                  );
+                                }
+                                if (vStatus === "NEEDS_REVISION") {
+                                  return (
+                                    <Badge variant="outline" className="text-[8.5px] font-medium px-1 py-0 orders-badge-danger flex items-center gap-0.5" title="Company needs revision">
+                                      <AlertCircle className="h-2 w-2" /> Revision
+                                    </Badge>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground orders-text-secondary flex items-center gap-1 mt-0.5 truncate">
+                              <Building className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{ord.client_name || "Representative"}</span>
+                            </div>
+                          </td>
+                          <td className={cn(
+                            "py-2 px-2.5 text-muted-foreground align-top pt-2.5 min-w-[180px]",
+                            isHighlighted && "border-y-2 border-emerald-500 shadow-[inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
+                          )}>
+                            {ord.items && ord.items.length > 0 ? (
+                              <div className="space-y-1.5 w-full my-0.5">
+                                {ord.items.map((item: any, idx: number) => {
+                                  const itemKey = `${ord.order_number}-${idx}`;
+                                  const isExpanded = !!expandedItems[itemKey];
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className="p-1.5 rounded-md orders-service-card space-y-1 transition-all duration-200"
+                                    >
+                                      <div className="flex flex-wrap items-center gap-1">
+                                        <span className="font-medium text-foreground orders-text-primary text-xs leading-tight break-words">
+                                          {item.job_title}
+                                        </span>
+                                        {item.job_id && (
+                                          <Badge variant="outline" className="text-[8.5px] font-mono py-0 px-1 orders-badge-info shrink-0">
+                                            {item.job_id}
+                                          </Badge>
+                                        )}
+                                        {item.pricing_tier && (
+                                          <Badge variant="secondary" className="text-[8.5px] py-0 px-1 font-medium orders-badge-neutral capitalize shrink-0">
+                                            {item.pricing_tier.toLowerCase().replace('_', ' ')}
+                                          </Badge>
+                                        )}
+                                        {renderVendorBadge(item)}
+                                      </div>
+                                      {item.description && (
+                                        <div className="space-y-0.5">
+                                          {isExpanded && (
+                                            <div className="text-[10px] text-muted-foreground orders-text-secondary leading-relaxed whitespace-pre-wrap transition-all duration-200 mt-0.5 border-l-2 border-border pl-1.5 py-0.5">
+                                              {item.description}
+                                            </div>
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleItemExpansion(itemKey)}
+                                            className="text-[9px] text-primary hover:text-primary/80 font-semibold hover:underline block"
+                                          >
+                                            {isExpanded ? "Hide details" : "Show details"}
+                                          </button>
+                                        </div>
                                       )}
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          toggleItemExpansion(itemKey);
-                                        }}
-                                        className="text-[10px] text-primary font-semibold hover:underline"
-                                      >
-                                        {isExpanded ? "Hide details" : "Show details"}
-                                      </button>
+
+                                      {item.service_instructions && (
+                                        <div className="mt-1 p-1.5 rounded bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 space-y-0.5">
+                                          <div className="flex items-center gap-1 font-semibold text-[9.5px] text-amber-700 dark:text-amber-400">
+                                            <FileText className="h-2.5 w-2.5 shrink-0" />
+                                            <span>Instructions:</span>
+                                          </div>
+                                          <p className="text-[10px] font-medium leading-relaxed whitespace-pre-wrap text-foreground/90">
+                                            {item.service_instructions}
+                                          </p>
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {/* Team Assignments */}
-                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                          {ord.consultants && ord.consultants.length > 0 ? (
-                            ord.consultants.map((c: any) => (
-                              <Badge
-                                key={c.id}
-                                variant="outline"
-                                className="text-[10px] orders-badge-neutral font-medium flex items-center gap-1 py-0.5 px-2"
-                              >
-                                <UserCheck className="h-3 w-3 text-emerald-600 shrink-0" />
-                                <span className="truncate">{c.first_name || c.name} {c.last_name || ""}</span>
-                              </Badge>
-                            ))
-                          ) : (
-                            <Badge variant="outline" className="text-[10px] orders-badge-neutral font-medium py-0.5 px-2">
-                              Unassigned
-                            </Badge>
-                          )}
-
-                          {(() => {
-                            const revList = ord.reviewers && ord.reviewers.length > 0
-                              ? ord.reviewers
-                              : ord.reviewer
-                                ? [ord.reviewer]
-                                : [];
-                            return revList.map((r: any) => (
-                              <Badge
-                                key={r.id || r.name}
-                                variant="outline"
-                                className="text-[10px] orders-badge-purple font-medium flex items-center gap-1 py-0.5 px-2"
-                              >
-                                <ShieldCheck className="h-3 w-3 text-purple-600 shrink-0" />
-                                <span className="truncate">Rev: {r.name}</span>
-                              </Badge>
-                            ));
-                          })()}
-
-                          {ord.notaries && ord.notaries.length > 0 && (
-                            ord.notaries.map((notary: any) => (
-                              <Badge
-                                key={notary.id}
-                                variant="outline"
-                                className="text-[10px] orders-badge-indigo font-medium flex items-center gap-1 py-0.5 px-2"
-                                title={`Assigned Notary: ${notary.name}`}
-                              >
-                                <Scale className="h-3 w-3 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                                <span className="truncate">Notary: {notary.name}</span>
-                              </Badge>
-                            ))
-                          )}
-                        </div>
-
-                        {/* Bottom Actions Row: Status Selector & Chat Button */}
-                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/50">
-                          <div className="flex-1 max-w-[210px]" onClick={(e) => e.stopPropagation()}>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground italic text-xs">-</span>
+                            )}
+                          </td>
+                          <td className={cn(
+                            "py-2 px-2 align-top pt-2.5 w-36 min-w-[120px] max-w-[145px]",
+                            isHighlighted && "border-y-2 border-emerald-500 shadow-[inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
+                          )}>
+                            <div className="flex flex-col items-start gap-1 w-full">
+                              {ord.consultants && ord.consultants.length > 0 ? (
+                                ord.consultants.map((c: any) => (
+                                  <Badge
+                                    key={c.id}
+                                    variant="outline"
+                                    className="text-[9px] orders-badge-neutral font-medium flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none"
+                                    title={`Assigned Consultant: ${c.name}`}
+                                  >
+                                    <UserCheck className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
+                                    <span className="truncate">{c.name}</span>
+                                  </Badge>
+                                ))
+                              ) : (
+                                <span className="text-muted-foreground italic text-[10px]">Unassigned</span>
+                              )}
+                              {(() => {
+                                const revs = ord.reviewers && ord.reviewers.length > 0 ? ord.reviewers : (ord.reviewer ? [ord.reviewer] : []);
+                                return revs.map((r: any) => (
+                                  <Badge
+                                    key={r.id}
+                                    variant="outline"
+                                    className="text-[9px] orders-badge-purple font-medium flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none"
+                                    title={`Designated Reviewer: ${r.name}`}
+                                  >
+                                    <ShieldCheck className="h-2.5 w-2.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                                    <span className="truncate">Rev: {r.name}</span>
+                                  </Badge>
+                                ));
+                              })()}
+                              {ord.notaries && ord.notaries.length > 0 && (
+                                ord.notaries.map((notary: any) => (
+                                  <Badge
+                                    key={notary.id}
+                                    variant="outline"
+                                    className="text-[9px] orders-badge-indigo font-medium flex items-center gap-1 py-0.5 px-1.5 max-w-full truncate shadow-none"
+                                    title={`Assigned Notary: ${notary.name}`}
+                                  >
+                                    <Scale className="h-2.5 w-2.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                    <span className="truncate">Notary: {notary.name}</span>
+                                  </Badge>
+                                ))
+                              )}
+                            </div>
+                          </td>
+                          <td className={cn(
+                            "py-2 px-2 text-center align-top pt-2.5 w-60 min-w-[220px] max-w-[260px]",
+                            isHighlighted && "border-y-2 border-emerald-500 shadow-[inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
+                          )}>
                             {checkIsEnquiry(ord) ? (
-                              <Select
-                                value={["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED"].includes((ord.status || "").toUpperCase()) ? ord.status.toUpperCase() : "UNDER_INITIAL_CHECK"}
-                                disabled={savingStatus}
-                                onValueChange={(val) => handleUpdateStatus(ord, val)}
-                              >
-                                <SelectTrigger className={cn("h-8 w-full text-xs font-semibold rounded-md shadow-xs transition-colors cursor-pointer justify-between", getOrderStatusTriggerStyles(ord.status))}>
-                                  <div className="flex items-center gap-1.5 truncate">
-                                    <span className={cn("h-2 w-2 rounded-full shrink-0", getOrderStatusDot(ord.status))} />
-                                    <span className="truncate">{getStatusDisplayLabel(ord.status)}</span>
-                                  </div>
-                                </SelectTrigger>
-                                <SelectContent align="start" className="min-w-[210px] bg-card dark:bg-[#16191F] border border-zinc-300 dark:border-white/20 shadow-xl z-50">
-                                  <SelectItem value="UNDER_INITIAL_CHECK" className="text-xs cursor-pointer">
-                                    <span className="flex items-center gap-2">
-                                      <span className="h-2 w-2 rounded-full bg-zinc-400 shrink-0" />
-                                      Under Initial Check
-                                    </span>
-                                  </SelectItem>
-                                  <SelectItem value="NEED_MORE_INFO" className="text-xs cursor-pointer">
-                                    <span className="flex items-center gap-2">
-                                      <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
-                                      Need More Info
-                                    </span>
-                                  </SelectItem>
-                                  <SelectItem value="CHECK_COMPLETED" className="text-xs cursor-pointer">
-                                    <span className="flex items-center gap-2">
-                                      <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-                                      Initial Check Passed
-                                    </span>
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : canSelectStatus ? (
-                              <Select
-                                value={ord.status}
-                                disabled={savingStatus}
-                                onValueChange={(val) => handleUpdateStatus(ord, val)}
-                              >
-                                <SelectTrigger className={cn("h-8 w-full text-xs font-semibold rounded-md shadow-xs transition-colors cursor-pointer justify-between", getOrderStatusTriggerStyles(ord.status))}>
-                                  <div className="flex items-center gap-1.5 truncate">
-                                    <span className={cn("h-2 w-2 rounded-full shrink-0", getOrderStatusDot(ord.status))} />
-                                    <span className="truncate">{getStatusDisplayLabel(ord.status)}</span>
-                                  </div>
-                                </SelectTrigger>
-                                <SelectContent align="start" className="min-w-[220px] max-h-64 bg-card dark:bg-[#16191F] border border-zinc-300 dark:border-white/20 shadow-xl z-50">
-                                  <SelectItem value="ORDER_ASSIGNED" className="text-xs cursor-pointer">
-                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Order Assigned</span>
-                                  </SelectItem>
-                                  <SelectItem value="IN_PROGRESS" className="text-xs cursor-pointer">
-                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />In Progress</span>
-                                  </SelectItem>
-                                  <SelectItem value="REVIEW_DOCS" className="text-xs cursor-pointer">
-                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Review Docs</span>
-                                  </SelectItem>
-                                  <SelectItem value="DOCUMENTS_REVIEWED" className="text-xs cursor-pointer">
-                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Documents Reviewed</span>
-                                  </SelectItem>
-                                  <SelectItem value="PRE_DOC_SENT_FOR_SIGNATURE" className="text-xs cursor-pointer">
-                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />Pre Doc Sent for Signature</span>
-                                  </SelectItem>
-                                  <SelectItem value="AWAITING_SIGNING_NOTARIZATION" className="text-xs cursor-pointer">
-                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Signing / Notarization</span>
-                                  </SelectItem>
-                                  <SelectItem value="AWAITING_DOCUMENT_RETURN" className="text-xs cursor-pointer">
-                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Document Return</span>
-                                  </SelectItem>
-                                  <SelectItem value="AWAITING_THIRD_PARTY_RESPONSE" className="text-xs cursor-pointer">
-                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Third-Party Response</span>
-                                  </SelectItem>
-                                  <SelectItem value="FINAL_DOCUMENT_PREPARATION" className="text-xs cursor-pointer">
-                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Final Document Preparation</span>
-                                  </SelectItem>
-                                  <SelectItem value="FINAL_DOC_READY" className="text-xs cursor-pointer">
-                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />Final Doc Ready</span>
-                                  </SelectItem>
-                                  <SelectItem value="ON_HOLD" className="text-xs cursor-pointer">
-                                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />On Hold</span>
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : isCompleted ? (
-                              <Badge variant="outline" className={cn("text-xs font-semibold py-1 px-2.5 whitespace-nowrap inline-flex items-center gap-1.5 rounded font-sans", getOrderStatusTriggerStyles(ord.status))}>
+                              <div onClick={(e) => e.stopPropagation()} className="w-full">
+                                <Select
+                                  value={["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED"].includes((ord.status || "").toUpperCase()) ? ord.status.toUpperCase() : "UNDER_INITIAL_CHECK"}
+                                  disabled={savingStatus}
+                                  onValueChange={(val) => handleUpdateStatus(ord, val)}
+                                >
+                                  <SelectTrigger className={cn("h-8 w-full text-xs font-semibold rounded-md shadow-xs transition-colors cursor-pointer justify-between", getOrderStatusTriggerStyles(ord.status))}>
+                                    <div className="flex items-center gap-1.5 truncate">
+                                      <span className={cn("h-2 w-2 rounded-full shrink-0", getOrderStatusDot(ord.status))} />
+                                      <span className="truncate">{getStatusDisplayLabel(ord.status)}</span>
+                                    </div>
+                                  </SelectTrigger>
+                                  <SelectContent align="center" className="min-w-[220px] bg-card dark:bg-[#16191F] border border-zinc-300 dark:border-white/20 shadow-xl z-50">
+                                    <SelectItem value="UNDER_INITIAL_CHECK" className="text-xs cursor-pointer">
+                                      <span className="flex items-center gap-2">
+                                        <span className="h-2 w-2 rounded-full bg-zinc-400 shrink-0" />
+                                        Under Initial Check
+                                      </span>
+                                    </SelectItem>
+                                    <SelectItem value="NEED_MORE_INFO" className="text-xs cursor-pointer">
+                                      <span className="flex items-center gap-2">
+                                        <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
+                                        Need More Info
+                                      </span>
+                                    </SelectItem>
+                                    <SelectItem value="CHECK_COMPLETED" className="text-xs cursor-pointer">
+                                      <span className="flex items-center gap-2">
+                                        <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                                        Initial Check Passed
+                                      </span>
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            ) : CONSULTANT_EDITABLE_STATUSES.includes((ord.status || "").toUpperCase()) ? (
+                              <div onClick={(e) => e.stopPropagation()} className="w-full">
+                                <Select
+                                  value={ord.status}
+                                  disabled={savingStatus}
+                                  onValueChange={(val) => handleUpdateStatus(ord, val)}
+                                >
+                                  <SelectTrigger className={cn("h-8 w-full text-xs font-semibold rounded-md shadow-xs transition-colors cursor-pointer justify-between", getOrderStatusTriggerStyles(ord.status))}>
+                                    <div className="flex items-center gap-1.5 truncate">
+                                      <span className={cn("h-2 w-2 rounded-full shrink-0", getOrderStatusDot(ord.status))} />
+                                      <span className="truncate">{getStatusDisplayLabel(ord.status)}</span>
+                                    </div>
+                                  </SelectTrigger>
+                                  <SelectContent align="center" className="min-w-[230px] max-h-64 bg-card dark:bg-[#16191F] border border-zinc-300 dark:border-white/20 shadow-xl z-50">
+                                    <SelectItem value="ORDER_ASSIGNED" className="text-xs cursor-pointer">
+                                      <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Order Assigned</span>
+                                    </SelectItem>
+                                    <SelectItem value="IN_PROGRESS" className="text-xs cursor-pointer">
+                                      <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />In Progress</span>
+                                    </SelectItem>
+                                    <SelectItem value="REVIEW_DOCS" className="text-xs cursor-pointer">
+                                      <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Review Docs</span>
+                                    </SelectItem>
+                                    <SelectItem value="DOCUMENTS_REVIEWED" className="text-xs cursor-pointer">
+                                      <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Documents Reviewed</span>
+                                    </SelectItem>
+                                    <SelectItem value="PRE_DOC_SENT_FOR_SIGNATURE" className="text-xs cursor-pointer">
+                                      <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />Pre Doc Sent for Signature</span>
+                                    </SelectItem>
+                                    <SelectItem value="AWAITING_SIGNING_NOTARIZATION" className="text-xs cursor-pointer">
+                                      <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Signing / Notarization</span>
+                                    </SelectItem>
+                                    <SelectItem value="AWAITING_DOCUMENT_RETURN" className="text-xs cursor-pointer">
+                                      <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Document Return</span>
+                                    </SelectItem>
+                                    <SelectItem value="AWAITING_THIRD_PARTY_RESPONSE" className="text-xs cursor-pointer">
+                                      <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Third-Party Response</span>
+                                    </SelectItem>
+                                    <SelectItem value="FINAL_DOCUMENT_PREPARATION" className="text-xs cursor-pointer">
+                                      <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Final Document Preparation</span>
+                                    </SelectItem>
+                                    <SelectItem value="FINAL_DOC_READY" className="text-xs cursor-pointer">
+                                      <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />Final Doc Ready</span>
+                                    </SelectItem>
+                                    <SelectItem value="ON_HOLD" className="text-xs cursor-pointer">
+                                      <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />On Hold</span>
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            ) : ord.status === "COMPLETED" ? (
+                              <Badge variant="outline" className={cn("text-xs font-semibold py-1 px-2.5 whitespace-nowrap inline-flex items-center justify-center gap-1.5 mx-auto rounded font-sans", getOrderStatusTriggerStyles(ord.status))}>
                                 <Lock className="h-3 w-3 shrink-0" />
                                 Completed
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className={cn("text-xs font-semibold py-1 px-2.5 whitespace-nowrap inline-flex items-center gap-1.5 rounded font-sans", getOrderStatusTriggerStyles(ord.status))}>
+                              <Badge variant="outline" className={cn("text-xs font-semibold py-1 px-2.5 whitespace-nowrap inline-flex items-center justify-center gap-1.5 mx-auto rounded font-sans", getOrderStatusTriggerStyles(ord.status))}>
                                 <span className={cn("h-2 w-2 rounded-full shrink-0", getOrderStatusDot(ord.status))} />
                                 {getStatusDisplayLabel(ord.status)}
                               </Badge>
                             )}
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {['SOFT_COPY_DELIVERED', 'HARD_COPY_DELIVERED', 'COMPLETED'].includes(ord.status) && (
+                          </td>
+                          <td className={cn(
+                            "py-2 px-2 text-right align-top pt-2.5 whitespace-nowrap orders-col-actions w-20 min-w-[75px] max-w-[85px]",
+                            isHighlighted && "border-r-2 border-r-emerald-500 border-y-2 border-emerald-500 shadow-[inset_-2px_0_0_0_#10b981,inset_0_2px_0_0_#10b981,inset_0_-2px_0_0_#10b981]"
+                          )}>
+                            <div className="flex items-center justify-end">
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="gap-1.5 font-semibold h-9 px-3 text-xs border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/20 dark:text-sky-300 dark:border-sky-500/40 shadow-xs shrink-0 rounded"
-                                title="Print Job Details & Checklist for Hard Copy Handover"
+                                className="h-6 px-1.5 text-[9.5px] font-semibold gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/40 shadow-none inline-flex items-center rounded"
+                                title="Order Chat"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setJobPrintOrder(ord);
-                                  setIsJobPrintOpen(true);
+                                  setSelectedGroup(ord);
+                                  setIsChatOpen(true);
+                                  fetchProgressUpdates(ord.order_number);
                                 }}
                               >
-                                <Printer className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
-                                <span className="hidden sm:inline">Print Job Details</span>
+                                <MessageSquare className="h-3 w-3" /> Chat
                               </Button>
-                            )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
 
+            {/* Mobile Card View (< md) */}
+            <div className="block md:hidden divide-y divide-border/60">
+              {paginatedOrders.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground p-4">
+                  <ShoppingCart className="h-10 w-10 text-muted-foreground/30 stroke-[1.5] mx-auto mb-2" />
+                  <span className="text-sm font-semibold text-foreground/80 block">
+                    {searchTerm || activeColFilterCount > 0 ? "No Matching Orders Found" : "No Orders Found"}
+                  </span>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {searchTerm || activeColFilterCount > 0
+                      ? "No orders match the specified filter or search criteria."
+                      : "There are currently no orders in this folder."}
+                  </p>
+                  {(searchTerm || activeColFilterCount > 0) && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleClearAllFilters}
+                      className="mt-3 text-xs font-semibold h-8 px-3"
+                    >
+                      Clear Filters
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                paginatedOrders.map((ord, idx) => {
+                  const isHighlighted = highlightedOrderNum === ord.order_number;
+                  const isCompleted = ord.status === "COMPLETED";
+                  const canSelectStatus = CONSULTANT_EDITABLE_STATUSES.includes((ord.status || "").toUpperCase());
 
+                  return (
+                    <div
+                      key={ord.order_number}
+                      id={`mobile-order-card-${ord.order_number}`}
+                      onClick={() => {
+                        setHighlightedOrderNum(ord.order_number);
+                        if (typeof window !== "undefined") {
+                          sessionStorage.setItem("assigned_orders_highlighted_order", ord.order_number);
+                        }
+                      }}
+                      className={cn(
+                        "p-4 transition-all duration-200 space-y-3 cursor-pointer orders-row",
+                        isHighlighted
+                          ? "is-highlighted bg-emerald-500/10 dark:bg-emerald-500/15 border-l-4 border-l-emerald-500 border-y border-r border-emerald-500/40 shadow-sm"
+                          : "hover:bg-muted/30"
+                      )}
+                    >
+                      {/* Top Header: Index, Order ID, Date */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-medium text-muted-foreground orders-text-secondary">
+                            #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (sortedOrders.length - (startIndex + idx))}
+                          </span>
+                          {ord.company_id ? (
+                            <Link
+                              href={`/business/clients/documents/${ord.company_id}?order=${ord.order_number}&from=assigned-orders&tab=${activeTab}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setHighlightedOrderNum(ord.order_number);
+                                if (typeof window !== "undefined") {
+                                  sessionStorage.setItem("assigned_orders_highlighted_order", ord.order_number);
+                                }
+                              }}
+                            >
+                              <Badge
+                                variant="outline"
+                                className="font-mono font-medium text-xs orders-badge-neutral cursor-pointer transition-colors px-2 py-0.5 rounded"
+                              >
+                                {ord.order_number}
+                              </Badge>
+                            </Link>
+                          ) : (
+                            <Badge variant="outline" className="font-mono font-medium text-xs orders-badge-neutral px-2 py-0.5 rounded">
+                              {ord.order_number}
+                            </Badge>
+                          )}
+                        </div>
+                        <span className="text-xs font-mono text-muted-foreground orders-text-secondary flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {formatDate(ord.created_at)}
+                        </span>
+                      </div>
 
-                            <Button
+                      {/* Client & Company */}
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-foreground orders-text-primary font-semibold text-sm">{ord.company_name || "Personal Client"}</span>
+                          {(() => {
+                            const vStatus = ord.company?.validation_status;
+                            if (vStatus === "PENDING_VALIDATION" || (!vStatus && ord.company_id)) {
+                              return (
+                                <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0 orders-badge-warning flex items-center gap-0.5">
+                                  <Clock className="h-2.5 w-2.5" /> Pending Company
+                                </Badge>
+                              );
+                            }
+                            if (vStatus === "NEEDS_REVISION") {
+                              return (
+                                <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0 orders-badge-danger flex items-center gap-0.5">
+                                  <AlertCircle className="h-2.5 w-2.5" /> Revision Required
+                                </Badge>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                        <div className="text-xs text-muted-foreground orders-text-secondary flex items-center gap-1.5">
+                          <Building className="h-3.5 w-3.5 shrink-0" />
+                          <span>{ord.client_name || "Representative"}</span>
+                        </div>
+                      </div>
 
-                              size="sm"
-                              variant="outline"
-                              className="gap-1.5 font-semibold h-9 px-3.5 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/40 shadow-xs shrink-0 rounded"
+                      {/* Deliverables / Scope */}
+                      {ord.items && ord.items.length > 0 && (
+                        <div className="space-y-2 orders-service-card rounded-xl p-2.5">
+                          <div className="text-xs font-medium text-muted-foreground orders-text-secondary flex items-center justify-between">
+                            <span>Deliverables ({ord.items.length})</span>
+                            <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedGroup(ord);
-                                setIsChatOpen(true);
-                                fetchProgressUpdates(ord.order_number);
+                                setIsViewOpen(true);
+                              }}
+                              className="text-primary hover:underline text-[11px] font-semibold"
+                            >
+                              View Scope
+                            </button>
+                          </div>
+                          {ord.items.map((item: any, iIdx: number) => {
+                            const itemKey = `${ord.order_number}-${iIdx}`;
+                            const isExpanded = !!expandedItems[itemKey];
+                            return (
+                              <div key={iIdx} className="text-xs space-y-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-medium text-foreground orders-text-primary">{item.job_title}</span>
+                                  {item.job_id && (
+                                    <Badge variant="outline" className="text-[9px] font-mono py-0 px-1 orders-badge-info">
+                                      {item.job_id}
+                                    </Badge>
+                                  )}
+                                  {renderVendorBadge(item)}
+                                </div>
+                                {item.description && (
+                                  <div>
+                                    {isExpanded && (
+                                      <p className="text-[11px] text-muted-foreground orders-text-secondary leading-relaxed whitespace-pre-wrap pl-2 border-l-2 border-border my-1">
+                                        {item.description}
+                                      </p>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleItemExpansion(itemKey);
+                                      }}
+                                      className="text-[10px] text-primary font-semibold hover:underline"
+                                    >
+                                      {isExpanded ? "Hide details" : "Show details"}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Team Assignments */}
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                        {ord.consultants && ord.consultants.length > 0 ? (
+                          ord.consultants.map((c: any) => (
+                            <Badge
+                              key={c.id}
+                              variant="outline"
+                              className="text-[10px] orders-badge-neutral font-medium flex items-center gap-1 py-0.5 px-2"
+                            >
+                              <UserCheck className="h-3 w-3 text-emerald-600 shrink-0" />
+                              <span className="truncate">{c.first_name || c.name} {c.last_name || ""}</span>
+                            </Badge>
+                          ))
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] orders-badge-neutral font-medium py-0.5 px-2">
+                            Unassigned
+                          </Badge>
+                        )}
+
+                        {(() => {
+                          const revList = ord.reviewers && ord.reviewers.length > 0
+                            ? ord.reviewers
+                            : ord.reviewer
+                              ? [ord.reviewer]
+                              : [];
+                          return revList.map((r: any) => (
+                            <Badge
+                              key={r.id || r.name}
+                              variant="outline"
+                              className="text-[10px] orders-badge-purple font-medium flex items-center gap-1 py-0.5 px-2"
+                            >
+                              <ShieldCheck className="h-3 w-3 text-purple-600 shrink-0" />
+                              <span className="truncate">Rev: {r.name}</span>
+                            </Badge>
+                          ));
+                        })()}
+
+                        {ord.notaries && ord.notaries.length > 0 && (
+                          ord.notaries.map((notary: any) => (
+                            <Badge
+                              key={notary.id}
+                              variant="outline"
+                              className="text-[10px] orders-badge-indigo font-medium flex items-center gap-1 py-0.5 px-2"
+                              title={`Assigned Notary: ${notary.name}`}
+                            >
+                              <Scale className="h-3 w-3 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                              <span className="truncate">Notary: {notary.name}</span>
+                            </Badge>
+                          ))
+                        )}
+                      </div>
+
+                      {/* Bottom Actions Row: Status Selector & Chat Button */}
+                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/50">
+                        <div className="flex-1 max-w-[210px]" onClick={(e) => e.stopPropagation()}>
+                          {checkIsEnquiry(ord) ? (
+                            <Select
+                              value={["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED"].includes((ord.status || "").toUpperCase()) ? ord.status.toUpperCase() : "UNDER_INITIAL_CHECK"}
+                              disabled={savingStatus}
+                              onValueChange={(val) => handleUpdateStatus(ord, val)}
+                            >
+                              <SelectTrigger className={cn("h-8 w-full text-xs font-semibold rounded-md shadow-xs transition-colors cursor-pointer justify-between", getOrderStatusTriggerStyles(ord.status))}>
+                                <div className="flex items-center gap-1.5 truncate">
+                                  <span className={cn("h-2 w-2 rounded-full shrink-0", getOrderStatusDot(ord.status))} />
+                                  <span className="truncate">{getStatusDisplayLabel(ord.status)}</span>
+                                </div>
+                              </SelectTrigger>
+                              <SelectContent align="start" className="min-w-[210px] bg-card dark:bg-[#16191F] border border-zinc-300 dark:border-white/20 shadow-xl z-50">
+                                <SelectItem value="UNDER_INITIAL_CHECK" className="text-xs cursor-pointer">
+                                  <span className="flex items-center gap-2">
+                                    <span className="h-2 w-2 rounded-full bg-zinc-400 shrink-0" />
+                                    Under Initial Check
+                                  </span>
+                                </SelectItem>
+                                <SelectItem value="NEED_MORE_INFO" className="text-xs cursor-pointer">
+                                  <span className="flex items-center gap-2">
+                                    <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
+                                    Need More Info
+                                  </span>
+                                </SelectItem>
+                                <SelectItem value="CHECK_COMPLETED" className="text-xs cursor-pointer">
+                                  <span className="flex items-center gap-2">
+                                    <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                                    Initial Check Passed
+                                  </span>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : canSelectStatus ? (
+                            <Select
+                              value={ord.status}
+                              disabled={savingStatus}
+                              onValueChange={(val) => handleUpdateStatus(ord, val)}
+                            >
+                              <SelectTrigger className={cn("h-8 w-full text-xs font-semibold rounded-md shadow-xs transition-colors cursor-pointer justify-between", getOrderStatusTriggerStyles(ord.status))}>
+                                <div className="flex items-center gap-1.5 truncate">
+                                  <span className={cn("h-2 w-2 rounded-full shrink-0", getOrderStatusDot(ord.status))} />
+                                  <span className="truncate">{getStatusDisplayLabel(ord.status)}</span>
+                                </div>
+                              </SelectTrigger>
+                              <SelectContent align="start" className="min-w-[220px] max-h-64 bg-card dark:bg-[#16191F] border border-zinc-300 dark:border-white/20 shadow-xl z-50">
+                                <SelectItem value="ORDER_ASSIGNED" className="text-xs cursor-pointer">
+                                  <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Order Assigned</span>
+                                </SelectItem>
+                                <SelectItem value="IN_PROGRESS" className="text-xs cursor-pointer">
+                                  <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />In Progress</span>
+                                </SelectItem>
+                                <SelectItem value="REVIEW_DOCS" className="text-xs cursor-pointer">
+                                  <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Review Docs</span>
+                                </SelectItem>
+                                <SelectItem value="DOCUMENTS_REVIEWED" className="text-xs cursor-pointer">
+                                  <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Documents Reviewed</span>
+                                </SelectItem>
+                                <SelectItem value="PRE_DOC_SENT_FOR_SIGNATURE" className="text-xs cursor-pointer">
+                                  <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />Pre Doc Sent for Signature</span>
+                                </SelectItem>
+                                <SelectItem value="AWAITING_SIGNING_NOTARIZATION" className="text-xs cursor-pointer">
+                                  <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Signing / Notarization</span>
+                                </SelectItem>
+                                <SelectItem value="AWAITING_DOCUMENT_RETURN" className="text-xs cursor-pointer">
+                                  <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Document Return</span>
+                                </SelectItem>
+                                <SelectItem value="AWAITING_THIRD_PARTY_RESPONSE" className="text-xs cursor-pointer">
+                                  <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />Awaiting Third-Party Response</span>
+                                </SelectItem>
+                                <SelectItem value="FINAL_DOCUMENT_PREPARATION" className="text-xs cursor-pointer">
+                                  <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />Final Document Preparation</span>
+                                </SelectItem>
+                                <SelectItem value="FINAL_DOC_READY" className="text-xs cursor-pointer">
+                                  <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />Final Doc Ready</span>
+                                </SelectItem>
+                                <SelectItem value="ON_HOLD" className="text-xs cursor-pointer">
+                                  <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />On Hold</span>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : isCompleted ? (
+                            <Badge variant="outline" className={cn("text-xs font-semibold py-1 px-2.5 whitespace-nowrap inline-flex items-center gap-1.5 rounded font-sans", getOrderStatusTriggerStyles(ord.status))}>
+                              <Lock className="h-3 w-3 shrink-0" />
+                              Completed
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className={cn("text-xs font-semibold py-1 px-2.5 whitespace-nowrap inline-flex items-center gap-1.5 rounded font-sans", getOrderStatusTriggerStyles(ord.status))}>
+                              <span className={cn("h-2 w-2 rounded-full shrink-0", getOrderStatusDot(ord.status))} />
+                              {getStatusDisplayLabel(ord.status)}
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {['SOFT_COPY_DELIVERED', 'HARD_COPY_DELIVERED', 'COMPLETED'].includes(ord.status) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1.5 font-semibold h-9 px-3 text-xs border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/20 dark:text-sky-300 dark:border-sky-500/40 shadow-xs shrink-0 rounded"
+                              title="Print Job Details & Checklist for Hard Copy Handover"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setJobPrintOrder(ord);
+                                setIsJobPrintOpen(true);
                               }}
                             >
-                              <MessageSquare className="h-4 w-4" /> Chat
+                              <Printer className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+                              <span className="hidden sm:inline">Print Job Details</span>
                             </Button>
-                          </div>
+                          )}
+
+
+
+                          <Button
+
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 font-semibold h-9 px-3.5 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 hover:text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/40 shadow-xs shrink-0 rounded"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedGroup(ord);
+                              setIsChatOpen(true);
+                              fetchProgressUpdates(ord.order_number);
+                            }}
+                          >
+                            <MessageSquare className="h-4 w-4" /> Chat
+                          </Button>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
 
-                {/* Pagination Controls */}
-                <TablePagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={setCurrentPage}
-                  startIndex={startIndex}
-                  endIndex={endIndex}
-                  totalEntries={filteredOrders.length}
-                />
-              </>
+            {/* Pagination Controls */}
+            {sortedOrders.length > 0 && (
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                startIndex={startIndex}
+                endIndex={endIndex}
+                totalEntries={sortedOrders.length}
+                pageSize={pageSize}
+                onPageSizeChange={handlePageSizeChange}
+              />
             )}
           </CardContent>
         </Card>
@@ -2616,13 +3098,12 @@ export default function AssignedOrdersPage() {
                         value={["UNDER_INITIAL_CHECK", "NEED_MORE_INFO", "CHECK_COMPLETED"].includes((selectedGroup.status || "").toUpperCase()) ? selectedGroup.status.toUpperCase() : "UNDER_INITIAL_CHECK"}
                         disabled={savingStatus}
                         onChange={(e) => handleUpdateStatus(selectedGroup, e.target.value)}
-                        className={`h-9 w-full px-3 text-xs font-bold rounded-lg border shadow-xs bg-background transition-colors cursor-pointer ${
-                          selectedGroup.status === "CHECK_COMPLETED"
-                            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-                            : selectedGroup.status === "NEED_MORE_INFO"
+                        className={`h-9 w-full px-3 text-xs font-bold rounded-lg border shadow-xs bg-background transition-colors cursor-pointer ${selectedGroup.status === "CHECK_COMPLETED"
+                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                          : selectedGroup.status === "NEED_MORE_INFO"
                             ? "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30"
                             : "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
-                        }`}
+                          }`}
                       >
                         <option value="UNDER_INITIAL_CHECK">UNDER INITIAL CHECK</option>
                         <option value="NEED_MORE_INFO">NEED MORE INFO</option>

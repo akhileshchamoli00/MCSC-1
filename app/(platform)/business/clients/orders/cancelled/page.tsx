@@ -44,17 +44,24 @@ import {
   Clock,
   Ban,
   RotateCcw,
-  XCircle
+  XCircle,
+  SlidersHorizontal,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useDebounce } from "@/hooks/use-debounce";
 import { toast } from "sonner";
 import domToImage from "dom-to-image";
 import { jsPDF } from "jspdf";
 import { motion, AnimatePresence } from "framer-motion";
 import { DualOrderChatDialog } from "@/components/dual-order-chat-dialog";
 import { useUser } from "@/contexts/user-context";
+
+const FILTERS_STORAGE_KEY = "mcsc_cancelled_orders_filters";
 
 export default function CancelledOrdersPage() {
   const router = useRouter();
@@ -70,7 +77,156 @@ export default function CancelledOrdersPage() {
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm, 250);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(15);
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
+
+  // Column Header Sorting State
+  const [sortColumn, setSortColumn] = useState<string | null>("created_at");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  const handleSort = (columnKey: string) => {
+    if (sortColumn === columnKey) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(columnKey);
+      setSortDirection("asc");
+    }
+  };
+
+  const renderSortIcon = (columnKey: string) => {
+    if (sortColumn === columnKey) {
+      return sortDirection === "asc" ? (
+        <ArrowUp className="h-3 w-3 text-primary shrink-0" />
+      ) : (
+        <ArrowDown className="h-3 w-3 text-primary shrink-0" />
+      );
+    }
+    return <ArrowUpDown className="h-3 w-3 opacity-30 group-hover/th:opacity-80 transition-opacity shrink-0" />;
+  };
+
+  // Column-Specific Filters State
+  const [colFilterOrderId, setColFilterOrderId] = useState("");
+  const [colFilterCompany, setColFilterCompany] = useState("");
+  const [colFilterService, setColFilterService] = useState("");
+  const [colFilterConsultant, setColFilterConsultant] = useState("");
+  const [colFilterAmount, setColFilterAmount] = useState("");
+  const [colFilterPayment, setColFilterPayment] = useState("ALL");
+  const [showColumnFilters, setShowColumnFilters] = useState(true);
+
+  const isRestoredRef = useRef(false);
+
+  const activeColFilterCount = useMemo(() => {
+    return [
+      colFilterOrderId.trim(),
+      colFilterCompany.trim(),
+      colFilterService.trim(),
+      colFilterConsultant.trim(),
+      colFilterAmount.trim(),
+      colFilterPayment !== "ALL" ? colFilterPayment : "",
+    ].filter(Boolean).length;
+  }, [
+    colFilterOrderId,
+    colFilterCompany,
+    colFilterService,
+    colFilterConsultant,
+    colFilterAmount,
+    colFilterPayment,
+  ]);
+
+  const saveCurrentFilters = () => {
+    if (typeof window === "undefined") return;
+    try {
+      const dataToSave = {
+        searchTerm,
+        colFilterOrderId,
+        colFilterCompany,
+        colFilterService,
+        colFilterConsultant,
+        colFilterAmount,
+        colFilterPayment,
+        showColumnFilters,
+        sortColumn,
+        sortDirection,
+        currentPage,
+        pageSize,
+      };
+      sessionStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(dataToSave));
+      localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(dataToSave));
+    } catch (e) {
+      console.error("Error saving filters:", e);
+    }
+  };
+
+  // Restore saved search and filter parameters on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = sessionStorage.getItem(FILTERS_STORAGE_KEY) || localStorage.getItem(FILTERS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed.searchTerm === "string") setSearchTerm(parsed.searchTerm);
+        if (typeof parsed.colFilterOrderId === "string") setColFilterOrderId(parsed.colFilterOrderId);
+        if (typeof parsed.colFilterCompany === "string") setColFilterCompany(parsed.colFilterCompany);
+        if (typeof parsed.colFilterService === "string") setColFilterService(parsed.colFilterService);
+        if (typeof parsed.colFilterConsultant === "string") setColFilterConsultant(parsed.colFilterConsultant);
+        if (typeof parsed.colFilterAmount === "string") setColFilterAmount(parsed.colFilterAmount);
+        if (typeof parsed.colFilterPayment === "string") setColFilterPayment(parsed.colFilterPayment);
+        if (typeof parsed.showColumnFilters === "boolean") setShowColumnFilters(parsed.showColumnFilters);
+        if (typeof parsed.sortColumn === "string") setSortColumn(parsed.sortColumn);
+        if (parsed.sortDirection === "asc" || parsed.sortDirection === "desc") setSortDirection(parsed.sortDirection);
+        if (typeof parsed.currentPage === "number" && parsed.currentPage > 0) setCurrentPage(parsed.currentPage);
+        if (typeof parsed.pageSize === "number" && [15, 25, 50, 100].includes(parsed.pageSize)) {
+          setPageSize(parsed.pageSize);
+        }
+      }
+    } catch (e) {
+      console.error("Error reading saved filters:", e);
+    } finally {
+      setTimeout(() => {
+        isRestoredRef.current = true;
+      }, 100);
+    }
+  }, []);
+
+  // Save search and filter parameters whenever they change AFTER initial restoration
+  useEffect(() => {
+    if (!isRestoredRef.current || typeof window === "undefined") return;
+    saveCurrentFilters();
+  }, [
+    searchTerm,
+    colFilterOrderId,
+    colFilterCompany,
+    colFilterService,
+    colFilterConsultant,
+    colFilterAmount,
+    colFilterPayment,
+    showColumnFilters,
+    sortColumn,
+    sortDirection,
+    currentPage,
+    pageSize,
+  ]);
+
+  const handleClearAllFilters = () => {
+    setSearchTerm("");
+    setColFilterOrderId("");
+    setColFilterCompany("");
+    setColFilterService("");
+    setColFilterConsultant("");
+    setColFilterAmount("");
+    setColFilterPayment("ALL");
+    setCurrentPage(1);
+    try {
+      sessionStorage.removeItem(FILTERS_STORAGE_KEY);
+      localStorage.removeItem(FILTERS_STORAGE_KEY);
+    } catch (e) {}
+  };
 
   // Modal States
   const [isViewOpen, setIsViewOpen] = useState(false);
@@ -384,20 +540,192 @@ export default function CancelledOrdersPage() {
     };
   }, [allCancelledOrders]);
 
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "-";
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
   const filteredOrders = allCancelledOrders.filter((ord) => {
-    const term = searchTerm.toLowerCase();
-    const orderNum = (ord.order_number || "").toLowerCase();
-    const clientName = (ord.client_name || "").toLowerCase();
-    const compName = (ord.company_name || "").toLowerCase();
-    const itemsStr = (ord.items || []).map((i: any) => `${i.job_title} ${i.job_id}`).join(" ").toLowerCase();
-    const consultantsStr = (ord.consultants || []).map((c: any) => c.name).join(" ").toLowerCase();
-    return orderNum.includes(term) || clientName.includes(term) || compName.includes(term) || itemsStr.includes(term) || consultantsStr.includes(term);
+    // 1. Global Search
+    if (debouncedSearchTerm) {
+      const term = debouncedSearchTerm.toLowerCase();
+      const orderNum = (ord.order_number || "").toLowerCase();
+      const clientName = (ord.client_name || "").toLowerCase();
+      const compName = (ord.company_name || "").toLowerCase();
+      const itemsStr = (ord.items || []).map((i: any) => `${i.job_title} ${i.job_id} ${i.branch_name || ""}`).join(" ").toLowerCase();
+      const consultantsStr = (ord.consultants || []).map((c: any) => c.name).join(" ").toLowerCase();
+      const dateStr = ord.created_at ? formatDate(ord.created_at).toLowerCase() : "";
+      if (!orderNum.includes(term) && !clientName.includes(term) && !compName.includes(term) && !itemsStr.includes(term) && !consultantsStr.includes(term) && !dateStr.includes(term)) {
+        return false;
+      }
+    }
+
+    // 2. Column: Order ID & Date
+    if (colFilterOrderId.trim()) {
+      const q = colFilterOrderId.trim().toLowerCase();
+      const orderNum = (ord.order_number || "").toLowerCase();
+      const dateStr = ord.created_at ? formatDate(ord.created_at).toLowerCase() : "";
+      if (!orderNum.includes(q) && !dateStr.includes(q)) return false;
+    }
+
+    // 3. Column: Company Entity / Client
+    if (colFilterCompany.trim()) {
+      const q = colFilterCompany.trim().toLowerCase();
+      const compName = (ord.company_name || "").toLowerCase();
+      const clientName = (ord.client_name || "").toLowerCase();
+      if (!compName.includes(q) && !clientName.includes(q)) return false;
+    }
+
+    // 4. Column: Service Package / Memo
+    if (colFilterService.trim()) {
+      const q = colFilterService.trim().toLowerCase();
+      const itemsStr = (ord.items || []).map((i: any) => `${i.job_title} ${i.job_id} ${i.branch_name || ""}`).join(" ").toLowerCase();
+      if (!itemsStr.includes(q)) return false;
+    }
+
+    // 5. Column: Assigned Consultants
+    if (colFilterConsultant.trim()) {
+      const q = colFilterConsultant.trim().toLowerCase();
+      const consultantsStr = (ord.consultants || []).map((c: any) => c.name).join(" ").toLowerCase();
+      const reviewerStr = ord.reviewer?.name?.toLowerCase() || "";
+      const reviewersStr = (ord.reviewers || []).map((r: any) => r.name).join(" ").toLowerCase();
+      if (!consultantsStr.includes(q) && !reviewerStr.includes(q) && !reviewersStr.includes(q)) return false;
+    }
+
+    // 6. Column: Total Amount
+    if (colFilterAmount.trim()) {
+      const q = colFilterAmount.trim().replace(/,/g, "");
+      const total = ord.total_amount || 0;
+      if (q.startsWith(">=")) {
+        const val = parseFloat(q.slice(2));
+        if (!isNaN(val) && total < val) return false;
+      } else if (q.startsWith("<=")) {
+        const val = parseFloat(q.slice(2));
+        if (!isNaN(val) && total > val) return false;
+      } else if (q.startsWith(">")) {
+        const val = parseFloat(q.slice(1));
+        if (!isNaN(val) && total <= val) return false;
+      } else if (q.startsWith("<")) {
+        const val = parseFloat(q.slice(1));
+        if (!isNaN(val) && total >= val) return false;
+      } else {
+        const val = parseFloat(q);
+        if (!isNaN(val)) {
+          if (!String(Math.round(total)).includes(q) && Math.abs(total - val) > 1) return false;
+        } else {
+          if (!String(Math.round(total)).includes(q)) return false;
+        }
+      }
+    }
+
+    // 7. Column: Payment Status
+    if (colFilterPayment !== "ALL") {
+      if ((ord.payment_status || "UNPAID").toUpperCase() !== colFilterPayment.toUpperCase()) return false;
+    }
+
+    return true;
   });
 
-  const totalPages = Math.ceil(filteredOrders.length / 10) || 1;
-  const startIndex = (currentPage - 1) * 10;
-  const endIndex = startIndex + 10;
-  const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
+  const sortedOrders = useMemo(() => {
+    if (!sortColumn) return filteredOrders;
+
+    return [...filteredOrders].sort((a, b) => {
+      let aVal: any = "";
+      let bVal: any = "";
+
+      switch (sortColumn) {
+        case "id":
+          aVal = a.id || 0;
+          bVal = b.id || 0;
+          return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+
+        case "order_number":
+          aVal = a.order_number || "";
+          bVal = b.order_number || "";
+          return sortDirection === "asc"
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+
+        case "created_at":
+          aVal = a.created_at ? new Date(a.created_at).getTime() : 0;
+          bVal = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+
+        case "company_name":
+          aVal = a.company_name || a.client_name || "";
+          bVal = b.company_name || b.client_name || "";
+          return sortDirection === "asc"
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+
+        case "service":
+          aVal = a.items?.[0]?.job_title || "";
+          bVal = b.items?.[0]?.job_title || "";
+          return sortDirection === "asc"
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+
+        case "consultants":
+          aVal = (a.consultants || []).map((c: any) => c.name).join(", ") || a.reviewer?.name || "";
+          bVal = (b.consultants || []).map((c: any) => c.name).join(", ") || b.reviewer?.name || "";
+          return sortDirection === "asc"
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+
+        case "total_amount":
+          aVal = Number(a.total_amount) || 0;
+          bVal = Number(b.total_amount) || 0;
+          return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+
+        case "total_notary_fee":
+          aVal = Number(a.total_notary_fee) || 0;
+          bVal = Number(b.total_notary_fee) || 0;
+          return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+
+        case "net_voided":
+          aVal = (Number(a.total_amount) || 0) - (Number(a.total_notary_fee) || 0);
+          bVal = (Number(b.total_amount) || 0) - (Number(b.total_notary_fee) || 0);
+          return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+
+        case "payment_status":
+          aVal = a.payment_status || "UNPAID";
+          bVal = b.payment_status || "UNPAID";
+          return sortDirection === "asc"
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+
+        case "status":
+          aVal = a.status || "";
+          bVal = b.status || "";
+          return sortDirection === "asc"
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+
+        default:
+          return 0;
+      }
+    });
+  }, [filteredOrders, sortColumn, sortDirection]);
+
+  const totalPages = Math.ceil(sortedOrders.length / pageSize) || 1;
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedOrders = sortedOrders.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
 
   // Metrics
   const totalOrdersCount = allCancelledOrders.length;
@@ -418,20 +746,6 @@ export default function CancelledOrdersPage() {
 
   const formatCurrency = (val: number) => {
     return "IDR " + new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(val || 0);
-  };
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "-";
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric"
-      });
-    } catch {
-      return dateStr;
-    }
   };
 
   const formatInvoiceDescription = (desc: string, isSmallText: boolean = false) => {
@@ -831,53 +1145,291 @@ export default function CancelledOrdersPage() {
 
         {/* Main Orders Table */}
         <Card className="border-border/40 shadow-sm overflow-hidden bg-background/50 backdrop-blur-md rounded-2xl orders-table-card">
-          <div className="p-4 bg-muted/10 border-b border-border/30 flex flex-col sm:flex-row gap-3 items-center justify-between orders-table-toolbar">
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search Order ID, Company..."
-                className="pl-8 h-9 text-xs rounded-lg orders-control"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 px-4 py-3 bg-card border-b border-border/50">
+            <div className="flex flex-wrap items-center gap-2 flex-1">
+              <div className="relative flex-1 min-w-[200px] max-w-md">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search across all fields..."
+                  className="pl-8 h-9 text-xs rounded-xl bg-background/70 border-border/50 orders-control"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <Button
+                type="button"
+                variant={showColumnFilters ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setShowColumnFilters(!showColumnFilters)}
+                className="h-9 px-3 rounded-xl text-xs font-semibold gap-1.5 shrink-0 orders-control"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                <span>Column Filters</span>
+                {activeColFilterCount > 0 && (
+                  <Badge variant="default" className="h-4 px-1.5 text-[9px] font-bold rounded-full ml-0.5">
+                    {activeColFilterCount}
+                  </Badge>
+                )}
+              </Button>
+              {(searchTerm || activeColFilterCount > 0) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClearAllFilters}
+                  className="h-9 px-2.5 text-xs text-muted-foreground hover:text-destructive gap-1 shrink-0"
+                >
+                  <X className="h-3.5 w-3.5" /> Clear Filters
+                </Button>
+              )}
             </div>
-            <span className="text-xs font-normal text-muted-foreground orders-text-secondary">
-              Showing {paginatedOrders.length} of {filteredOrders.length} entries
-            </span>
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground orders-text-secondary">
+                <span className="text-[11px] font-medium orders-text-secondary">Show</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                  className="h-8 px-2 py-0.5 text-xs font-semibold rounded-lg bg-background border border-border/60 text-foreground cursor-pointer hover:bg-accent/50 focus:outline-none focus:ring-1 focus:ring-primary transition-colors shadow-2xs orders-control"
+                  aria-label="Select orders per page"
+                >
+                  <option value={15}>15</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <span className="text-[11px] font-medium orders-text-secondary">per page</span>
+              </div>
+              <span className="text-xs font-normal text-muted-foreground orders-text-secondary hidden sm:inline">
+                Showing {sortedOrders.length === 0 ? 0 : startIndex + 1} to {Math.min(sortedOrders.length, endIndex)} of {sortedOrders.length} orders
+              </span>
+            </div>
           </div>
 
           <CardContent className="p-0">
-            {filteredOrders.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
-                <Ban className="h-10 w-10 text-muted-foreground/35" />
-                <span className="text-sm font-semibold">No Cancelled Orders Found</span>
-                <p className="text-xs max-w-sm">
-                  {searchTerm
-                    ? `No cancelled orders match your search "${searchTerm}".`
-                    : "There are currently no cancelled orders in the archive. All active and completed orders are running smoothly."}
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-muted/40 border-b border-border/40 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
-                        <th className="py-2.5 px-2 w-8 text-center orders-th">No.</th>
-                        <th className="py-2.5 px-2 whitespace-nowrap w-24 orders-th">Order ID</th>
-                        <th className="py-2.5 px-2 min-w-[120px] max-w-[160px] orders-th">Company Entity</th>
-                        <th className="py-2.5 px-2.5 min-w-[220px] max-w-[320px] orders-th">Service Package</th>
-                        <th className="py-2.5 px-3 w-36 min-w-[145px] max-w-[170px] whitespace-nowrap text-left orders-th">Assigned Consultants</th>
-                        <th className="py-2.5 px-2.5 text-right whitespace-nowrap orders-th">Total Amount</th>
-                        <th className="py-2.5 px-2.5 text-right whitespace-nowrap orders-th">Vendor Fee</th>
-                        <th className="py-2.5 px-2.5 text-right whitespace-nowrap orders-th">Net Voided</th>
-                        <th className="py-2.5 px-2 text-center whitespace-nowrap min-w-[85px] orders-th">Payment</th>
-                        <th className="py-2.5 px-2 text-left whitespace-nowrap min-w-[130px] max-w-[155px] orders-th">Lifecycle Status</th>
-                        <th className="py-2.5 px-2 text-right whitespace-nowrap orders-th orders-col-actions w-32 min-w-[120px] max-w-[135px]">Actions</th>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                    <thead className="sticky top-0 z-30">
+                      <tr className="border-b border-border/60 text-muted-foreground uppercase font-semibold text-[10px] tracking-wider">
+                        <th 
+                          onClick={() => handleSort("id")}
+                          className="sticky top-0 z-30 py-2.5 px-2 w-8 text-center bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors orders-th"
+                          title="Click to sort by Sequence #"
+                        >
+                          <div className="flex items-center justify-center gap-0.5">
+                            <span>No.</span>
+                            {renderSortIcon("id")}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleSort("order_number")}
+                          className="sticky top-0 z-30 py-2.5 px-2 whitespace-nowrap w-24 bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors orders-th"
+                          title="Click to sort by Order ID & Date"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Order ID</span>
+                            {renderSortIcon("order_number")}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleSort("company_name")}
+                          className="sticky top-0 z-30 py-2.5 px-2 min-w-[120px] max-w-[160px] bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors orders-th"
+                          title="Click to sort by Company Entity"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Company Entity</span>
+                            {renderSortIcon("company_name")}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleSort("service")}
+                          className="sticky top-0 z-30 py-2.5 px-2.5 min-w-[220px] max-w-[320px] bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors orders-th"
+                          title="Click to sort by Service Package"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Service Package</span>
+                            {renderSortIcon("service")}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleSort("consultants")}
+                          className="sticky top-0 z-30 py-2.5 px-3 w-36 min-w-[145px] max-w-[170px] whitespace-nowrap text-left bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors orders-th"
+                          title="Click to sort by Assigned Consultants"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Assigned Consultants</span>
+                            {renderSortIcon("consultants")}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleSort("total_amount")}
+                          className="sticky top-0 z-30 py-2.5 px-2.5 text-right whitespace-nowrap bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors orders-th"
+                          title="Click to sort by Total Amount"
+                        >
+                          <div className="flex items-center justify-end gap-1">
+                            <span>Total Amount</span>
+                            {renderSortIcon("total_amount")}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleSort("total_notary_fee")}
+                          className="sticky top-0 z-30 py-2.5 px-2.5 text-right whitespace-nowrap bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors orders-th"
+                          title="Click to sort by Vendor Fee"
+                        >
+                          <div className="flex items-center justify-end gap-1">
+                            <span>Vendor Fee</span>
+                            {renderSortIcon("total_notary_fee")}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleSort("net_voided")}
+                          className="sticky top-0 z-30 py-2.5 px-2.5 text-right whitespace-nowrap bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors orders-th"
+                          title="Click to sort by Net Voided"
+                        >
+                          <div className="flex items-center justify-end gap-1">
+                            <span>Net Voided</span>
+                            {renderSortIcon("net_voided")}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleSort("payment_status")}
+                          className="sticky top-0 z-30 py-2.5 px-2 text-center whitespace-nowrap min-w-[85px] bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors orders-th"
+                          title="Click to sort by Payment"
+                        >
+                          <div className="flex items-center justify-center gap-1">
+                            <span>Payment</span>
+                            {renderSortIcon("payment_status")}
+                          </div>
+                        </th>
+                        <th 
+                          onClick={() => handleSort("status")}
+                          className="sticky top-0 z-30 py-2.5 px-2 text-left whitespace-nowrap min-w-[130px] max-w-[155px] bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs cursor-pointer select-none group/th hover:text-foreground hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors orders-th"
+                          title="Click to sort by Lifecycle Status"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Lifecycle Status</span>
+                            {renderSortIcon("status")}
+                          </div>
+                        </th>
+                        <th className="sticky top-0 right-0 z-40 py-2.5 px-2 text-right whitespace-nowrap bg-zinc-100 dark:bg-zinc-900 border-b border-border/70 shadow-2xs border-l border-border/40 orders-th orders-col-actions w-32 min-w-[120px] max-w-[135px]">
+                          Actions
+                        </th>
                       </tr>
+                      {showColumnFilters && (
+                        <tr className="bg-muted/15 dark:bg-zinc-900/60 border-b border-border/50 dark:border-zinc-800 text-xs orders-filter-row">
+                          {/* 1. No. */}
+                          <th className="py-1.5 px-1 text-center align-middle">
+                            {activeColFilterCount > 0 ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleClearAllFilters}
+                                className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 mx-auto orders-action-btn is-delete"
+                                title="Reset all column filters"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground/40 dark:text-zinc-600 font-mono orders-text-secondary">#</span>
+                            )}
+                          </th>
+                          {/* 2. Order ID */}
+                          <th className="py-1.5 px-1.5">
+                            <Input
+                              placeholder="ID / date..."
+                              value={colFilterOrderId}
+                              onChange={(e) => setColFilterOrderId(e.target.value)}
+                              className="h-7 text-[11px] px-1.5 rounded-md bg-background/80 dark:bg-zinc-900 border-border/60 dark:border-zinc-700/60 font-mono text-foreground dark:text-zinc-100 placeholder:text-muted-foreground/50 dark:placeholder:text-zinc-500 w-full orders-control"
+                            />
+                          </th>
+                          {/* 3. Company Entity */}
+                          <th className="py-1.5 px-1.5">
+                            <Input
+                              placeholder="Company / client..."
+                              value={colFilterCompany}
+                              onChange={(e) => setColFilterCompany(e.target.value)}
+                              className="h-7 text-[11px] px-2 rounded-md bg-background/80 dark:bg-zinc-900 border-border/60 dark:border-zinc-700/60 text-foreground dark:text-zinc-100 placeholder:text-muted-foreground/50 dark:placeholder:text-zinc-500 w-full orders-control"
+                            />
+                          </th>
+                          {/* 4. Service Package */}
+                          <th className="py-1.5 px-1.5">
+                            <Input
+                              placeholder="Service / code / memo..."
+                              value={colFilterService}
+                              onChange={(e) => setColFilterService(e.target.value)}
+                              className="h-7 text-[11px] px-2 rounded-md bg-background/80 dark:bg-zinc-900 border-border/60 dark:border-zinc-700/60 text-foreground dark:text-zinc-100 placeholder:text-muted-foreground/50 dark:placeholder:text-zinc-500 w-full orders-control"
+                            />
+                          </th>
+                          {/* 5. Assigned Consultants */}
+                          <th className="py-1.5 px-1.5">
+                            <Input
+                              placeholder="Consultant / reviewer..."
+                              value={colFilterConsultant}
+                              onChange={(e) => setColFilterConsultant(e.target.value)}
+                              className="h-7 text-[11px] px-2 rounded-md bg-background/80 dark:bg-zinc-900 border-border/60 dark:border-zinc-700/60 text-foreground dark:text-zinc-100 placeholder:text-muted-foreground/50 dark:placeholder:text-zinc-500 w-full orders-control"
+                            />
+                          </th>
+                          {/* 6. Total Amount */}
+                          <th className="py-1.5 px-1.5">
+                            <Input
+                              placeholder="e.g. >5M"
+                              value={colFilterAmount}
+                              onChange={(e) => setColFilterAmount(e.target.value)}
+                              className="h-7 text-[11px] px-2 rounded-md bg-background/80 dark:bg-zinc-900 border-border/60 dark:border-zinc-700/60 font-mono text-right text-foreground dark:text-zinc-100 placeholder:text-muted-foreground/50 dark:placeholder:text-zinc-500 w-full orders-control"
+                            />
+                          </th>
+                          {/* 7. Vendor Fee */}
+                          <th className="py-1.5 px-1.5"></th>
+                          {/* 8. Net Voided */}
+                          <th className="py-1.5 px-1.5"></th>
+                          {/* 9. Payment */}
+                          <th className="py-1.5 px-1.5">
+                            <select
+                              value={colFilterPayment}
+                              onChange={(e) => setColFilterPayment(e.target.value)}
+                              className="h-7 w-full text-[11px] px-1 rounded-md bg-background/80 dark:bg-zinc-900 border border-border/60 dark:border-zinc-700/60 font-bold text-foreground dark:text-zinc-200 text-center orders-control"
+                            >
+                              <option value="ALL">All Payments</option>
+                              <option value="PAID">PAID</option>
+                              <option value="PARTIALLY_PAID">PARTIAL</option>
+                              <option value="UNPAID">UNPAID</option>
+                            </select>
+                          </th>
+                          {/* 10. Lifecycle Status */}
+                          <th className="py-1.5 px-1.5"></th>
+                          {/* 11. Actions */}
+                          <th className="py-1.5 px-2 text-right"></th>
+                        </tr>
+                      )}
                     </thead>
                     <tbody className="divide-y divide-border/30">
-                      {paginatedOrders.map((ord, index) => {
+                      {paginatedOrders.length === 0 ? (
+                        <tr>
+                          <td colSpan={11} className="py-14 text-center text-muted-foreground">
+                            <div className="flex flex-col items-center justify-center gap-2.5">
+                              <Ban className="h-10 w-10 text-muted-foreground/30 stroke-[1.5]" />
+                              <span className="text-sm font-semibold text-foreground/80">No Cancelled Orders Found</span>
+                              <p className="text-xs max-w-sm text-muted-foreground">
+                                {searchTerm || activeColFilterCount > 0
+                                  ? "No cancelled orders match the specified filter or search criteria. You can clear your filters above."
+                                  : "There are currently no cancelled orders in the archive. All active and completed orders are running smoothly."}
+                              </p>
+                              {(searchTerm || activeColFilterCount > 0) && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={handleClearAllFilters}
+                                  className="mt-1 text-xs font-semibold h-8 px-3"
+                                >
+                                  Clear Filters
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedOrders.map((ord, index) => {
                         const isHighlighted = highlightedOrderNum === ord.order_number;
                         return (
                         <tr 
@@ -890,7 +1442,7 @@ export default function CancelledOrdersPage() {
                           }`}
                         >
                           <td className="py-2 px-2 text-center font-mono font-medium text-muted-foreground orders-text-secondary align-top pt-2.5 text-xs">
-                            #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (filteredOrders.length - (startIndex + index))}
+                            #{orderSeqMap.get(ord.order_number || `SINGLE-${ord.id}`) ?? (sortedOrders.length - (startIndex + index))}
                           </td>
                           <td className="py-2 px-2 align-top pt-2.5 whitespace-nowrap">
                             {ord.company_id ? (
@@ -1077,23 +1629,26 @@ export default function CancelledOrdersPage() {
                           </td>
                         </tr>
                       );
-                    })}
-                    </tbody>
-                  </table>
-                </div>
+                    })
+                  )}
+                  </tbody>
+                </table>
+              </div>
 
-                {/* Pagination Controls */}
+              {/* Pagination Controls */}
+              {sortedOrders.length > 0 && (
                 <TablePagination
                   currentPage={currentPage}
                   totalPages={totalPages}
                   onPageChange={setCurrentPage}
                   startIndex={startIndex}
                   endIndex={endIndex}
-                  totalEntries={filteredOrders.length}
+                  totalEntries={sortedOrders.length}
+                  pageSize={pageSize}
+                  onPageSizeChange={handlePageSizeChange}
                 />
-              </>
-            )}
-          </CardContent>
+              )}
+        </CardContent>
         </Card>
 
       </div>
