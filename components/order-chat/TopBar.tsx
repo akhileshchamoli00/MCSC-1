@@ -139,16 +139,10 @@ export function TopBar({
             </span>
           </div>
 
-          {/* Subtitle: Client Name & Company Name */}
-          {(companyName || clientName) && (
+          {/* Subtitle: Company Name */}
+          {companyName && (
             <div className="text-xs text-[var(--oc-text-secondary)] truncate flex items-center gap-1.5 mt-0.5 max-w-[240px] xs:max-w-xs sm:max-w-md">
-              <span className="font-medium text-[var(--oc-text-primary)] truncate">{companyName || clientName}</span>
-              {companyName && clientName && companyName !== clientName && (
-                <>
-                  <span className="text-[var(--oc-text-tertiary)]">•</span>
-                  <span className="truncate">{clientName}</span>
-                </>
-              )}
+              <span className="font-medium text-[var(--oc-text-primary)] truncate">{companyName}</span>
             </div>
           )}
         </div>
